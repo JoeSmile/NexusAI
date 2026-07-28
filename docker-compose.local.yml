@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  # PostgreSQL + pgvector — 替换 MySQL + ChromaDB
+  postgres:
+    image: pgvector/pgvector:pg16
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: emotional_chat
+      POSTGRES_USER: emotional_chat
+      POSTGRES_PASSWORD: emotional_chat_local
+    volumes:
+      - pgvector_data:/var/lib/postgresql/data
+      - ./backend/database/init_pgvector.sql:/docker-entrypoint-initdb.d/init_pgvector.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U emotional_chat -d emotional_chat"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - emotional_chat_local
+
+  # 后端 — 本地模式
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APT_MIRROR: aliyun
+        PIP_MIRROR: aliyun
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - DATABASE_URL=postgresql://emotional_chat:emotional_chat_local@postgres:5432/emotional_chat
+      - LLM_MOCK=true
+      - LLM_MOCK_DATA_DIR=/app/data/mock_data
+      - LANGFUSE_HOST=http://langfuse:3000
+      - LANGFUSE_PUBLIC_KEY=pk-local-dev-key
+      - LANGFUSE_SECRET_KEY=sk-local-dev-key
+      - LANGCHAIN_TRACING_V2=false
+      - USE_SQLITE=false
+    volumes:
+      - ./backend:/app/backend
+      - ./data:/app/data
+      - ./config.py:/app/config.py
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - emotional_chat_local
+
+  # LangFuse — 可观测性
+  langfuse:
+    image: ghcr.io/langfuse/langfuse:latest
+    ports:
+      - "3001:3000"
+    environment:
+      - DATABASE_URL=postgresql://emotional_chat:emotional_chat_local@postgres:5432/emotional_chat
+      - NODE_ENV=development
+      - NEXTAUTH_SECRET=my-secret-key-change-in-prod
+      - SALT=my-salt-change-in-prod
+      - LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - emotional_chat_local
+
+volumes:
+  pgvector_data:
+
+networks:
+  emotional_chat_local:
+    driver: bridge
