@@ -154,3 +154,71 @@ BEGIN
     LIMIT p_limit;
 END;
 $$ LANGUAGE plpgsql;
+
+-- ========== Task 02: 权限表 ==========
+
+-- API Keys 表
+CREATE TABLE IF NOT EXISTS api_keys (
+    id                  SERIAL PRIMARY KEY,
+    tenant_id           VARCHAR(64) NOT NULL,
+    user_id             VARCHAR(128) NOT NULL,
+    key_hash            VARCHAR(64) UNIQUE NOT NULL,
+    key_prefix          VARCHAR(8),
+    role                VARCHAR(32) NOT NULL DEFAULT 'user',
+    is_active           BOOLEAN DEFAULT true,
+    expires_at          TIMESTAMPTZ,
+    description         TEXT DEFAULT '',
+    created_by          VARCHAR(128),
+    created_at          TIMESTAMPTZ DEFAULT now(),
+    access_key_id       VARCHAR(64) UNIQUE,
+    access_key_secret   TEXT,
+    signature_enabled   BOOLEAN DEFAULT false,
+    signature_key_version INT DEFAULT 1
+);
+CREATE INDEX IF NOT EXISTS idx_ak_tenant ON api_keys(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_ak_access_key ON api_keys(access_key_id);
+
+-- 角色表
+CREATE TABLE IF NOT EXISTS roles (
+    id          SERIAL PRIMARY KEY,
+    name        VARCHAR(32) UNIQUE NOT NULL,
+    permissions JSONB NOT NULL DEFAULT '[]',
+    description TEXT DEFAULT ''
+);
+
+-- 用户应用权限（附加权限）
+CREATE TABLE IF NOT EXISTS user_app_perms (
+    id          SERIAL PRIMARY KEY,
+    tenant_id   VARCHAR(64) NOT NULL,
+    user_id     VARCHAR(128) NOT NULL,
+    permissions JSONB NOT NULL DEFAULT '[]',
+    created_at  TIMESTAMPTZ DEFAULT now(),
+    updated_at  TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(tenant_id, user_id)
+);
+
+-- 审批请求表（权限申请 + Skill 人工介入）
+CREATE TABLE IF NOT EXISTS approval_requests (
+    id            SERIAL PRIMARY KEY,
+    tenant_id     VARCHAR(64) NOT NULL,
+    user_id       VARCHAR(128) NOT NULL,
+    resource      VARCHAR(256) NOT NULL,
+    resource_type VARCHAR(32) NOT NULL DEFAULT 'permission',
+    action        VARCHAR(64) NOT NULL,
+    params        JSONB DEFAULT '{}',
+    status        VARCHAR(16) NOT NULL DEFAULT 'pending',
+    created_at    TIMESTAMPTZ DEFAULT now(),
+    timeout_at    TIMESTAMPTZ,
+    reviewed_by   VARCHAR(128),
+    reviewed_at   TIMESTAMPTZ,
+    review_reason TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_apr_tenant_status ON approval_requests(tenant_id, status);
+
+-- 初始角色数据
+INSERT INTO roles (name, permissions, description) VALUES
+('super_admin', '["admin:*", "audit:read", "audit:export"]', '跨租户管理员'),
+('auditor',     '["audit:read", "audit:export"]', '跨租户审计员'),
+('tenant_admin', '["chat:*", "kb:*", "admin:approve", "admin:llm_key"]', '租户管理员'),
+('user',        '["chat:write", "chat:read"]', '普通用户')
+ON CONFLICT (name) DO NOTHING;

@@ -27,6 +27,7 @@ except ImportError:
 
 # 导入路由
 from backend.routers import (
+    admin_router,
     chat_router,
     memory_router,
     feedback_router,
@@ -123,6 +124,10 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    from backend.core.auth.signature_auth import SignatureMiddleware
+
+    app.add_middleware(SignatureMiddleware)
     
     # 配置静态文件
     upload_dir = Path(project_root) / "uploads"
@@ -130,6 +135,7 @@ def create_app() -> FastAPI:
     app.mount("/uploads", StaticFiles(directory=str(upload_dir)), name="uploads")
     
     # 注册路由
+    app.include_router(admin_router, prefix="/api")
     app.include_router(chat_router)
     app.include_router(memory_router)
     app.include_router(feedback_router)

@@ -237,8 +237,27 @@ class PGVectorSession:
         self.Session = sessionmaker(bind=self.engine)
 
     def init_db(self):
-        """创建所有表（仅首次部署使用）"""
+        """创建所有表（仅首次部署使用）并种子角色"""
         Base.metadata.create_all(self.engine)
+        self._seed_roles()
+
+    def _seed_roles(self) -> None:
+        """幂等写入默认角色"""
+        from backend.core.auth.models import ROLES
+
+        with self.Session() as session:
+            for name, meta in ROLES.items():
+                existing = session.query(Role).filter_by(name=name).first()
+                if existing:
+                    continue
+                session.add(
+                    Role(
+                        name=name,
+                        permissions=list(meta.get("permissions", [])),
+                        description=str(meta.get("description", "")),
+                    )
+                )
+            session.commit()
 
     @contextmanager
     def get_session(self):
