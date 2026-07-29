@@ -15,7 +15,7 @@ import json
 
 from backend.models import ChatRequest, ChatResponse
 from backend.database import DatabaseManager, ChatSession, ChatMessage
-from backend.modules.llm.core.llm_core import SimpleEmotionalChatEngine
+from backend.modules.llm.core.llm_core import ChatEngine
 
 # 导入增强版组件
 from backend.services.enhanced_memory_manager import EnhancedMemoryManager
@@ -66,7 +66,7 @@ class EnhancedChatService:
             enable_proactive_recall: 是否启用主动回忆
         """
         # 核心引擎
-        self.chat_engine = SimpleEmotionalChatEngine()
+        self.chat_engine = ChatEngine()
         
         # 增强版组件
         self.memory_manager = EnhancedMemoryManager()
@@ -267,7 +267,7 @@ class EnhancedChatService:
     
     def _build_system_prompt(self, context: Dict[str, Any], proactive_prompt: Optional[str]) -> str:
         """构建系统Prompt"""
-        system_prompt = """你是"心语"，一位温暖、耐心的心理陪伴者。"""
+        system_prompt = """你是"ContextGate"，一位温暖、耐心的心理陪伴者。"""
         
         # 如果有主动回忆提示，添加到系统Prompt
         if proactive_prompt:

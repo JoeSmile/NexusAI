@@ -5,7 +5,7 @@ Session FSM — 6-state finite state machine
 States: idle, running, requires_approval, compacted, forked, failed, timeout, terminated
 Transitions enforce valid paths; invalid transitions raise IllegalTransitionError.
 
-情感陪伴场景状态流：
+LLM Gateway场景状态流：
   idle → running → (requires_approval | compacted | failed | timeout | terminated)
   requires_approval → running (approved) | terminated (rejected)
   compacted → running | terminated

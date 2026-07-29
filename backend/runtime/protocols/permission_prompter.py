@@ -27,7 +27,7 @@ class PermissionRequest:
     arguments: dict
     reason: str
     risk_level: str = "low"  # "low" | "medium" | "high" | "critical"
-    # 情感陪伴扩展：内容安全分类
+    # LLM Gateway扩展：内容安全分类
     content_safety: str = "safe"  # "safe" | "sensitive" | "crisis"
 
 
@@ -37,7 +37,7 @@ class PermissionDecision:
 
     allowed: bool
     reason: str = ""
-    # 情感陪伴扩展：降级替代方案
+    # LLM Gateway扩展：降级替代方案
     fallback_action: str | None = None  # "degrade_to_safe_response" | "escalate_to_human"
 
 

@@ -118,7 +118,7 @@ class PersonalizedChatService:
         模拟LLM回复（用于测试）
         实际使用时应调用真实的LLM
         """
-        role_name = user_config.get("role_name", "心语")
+        role_name = user_config.get("role_name", "ContextGate")
         role = user_config.get("role", "温暖倾听者")
         tone = user_config.get("tone", "温和")
         

@@ -42,7 +42,7 @@ if 'PROJECT_ROOT' in os.environ:
     project_root = os.environ['PROJECT_ROOT']
 
 # 使用带插件支持的聊天引擎
-from backend.modules.llm.core.llm_with_plugins import EmotionalChatEngineWithPlugins
+from backend.modules.llm.core.llm_with_plugins import ChatEngineWithTools
 from backend.plugins.plugin_manager import PluginManager
 from backend.models import (
     ChatRequest, ChatResponse, FeedbackRequest, FeedbackResponse, 
@@ -107,7 +107,7 @@ app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 logger = get_logger(__name__)
 
 # 初始化带插件的聊天引擎
-chat_engine = EmotionalChatEngineWithPlugins()
+chat_engine = ChatEngineWithTools()
 
 # 初始化插件管理器
 plugin_manager = chat_engine.plugin_manager

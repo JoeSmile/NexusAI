@@ -506,7 +506,7 @@ class AdvancedSentimentAnalyzer:
         
         # 基础角色设定
         if not base_prompt:
-            base_prompt = "你是一个温暖、耐心的心理健康陪伴者，名叫'心语'。请用共情、支持性的语言回应用户。"
+            base_prompt = "你是一个温暖、耐心的心理健康陪伴者，名叫'ContextGate'。请用共情、支持性的语言回应用户。"
         
         # 根据情绪类型和强度动态调整
         emotion_instructions = {

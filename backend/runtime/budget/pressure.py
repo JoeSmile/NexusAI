@@ -4,7 +4,7 @@ BudgetPressure — 预算压力注入
 
 在对话轮次接近上限时注入压力提示，引导 Agent 尽早收束。
 
-情感陪伴场景：
+LLM Gateway场景：
 - 当迭代接近 max_iterations 时注入"请尽快总结"提示
 - 支持分级压力：soft (70%) → medium (85%) → hard (95%)
 """

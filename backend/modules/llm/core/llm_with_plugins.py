@@ -1,5 +1,5 @@
 """
-带插件支持的聊天引擎 - 扩展 SimpleEmotionalChatEngine 以支持 Function Calling
+带插件支持的聊天引擎 - 扩展 ChatEngine 以支持 Function Calling
 """
 import json
 import uuid
@@ -35,7 +35,7 @@ except ImportError:
     VECTOR_STORE_AVAILABLE = False
 
 
-class EmotionalChatEngineWithPlugins:
+class ChatEngineWithTools:
     """
     带插件支持的情感聊天引擎
     支持 Function Calling 机制，允许模型调用外部工具
@@ -103,7 +103,7 @@ class EmotionalChatEngineWithPlugins:
 {{history}}
 
 用户：{{input}}
-心语：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
+ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
 
                     self.prompt = ChatPromptTemplate.from_template(self.template)
                     self.output_parser = StrOutputParser()
@@ -549,7 +549,7 @@ class EmotionalChatEngineWithPlugins:
 1. 必须包含具体的天气信息（温度、天气状况等）
 2. 用温暖、关心的语气
 3. 可以结合天气给出贴心的建议
-4. 保持"心语"的陪伴者角色，不要只是冷冰冰地报数据"""
+4. 保持"ContextGate"的陪伴者角色，不要只是冷冰冰地报数据"""
                 elif func_name == "get_latest_news":
                     user_message_content = f"""用户询问了新闻信息，我已经查询到了以下新闻数据：
 
@@ -560,7 +560,7 @@ class EmotionalChatEngineWithPlugins:
 2. 每条新闻都要有明确的标题和简要描述
 3. 用温暖、关心的语气介绍这些新闻
 4. 可以询问用户对哪条新闻感兴趣，想了解更多
-5. 保持"心语"的陪伴者角色，让用户感受到你在分享有用的信息"""
+5. 保持"ContextGate"的陪伴者角色，让用户感受到你在分享有用的信息"""
                 elif func_name == "get_holiday_info":
                     user_message_content = f"""用户询问了节假日信息，我已经查询到了以下数据：
 
@@ -571,7 +571,7 @@ class EmotionalChatEngineWithPlugins:
 2. 如果是节假日，说明是什么节日
 3. 结合用户提到的出游、旅行等需求，给出贴心的建议
 4. 用温暖、关心的语气，帮助用户规划行程
-5. 保持"心语"的陪伴者角色，让用户感受到你在关心他们的出行安排"""
+5. 保持"ContextGate"的陪伴者角色，让用户感受到你在关心他们的出行安排"""
                 else:
                     user_message_content = f"""用户询问了相关信息，我已经查询到了以下数据：
 
@@ -789,7 +789,7 @@ class EmotionalChatEngineWithPlugins:
             recent_messages = db.get_session_messages(session_id, limit=10)
             history_text = ""
             for msg in reversed(recent_messages[-5:]):
-                history_text += "{}: {}\n".format('用户' if msg.role == 'user' else '心语', msg.content)
+                history_text += "{}: {}\n".format('用户' if msg.role == 'user' else 'ContextGate', msg.content)
         
         # 获取个性化系统Prompt
         system_prompt = self._get_personalized_system_prompt(user_id, user_input, emotion_state)
@@ -815,9 +815,9 @@ class EmotionalChatEngineWithPlugins:
         
         # 构建完整Prompt（包含历史对话）
         if history_text:
-            full_prompt = f"{system_prompt}\n\n对话历史：\n{history_text}\n\n用户：{user_input}\n心语："
+            full_prompt = f"{system_prompt}\n\n对话历史：\n{history_text}\n\n用户：{user_input}\nContextGate："
         else:
-            full_prompt = f"{system_prompt}\n\n用户：{user_input}\n心语："
+            full_prompt = f"{system_prompt}\n\n用户：{user_input}\nContextGate："
         
         try:
             api_url = f"{self.api_base_url}/chat/completions"
@@ -873,7 +873,7 @@ class EmotionalChatEngineWithPlugins:
     
     def analyze_emotion(self, message: str) -> Dict[str, Any]:
         """
-        分析用户消息的情感（公开接口，兼容 SimpleEmotionalChatEngine）
+        分析用户消息的情感（公开接口，兼容 ChatEngine）
         
         Args:
             message: 用户消息

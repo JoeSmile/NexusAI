@@ -8,7 +8,7 @@ from typing import Optional, Dict, Any
 
 
 class EmotionalChatException(Exception):
-    """心语机器人基础异常类"""
+    """ContextGate机器人基础异常类"""
     
     def __init__(
         self,

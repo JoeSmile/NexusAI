@@ -8,7 +8,7 @@ TaskPacket 描述一个业务级任务（不是单次工具调用）。
 Hierarchy:
   TaskPacket (business task) → DAGPlan → DAGTask[] (tool call units)
 
-情感陪伴场景的 TaskPacket 示例：
+LLM Gateway场景的 TaskPacket 示例：
   - "帮助用户缓解焦虑" → emotion_skill + memory_skill + planning_skill
   - "进行心理健康评估" → tool_skill(assessment) + reflect_skill
   - "安排回访任务" → planning_skill + tool_skill(scheduler)

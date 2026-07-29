@@ -155,7 +155,7 @@ class PersonalizationConfig(BaseModel):
     
     # 角色层
     role: str = "温暖倾听者"
-    role_name: str = "心语"
+    role_name: str = "ContextGate"
     role_background: Optional[str] = None
     personality: str = "温暖耐心"
     core_principles: Optional[List[str]] = None

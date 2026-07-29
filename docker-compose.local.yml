@@ -23,7 +23,7 @@ services:
       - emotional_chat_local
 
   # 后端 — 本地模式
-  backend:
+  contextgate:
     build:
       context: .
       dockerfile: Dockerfile

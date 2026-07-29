@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # 创建路由器
 router = APIRouter(
     prefix="/api/emotion",
-    tags=["emotion_analysis"]
+    tags=["analysis"]
 )
 
 # 初始化服务

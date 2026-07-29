@@ -3,7 +3,7 @@ LLM模块
 大语言模型调用相关功能
 """
 
-from .core.llm_core import SimpleEmotionalChatEngine
+from .core.llm_core import ChatEngine
 # from .services.llm_service import LLMService  # LLMService依赖LLMCore，暂时禁用
 from .models.llm_models import LLMRequest, LLMResponse, LLMProvider
 from .providers.openai_provider import OpenAIProvider
@@ -15,7 +15,7 @@ from .harness import (
 )
 
 __all__ = [
-    "SimpleEmotionalChatEngine",
+    "ChatEngine",
     # "LLMService",  # 暂时禁用
     "LLMRequest",
     "LLMResponse",

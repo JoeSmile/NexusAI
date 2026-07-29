@@ -346,8 +346,8 @@ class ResponseGenerator:
         # 1. 去除首尾空格和多余换行
         processed = response.strip()
         
-        # 2. 去除可能的"心语："前缀（有些模型会重复）
-        if processed.startswith("心语：") or processed.startswith("心语:"):
+        # 2. 去除可能的"ContextGate："前缀（有些模型会重复）
+        if processed.startswith("ContextGate：") or processed.startswith("ContextGate:"):
             processed = processed.split("：", 1)[-1].split(":", 1)[-1].strip()
         
         # 3. 限制长度（按句子数）
@@ -371,8 +371,8 @@ class ResponseGenerator:
         
         # 4. 确保不暴露AI身份
         identity_replacements = {
-            "我是AI": "我是心语",
-            "我是一个AI": "我是心语",
+            "我是AI": "我是ContextGate",
+            "我是一个AI": "我是ContextGate",
             "作为AI": "作为陪伴者",
             "AI助手": "陪伴者",
             "人工智能": "陪伴者"

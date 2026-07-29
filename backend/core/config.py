@@ -121,9 +121,9 @@ class SecurityConfig:
 @dataclass
 class APIConfig:
     """API配置"""
-    title: str = "心语情感陪伴机器人 API"
-    description: str = "基于LangChain和记忆系统的情感支持聊天机器人"
-    version: str = "3.0.0"
+    title: str = "ContextGate API"
+    description: str = "The Intelligent Gateway for LLM Context Management"
+    version: str = "1.0.0"
     docs_url: str = "/docs"
     redoc_url: str = "/redoc"
     host: str = "0.0.0.0"

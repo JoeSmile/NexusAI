@@ -10,7 +10,7 @@ from backend.services.memory_service import MemoryService
 from backend.services.context_service import ContextService
 from backend.logging_config import get_logger
 
-router = APIRouter(prefix="/memory", tags=["记忆系统"])
+router = APIRouter(prefix="/memory", tags=["memory"])
 logger = get_logger(__name__)
 
 # 初始化服务

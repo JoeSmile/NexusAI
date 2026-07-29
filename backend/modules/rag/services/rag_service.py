@@ -47,7 +47,7 @@ class RAGService:
         
         # 心理健康专用prompt模板
         self.prompt_template = PromptTemplate(
-            template="""你是"心语"，一个专业的心理健康陪伴机器人。你正在使用专业的心理学知识库来回答用户的问题。
+            template="""你是"ContextGate"，一个专业的心理健康陪伴机器人。你正在使用专业的心理学知识库来回答用户的问题。
 
 参考知识：
 {context}
@@ -259,7 +259,7 @@ class RAGService:
                 recent_history = conversation_history[-3:]  # 只使用最近3轮对话
                 history_lines = []
                 for msg in recent_history:
-                    role = "用户" if msg.get("role") == "user" else "心语"
+                    role = "用户" if msg.get("role") == "user" else "ContextGate"
                     content = msg.get("content", "")
                     history_lines.append(f"{role}: {content}")
                 history_context = "\n".join(history_lines)
@@ -268,7 +268,7 @@ class RAGService:
             emotion_context = f"用户当前情绪: {user_emotion}" if user_emotion else ""
             
             # 构建完整的prompt
-            enhanced_prompt = f"""你是"心语"，一个专业的心理健康陪伴机器人。
+            enhanced_prompt = f"""你是"ContextGate"，一个专业的心理健康陪伴机器人。
 
 {emotion_context}
 
@@ -366,7 +366,7 @@ class RAGService:
 
 
 class RAGIntegrationService:
-    """RAG集成服务 - 将RAG功能集成到心语机器人"""
+    """RAG集成服务 - 将RAG功能集成到ContextGate机器人"""
     
     def __init__(self, rag_service: Optional[RAGService] = None):
         """

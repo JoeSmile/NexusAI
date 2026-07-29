@@ -11,7 +11,8 @@ from datetime import datetime
 
 
 def _project_root() -> str:
-    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # backend/database/legacy.py → repo root
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def _truthy_env(name: str, default: str = "0") -> bool:
@@ -26,9 +27,10 @@ def _sqlite_url_from_path(relative_or_abs: str) -> str:
 def _resolve_database_url() -> str:
     """
     解析数据库 URL。
-    - 显式 DATABASE_URL 优先（除非仅想用 USE_SQLITE 覆盖时可先不设 DATABASE_URL）。
-    - USE_SQLITE=1 时使用本地 SQLite 文件（便于无 MySQL 环境跑通后端）。
-    - 否则默认 MySQL（MYSQL_* / 默认 localhost）。
+    - USE_SQLITE=1 时使用本地 SQLite。
+    - 显式 DATABASE_URL 优先。
+    - DB_TYPE=sqlite|mysql|postgresql。
+    - 默认 postgresql + pgvector。
     """
     if _truthy_env("USE_SQLITE"):
         filename = os.getenv("SQLITE_PATH", os.path.join(_project_root(), "data", "emotional_chat_local.db"))
@@ -39,12 +41,25 @@ def _resolve_database_url() -> str:
     explicit = os.getenv("DATABASE_URL")
     if explicit:
         return explicit.strip()
-    return (
-        f"mysql+pymysql://{os.getenv('MYSQL_USER', 'root')}:"
-        f"{os.getenv('MYSQL_PASSWORD', '')}@"
-        f"{os.getenv('MYSQL_HOST', 'localhost')}:"
-        f"{os.getenv('MYSQL_PORT', '3306')}/"
-        f"{os.getenv('MYSQL_DATABASE', 'emotional_chat')}"
+    db_type = os.getenv("DB_TYPE", "postgresql").lower()
+    if db_type == "sqlite":
+        filename = os.getenv("SQLITE_PATH", os.path.join(_project_root(), "data", "emotional_chat.db"))
+        parent = os.path.dirname(filename)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        return _sqlite_url_from_path(filename)
+    if db_type == "mysql":
+        return (
+            f"mysql+pymysql://{os.getenv('MYSQL_USER', 'root')}:"
+            f"{os.getenv('MYSQL_PASSWORD', '')}@"
+            f"{os.getenv('MYSQL_HOST', 'localhost')}:"
+            f"{os.getenv('MYSQL_PORT', '3306')}/"
+            f"{os.getenv('MYSQL_DATABASE', 'emotional_chat')}"
+        )
+    # 默认 postgresql + pgvector
+    return os.getenv(
+        "DATABASE_URL",
+        "postgresql://emotional_chat:emotional_chat_password@localhost:5432/emotional_chat",
     )
 
 
@@ -52,9 +67,8 @@ def _resolve_database_url() -> str:
 # 支持模式：
 #   1. USE_SQLITE=1 强制本地 SQLite（可用 SQLITE_PATH 指定文件）
 #   2. DATABASE_URL 环境变量直接指定
-#   3. MYSQL_* 环境变量组合构建 MySQL URL
-#   4. DB_TYPE=sqlite|mysql 明确指定
-#   5. 默认自动检测（MySQL 不可用时回退 SQLite）
+#   3. DB_TYPE=sqlite|mysql|postgresql 明确指定
+#   4. 默认 postgresql + pgvector
 
 if _truthy_env("USE_SQLITE"):
     filename = os.getenv("SQLITE_PATH", os.path.join(_project_root(), "data", "emotional_chat_local.db"))
@@ -66,13 +80,16 @@ if _truthy_env("USE_SQLITE"):
 elif os.getenv("DATABASE_URL"):
     DATABASE_URL = os.getenv("DATABASE_URL")
 else:
-    DB_TYPE = os.getenv("DB_TYPE", "").lower()
+    DB_TYPE = os.getenv("DB_TYPE", "postgresql").lower()
     _default_mysql_url = (
         f"mysql+pymysql://{os.getenv('MYSQL_USER', 'root')}:"
         f"{os.getenv('MYSQL_PASSWORD', '')}@"
         f"{os.getenv('MYSQL_HOST', 'localhost')}:"
         f"{os.getenv('MYSQL_PORT', '3306')}/"
         f"{os.getenv('MYSQL_DATABASE', 'emotional_chat')}"
+    )
+    _default_pg_url = (
+        "postgresql://emotional_chat:emotional_chat_password@localhost:5432/emotional_chat"
     )
 
     if DB_TYPE == "sqlite":
@@ -81,23 +98,10 @@ else:
         print(f"✓ 使用 SQLite 数据库: {_sqlite_path}")
     elif DB_TYPE == "mysql":
         DATABASE_URL = _default_mysql_url
+        print("✓ 使用 MySQL 数据库")
     else:
-        try:
-            import pymysql
-            pymysql.connect(
-                host=os.getenv("MYSQL_HOST", "localhost"),
-                port=int(os.getenv("MYSQL_PORT", "3306")),
-                user=os.getenv("MYSQL_USER", "root"),
-                password=os.getenv("MYSQL_PASSWORD", ""),
-                database=os.getenv("MYSQL_DATABASE", "emotional_chat"),
-                connect_timeout=3,
-            )
-            DATABASE_URL = _default_mysql_url
-            print("✓ 使用 MySQL 数据库")
-        except Exception:
-            _sqlite_path = os.path.join(_project_root(), "data", "emotional_chat.db")
-            DATABASE_URL = _sqlite_url_from_path(_sqlite_path)
-            print(f"⚠ MySQL 不可用，自动回退到 SQLite 数据库: {_sqlite_path}")
+        DATABASE_URL = _default_pg_url
+        print("✓ 使用 PostgreSQL + pgvector 数据库")
 
 _engine_kwargs = {"echo": False}
 if DATABASE_URL.startswith("sqlite"):
@@ -355,7 +359,7 @@ class UserPersonalization(Base):
     
     # 角色层：AI身份与人格
     role = Column(String(100), default="温暖倾听者")  # 角色类型
-    role_name = Column(String(100), default="心语")  # 角色名称
+    role_name = Column(String(100), default="ContextGate")  # 角色名称
     role_background = Column(Text)  # 角色背景故事
     personality = Column(String(100), default="温暖耐心")  # 性格特征
     core_principles = Column(Text)  # 核心原则 (JSON数组)
@@ -456,6 +460,7 @@ def get_db():
         db.close()
 
 # 数据库操作类
+# DEPRECATED: 请使用 backend.database.pgvector_session.PGVectorSession
 class DatabaseManager:
     def __init__(self):
         self.db = SessionLocal()

@@ -7,7 +7,7 @@ Triple Protocol — 基础契约层
 - ToolExecutor: 工具执行抽象
 - PermissionPrompter: 权限提示抽象
 
-参考 ai-buddy/src/runtime/protocols 设计，适配情感陪伴场景。
+参考 ai-buddy/src/runtime/protocols 设计，适配LLM Gateway场景。
 """
 
 from backend.runtime.protocols.llm_client import AssistantEvent, LLMClient, TurnSummary

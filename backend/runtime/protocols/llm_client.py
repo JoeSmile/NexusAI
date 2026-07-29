@@ -27,7 +27,7 @@ class AssistantEvent:
     tool_args: dict | None = None
     call_id: str | None = None
     usage: dict | None = None  # {prompt_tokens, completion_tokens, cache_*}
-    # 情感陪伴扩展字段
+    # LLM Gateway扩展字段
     emotion_tag: str | None = None  # "empathy" | "encouragement" | "neutral" | ...
 
 

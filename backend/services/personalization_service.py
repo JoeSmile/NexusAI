@@ -96,7 +96,7 @@ class PersonalizationService:
         return {
             "user_id": user_id,
             "role": "温暖倾听者",
-            "role_name": "心语",
+            "role_name": "ContextGate",
             "role_background": "我是一个专注于情感支持的AI伙伴，我的使命是倾听你的心声，理解你的感受。",
             "personality": "温暖耐心",
             "core_principles": ["永远不评判用户", "倾听优先于建议", "共情是第一要务"],

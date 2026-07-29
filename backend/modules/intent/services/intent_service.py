@@ -125,7 +125,7 @@ class IntentService:
                     "适当的安慰"
                 ],
                 "avoid": ["立即给建议", "否定感受"],
-                "prompt_hint": "情感陪伴模式：重点在于理解和共情，而非解决问题"
+                "prompt_hint": "LLM Gateway模式：重点在于理解和共情，而非解决问题"
             },
             IntentType.ADVICE: {
                 "response_style": "建设性、实用、温和",
@@ -243,7 +243,7 @@ class IntentService:
         
         # 构建prompt
         base_prompt = f"""
-你是一位温暖、耐心的心理陪伴助手"心语"。请根据用户的情绪和意图，给予恰当的回应。
+你是一位温暖、耐心的心理陪伴助手"ContextGate"。请根据用户的情绪和意图，给予恰当的回应。
 
 【用户状态分析】
 - 当前情绪：{emotion}

@@ -3,7 +3,7 @@ global:
   scrape_interval: 15s          # 抓取间隔
   evaluation_interval: 15s      # 规则评估间隔
   external_labels:
-    monitor: 'emotional-chat-monitor'
+    monitor: 'contextgate-monitor'
 
 # Alertmanager 配置（可选）
 alerting:
@@ -22,8 +22,8 @@ scrape_configs:
       - targets: ['localhost:9090']
 
   # 后端服务监控
-  - job_name: 'emotional-chat-backend'
+  - job_name: 'contextgate'
     static_configs:
-      - targets: ['backend:8000']
+      - targets: ['contextgate:8000']
     metrics_path: '/metrics'
     scrape_interval: 10s

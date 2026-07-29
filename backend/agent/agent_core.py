@@ -665,7 +665,7 @@ class AgentCore:
         # 这里应该调用实际的LLM服务
         # 简化实现
         prompt = f"""
-你是一位温暖、耐心的心理陪伴者，名叫"心语"。
+你是一位温暖、耐心的心理陪伴者，名叫"ContextGate"。
 
 上下文：
 {context}
@@ -824,7 +824,7 @@ if __name__ == "__main__":
         user_id = "user_test_123"
         
         print("=" * 60)
-        print("心语Agent测试")
+        print("ContextGateAgent测试")
         print("=" * 60)
         
         # 测试1: 情感支持场景
@@ -834,7 +834,7 @@ if __name__ == "__main__":
             user_id=user_id
         )
         print(f"用户：我最近心情很不好，感觉很焦虑")
-        print(f"心语：{result1['response']}")
+        print(f"ContextGate：{result1['response']}")
         print(f"情绪：{result1['emotion']} (强度: {result1['emotion_intensity']})")
         print(f"执行了 {len(result1['actions'])} 个行动")
         
@@ -847,7 +847,7 @@ if __name__ == "__main__":
             user_id=user_id
         )
         print(f"用户：我最近睡不好，怎么办？")
-        print(f"心语：{result2['response']}")
+        print(f"ContextGate：{result2['response']}")
         print(f"情绪：{result2['emotion']} (强度: {result2['emotion_intensity']})")
         print(f"执行了 {len(result2['actions'])} 个行动")
         if result2.get('followup_scheduled'):

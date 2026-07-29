@@ -1,14 +1,14 @@
 [project]
-name = "emotional-chat"
+name = "context-gate"
 version = "3.0.0"
-description = "心语情感陪伴机器人 - 基于阿里云通义千问的智能情感支持聊天机器人"
+description = "The Intelligent Gateway for LLM Context Management"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
-    {name = "emotional_chat", email = "congdeyuan@gmail.com"}
+    {name = "Joe"}
 ]
-keywords = ["chatbot", "emotional-support", "ai", "qwen", "langchain", "rag"]
+keywords = ["llm-gateway", "context-management", "observability", "ai-gateway"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -33,15 +33,11 @@ dependencies = [
     "langchain>=0.2.0,<0.3.0",
     "langchain-openai>=0.1.10,<0.2.0",
     "langchain-community>=0.0.1,<0.3.0",
-    "langchain-chroma>=0.1.0,<0.2.0",
     "pandas>=2.0.0",
     
-    # 向量数据库
-    "chromadb>=0.4.22,<0.5.0",
-    "sentence-transformers>=2.7.0",
-    
-    # 数据库
-    "PyMySQL>=1.1.0",
+    # 数据库 (PostgreSQL + pgvector)
+    "psycopg2-binary>=2.9.0",
+    "pgvector>=0.3.0,<0.4.0",
     "sqlalchemy>=1.4.0,<2.0.0",
     "alembic>=1.8.0",
     
@@ -103,10 +99,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/congde/emotional_chat"
-Documentation = "https://github.com/congde/emotional_chat#readme"
-Repository = "https://github.com/congde/emotional_chat.git"
-Issues = "https://github.com/congde/emotional_chat/issues"
+Homepage = "https://github.com/joe/context-gate"
+Documentation = "https://github.com/joe/context-gate#readme"
+Repository = "https://github.com/joe/context-gate"
+Issues = "https://github.com/joe/context-gate/issues"
 
 [build-system]
 requires = ["hatchling"]

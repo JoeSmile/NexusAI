@@ -9,7 +9,7 @@ PolicyEngine — 声明式规则引擎
 - DENY 动作短路评估
 - 支持: deny, ask, alert, retry, degrade, escalate_to_human
 
-情感陪伴场景的典型规则：
+LLM Gateway场景的典型规则：
 1. 危机检测 → escalate_to_human (优先级最高)
 2. 敏感内容 → alert + degrade
 3. 高频工具调用 → alert
@@ -89,7 +89,7 @@ class PolicyEngine:
                 ...
     """
 
-    # 情感陪伴场景的默认规则
+    # LLM Gateway场景的默认规则
     _DEFAULT_RULES: List[PolicyRule] = [
         PolicyRule(
             rule_id="crisis_intervention",

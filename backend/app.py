@@ -92,9 +92,9 @@ def create_app() -> FastAPI:
     """
     # 创建应用
     app = FastAPI(
-        title="心语情感陪伴机器人 API",
-        description="基于LangChain和记忆系统的情感支持聊天机器人",
-        version="3.0.0",
+        title="ContextGate API",
+        description="The Intelligent Gateway for LLM Context Management",
+        version="1.0.0",
         docs_url="/docs",
         redoc_url="/redoc"
     )
@@ -206,8 +206,8 @@ def create_app() -> FastAPI:
             features.append("意图识别系统")
         
         return {
-            "name": "心语情感陪伴机器人",
-            "version": "3.0.0",
+            "name": "ContextGate",
+            "version": "1.0.0",
             "status": "running",
             "features": features,
             "architecture": "分层服务架构 + Agent核心" if AGENT_ENABLED else "分层服务架构",
@@ -229,7 +229,7 @@ def create_app() -> FastAPI:
             return {
                 "status": "healthy",
                 "timestamp": datetime.now().isoformat(),
-                "version": "3.0.0",
+                "version": "1.0.0",
                 "database": "connected",
                 "vector_db": "ready",
                 "memory_system": "enabled"

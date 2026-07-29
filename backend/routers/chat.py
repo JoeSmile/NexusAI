@@ -24,7 +24,7 @@ from datetime import datetime
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, project_root)
 
-router = APIRouter(prefix="/chat", tags=["聊天"])
+router = APIRouter(prefix="/chat", tags=["chat"])
 logger = get_logger(__name__)
 
 # 初始化服务
@@ -418,7 +418,7 @@ async def chat_stream(
                 recent = db.get_session_messages(sid, limit=10)
                 history_text = ""
                 for msg in list(reversed(recent[-5:])):
-                    history_text += f"{'用户' if msg.role == 'user' else '心语'}: {msg.content}\n"
+                    history_text += f"{'用户' if msg.role == 'user' else 'ContextGate'}: {msg.content}\n"
 
             # 长期记忆
             long_term = ""
@@ -442,10 +442,10 @@ async def chat_stream(
             api_base_url = engine.api_base_url
             model = engine.model
 
-            # 当有文件附件时，切换到内容分析模式而非纯情感陪伴模式
+            # 当有文件附件时，切换到内容分析模式而非纯LLM Gateway模式
             if file_contents:
                 system_content = (
-                    '你是"心语"，一位智能AI助手。用户上传了文件附件并请求你分析。'
+                    '你是"ContextGate"，一位智能AI助手。用户上传了文件附件并请求你分析。'
                     '请根据用户的具体要求，认真分析附件内容并给出有用的回答。'
                     '回答要专业、详细、有条理。如果用户要求总结、分析、提取信息等，请直接执行任务。'
                 )

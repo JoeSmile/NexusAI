@@ -8,7 +8,7 @@ from backend.models import FeedbackRequest, FeedbackResponse, FeedbackStatistics
 from backend.database import DatabaseManager
 from backend.logging_config import get_logger
 
-router = APIRouter(prefix="/feedback", tags=["反馈"])
+router = APIRouter(prefix="/feedback", tags=["feedback"])
 logger = get_logger(__name__)
 
 

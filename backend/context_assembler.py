@@ -199,7 +199,7 @@ class ContextAssembler:
         # 构建对话历史部分
         history_section = "【当前对话】\n"
         for msg in context["chat_history"]:
-            role_name = "用户" if msg["role"] == "user" else "心语"
+            role_name = "用户" if msg["role"] == "user" else "ContextGate"
             history_section += f"{role_name}: {msg['content']}\n"
         
         # 当前消息

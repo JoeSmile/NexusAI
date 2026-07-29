@@ -13,7 +13,7 @@ Module Toggles — per-module enable/disable switches
 2. 紧急禁用：不需要代码部署即可关闭异常模块
 3. 隔离测试：开发期间可以只开某个模块
 
-情感陪伴模块列表：
+LLM Gateway模块列表：
   emotion_skill        — 情感分析 Skill
   memory_skill         — 记忆检索 Skill
   planning_skill       — 任务规划 Skill

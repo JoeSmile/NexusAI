@@ -4,7 +4,7 @@ FallbackManager — 模型降级管理
 
 当主模型不可用时，自动切换到备用模型。
 
-情感陪伴场景的降级策略：
+LLM Gateway场景的降级策略：
 - 主模型 → 备用模型 (如 GPT-4 → GPT-3.5)
 - LLM 降级 → 规则式回应 (最极端的降级)
 """
@@ -26,7 +26,7 @@ class FallbackConfig:
     fallback_models: List[str] = field(default_factory=lambda: ["gpt-3.5-turbo"])
     max_retries: int = 1
     timeout_seconds: float = 30.0
-    # 情感陪伴扩展：最终降级使用规则式回应
+    # LLM Gateway扩展：最终降级使用规则式回应
     rule_based_fallback: bool = True
 
 

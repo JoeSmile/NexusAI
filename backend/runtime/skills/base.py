@@ -42,7 +42,7 @@ class SkillContext:
     user_id: str
     workspace_id: str
     iteration: int = 0  # 当前 ReAct 迭代次数 (1-based)
-    # 情感陪伴上下文
+    # LLM Gateway上下文
     user_input: str = ""
     emotion_data: Dict[str, Any] = field(default_factory=dict)
     memories: List[Dict[str, Any]] = field(default_factory=list)
@@ -61,7 +61,7 @@ class SkillResult:
     output: Any = None
     error: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
-    # 情感陪伴扩展
+    # LLM Gateway扩展
     emotion_tag: Optional[str] = None  # 当前情感标签
     confidence: float = 1.0  # 结果置信度 [0, 1]
     # Skill 调用信息

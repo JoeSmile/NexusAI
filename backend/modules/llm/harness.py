@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-LLM Harness — 心语后台的「模型网关」层。
+LLM Harness — ContextGate后台的「模型网关」层。
 
 设计对齐 Nous Research Hermes Agent 的思路：单一入口解析密钥与 endpoint，
 通过修改 LLM_BASE_URL / DEFAULT_MODEL 即可切换智谱、OpenRouter、自建兼容端等，

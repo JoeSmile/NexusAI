@@ -24,7 +24,7 @@ from backend.database import DatabaseManager, create_tables
 from backend.models import ChatRequest, ChatResponse
 from backend.modules.llm.harness import resolve_llm_settings, try_create_chat_openai
 
-# 导入心语Prompt配置
+# 导入ContextGatePrompt配置
 from backend.xinyu_prompt import (
     get_system_prompt,
     build_full_prompt,
@@ -41,7 +41,7 @@ except ImportError as e:
     print("提示: 向量数据库模块未安装 ({}), 将仅使用MySQL短期记忆".format(e))
 
 
-class SimpleEmotionalChatEngine:
+class ChatEngine:
     def __init__(self):
         # 初始化API配置 - 经 LLM Harness 统一解析
         _cfg = resolve_llm_settings()
@@ -77,7 +77,7 @@ class SimpleEmotionalChatEngine:
                     print("警告: LangChain ChatOpenAI 不可用，将使用传统方式")
                     self.chain = None
                 else:
-                    # 2. 定义 AI 人格与行为准则（使用完整的心语Prompt）
+                    # 2. 定义 AI 人格与行为准则（使用完整的ContextGatePrompt）
                     self.template = """{system_prompt}
 
 {{long_term_memory}}
@@ -86,7 +86,7 @@ class SimpleEmotionalChatEngine:
 {{history}}
 
 用户：{{input}}
-心语：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
+ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
 
                     # 3. 创建提示模板和链（LCEL表达式）
                     self.prompt = ChatPromptTemplate.from_template(self.template)
@@ -222,7 +222,7 @@ class SimpleEmotionalChatEngine:
             recent_messages = db.get_session_messages(session_id, limit=10)
             history_text = ""
             for msg in reversed(recent_messages[-5:]):  # 最近5条消息
-                history_text += "{}: {}\n".format('用户' if msg.role == 'user' else '心语', msg.content)
+                history_text += "{}: {}\n".format('用户' if msg.role == 'user' else 'ContextGate', msg.content)
         
         # 从向量数据库检索相似对话（长期记忆）
         long_term_context = ""
@@ -262,7 +262,7 @@ class SimpleEmotionalChatEngine:
     
     def _call_api_traditional(self, user_input, history_text, long_term_context=""):
         """传统HTTP请求方式调用API（兼容旧环境）"""
-        # 使用完整的心语Prompt构建提示词
+        # 使用完整的ContextGatePrompt构建提示词
         full_prompt = build_full_prompt(
             user_input=user_input,
             history_text=history_text,
@@ -312,7 +312,7 @@ class SimpleEmotionalChatEngine:
         emotion = emotion_data.get("emotion", "neutral")
         suggestions = emotion_data.get("suggestions", [])
         
-        # 基于情感类型提供合适的回应（符合心语Prompt：3-4句话，不使用表情符号）
+        # 基于情感类型提供合适的回应（符合ContextGatePrompt：3-4句话，不使用表情符号）
         fallback_responses = {
             "happy": [
                 "听起来你心情很好。你的快乐让我也感到温暖。有什么特别的事情想要分享吗？",

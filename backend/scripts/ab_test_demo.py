@@ -33,7 +33,7 @@ def demo_model_comparison():
     config = ABTestConfig(
         experiment_id=experiment_id,
         name="模型选型对比：GPT-4 vs 微调Llama3",
-        description="对比GPT-4和微调Llama3在情感陪伴场景下的表现",
+        description="对比GPT-4和微调Llama3在LLM Gateway场景下的表现",
         groups=["A", "B"],
         weights=[0.5, 0.5],
         start_date=datetime.now(),

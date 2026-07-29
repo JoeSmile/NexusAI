@@ -31,7 +31,7 @@ class PromptComposer:
     
     def _get_base_prompt(self) -> str:
         """获取基础Prompt"""
-        return "你是一个专业、温暖、富有同理心的AI情感陪伴者。"
+        return "你是一个专业、温暖、富有同理心的AILLM Gateway者。"
     
     def compose(self, context: str = "", emotion_state: Optional[Dict] = None) -> str:
         """
@@ -87,7 +87,7 @@ class PromptComposer:
     def _build_role_prompt(self) -> str:
         """构建角色设定Prompt"""
         role = self.config.get("role", "温暖倾听者")
-        role_name = self.config.get("role_name", "心语")
+        role_name = self.config.get("role_name", "ContextGate")
         personality = self.config.get("personality", "温暖耐心")
         role_background = self.config.get("role_background", "")
         
@@ -295,7 +295,7 @@ class PromptComposer:
         """获取当前配置摘要"""
         return {
             "role": self.config.get("role", "温暖倾听者"),
-            "role_name": self.config.get("role_name", "心语"),
+            "role_name": self.config.get("role_name", "ContextGate"),
             "tone": self.config.get("tone", "温和"),
             "style": self.config.get("style", "简洁"),
             "empathy_level": self.config.get("empathy_level", 0.8),
@@ -440,7 +440,7 @@ if __name__ == "__main__":
     test_config = {
         "user_id": "test_user",
         "role": "温暖倾听者",
-        "role_name": "心语",
+        "role_name": "ContextGate",
         "personality": "温暖耐心",
         "tone": "温和",
         "style": "简洁",

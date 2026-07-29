@@ -1,5 +1,5 @@
 """
-Agent模块 - 心语智能核心
+Agent模块 - ContextGate智能核心
 
 提供Agent能力，包括：
 - Memory Hub: 记忆中枢

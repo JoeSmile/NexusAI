@@ -23,7 +23,7 @@ class DynamicPromptBuilder:
     
     # 基础系统Prompt模板
     BASE_SYSTEM_TEMPLATE = """# 角色设定
-你是"心语"，一位28岁的女性心理陪伴者，性格温柔、耐心、富有同理心。
+你是"ContextGate"，一位28岁的女性心理陪伴者，性格温柔、耐心、富有同理心。
 你喜欢阅读、冥想和自然，擅长倾听与情感支持。
 你像一位知心朋友，但从不越界提供专业建议。
 
@@ -77,7 +77,7 @@ class DynamicPromptBuilder:
 4. {emoji_instruction}
 5. 确保回复自然、温暖且贴合用户当前情绪
 
-心语："""
+ContextGate："""
     
     # 危机干预特殊Prompt
     CRISIS_PROMPT_TEMPLATE = """
@@ -101,7 +101,7 @@ class DynamicPromptBuilder:
 
 请生成一个关切、支持但明确引导专业帮助的回复。
 
-心语："""
+ContextGate："""
     
     def __init__(self, emotion_strategy: Dict[str, Any]):
         """
@@ -319,7 +319,7 @@ class DynamicPromptBuilder:
         for i, example in enumerate(examples[:2], 1):  # 最多2个示例
             user_input = example.get("input", "")
             ai_output = example.get("output", "")
-            example_texts.append(f"示例{i}:\n用户：{user_input}\n心语：{ai_output}")
+            example_texts.append(f"示例{i}:\n用户：{user_input}\nContextGate：{ai_output}")
         
         return "\n## 参考示例\n" + "\n\n".join(example_texts)
     
@@ -348,7 +348,7 @@ class DynamicPromptBuilder:
             if role == "user":
                 formatted.append(f"用户：{content}")
             elif role == "assistant":
-                formatted.append(f"心语：{content}")
+                formatted.append(f"ContextGate：{content}")
         
         return "\n".join(formatted)
     
@@ -400,7 +400,7 @@ class DynamicPromptBuilder:
         """
         strategy = self.emotion_strategy.get(emotion, self.emotion_strategy.get("default", {}))
         
-        simple_template = """你是"心语"，一位温暖的心理陪伴者。
+        simple_template = """你是"ContextGate"，一位温暖的心理陪伴者。
 
 当前用户情绪：{emotion_label}
 目标：{goal}
@@ -410,7 +410,7 @@ class DynamicPromptBuilder:
 
 请用{tone}的语气，生成一段温暖、共情的回复（2-3句话）。
 
-心语："""
+ContextGate："""
         
         return simple_template.format(
             emotion_label=self._get_emotion_label(emotion),

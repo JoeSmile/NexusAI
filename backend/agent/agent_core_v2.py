@@ -123,7 +123,7 @@ class _ToolExecutorAdapter:
 
 class _PermissionPrompterAdapter:
     """
-    权限确认 — 情感陪伴场景默认自动批准（无危险操作）
+    权限确认 — LLM Gateway场景默认自动批准（无危险操作）
 
     如果后续需要用户确认（如删除记忆等），可替换实现。
     """

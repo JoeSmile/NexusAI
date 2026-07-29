@@ -331,7 +331,7 @@ class LLMService:
         """
         try:
             # 构建系统提示
-            system_prompt = f"""你是"心语"，一个专业的心理健康陪伴机器人。
+            system_prompt = f"""你是"ContextGate"，一个专业的心理健康陪伴机器人。
 
 个性特点：{personality}
 

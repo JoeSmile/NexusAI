@@ -117,7 +117,7 @@ async def get_user_config(user_id: str, db: Session = Depends(get_db)):
                 "config": {
                     "user_id": user_id,
                     "role": "温暖倾听者",
-                    "role_name": "心语",
+                    "role_name": "ContextGate",
                     "personality": "温暖耐心",
                     "tone": "温和",
                     "style": "简洁",
@@ -236,7 +236,7 @@ async def create_or_update_config(
             config_data = {
                 "user_id": user_id,
                 "role": update_data.role or "温暖倾听者",
-                "role_name": update_data.role_name or "心语",
+                "role_name": update_data.role_name or "ContextGate",
                 "role_background": update_data.role_background,
                 "personality": update_data.personality or "温暖耐心",
                 "tone": update_data.tone or "温和",

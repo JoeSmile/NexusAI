@@ -1,5 +1,5 @@
 """
-插件系统 - 为心语机器人提供可扩展的功能模块
+插件系统 - 为ContextGate机器人提供可扩展的功能模块
 """
 from .base_plugin import BasePlugin
 from .weather_plugin import WeatherPlugin
