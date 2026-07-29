@@ -25,7 +25,7 @@ from datetime import datetime
 try:
     from backend.modules.rag.services.rag_service import RAGIntegrationService
     RAG_AVAILABLE = True
-except ImportError:
+except Exception:
     RAG_AVAILABLE = False
     RAGIntegrationService = None
 

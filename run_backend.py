@@ -73,9 +73,9 @@ def check_dependencies():
     missing_deps = []
     
     try:
-        import chromadb
+        import pgvector
     except ImportError:
-        missing_deps.append("chromadb")
+        missing_deps.append("pgvector")
     
     try:
         import langchain
@@ -89,14 +89,14 @@ def check_dependencies():
     
     if missing_deps:
         print(f"⚠️ 缺少依赖: {', '.join(missing_deps)}")
-        print("请运行: pip install -r requirements.txt")
+        print("请运行: uv sync")
         return False
     
     print("✓ 依赖检查通过")
     return True
 
 if __name__ == "__main__":
-    print("🚀 启动情感聊天机器人后端服务...")
+    print("🚀 启动 ContextGate API...")
     print(f"📍 服务地址: http://{Config.HOST}:{Config.PORT}")
     print("🔗 API文档: http://localhost:8000/docs")
     print(f"📂 工作目录: {project_root}")

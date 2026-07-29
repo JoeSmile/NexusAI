@@ -9,12 +9,30 @@ import os
 import tempfile
 import time
 from typing import Dict, Any, List, Optional
-import cv2
-import numpy as np
+
 from PIL import Image
-import pytesseract
-from deepface import DeepFace
-import face_recognition
+
+try:
+    import cv2
+    import numpy as np
+except ImportError:  # pragma: no cover
+    cv2 = None
+    np = None
+
+try:
+    import pytesseract
+except ImportError:  # pragma: no cover
+    pytesseract = None
+
+try:
+    from deepface import DeepFace
+except ImportError:  # pragma: no cover
+    DeepFace = None
+
+try:
+    import face_recognition
+except ImportError:  # pragma: no cover
+    face_recognition = None
 
 logger = logging.getLogger(__name__)
 

@@ -1,11 +1,8 @@
-# Python 3.10+ 版本依赖
-# 注意: 版本要求已调整为适配阿里云镜像源 (http://mirrors.cloud.aliyuncs.com/pypi/simple/)
-# 如需最新版本，请使用官方 PyPI 源: pip install -r requirements.txt -i https://pypi.org/simple
+# DEPRECATED — 权威依赖已迁至 pyproject.toml + uv.lock。
+# 请使用: uv sync   或   make sync
+# 本文件仅供旧 Docker/CI 过渡；Batch 6/7 后将删除。勿再 pip install -r。
 #
-# ⚠️ Python 3.13 用户注意:
-# - 推荐使用 Python 3.10 或 3.11 以获得最佳兼容性
-# - 如果使用 Python 3.13，某些依赖可能有版本冲突警告，但通常可以正常运行
-# - 详细说明请查看 INSTALL_GUIDE_PYTHON313.md
+# 推荐 Python 3.11+（requires-python >=3.11）
 
 # 核心框架
 fastapi>=0.83.0

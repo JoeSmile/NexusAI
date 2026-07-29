@@ -124,7 +124,7 @@ class KnowledgeBaseStats(BaseModel):
 class RAGConfig(BaseModel):
     """RAG配置模型"""
     enabled: bool = Field(True, description="是否启用RAG")
-    knowledge_base_path: str = Field("./chroma_db/psychology_kb", description="知识库路径")
+    knowledge_base_path: str = Field("./data/knowledge", description="知识库路径")
     search_k: int = Field(3, ge=1, le=10, description="默认检索数量")
     similarity_threshold: float = Field(0.7, ge=0, le=1, description="相似度阈值")
     max_context_length: int = Field(4000, ge=1000, le=8000, description="最大上下文长度")

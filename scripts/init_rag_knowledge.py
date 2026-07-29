@@ -86,7 +86,7 @@ def main():
         traceback.print_exc()
         
         print("\n💡 故障排查建议:")
-        print("  1. 确保已安装所有依赖: pip install -r requirements.txt")
+        print("  1. 确保已安装所有依赖: uv sync")
         print("  2. 检查OpenAI API密钥是否正确配置")
         print("  3. 确保有足够的磁盘空间存储向量数据库")
         print("  4. 查看上方的详细错误信息")

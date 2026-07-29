@@ -7,10 +7,6 @@ from dotenv import load_dotenv
 env_path = Path(__file__).parent.parent / 'config.env'
 load_dotenv(env_path)
 
-# 使用 SQLite3 兼容性模块（处理 Mac Python 3.10 兼容性问题）
-from backend.utils.sqlite_compat import setup_sqlite3
-setup_sqlite3()
-
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
@@ -1131,7 +1127,7 @@ if __name__ == "__main__":
     print("📍 服务地址: http://localhost:8000")
     print("🔗 API文档: http://localhost:8000/docs")
     print("🗄️ 数据库: MySQL")
-    print("🧠 向量数据库: Chroma")
+    print("🧠 向量数据库: pgvector")
     print("🤖 AI引擎: LangChain + OpenAI")
     
     uvicorn.run(

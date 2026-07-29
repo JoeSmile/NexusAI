@@ -9,23 +9,22 @@
 ## Quick Start
 
 ```bash
-# 1. 启动基础设施
-docker compose -f docker-compose.local.yml up -d
+# 1. 启动基础设施（postgres + pgvector）
+make up
 
 # 2. 安装依赖
-uv sync
+make sync
 
 # 3. 初始化数据库
-uv run python -c "from backend.database.pgvector_session import PGVectorSession; PGVectorSession().init_db()"
+make db-init
 
-# 4. 创建 API Key
-uv run python scripts/seed_api_keys.py
-
-# 5. 启动服务
-uv run uvicorn backend.app:app --reload
+# 4. 启动服务
+make run
 ```
 
 开发期测试客户端（前端）: http://localhost:3000（v1.0 将替换为 Playground）
+
+API Key 种子脚本见 Batch 6：`scripts/seed_api_keys.py`（尚未合入时可用手工插入 `api_keys` 表）。
 
 ## Architecture
 

@@ -21,9 +21,15 @@ from backend.database import Base
 # 这是Alembic配置对象，提供了alembic.ini文件的访问
 config = context.config
 
-# 从config.py读取数据库URL，覆盖alembic.ini中的配置
-database_url = os.getenv("DATABASE_URL", 
-                        f"mysql+pymysql://{Config.MYSQL_USER}:{Config.MYSQL_PASSWORD}@{Config.MYSQL_HOST}:{Config.MYSQL_PORT}/{Config.MYSQL_DATABASE}")
+# 从环境变量 / Config 读取数据库 URL（默认 PostgreSQL + pgvector）
+database_url = os.getenv(
+    "DATABASE_URL",
+    getattr(
+        Config,
+        "DATABASE_URL",
+        "postgresql://contextgate:contextgate_local@localhost:5432/contextgate",
+    ),
+)
 config.set_main_option("sqlalchemy.url", database_url)
 
 # 解释Python日志配置文件

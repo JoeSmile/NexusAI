@@ -3,8 +3,8 @@ name = "context-gate"
 version = "3.0.0"
 description = "The Intelligent Gateway for LLM Context Management"
 readme = "README.md"
-requires-python = ">=3.10"
-license = {text = "MIT"}
+requires-python = ">=3.11"
+license = {text = "Apache-2.0"}
 authors = [
     {name = "Joe"}
 ]
@@ -12,9 +12,8 @@ keywords = ["llm-gateway", "context-management", "observability", "ai-gateway"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
@@ -22,70 +21,44 @@ classifiers = [
 # 核心框架
 dependencies = [
     # 核心框架
-    "fastapi>=0.83.0",
+    "fastapi>=0.95.0,<0.100.0",
     "uvicorn[standard]>=0.17.0",
     "pydantic>=1.9.2,<2.0.0",
     "python-dotenv>=0.20.0",
     "requests>=2.25.0",
-    
+
     # LLM和LangChain
     "openai>=1.26.0,<2.0.0",
     "langchain>=0.2.0,<0.3.0",
     "langchain-openai>=0.1.10,<0.2.0",
     "langchain-community>=0.0.1,<0.3.0",
     "pandas>=2.0.0",
-    
+
     # 数据库 (PostgreSQL + pgvector)
     "psycopg2-binary>=2.9.0",
     "pgvector>=0.3.0,<0.4.0",
     "sqlalchemy>=1.4.0,<2.0.0",
     "alembic>=1.8.0",
-    
+
     # 文档处理
     "python-multipart>=0.0.9",
     "pypdf>=3.0.0",
-    
+    "PyPDF2>=2.0.0",
+
     # 依赖冲突修复
     "idna>=2.10",
     "anyio>=3.0.0",
     "sniffio>=1.3.0",
     "httpx>=0.25.0,<0.28.0",
     "protobuf>=3.19.0,<=3.20.3",
-    
-    # 多模态功能依赖
-    # 语音识别和合成
-    "openai-whisper>=20230314",
-    "pydub>=0.25.1",
-    "noisereduce>=2.0.0",
-    "librosa>=0.9.0",
-    "soundfile>=0.12.0",
-    
-    # 图像处理和分析
+
+    # 轻量工具
     "Pillow>=9.0.0",
-    "opencv-python>=4.5.0",
-    "deepface>=0.0.79",
-    "face-recognition>=1.3.0",
-    "pytesseract>=0.3.10",
-    
-    # 阿里云SDK
-    "aliyun-python-sdk-core>=2.15.0",
-    "aliyun-python-sdk-imageprocess>=2.0.0",
-    "aliyun-python-sdk-ocr>=1.0.0",
-    
-    # 音频处理
-    "gTTS>=2.5.0",
-    
-    # 其他多模态依赖
-    "numpy>=1.21.0,<1.24.0",
     "jieba>=0.42.1",
-    
-    # 其他必要依赖
     "beautifulsoup4>=4.9.0",
-    "PyPDF2>=2.0.0",
     "feedparser>=5.2.0",
-    
-    # 额外依赖
     "typing-extensions>=4.0.0",
+    "numpy>=1.21.0",
 ]
 
 [project.optional-dependencies]
@@ -96,6 +69,22 @@ dev = [
     "black>=23.0.0",
     "ruff>=0.1.0",
     "mypy>=1.0.0",
+]
+# 旧多模态能力（会拉 tensorflow，macOS/arm64 常装不上；需要时: uv sync --extra multimodal）
+multimodal = [
+    "openai-whisper>=20230314",
+    "pydub>=0.25.1",
+    "noisereduce>=2.0.0",
+    "librosa>=0.9.0",
+    "soundfile>=0.12.0",
+    "opencv-python>=4.5.0",
+    "deepface>=0.0.79",
+    "face-recognition>=1.3.0",
+    "pytesseract>=0.3.10",
+    "gTTS>=2.5.0",
+    "aliyun-python-sdk-core>=2.15.0",
+    "aliyun-python-sdk-imageprocess>=2.0.0",
+    "aliyun-python-sdk-ocr>=1.0.0",
 ]
 
 [project.urls]
@@ -109,7 +98,11 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.uv]
-# uv 特定配置
+# 应用仓库：不打包安装项目本身，只同步依赖
+package = false
+
+[tool.hatch.build.targets.wheel]
+packages = ["backend"]
 
 [tool.uv.sources]
 # 可以在这里指定自定义源，例如阿里云镜像

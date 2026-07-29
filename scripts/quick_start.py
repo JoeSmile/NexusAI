@@ -4,7 +4,6 @@
 自动完成数据库初始化、RAG知识库初始化，并启动服务
 """
 
-# 使用 SQLite3 兼容性模块（处理 Mac Python 3.10 兼容性问题）
 import sys
 import os
 
@@ -14,17 +13,6 @@ if os.name == "nt" and hasattr(sys.stdout, "reconfigure"):
 # 添加项目根目录到 Python 路径
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
-
-try:
-    from backend.utils.sqlite_compat import setup_sqlite3
-    setup_sqlite3()
-except ImportError:
-    # 如果模块还未创建，使用回退方案
-    try:
-        import pysqlite3 as sqlite3
-        sys.modules['sqlite3'] = sqlite3
-    except ImportError:
-        sys.modules['pysqlite3'] = __import__('sqlite3')
 
 import os
 import subprocess
@@ -50,7 +38,7 @@ def check_dependencies():
     missing = []
     required_packages = [
         "fastapi", "uvicorn", "sqlalchemy", "alembic",
-        "langchain", "chromadb", "openai"
+        "langchain", "pgvector", "openai"
     ]
     
     for package in required_packages:
@@ -63,10 +51,10 @@ def check_dependencies():
     
     if missing:
         print(f"\n⚠️  缺少依赖: {', '.join(missing)}")
-        print("💡 运行: pip install -r requirements.txt")
-        response = input("是否现在安装依赖? (y/n): ")
-        if response.lower() == 'y':
-            subprocess.run([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"], cwd=project_root)
+        print("💡 运行: uv sync")
+        response = input("是否现在执行 uv sync? (y/n): ")
+        if response.lower() == "y":
+            subprocess.run(["uv", "sync"], cwd=project_root, check=False)
         else:
             print("⚠️  继续启动，但可能遇到错误")
     

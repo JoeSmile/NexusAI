@@ -14,7 +14,10 @@ from pathlib import Path
 import uuid
 import os
 import sys
-import PyPDF2
+try:
+    import PyPDF2
+except ImportError:  # pragma: no cover
+    PyPDF2 = None
 import requests
 from bs4 import BeautifulSoup
 import asyncio

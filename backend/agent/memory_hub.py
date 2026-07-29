@@ -42,7 +42,7 @@ from backend.agent.activity_distiller import (
     PATTERNS_EMOTION_RESPONSE_PATH,
 )
 
-# 惰性导入：MemoryManager 依赖 chromadb，数据库依赖 SQLAlchemy，允许缺失
+# 惰性导入：MemoryManager / Database 允许在缺依赖时降级
 try:
     from backend.memory_manager import MemoryManager
 except ImportError:

@@ -60,7 +60,7 @@ class ChatEngine:
         if VECTOR_STORE_AVAILABLE:
             try:
                 self.vector_store = VectorStore()
-                print("✓ 向量数据库 (Chroma) 初始化成功")
+                print("✓ 向量数据库 (pgvector) 初始化成功")
             except Exception as e:
                 print("警告: 向量数据库初始化失败: {}，将仅使用MySQL".format(e))
                 self.vector_store = None

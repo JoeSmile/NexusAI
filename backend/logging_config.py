@@ -81,7 +81,7 @@ def setup_logging():
     logging.getLogger("uvicorn.error").addFilter(invalid_request_filter)
     logging.getLogger("fastapi").setLevel(logging.INFO)
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
-    logging.getLogger("chromadb").setLevel(logging.WARNING)
+    logging.getLogger("pgvector").setLevel(logging.WARNING)
     
     return root_logger
 

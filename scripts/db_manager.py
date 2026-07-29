@@ -53,7 +53,7 @@ def run_alembic_command(command: str, *args):
         
     except FileNotFoundError:
         print("❌ 错误: 找不到alembic命令")
-        print("💡 请确保已安装alembic: pip install alembic")
+        print("💡 请确保已安装 alembic: uv sync")
         return False
     except Exception as e:
         print(f"❌ 执行命令时出错: {e}")
@@ -64,9 +64,7 @@ def check_database_connection():
     """检查数据库连接"""
     try:
         print("🔍 检查数据库连接...")
-        print(f"   数据库: {Config.MYSQL_DATABASE}")
-        print(f"   主机: {Config.MYSQL_HOST}:{Config.MYSQL_PORT}")
-        print(f"   用户: {Config.MYSQL_USER}")
+        print(f"   URL: {Config.DATABASE_URL}")
         
         # 尝试连接数据库
         from sqlalchemy import text
@@ -80,9 +78,9 @@ def check_database_connection():
     except Exception as e:
         print(f"❌ 数据库连接失败: {e}")
         print("\n💡 故障排查建议:")
-        print("  1. 检查MySQL服务是否运行")
-        print("  2. 检查config.env中的数据库配置")
-        print("  3. 确保数据库已创建")
+        print("  1. 检查 PostgreSQL 是否运行（make up）")
+        print("  2. 检查 config.env 中的 DATABASE_URL")
+        print("  3. 确保数据库已创建（make db-init）")
         print("  4. 检查用户权限")
         return False
 

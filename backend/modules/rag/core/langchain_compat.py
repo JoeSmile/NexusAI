@@ -1,44 +1,56 @@
 #!/usr/bin/env python3
 """
 LangChain 兼容层
-统一使用 langchain 0.2.x+ (Python 3.10+)
+Chroma 已移除；向量检索改用 pgvector。
+文档加载器等在缺依赖时降级为 None，避免阻断应用启动。
 """
 
-# 1. Document Loaders
-from langchain_community.document_loaders import PyPDFLoader, DirectoryLoader, TextLoader
-
-# Prefer the new package to avoid LangChain deprecation warnings.
 try:
-    from langchain_chroma import Chroma
-except ImportError:  # pragma: no cover - compatibility fallback
-    from langchain_community.vectorstores import Chroma
+    from langchain_community.document_loaders import PyPDFLoader, DirectoryLoader, TextLoader
+except ImportError:  # pragma: no cover
+    PyPDFLoader = DirectoryLoader = TextLoader = None
 
-# 2. Embeddings
-from langchain_openai import OpenAIEmbeddings
+try:
+    from langchain_openai import OpenAIEmbeddings
+except ImportError:  # pragma: no cover
+    OpenAIEmbeddings = None
 
-# 3. Text Splitter
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+try:
+    from langchain.text_splitter import RecursiveCharacterTextSplitter
+except ImportError:  # pragma: no cover
+    try:
+        from langchain_text_splitters import RecursiveCharacterTextSplitter
+    except ImportError:
+        RecursiveCharacterTextSplitter = None
 
-# 4. Document
-from langchain_core.documents import Document
+try:
+    from langchain_core.documents import Document
+except ImportError:  # pragma: no cover
+    from dataclasses import dataclass, field
+    from typing import Any
 
-# 版本信息
+    @dataclass
+    class Document:
+        page_content: str = ""
+        metadata: dict = field(default_factory=dict)
+
 try:
     import langchain
     LANGCHAIN_VERSION = langchain.__version__
 except (ImportError, AttributeError):
     LANGCHAIN_VERSION = "unknown"
 
-IS_NEW_VERSION = True  # 统一使用新版本
+IS_NEW_VERSION = True
+Chroma = None
 
 __all__ = [
-    'PyPDFLoader',
-    'DirectoryLoader', 
-    'TextLoader',
-    'Chroma',
-    'OpenAIEmbeddings',
-    'RecursiveCharacterTextSplitter',
-    'Document',
-    'IS_NEW_VERSION',
-    'LANGCHAIN_VERSION'
+    "PyPDFLoader",
+    "DirectoryLoader",
+    "TextLoader",
+    "Chroma",
+    "OpenAIEmbeddings",
+    "RecursiveCharacterTextSplitter",
+    "Document",
+    "IS_NEW_VERSION",
+    "LANGCHAIN_VERSION",
 ]

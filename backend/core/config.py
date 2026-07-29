@@ -23,25 +23,23 @@ class Environment(Enum):
 
 @dataclass
 class DatabaseConfig:
-    """数据库配置"""
+    """数据库配置 — PostgreSQL + pgvector"""
     host: str = "localhost"
-    port: int = 3306
-    username: str = "root"
-    password: str = ""
-    database: str = "emotional_chat"
-    charset: str = "utf8mb4"
+    port: int = 5432
+    username: str = "contextgate"
+    password: str = "contextgate_local"
+    database: str = "contextgate"
     pool_size: int = 10
     max_overflow: int = 20
     pool_timeout: int = 30
     pool_recycle: int = 3600
-    
+
     @property
     def url(self) -> str:
         """数据库连接URL"""
         return (
-            f"mysql+pymysql://{self.username}:{self.password}"
+            f"postgresql://{self.username}:{self.password}"
             f"@{self.host}:{self.port}/{self.database}"
-            f"?charset={self.charset}"
         )
 
 
@@ -77,9 +75,10 @@ class OpenAIConfig:
 
 @dataclass
 class VectorDBConfig:
-    """向量数据库配置"""
-    persist_directory: str = "./chroma_db"
-    collection_name: str = "emotional_memories"
+    """向量数据库配置 — pgvector"""
+    backend: str = "pgvector"
+    dimension: int = 1536
+    collection_name: str = "contextgate_memories"
     chunk_size: int = 500
     chunk_overlap: int = 50
     embedding_model: str = "text-embedding-v1"
@@ -89,7 +88,7 @@ class VectorDBConfig:
 class RAGConfig:
     """RAG知识库配置"""
     enabled: bool = True
-    knowledge_base_path: str = "./chroma_db/psychology_kb"
+    knowledge_base_path: str = "./data/knowledge"
     search_k: int = 3
     max_context_length: int = 4000
     similarity_threshold: float = 0.7
@@ -100,7 +99,7 @@ class LoggingConfig:
     """日志配置"""
     level: str = "INFO"
     format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    file_path: str = "./logs/emotional_chat.log"
+    file_path: str = "./logs/contextgate.log"
     max_file_size: int = 10 * 1024 * 1024  # 10MB
     backup_count: int = 5
     enable_console: bool = True

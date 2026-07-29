@@ -1,57 +1,15 @@
 """Regression tests for memory tenant isolation and vector ownership."""
 
-import sys
-import types
-
-# The safety tests exercise logic with a fake collection and do not require the
-# optional Chroma runtime to be installed in the test environment.
-if "chromadb" not in sys.modules:
-    chromadb = types.ModuleType("chromadb")
-    chromadb_config = types.ModuleType("chromadb.config")
-    chromadb_utils = types.ModuleType("chromadb.utils")
-    chromadb_embeddings = types.ModuleType("chromadb.utils.embedding_functions")
-    chromadb_config.Settings = object
-    chromadb_embeddings.DefaultEmbeddingFunction = object
-    chromadb_utils.embedding_functions = chromadb_embeddings
-    chromadb.utils = chromadb_utils
-    sys.modules["chromadb"] = chromadb
-    sys.modules["chromadb.config"] = chromadb_config
-    sys.modules["chromadb.utils"] = chromadb_utils
-    sys.modules["chromadb.utils.embedding_functions"] = chromadb_embeddings
+from unittest.mock import MagicMock, patch
 
 from backend.agent.memory_hub import get_memory_hub, reset_memory_hub
 from backend.memory_manager import MemoryManager
 
 
-class FakeCollection:
-    def __init__(self):
-        self.rows = {
-            "alice-memory": {"user_id": "alice", "importance": 0.4},
-        }
-        self.deleted = []
-        self.updated = []
-
-    def get(self, ids, include=None):
-        found_ids = [memory_id for memory_id in ids if memory_id in self.rows]
-        return {
-            "ids": found_ids,
-            "metadatas": [self.rows[memory_id].copy() for memory_id in found_ids],
-        }
-
-    def delete(self, ids):
-        self.deleted.extend(ids)
-        for memory_id in ids:
-            self.rows.pop(memory_id, None)
-
-    def update(self, ids, metadatas):
-        self.updated.extend(zip(ids, metadatas))
-        for memory_id, metadata in zip(ids, metadatas):
-            self.rows[memory_id] = metadata.copy()
-
-
-def make_manager(collection):
+def make_manager(tenant_id: str = "default"):
     manager = MemoryManager.__new__(MemoryManager)
-    manager.memory_collection = collection
+    manager.memory_collection = True
+    manager.tenant_id = tenant_id
     return manager
 
 
@@ -82,26 +40,52 @@ def test_reset_memory_hub_can_target_one_user():
 
 
 def test_vector_delete_rejects_wrong_owner():
-    collection = FakeCollection()
-    manager = make_manager(collection)
+    manager = make_manager()
+    row = MagicMock()
+    row.user_id = "alice"
+    row.tenant_id = "default"
 
-    assert manager.delete_memory("bob", "alice-memory") is False
-    assert collection.deleted == []
-    assert "alice-memory" in collection.rows
+    session = MagicMock()
+    session.query.return_value.filter_by.return_value.first.return_value = row
+    sf = MagicMock()
+    sf.Session.return_value.__enter__.return_value = session
+    sf.Session.return_value.__exit__.return_value = False
+
+    with patch("backend.database.pgvector_session.get_pg_session", return_value=sf):
+        assert manager.delete_memory("bob", "1") is False
+    session.delete.assert_not_called()
 
 
 def test_vector_delete_allows_owner():
-    collection = FakeCollection()
-    manager = make_manager(collection)
+    manager = make_manager()
+    row = MagicMock()
+    row.user_id = "alice"
+    row.tenant_id = "default"
 
-    assert manager.delete_memory("alice", "alice-memory") is True
-    assert collection.deleted == ["alice-memory"]
+    session = MagicMock()
+    session.query.return_value.filter_by.return_value.first.return_value = row
+    sf = MagicMock()
+    sf.Session.return_value.__enter__.return_value = session
+    sf.Session.return_value.__exit__.return_value = False
+
+    with patch("backend.database.pgvector_session.get_pg_session", return_value=sf):
+        assert manager.delete_memory("alice", "1") is True
+    session.delete.assert_called_once_with(row)
+    session.commit.assert_called_once()
 
 
 def test_importance_update_changes_vector_metadata():
-    collection = FakeCollection()
-    manager = make_manager(collection)
+    manager = make_manager()
+    row = MagicMock()
+    row.confidence = 0.4
 
-    assert manager.update_memory_importance("alice-memory", 0.9) is True
-    assert collection.rows["alice-memory"]["importance"] == 0.9
-    assert collection.rows["alice-memory"]["user_id"] == "alice"
+    session = MagicMock()
+    session.query.return_value.filter_by.return_value.first.return_value = row
+    sf = MagicMock()
+    sf.Session.return_value.__enter__.return_value = session
+    sf.Session.return_value.__exit__.return_value = False
+
+    with patch("backend.database.pgvector_session.get_pg_session", return_value=sf):
+        assert manager.update_memory_importance("1", 0.9) is True
+    assert row.confidence == 0.9
+    session.commit.assert_called_once()

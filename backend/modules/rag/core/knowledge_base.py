@@ -9,17 +9,17 @@ from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
 import logging
 from datetime import datetime
-from chromadb.config import Settings as ChromaSettings
 
-# 使用兼容层统一处理 langchain 导入
+# 使用兼容层统一处理 langchain 导入（无 Chroma）
 from .langchain_compat import (
-    PyPDFLoader, DirectoryLoader, TextLoader, Chroma,
+    PyPDFLoader, DirectoryLoader, TextLoader,
     OpenAIEmbeddings, RecursiveCharacterTextSplitter, Document
 )
 
 from .chunking_selector import ChunkingStrategySelector
 
 from backend.logging_config import get_logger
+from backend.database import vector_ops
 from config import Config
 
 logger = get_logger(__name__)
@@ -30,7 +30,7 @@ class KnowledgeBaseManager:
     
     def __init__(
         self,
-        persist_directory: str = "./chroma_db/psychology_kb",
+        persist_directory: str = "./data/knowledge",
         chunking_strategy: str = "auto",
         chunk_size: int = 500,
         chunk_overlap: int = 50
@@ -48,7 +48,7 @@ class KnowledgeBaseManager:
         
         # 启用真实的 Embedding 模型 (使用配置的 API Key)
         api_key = Config.LLM_API_KEY
-        if api_key:
+        if api_key and OpenAIEmbeddings is not None:
             try:
                 self.embeddings = OpenAIEmbeddings(
                     openai_api_key=api_key,
@@ -62,21 +62,27 @@ class KnowledgeBaseManager:
                 self.embeddings = None
         else:
             self.embeddings = None
-            logger.warning("未配置 LLM_API_KEY，降级为文本匹配模式")
+            if not api_key:
+                logger.warning("未配置 LLM_API_KEY，降级为文本匹配模式")
             
-        self.vectorstore: Optional[Chroma] = None
-        self.chroma_client_settings = ChromaSettings(anonymized_telemetry=False)
+        # Chroma 已移除；检索走 pgvector knowledge_chunks
+        self.vectorstore = None
+        self.chroma_client_settings = None
+        self.tenant_id = "default"
         
-        # 确保目录存在
+        # 确保目录存在（文档源目录，非向量库）
         Path(persist_directory).mkdir(parents=True, exist_ok=True)
         
         # 文档分块器配置（保持向后兼容）
-        self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
-            length_function=len,
-            separators=["\n\n", "\n", "。", "！", "？", "；", ".", "!", "?", ";", " ", ""]
-        )
+        if RecursiveCharacterTextSplitter is not None:
+            self.text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
+                length_function=len,
+                separators=["\n\n", "\n", "。", "！", "？", "；", ".", "!", "?", ";", " ", ""]
+            )
+        else:
+            self.text_splitter = None
         
         # 初始化策略选择器
         self.chunking_strategy = chunking_strategy
@@ -247,260 +253,142 @@ class KnowledgeBaseManager:
                 logger.error(f"传统分块器也失败: {e2}")
                 raise
     
-    def create_vectorstore(self, chunks: List[Document]) -> Chroma:
-        """
-        创建向量存储
-        
-        Args:
-            chunks: 文档块列表
-            
-        Returns:
-            向量存储实例
-        """
+    def create_vectorstore(self, chunks: List[Document]):
+        """将文档块写入 pgvector knowledge_chunks"""
         try:
-            logger.info(f"开始创建向量存储，共 {len(chunks)} 个文档块")
-            
-            # 为每个文档块添加元数据
+            logger.info(f"开始写入 pgvector 知识库，共 {len(chunks)} 个文档块")
             for i, chunk in enumerate(chunks):
-                if 'chunk_id' not in chunk.metadata:
-                    chunk.metadata['chunk_id'] = i
-                if 'timestamp' not in chunk.metadata:
-                    chunk.metadata['timestamp'] = datetime.now().isoformat()
-            
-            # 如果没有嵌入函数，使用简单的文本存储
-            if self.embeddings is None:
-                logger.info("使用简单文本存储模式")
-                # 创建一个简单的文本存储，不使用向量
-                self.vectorstore = None
-                self.text_storage = chunks  # 直接存储文本块
-                logger.info("文本存储创建完成")
-                return None
-            else:
-                from langchain_community.vectorstores.utils import filter_complex_metadata
-                
-                # 过滤掉 Chroma 不支持的复杂 metadata (比如列表/字典)
-                filtered_chunks = filter_complex_metadata(chunks)
-                
-                vectorstore = Chroma.from_documents(
-                    documents=filtered_chunks,
-                    embedding=self.embeddings,
-                    persist_directory=self.persist_directory,
-                    client_settings=self.chroma_client_settings
+                meta = dict(chunk.metadata or {})
+                meta.setdefault("chunk_id", i)
+                meta.setdefault("timestamp", datetime.now().isoformat())
+                # 只保留简单类型
+                clean_meta = {
+                    k: v for k, v in meta.items() if isinstance(v, (str, int, float, bool))
+                }
+                vector_ops.add_knowledge(
+                    text=chunk.page_content,
+                    category=str(meta.get("category", "general")),
+                    tenant_id=self.tenant_id,
+                    metadata=clean_meta,
                 )
-                vectorstore.persist()
-                
-                self.vectorstore = vectorstore
-                logger.info("向量存储创建完成并持久化")
-                return vectorstore
+            self.vectorstore = "pgvector"
+            logger.info("pgvector 知识库写入完成")
+            return self.vectorstore
         except Exception as e:
             logger.error(f"创建向量存储失败: {e}")
             raise
     
-    def load_vectorstore(self) -> Chroma:
-        """
-        加载已存在的向量存储
-        
-        Returns:
-            向量存储实例
-        """
-        try:
-            logger.info(f"从 {self.persist_directory} 加载向量存储")
-            self.vectorstore = Chroma(
-                persist_directory=self.persist_directory,
-                embedding_function=self.embeddings,
-                client_settings=self.chroma_client_settings
-            )
-            logger.info("向量存储加载成功")
-            return self.vectorstore
-        except Exception as e:
-            logger.error(f"加载向量存储失败: {e}")
-            raise
+    def load_vectorstore(self):
+        """pgvector 无需从目录加载；标记就绪即可"""
+        self.vectorstore = "pgvector"
+        logger.info("pgvector 知识库就绪")
+        return self.vectorstore
     
     def add_documents(self, documents: List[Document]) -> None:
-        """
-        向现有向量存储添加文档
-        
-        Args:
-            documents: 新文档列表
-        """
+        """向 pgvector 添加文档"""
         try:
-            if self.vectorstore is None:
-                logger.warning("向量存储未初始化，尝试加载...")
-                try:
-                    self.load_vectorstore()
-                except:
-                    logger.info("向量存储不存在，创建新的向量存储")
-                    self.create_vectorstore(documents)
-                    return
-            
-            logger.info(f"向向量存储添加 {len(documents)} 个文档")
-            
-            # 分割文档
+            logger.info(f"向知识库添加 {len(documents)} 个文档")
             chunks = self.split_documents(documents)
-            
-            # 添加元数据
-            for i, chunk in enumerate(chunks):
-                chunk.metadata['timestamp'] = datetime.now().isoformat()
-            
-            # 添加到向量存储
-            self.vectorstore.add_documents(chunks)
-            self.vectorstore.persist()
-            
-            logger.info("文档添加完成并持久化")
+            self.create_vectorstore(chunks)
+            logger.info("文档添加完成")
         except Exception as e:
             logger.error(f"添加文档失败: {e}")
             raise
     
     def search_similar(self, query: str, k: int = 3, filter: Optional[Dict[str, Any]] = None) -> List[Document]:
-        """
-        相似度搜索
-        
-        Args:
-            query: 查询文本
-            k: 返回结果数量
-            filter: Chroma 元数据过滤器
-            
-        Returns:
-            相似文档列表
-        """
+        """pgvector 相似度搜索"""
         try:
-            # 如果使用简单文本存储
-            if self.embeddings is None and hasattr(self, 'text_storage'):
-                logger.info(f"使用简单文本搜索: {query[:50]}...")
-                # 简单的关键词匹配
-                query_lower = query.lower()
-                results = []
-                for doc in self.text_storage:
-                    # 简易 filter 匹配
-                    if filter:
-                        match = True
-                        for k_f, v_f in filter.items():
-                            if doc.metadata.get(k_f) != v_f:
-                                match = False
-                                break
-                        if not match:
-                            continue
-
-                    if query_lower in doc.page_content.lower():
-                        results.append(doc)
-                        if len(results) >= k:
-                            break
-                logger.info(f"简单搜索完成，返回 {len(results)} 个结果")
-                return results
-            
-            # 使用向量搜索
-            if self.vectorstore is None:
-                logger.info("向量存储未加载，尝试加载...")
-                self.load_vectorstore()
-            
-            logger.info(f"执行相似度搜索: {query[:50]}... filter: {filter}")
-            results = self.vectorstore.similarity_search(query, k=k, filter=filter)
-            logger.info(f"搜索完成，返回 {len(results)} 个结果")
-            return results
+            logger.info(f"执行相似度搜索: {query[:50]}...")
+            raw = vector_ops.search_knowledge(
+                query=query, tenant_id=self.tenant_id, n_results=k
+            )
+            docs: List[Document] = []
+            documents = (raw.get("documents") or [[]])[0]
+            metadatas = (raw.get("metadatas") or [[]])[0]
+            for i, content in enumerate(documents):
+                meta = metadatas[i] if i < len(metadatas) else {}
+                if filter:
+                    if any(meta.get(fk) != fv for fk, fv in filter.items()):
+                        continue
+                docs.append(Document(page_content=content, metadata=meta))
+            logger.info(f"搜索完成，返回 {len(docs)} 个结果")
+            return docs
         except Exception as e:
             logger.error(f"相似度搜索失败: {e}")
-            raise
+            return []
     
     def search_with_score(self, query: str, k: int = 3) -> List[Tuple[Document, float]]:
-        """
-        带评分的相似度搜索
-        
-        Args:
-            query: 查询文本
-            k: 返回结果数量
-            
-        Returns:
-            (文档, 相似度分数)元组列表
-        """
+        """带评分的相似度搜索"""
         try:
-            if self.vectorstore is None:
-                logger.info("向量存储未加载，尝试加载...")
-                self.load_vectorstore()
-            
-            logger.info(f"执行带评分的相似度搜索: {query[:50]}...")
-            results = self.vectorstore.similarity_search_with_score(query, k=k)
-            logger.info(f"搜索完成，返回 {len(results)} 个结果")
+            raw = vector_ops.search_knowledge(
+                query=query, tenant_id=self.tenant_id, n_results=k
+            )
+            documents = (raw.get("documents") or [[]])[0]
+            metadatas = (raw.get("metadatas") or [[]])[0]
+            distances = (raw.get("distances") or [[]])[0]
+            results = []
+            for i, content in enumerate(documents):
+                meta = metadatas[i] if i < len(metadatas) else {}
+                dist = distances[i] if i < len(distances) else 1.0
+                results.append((Document(page_content=content, metadata=meta), float(dist)))
             return results
         except Exception as e:
             logger.error(f"带评分的相似度搜索失败: {e}")
-            raise
+            return []
     
     def get_retriever(self, search_kwargs: Optional[Dict[str, Any]] = None):
-        """
-        获取检索器
-        
-        Args:
-            search_kwargs: 搜索参数
-            
-        Returns:
-            检索器实例
-        """
-        try:
-            if self.vectorstore is None:
-                logger.info("向量存储未加载，尝试加载...")
-                self.load_vectorstore()
-            
-            if search_kwargs is None:
-                search_kwargs = {"k": 3}
-            
-            retriever = self.vectorstore.as_retriever(search_kwargs=search_kwargs)
-            logger.info("检索器获取成功")
-            return retriever
-        except Exception as e:
-            logger.error(f"获取检索器失败: {e}")
-            raise
+        """返回简易可调用检索器（兼容 as_retriever 用法）"""
+        k = (search_kwargs or {}).get("k", 3)
+
+        class _PgRetriever:
+            def __init__(self, outer, top_k):
+                self.outer = outer
+                self.top_k = top_k
+
+            def get_relevant_documents(self, query: str):
+                return self.outer.search_similar(query, k=self.top_k)
+
+            def invoke(self, query: str):
+                return self.get_relevant_documents(query)
+
+        return _PgRetriever(self, k)
     
     def delete_collection(self) -> None:
-        """删除整个向量集合"""
+        """删除当前租户知识块"""
         try:
-            if self.vectorstore is not None:
-                self.vectorstore.delete_collection()
-                self.vectorstore = None
-                logger.info("向量集合已删除")
+            from backend.database.pgvector_session import KnowledgeChunk, get_pg_session
+
+            sf = get_pg_session()
+            with sf.Session() as session:
+                session.query(KnowledgeChunk).filter_by(tenant_id=self.tenant_id).delete()
+                session.commit()
+            self.vectorstore = None
+            logger.info("知识块已删除")
         except Exception as e:
             logger.error(f"删除向量集合失败: {e}")
             raise
     
     def get_stats(self) -> Dict[str, Any]:
-        """
-        获取知识库统计信息
-        
-        Returns:
-            统计信息字典
-        """
+        """获取知识库统计信息"""
         try:
-            # 检查文本存储模式（当embeddings为None时使用简单文本存储）
-            if hasattr(self, 'text_storage') and self.text_storage:
-                return {
-                    "status": "就绪",
-                    "document_count": len(self.text_storage),
-                    "persist_directory": self.persist_directory,
-                    "embedding_model": "文本存储模式"
-                }
-            
-            # 检查向量存储模式
-            if self.vectorstore is None:
-                return {
-                    "status": "未初始化",
-                    "document_count": 0
-                }
-            
-            # 获取集合信息
-            collection = self.vectorstore._collection
-            count = collection.count() if collection else 0
-            
+            from backend.database.pgvector_session import KnowledgeChunk, get_pg_session
+
+            sf = get_pg_session()
+            with sf.Session() as session:
+                count = (
+                    session.query(KnowledgeChunk)
+                    .filter_by(tenant_id=self.tenant_id)
+                    .count()
+                )
             return {
                 "status": "就绪",
                 "document_count": count,
-                "persist_directory": self.persist_directory,
-                "embedding_model": "OpenAI Ada-002"
+                "backend": "pgvector",
+                "embedding_model": "api-or-hash",
             }
         except Exception as e:
             logger.error(f"获取统计信息失败: {e}")
-            return {
-                "status": "错误",
-                "error": str(e)
-            }
+            return {"status": "错误", "error": str(e)}
 
 
 class PsychologyKnowledgeLoader:

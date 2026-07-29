@@ -36,17 +36,11 @@ class Config:
     # 禁用LangSmith以避免403错误
     LANGCHAIN_ENDPOINT = os.getenv("LANGCHAIN_ENDPOINT", "")
     
-    # 数据库配置
-    DATABASE_URL = os.getenv("DATABASE_URL")
-    MYSQL_HOST = os.getenv("MYSQL_HOST", "localhost")
-    MYSQL_PORT = int(os.getenv("MYSQL_PORT", "3306"))
-    MYSQL_USER = os.getenv("MYSQL_USER", "root")
-    MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD")
-    MYSQL_DATABASE = os.getenv("MYSQL_DATABASE", "emotional_chat")
-    
-    # 向量数据库配置（使用项目根目录的绝对路径）
-    CHROMA_PERSIST_DIRECTORY = os.getenv("CHROMA_PERSIST_DIRECTORY", 
-                                        os.path.join(PROJECT_ROOT, "chroma_db"))
+    # 数据库配置（PostgreSQL + pgvector）
+    DATABASE_URL = os.getenv(
+        "DATABASE_URL",
+        "postgresql://contextgate:contextgate_local@localhost:5432/contextgate",
+    )
     
     # 模型配置
     DEFAULT_MODEL = os.getenv("DEFAULT_MODEL") or os.getenv("DEEPSEEK_MODEL", "glm-5.1")

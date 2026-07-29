@@ -136,7 +136,8 @@ def create_app() -> FastAPI:
     app.include_router(evaluation_router)
     app.include_router(emotion_router)
     app.include_router(personalization_router)
-    app.include_router(rag_router)
+    if rag_router is not None:
+        app.include_router(rag_router)
     
     # 注册增强版聊天路由（如果可用）
     if ENHANCED_CHAT_ENABLED and enhanced_chat_router:
@@ -272,7 +273,7 @@ def create_app() -> FastAPI:
             "memory_system": {
                 "enabled": True,
                 "components": ["记忆提取器", "记忆管理器", "上下文组装器"],
-                "storage": ["向量数据库 (ChromaDB)", "关系数据库 (MySQL)"]
+                "storage": ["向量数据库 (pgvector)", "关系数据库 (PostgreSQL)"]
             },
             "features": {
                 "emotion_analysis": "情绪分析与追踪",

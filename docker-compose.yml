@@ -1,61 +1,53 @@
-version: '3.8'
-
 services:
   # 后端API服务
   contextgate:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        # 使用国内镜像源加速构建（可选：aliyun, tsinghua, ustc, 留空使用官方源）
-        APT_MIRROR: aliyun
-        PIP_MIRROR: aliyun
     ports:
       - "8000:8000"
     environment:
       - ENVIRONMENT=production
       - DEBUG=false
-      - DB_HOST=mysql
-      - DB_PORT=3306
-      - DB_USERNAME=emotional_chat
-      - DB_PASSWORD=emotional_chat_password
-      - DB_DATABASE=emotional_chat
+      - DATABASE_URL=postgresql://contextgate:contextgate_password@postgres:5432/contextgate
+      - DB_TYPE=postgresql
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LLM_API_KEY=${LLM_API_KEY:-${OPENAI_API_KEY}}
     volumes:
       - ./logs:/app/logs
-      - ./chroma_db:/app/chroma_db
       - ./uploads:/app/uploads
+      - ./data:/app/data
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - emotional_chat_network
+      - contextgate_network
 
-  # MySQL数据库
-  mysql:
-    image: mysql:8.0
+  # PostgreSQL + pgvector
+  postgres:
+    image: pgvector/pgvector:pg16
     environment:
-      - MYSQL_ROOT_PASSWORD=root_password
-      - MYSQL_DATABASE=emotional_chat
-      - MYSQL_USER=emotional_chat
-      - MYSQL_PASSWORD=emotional_chat_password
+      POSTGRES_DB: contextgate
+      POSTGRES_USER: contextgate
+      POSTGRES_PASSWORD: contextgate_password
     volumes:
-      - mysql_data:/var/lib/mysql
-      - ./backend/database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - pgvector_data:/var/lib/postgresql/data
+      - ./backend/database/init_pgvector.sql:/docker-entrypoint-initdb.d/init_pgvector.sql
     ports:
-      - "3306:3306"
+      - "5432:5432"
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      timeout: 20s
+      test: ["CMD-SHELL", "pg_isready -U contextgate -d contextgate"]
+      interval: 5s
+      timeout: 5s
       retries: 10
     restart: unless-stopped
     networks:
-      - emotional_chat_network
+      - contextgate_network
 
   # Redis缓存
   redis:
@@ -70,7 +62,7 @@ services:
       retries: 5
     restart: unless-stopped
     networks:
-      - emotional_chat_network
+      - contextgate_network
 
   # Nginx反向代理
   nginx:
@@ -85,7 +77,7 @@ services:
       - contextgate
     restart: unless-stopped
     networks:
-      - emotional_chat_network
+      - contextgate_network
 
   # 监控服务
   prometheus:
@@ -104,9 +96,8 @@ services:
       - '--web.enable-lifecycle'
     restart: unless-stopped
     networks:
-      - emotional_chat_network
+      - contextgate_network
 
-  # 日志收集
   grafana:
     image: grafana/grafana:latest
     ports:
@@ -119,9 +110,8 @@ services:
       - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
     restart: unless-stopped
     networks:
-      - emotional_chat_network
+      - contextgate_network
 
-  # 日志聚合
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.8.0
     environment:
@@ -134,9 +124,8 @@ services:
       - "9200:9200"
     restart: unless-stopped
     networks:
-      - emotional_chat_network
+      - contextgate_network
 
-  # 日志可视化
   kibana:
     image: docker.elastic.co/kibana/kibana:8.8.0
     environment:
@@ -147,15 +136,15 @@ services:
       - elasticsearch
     restart: unless-stopped
     networks:
-      - emotional_chat_network
+      - contextgate_network
 
 volumes:
-  mysql_data:
+  pgvector_data:
   redis_data:
   prometheus_data:
   grafana_data:
   elasticsearch_data:
 
 networks:
-  emotional_chat_network:
+  contextgate_network:
     driver: bridge

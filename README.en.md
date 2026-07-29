@@ -9,23 +9,22 @@ Enterprise LLM pre-processing pipeline with auth, multi-tenancy, guardrails, obs
 ## Quick Start
 
 ```bash
-# 1. Start infrastructure
-docker compose -f docker-compose.local.yml up -d
+# 1. Start infrastructure (postgres + pgvector)
+make up
 
 # 2. Install dependencies
-uv sync
+make sync
 
 # 3. Initialize database
-uv run python -c "from backend.database.pgvector_session import PGVectorSession; PGVectorSession().init_db()"
+make db-init
 
-# 4. Seed API keys
-uv run python scripts/seed_api_keys.py
-
-# 5. Start the API
-uv run uvicorn backend.app:app --reload
+# 4. Start the API
+make run
 ```
 
 Dev test client (frontend): http://localhost:3000 (to be replaced by Playground in v1.0)
+
+API key seeding lands in Batch 6 (`scripts/seed_api_keys.py`).
 
 ## Architecture
 

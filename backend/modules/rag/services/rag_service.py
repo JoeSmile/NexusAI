@@ -10,9 +10,18 @@ import logging
 # 使用兼容层处理 langchain 导入
 from ..core.langchain_compat import Document
 
-# 导入 LangChain (Python 3.10+, langchain 0.2.x+)
-from langchain.chains import RetrievalQA
-from langchain_core.prompts import PromptTemplate
+try:
+    from langchain.chains import RetrievalQA
+except ImportError:  # pragma: no cover
+    try:
+        from langchain.chains.retrieval_qa.base import RetrievalQA
+    except ImportError:
+        RetrievalQA = None
+
+try:
+    from langchain_core.prompts import PromptTemplate
+except ImportError:  # pragma: no cover
+    PromptTemplate = None
 
 from ..core.knowledge_base import KnowledgeBaseManager
 from backend.logging_config import get_logger

@@ -6,6 +6,7 @@ pgvector 数据库会话管理 + ORM 模型。
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
@@ -210,6 +211,20 @@ class LlmApiKey(Base):
     )
 
 
+class KnowledgeChunk(Base):
+    """RAG 知识块 — 替代 Chroma knowledge collection"""
+
+    __tablename__ = "knowledge_chunks"
+    id = Column(Integer, primary_key=True)
+    tenant_id = Column(String(50), nullable=False, default="default", index=True)
+    category = Column(String(100), default="general", index=True)
+    content = Column(Text, nullable=False)
+    source = Column(String(256), default="")
+    meta = Column(JSON, default=dict)
+    embedding = Column(Vector(1536), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class PGVectorSession:
     """pgvector 数据库会话管理器"""
 
@@ -225,6 +240,7 @@ class PGVectorSession:
         """创建所有表（仅首次部署使用）"""
         Base.metadata.create_all(self.engine)
 
+    @contextmanager
     def get_session(self):
         """上下文管理器获取 session"""
         session = self.Session()

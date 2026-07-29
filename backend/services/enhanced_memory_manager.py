@@ -182,24 +182,12 @@ class EnhancedMemoryManager:
     
     def __init__(self):
         """初始化增强版记忆管理器"""
-        self.vector_store = VectorStore()
+        self.tenant_id = "default"
+        self.vector_store = VectorStore(tenant_id=self.tenant_id)
         self.extractor = MemoryExtractor()
         self.short_term = ShortTermMemory()
         self.decay_calculator = MemoryDecayCalculator()
-        
-        # 创建专门的记忆集合
-        try:
-            from chromadb.utils import embedding_functions
-            default_ef = embedding_functions.DefaultEmbeddingFunction()
-            
-            self.memory_collection = self.vector_store.client.get_or_create_collection(
-                name="user_memories_enhanced",
-                embedding_function=default_ef,
-                metadata={"hnsw:space": "cosine"}
-            )
-        except Exception as e:
-            print(f"初始化记忆集合失败: {e}")
-            self.memory_collection = None
+        self.memory_collection = True  # pgvector 就绪标记
     
     async def process_conversation(self, 
                                    session_id: str, 
@@ -277,31 +265,20 @@ class EnhancedMemoryManager:
             return None
         
         try:
-            # 生成唯一ID
             import uuid
-            memory_id = f"{user_id}_{uuid.uuid4().hex[:12]}"
-            
-            # 准备存储文本（用于向量化）
-            memory_text = f"{memory.get('summary', '')} {memory.get('content', '')}"
-            
-            # 准备元数据
-            metadata = {
-                "user_id": user_id,
-                "session_id": session_id,
-                "type": memory.get("type", "other"),
-                "emotion": memory.get("emotion", "neutral"),
-                "intensity": float(memory.get("intensity", 5.0)),
-                "importance": float(memory.get("importance", 0.5)),
-                "timestamp": memory.get("timestamp", datetime.now().isoformat()),
-                "extraction_method": memory.get("extraction_method", "unknown")
-            }
-            
-            # 存储到向量数据库
-            self.memory_collection.add(
-                documents=[memory_text],
-                metadatas=[metadata],
-                ids=[memory_id]
+            from backend.database import vector_ops
+
+            memory_key = f"{memory.get('type', 'other')}_{uuid.uuid4().hex[:12]}"
+            memory_text = f"{memory.get('summary', '')} {memory.get('content', '')}".strip()
+            mid = vector_ops.store_user_memory(
+                tenant_id=self.tenant_id,
+                user_id=user_id,
+                key=memory_key,
+                value=memory_text or json.dumps(memory, ensure_ascii=False),
+                confidence=float(memory.get("importance", 0.5)),
+                source=memory.get("extraction_method", "extracted"),
             )
+            memory_id = str(mid) if mid is not None else memory_key
             
             # 同步到关系数据库
             with DatabaseManager() as db:
@@ -361,92 +338,53 @@ class EnhancedMemoryManager:
             return []
         
         try:
-            # 构建过滤条件
-            where_filter = {"user_id": user_id}
-            if emotion_filter:
-                where_filter["emotion"] = emotion_filter
-            
-            # 查询向量数据库（多检索一些，再过滤）
-            results = self.memory_collection.query(
-                query_texts=[query],
-                n_results=n_results * 3,
-                where=where_filter
+            from backend.database import vector_ops
+
+            results = vector_ops.search_user_memories(
+                tenant_id=self.tenant_id,
+                user_id=user_id,
+                query=query,
+                limit=n_results * 3,
+                min_score=0.25,
             )
-            
-            # 处理结果
+
             memories = []
-            if results and results.get("documents") and results["documents"][0]:
-                for i, doc in enumerate(results["documents"][0]):
-                    metadata = results["metadatas"][0][i] if results.get("metadatas") else {}
-                    distance = results["distances"][0][i] if results.get("distances") else 1.0
-                    
-                    # 解析时间戳
-                    timestamp_str = metadata.get("timestamp", "")
-                    try:
-                        memory_time = datetime.fromisoformat(timestamp_str)
-                        days_ago = (datetime.now() - memory_time).days
-                    except:
-                        days_ago = 0
-                    
-                    # 时间限制过滤
-                    if days_limit and days_ago > days_limit:
-                        continue
-                    
-                    # 计算相似度
-                    similarity = 1 - (distance / 2)
-                    if similarity < 0.25:  # 相似度阈值
-                        continue
-                    
-                    # 获取原始重要性
-                    original_importance = float(metadata.get("importance", 0.5))
-                    
-                    # 应用时间衰减
-                    if enable_decay:
-                        # 但对标记为重要的记忆，衰减速度更慢
-                        decay_rate = 0.95 if original_importance > 0.7 else 0.9
-                        current_importance = self.decay_calculator.decay_score(
-                            original_importance, 
-                            days_ago,
-                            decay_rate
-                        )
-                    else:
-                        current_importance = original_importance
-                    
-                    # 重要性过滤
-                    if current_importance < min_importance:
-                        continue
-                    
-                    # 计算综合分数（重要性40% + 相似度60%）
-                    final_score = current_importance * 0.4 + similarity * 0.6
-                    
-                    memories.append({
-                        "id": results["ids"][0][i] if results.get("ids") else "",
-                        "content": doc,
-                        "type": metadata.get("type", "other"),
-                        "emotion": metadata.get("emotion", "neutral"),
-                        "intensity": float(metadata.get("intensity", 5.0)),
-                        "importance": current_importance,
-                        "original_importance": original_importance,
-                        "timestamp": timestamp_str,
-                        "days_ago": days_ago,
-                        "similarity": similarity,
-                        "final_score": final_score,
-                        "extraction_method": metadata.get("extraction_method", "unknown")
-                    })
-            
-            # 按综合分数排序
-            memories.sort(key=lambda x: x["final_score"], reverse=True)
-            
-            # 更新访问统计
-            if memories:
-                await self._update_access_stats([m["id"] for m in memories[:n_results]])
-            
+            for item in results:
+                timestamp_str = item.get("timestamp", "")
+                try:
+                    memory_time = datetime.fromisoformat(timestamp_str)
+                    days_ago = (datetime.now() - memory_time).days
+                except Exception:
+                    days_ago = 0
+
+                if days_limit and days_ago > days_limit:
+                    continue
+
+                similarity = float(item.get("similarity", 0))
+                if similarity < 0.25:
+                    continue
+
+                if emotion_filter and item.get("emotion") != emotion_filter:
+                    continue
+
+                importance = float(item.get("importance", 0.5))
+                if enable_decay:
+                    importance = self.decay_calculator.decay_score(importance, float(days_ago))
+
+                if importance < min_importance:
+                    continue
+
+                memories.append({
+                    **item,
+                    "importance": importance,
+                    "days_ago": days_ago,
+                })
+
+            memories.sort(key=lambda x: x.get("importance", 0), reverse=True)
             return memories[:n_results]
             
         except Exception as e:
             print(f"检索记忆失败: {e}")
-            import traceback
-            traceback.print_exc()
             return []
     
     async def _update_access_stats(self, memory_ids: List[str]):

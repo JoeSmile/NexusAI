@@ -1,31 +1,39 @@
 """
 模块系统
-包含RAG、Agent、LLM、Intent等核心模块
+包含RAG、Agent、LLM、Intent等核心模块。
+包初始化不做重型导入，避免循环依赖。
 """
 
-# 使用可选导入，避免依赖问题
-__all__ = []
+__all__ = ["RAGModule", "AgentModule", "LLMModule", "IntentService"]
 
-try:
-    from .rag import RAGModule
-    __all__.append("RAGModule")
-except ImportError:
-    RAGModule = None
 
-try:
-    from .agent import AgentModule
-    __all__.append("AgentModule")
-except ImportError:
-    AgentModule = None
+def __getattr__(name: str):
+    if name == "RAGModule":
+        try:
+            from .rag import RAGModule  # type: ignore
 
-try:
-    from .llm import LLMModule
-    __all__.append("LLMModule")
-except ImportError:
-    LLMModule = None
+            return RAGModule
+        except Exception:
+            return None
+    if name == "AgentModule":
+        try:
+            from .agent import AgentModule
 
-try:
-    from .intent import IntentService
-    __all__.append("IntentService")
-except ImportError:
-    IntentService = None
+            return AgentModule
+        except Exception:
+            return None
+    if name == "LLMModule":
+        try:
+            from .llm import LLMModule
+
+            return LLMModule
+        except Exception:
+            return None
+    if name == "IntentService":
+        try:
+            from .intent import IntentService
+
+            return IntentService
+        except Exception:
+            return None
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

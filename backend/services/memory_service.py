@@ -56,7 +56,7 @@ class MemoryService:
         # 同步到关系数据库
         if memories:
             synced_ids = self._sync_memories_to_db(memories)
-            # Chroma is an index, not the source of truth. Remove entries whose
+            # pgvector UserMemory must match relational sync. Drop rows whose
             # relational write failed so they cannot leak into later retrievals.
             for memory in memories:
                 memory_id = memory.get("id")

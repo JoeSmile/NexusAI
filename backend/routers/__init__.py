@@ -9,8 +9,11 @@ from backend.routers.evaluation import router as evaluation_router
 from backend.routers.emotion_analysis import router as emotion_router
 from backend.routers.personalization import router as personalization_router
 
-# 模块化路由
-from backend.modules.rag.routers.rag_router import router as rag_router
+try:
+    from backend.modules.rag.routers.rag_router import router as rag_router
+except Exception:  # pragma: no cover
+    rag_router = None
+
 from backend.routers.agent import router as agent_router
 
 __all__ = [
@@ -23,4 +26,3 @@ __all__ = [
     "rag_router",
     "agent_router",
 ]
-
