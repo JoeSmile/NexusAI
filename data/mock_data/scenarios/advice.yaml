@@ -1,0 +1,13 @@
+scenario: "寻求建议"
+description: "用户寻求生活/工作建议"
+turns:
+  - user: "我该怎样提高自己的技术水平？"
+    emotion: "中性"
+    intensity: 5
+    intent: "advice"
+    response: "建议可以从这几个方面入手：1) 选择一个方向深耕 2) 多做开源项目 3) 定期复盘总结"
+  - user: "怎么跟同事处好关系？"
+    emotion: "中性"
+    intensity: 5
+    intent: "advice"
+    response: "好的同事关系需要：1) 主动沟通 2) 互相帮助 3) 尊重边界。你遇到什么具体问题了吗？"

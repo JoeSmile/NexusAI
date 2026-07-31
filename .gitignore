@@ -53,6 +53,8 @@ data/
 !data/
 data/*
 !data/.gitkeep
+!data/mock_data/
+!data/mock_data/**
 chroma_db/
 
 # Local assets
