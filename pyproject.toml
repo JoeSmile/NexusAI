@@ -59,6 +59,7 @@ dependencies = [
     "feedparser>=5.2.0",
     "typing-extensions>=4.0.0",
     "numpy>=1.21.0",
+    "prometheus-client>=0.17.0",
 ]
 
 [project.optional-dependencies]

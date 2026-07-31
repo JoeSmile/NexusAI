@@ -9,6 +9,7 @@ from backend.routers.evaluation import router as evaluation_router
 from backend.routers.emotion_analysis import router as emotion_router
 from backend.routers.personalization import router as personalization_router
 from backend.routers.admin import router as admin_router
+from backend.routers.audit import router as audit_router
 
 try:
     from backend.modules.rag.routers.rag_router import router as rag_router
@@ -19,6 +20,7 @@ from backend.routers.agent import router as agent_router
 
 __all__ = [
     "admin_router",
+    "audit_router",
     "chat_router",
     "memory_router",
     "feedback_router",

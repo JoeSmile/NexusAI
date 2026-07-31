@@ -222,3 +222,24 @@ INSERT INTO roles (name, permissions, description) VALUES
 ('tenant_admin', '["chat:*", "kb:*", "admin:approve", "admin:llm_key"]', '租户管理员'),
 ('user',        '["chat:write", "chat:read"]', '普通用户')
 ON CONFLICT (name) DO NOTHING;
+
+-- ========== Task 03: 审计日志 ==========
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id              SERIAL PRIMARY KEY,
+    tenant_id       VARCHAR(64) NOT NULL,
+    user_id         VARCHAR(128) NOT NULL,
+    action          VARCHAR(100) NOT NULL,
+    trace_id        VARCHAR(100),
+    input_text      TEXT,
+    output_text     TEXT,
+    model           VARCHAR(100) DEFAULT '',
+    input_tokens    INTEGER DEFAULT 0,
+    output_tokens   INTEGER DEFAULT 0,
+    cost            DOUBLE PRECISION DEFAULT 0.0,
+    latency_ms      DOUBLE PRECISION DEFAULT 0.0,
+    error_code      VARCHAR(50),
+    ip_address      VARCHAR(50) DEFAULT '',
+    user_agent      TEXT DEFAULT '',
+    created_at      TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_audit_tenant_time ON audit_logs(tenant_id, created_at);

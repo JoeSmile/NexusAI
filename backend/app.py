@@ -28,6 +28,7 @@ except ImportError:
 # 导入路由
 from backend.routers import (
     admin_router,
+    audit_router,
     chat_router,
     memory_router,
     feedback_router,
@@ -99,6 +100,15 @@ def create_app() -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc"
     )
+
+    from backend.core.errors import (
+        ContextGateException,
+        contextgate_exception_handler,
+        global_exception_handler,
+    )
+
+    app.add_exception_handler(ContextGateException, contextgate_exception_handler)
+    app.add_exception_handler(Exception, global_exception_handler)
     
     # CORS：浏览器不允许 allow_origins=["*"] 与 allow_credentials=True 同时使用
     _cors_all = os.getenv("CORS_ALLOW_ALL", "").strip().lower() in ("1", "true", "yes")
@@ -126,16 +136,29 @@ def create_app() -> FastAPI:
     )
 
     from backend.core.auth.signature_auth import SignatureMiddleware
+    from backend.core.metrics import MetricsMiddleware
+    from backend.core.tenant import TenantMiddleware
 
+    # LIFO: 后添加的先执行 → Tenant → Metrics → Signature → CORS
     app.add_middleware(SignatureMiddleware)
+    app.add_middleware(MetricsMiddleware)
+    app.add_middleware(TenantMiddleware)
     
     # 配置静态文件
     upload_dir = Path(project_root) / "uploads"
     upload_dir.mkdir(exist_ok=True)
     app.mount("/uploads", StaticFiles(directory=str(upload_dir)), name="uploads")
-    
+
+    from prometheus_client import make_asgi_app
+
+    app.mount("/metrics", make_asgi_app())
+
+    from backend.core.health import router as health_router
+
     # 注册路由
+    app.include_router(health_router)
     app.include_router(admin_router, prefix="/api")
+    app.include_router(audit_router, prefix="/api")
     app.include_router(chat_router)
     app.include_router(memory_router)
     app.include_router(feedback_router)
@@ -221,36 +244,6 @@ def create_app() -> FastAPI:
             "agent_enabled": AGENT_ENABLED,
             "timestamp": datetime.now().isoformat()
         }
-    
-    # 健康检查
-    @app.get("/health")
-    async def health_check():
-        """健康检查"""
-        try:
-            from backend.database import DatabaseManager
-            
-            # 测试数据库连接
-            db_manager = DatabaseManager()
-            db_manager.log_system_event("INFO", "Health check")
-            
-            return {
-                "status": "healthy",
-                "timestamp": datetime.now().isoformat(),
-                "version": "1.0.0",
-                "database": "connected",
-                "vector_db": "ready",
-                "memory_system": "enabled"
-            }
-        except Exception as e:
-            logger.error(f"健康检查失败: {e}")
-            return JSONResponse(
-                status_code=503,
-                content={
-                    "status": "unhealthy",
-                    "timestamp": datetime.now().isoformat(),
-                    "error": str(e)
-                }
-            )
     
     # 系统信息
     @app.get("/system/info")

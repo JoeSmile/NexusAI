@@ -272,6 +272,21 @@ class PGVectorSession:
         finally:
             session.close()
 
+    def query_with_tenant(
+        self,
+        model_class,
+        tenant_id: str,
+        user_id: str | None = None,
+    ):
+        """带租户隔离的查询 — 自动加 WHERE tenant_id=:tid（可选 user_id）"""
+        with self.Session() as session:
+            q = session.query(model_class).filter(model_class.tenant_id == tenant_id)
+            if user_id and hasattr(model_class, "user_id"):
+                q = q.filter(model_class.user_id == user_id)
+            rows = q.all()
+            session.expunge_all()
+            return rows
+
     def search_similar(
         self,
         tenant_id: str,
