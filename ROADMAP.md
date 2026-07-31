@@ -61,6 +61,50 @@
 - **文档列表/删除** — `GET/DELETE /api/documents`
 - **增量更新** — `POST /api/documents/reindex` 重建全部 embedding
 
+### 威胁情报 + 自动拉黑
+
+> 现在 guardrails 只是无状态拦截（来一次拦一次）。v1.1 加记仇机制，累积攻击行为后自动拉黑。
+
+- **ThreatIntel 模块** — 每请求记分板（key_hash + offense_type + count）
+- **三级响应:**
+  - `SUSPICIOUS`（1 次）→ 记日志，不处理
+  - `WATCHED`（2 次）→ 每次请求慢 500ms 惩罚，写审计告警
+  - `BLOCKED`（3 次）→ `api_keys.is_active = false`，自动拉黑
+- **触发源:** guardrails 拦截（注入/PII/违规）、rate_limiter 超限
+- **auth_check 集成:** pipeline 入口先查 threat_intel，拉黑的直接 403
+- **管理 API:** `GET /api/admin/threats` 查看拉黑列表，`POST /api/admin/threats/{id}/release` 解封
+
+**结构预留:**
+
+```
+backend/core/threat_intel/
+├── __init__.py
+├── scorer.py         ← 记分 + 分级判断
+├── rules.py          ← 什么行为记几分
+└── api.py            ← 管理 API
+```
+
+### 反思引擎 ReflectionEngine（可配置 BERT / LLM）
+
+> 流式模式下用户已经看到了答案，所以全量反思不是"阻止当前回答"，而是撤回机制 + 质量审计层。
+> 后端是可配置的：配了 BERT 用 BERT，配了便宜 LLM 用 LLM，都没配就关闭。
+
+- **ReflectionEngine 接口** — `backend/core/guardrails/reflector.py`
+  - 配置 `BERT_API_URL` → 本地 BERT 反射（快、便宜）
+  - 配置 `REFLECT_MODEL` → 便宜 LLM 反射（语义级）
+  - 都不配 / `REFLECT_ENABLED=false` → 关闭
+- **三项检查:**
+  - 意图一致性（回答是否偏离用户 Query）
+  - 幻觉实体检测（提取实体 → 查知识库）
+  - 违规内容（语义级，补充正则的盲区）
+- **两种落地方式:**
+  - **撤回机制:** 反思失败 → SSE 发 `{"type":"retraction"}`，前端撤回显示
+  - **质量审计:** 反思结果写 LangFuse + audit，标注 `hallucination_risk`，喂给后续评估
+
+**依赖 v1.0 已有的:**
+- SSE retraction 事件类型（v1.0 Subtask 02.06 已加）
+- guardrails_output 节点（v1.0 Task 09 已有）
+
 **结构预留:**
 
 ```
@@ -129,6 +173,75 @@ ContextGate (运行时)
 | `POST /api/admin/approve` | ai-platform 调用审批 |
 
 **标志:** ai-platform 可以零代码创建一个新的 AI 应用
+
+---
+
+## 小模型挂载点清单（Model Mount Points）
+
+> **背景:** 本项目多处使用小模型，v1.0 阶段全部 mock/降级。后期在另一台 Windows 机器上跑真实小模型（vLLM / Ollama / BERT 服务），本机通过 HTTP 调用。
+>
+> **核心原则:** 所有小模型走 **OpenAI 兼容接口**，配置化切换（Mac 上 mock，Windows 上真模型），代码零改动。
+
+### 挂载点总览
+
+| # | 挂载点 | 用途 | v1.0 现状 | v1.1+ 真模型 | 配置项 |
+|---|--------|------|----------|-------------|--------|
+| 1 | **Embedding** | 向量化文本（记忆/知识库） | `embed_text()` API 优先，无 key 回退哈希向量 | `bge-m3` / `text-embedding-3-small` (vLLM) | `EMBEDDING_MODEL` + `LLM_BASE_URL` |
+| 2 | **意图识别** | 分类用户意图（greeting/advice/query/...） | 大模型 JSON 输出 mock | BERT 分类器 (本地) | `INTENT_MODEL_URL` |
+| 3 | **记忆总结** | 每 N 轮压缩对话摘要（L3 冷记忆） | 大模型（便宜档） | 小模型专用 | `SUMMARY_MODEL` |
+| 4 | **反思引擎** | 生成后语义检查（意图一致/幻觉/违规） | 未启用（v1.1 才有） | 可配 BERT 或便宜 LLM | `BERT_API_URL` / `REFLECT_MODEL` |
+| 5 | **RAG ReRank** | 检索结果重排序 | 未启用 | `bge-reranker` (本地) | `RERANK_MODEL_URL` |
+| 6 | **校验模型** | 输出安全语义校验 | 正则拦截（快而廉价） | 语义级校验小模型 | `VALIDATOR_MODEL_URL` |
+
+### 统一接入方式
+
+所有挂载点共用同一个适配层，避免每个模块各写各的：
+
+```python
+# backend/core/models/model_registry.py (v1.1)
+class ModelRegistry:
+    """
+    统一小模型注册表。
+    每个挂载点是一个 provider，配置决定走哪个后端。
+    """
+
+    def get(self, mount_point: str) -> ModelEndpoint:
+        # mount_point: "embedding" | "intent"
+        #              | "summary" | "reflect" | "rerank" | "validator"
+        config = self._configs[mount_point]
+        if config.mock:      # v1.0 阶段：mock 或大模型兜底
+            return MockEndpoint(config)
+        if config.http_url:  # v1.1+：远程小模型服务（Windows 机器）
+            return OpenAICompatEndpoint(config.http_url, config.model)
+        return MockEndpoint(config)
+```
+
+### 配置切换（Mac mock → Windows 真模型）
+
+```env
+# ===== Mac 开发（默认，全部 mock / 大模型兜底）=====
+LLM_MOCK=true
+
+# ===== Windows 小模型机器（真模型）=====
+# 机器上跑 vLLM / Ollama，暴露 OpenAI 兼容接口
+# 例: vLLM 起 bge-m3 → http://192.168.1.100:8001/v1
+#      Ollama 起 qwen2.5-7b → http://192.168.1.100:11434/v1
+
+LLM_MOCK=false
+EMBEDDING_BASE_URL=http://192.168.1.100:8001/v1
+INTENT_MODEL_URL=http://192.168.1.100:8002/v1
+REFLECT_MODEL_URL=http://192.168.1.100:11434/v1
+RERANK_MODEL_URL=http://192.168.1.100:8003/v1
+```
+
+### 切换动作
+
+```
+Mac:  git clone + uv sync + LLM_MOCK=true          → 全 mock 跑通
+Windows: 起 vLLM/Ollama 容器 → 改 env 指向 IP        → 真模型生效
+```
+
+**标志:** 一套代码，两端跑，模型地址全在配置里
 
 ---
 
