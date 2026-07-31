@@ -321,9 +321,18 @@ def create_app() -> FastAPI:
             }
         
         return info
-    
+
+    # 启动时自动发现 Skill
+    try:
+        from backend.skills.registry import registry
+
+        registry.discover()
+        logger.info("Skill registry: %s skills loaded", len(registry._skills))
+    except Exception as e:
+        logger.warning("Skill discovery failed: %s", e)
+
     logger.info("应用初始化完成")
-    
+
     return app
 
 
