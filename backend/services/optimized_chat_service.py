@@ -11,7 +11,6 @@ from typing import Any
 from fastapi.responses import StreamingResponse
 
 from backend.logging_config import get_logger
-from backend.services.chat_service import ChatService
 from backend.services.performance_optimizer import (
     cache_manager,
     performance_optimizer,
@@ -21,11 +20,10 @@ from backend.services.performance_optimizer import (
 logger = get_logger(__name__)
 
 
-class OptimizedChatService(ChatService):
-    """优化的聊天服务"""
+class OptimizedChatService:
+    """优化的聊天服务（独立实现 — 原 ChatService 父类已删除，且父类属性从未被使用）"""
     
     def __init__(self):
-        super().__init__()
         self.performance_optimizer = performance_optimizer
         self.stream_handler = stream_handler
         self.cache_manager = cache_manager

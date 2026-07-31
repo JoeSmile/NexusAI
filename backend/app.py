@@ -152,9 +152,8 @@ def create_app() -> FastAPI:
     app.include_router(admin_router, prefix="/api")
     app.include_router(audit_router, prefix="/api")
     app.include_router(files_router)
-    # LangGraph 管线接管 /chat（旧 chat_router 保留但不再挂载主路径）
+    # LangGraph 管线接管 /chat（旧 chat_router 已删除，Batch 8）
     app.include_router(chat_pipeline_router)
-    # app.include_router(chat_router)  # DEPRECATED: 使用 chat_pipeline_router
     app.include_router(memory_router)
     app.include_router(feedback_router)
     app.include_router(evaluation_router)
@@ -238,7 +237,7 @@ def create_app() -> FastAPI:
     async def system_info():
         """系统信息"""
         routers_list = ["chat", "memory", "feedback", "evaluation"]
-        services_list = ["ChatService", "MemoryService", "ContextService"]
+        services_list = ["MemoryService", "ContextService"]
         
         # 如果Agent模块启用，添加Agent相关信息
         if AGENT_ENABLED:

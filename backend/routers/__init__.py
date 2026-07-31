@@ -4,7 +4,6 @@
 
 from backend.routers.admin import router as admin_router
 from backend.routers.audit import router as audit_router
-from backend.routers.chat import router as chat_router
 from backend.routers.evaluation import router as evaluation_router
 from backend.routers.feedback import router as feedback_router
 from backend.routers.memory import router as memory_router
@@ -24,7 +23,6 @@ __all__ = [
     "admin_router",
     "agent_router",
     "audit_router",
-    "chat_router",
     "evaluation_router",
     "feedback_router",
     "memory_router",
