@@ -1,0 +1,35 @@
+---
+description: After implementation, run code review; Important needs user OK, rest auto-fix
+alwaysApply: true
+---
+
+# Post-implementation code review workflow
+
+After finishing a batch, feature, or non-trivial change set — **before** asking the user “下一步” or starting the next batch — run a code review on the diff.
+
+## Sequence
+
+1. **Implement** against the batch/task plan.
+2. **Verify** with the plan’s verification commands (imports, unit checks, smoke).
+3. **Code review** the commit/diff (Standards + Spec when a plan exists; otherwise quality + security).
+4. **Triage findings** by severity:
+   - **Critical** — fix immediately (security, data loss, broken auth, wrong tenant isolation).
+   - **Important** — **do not auto-fix**. Present a short审核 list (what / why / options) and wait for the user’s decision.
+   - **Minor / nits / smells** — fix directly in the same session; no need to ask.
+5. After user decides on Important items, apply the chosen fixes, re-verify, then proceed (commit only if the user asked or the batch plan’s commit step is in progress).
+
+## Important 审核 format
+
+For each Important item, report:
+
+- **Finding** — one line
+- **Why it matters**
+- **Options** — A / B (or keep as-is), with a recommended default
+
+Do not bury Important items inside a long review dump.
+
+## Do not
+
+- Skip review because “it’s a small batch”
+- Auto-apply Important policy choices (role model, cross-tenant scope, signature gates, etc.)
+- Start the next batch while Important items are still unanswered

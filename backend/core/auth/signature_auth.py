@@ -138,7 +138,6 @@ async def _get_key_secret(key_id: str) -> str | None:
         sql = text("""
             SELECT access_key_secret FROM api_keys
             WHERE access_key_id = :kid AND is_active = true
-              AND signature_enabled = true
         """)
         row = session.execute(sql, {"kid": key_id}).fetchone()
     if row and row.access_key_secret:
@@ -173,9 +172,11 @@ def sign_request(
     path: str,
     body: bytes,
     secret: str,
-    access_key_id: str | None = None,
+    access_key_id: str,
 ) -> dict[str, str]:
-    """生成签名头（客户端使用）"""
+    """生成签名头（客户端使用）。access_key_id 必须与 api_keys.access_key_id 一致。"""
+    if not access_key_id:
+        raise ValueError("access_key_id is required")
     ts = str(int(time.time() * 1000))
     nonce = uuid.uuid4().hex
     body_hash = hashlib.sha256(body).hexdigest()
@@ -183,9 +184,8 @@ def sign_request(
     sig = hmac.new(
         secret.encode(), string_to_sign.encode(), hashlib.sha256
     ).hexdigest()
-    key_id = access_key_id or secret[:8]
     return {
-        "X-CG-Access-Key-Id": key_id,
+        "X-CG-Access-Key-Id": access_key_id,
         "X-CG-Signature": sig,
         "X-CG-Timestamp": ts,
         "X-CG-Nonce": nonce,

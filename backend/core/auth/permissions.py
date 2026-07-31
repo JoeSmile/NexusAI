@@ -8,6 +8,11 @@ from backend.core.auth.api_key_auth import verify_api_key
 from backend.core.auth.models import TenantContext
 
 
+def _attach_tenant(request: Request, tenant: TenantContext) -> TenantContext:
+    request.state.tenant_context = tenant
+    return tenant
+
+
 def require_permission(permission: str):
     """
     权限检查 Depends 工厂。
@@ -27,14 +32,13 @@ def require_permission(permission: str):
                 status_code=403,
                 detail={"code": "AUTH_002", "message": "insufficient_permissions"},
             )
-        request.state.tenant_context = tenant
-        return tenant
+        return _attach_tenant(request, tenant)
 
     return _check
 
 
 def cross_tenant_only():
-    """仅 super_admin 可访问"""
+    """仅跨租户角色（super_admin / auditor）可访问"""
 
     async def _check(
         request: Request,
@@ -45,8 +49,7 @@ def cross_tenant_only():
                 status_code=403,
                 detail={"code": "AUTH_003", "message": "cross_tenant_access_denied"},
             )
-        request.state.tenant_context = tenant
-        return tenant
+        return _attach_tenant(request, tenant)
 
     return _check
 
@@ -60,8 +63,7 @@ def require_any_permission(permissions: list[str]):
     ) -> TenantContext:
         for perm in permissions:
             if tenant.has_permission(perm):
-                request.state.tenant_context = tenant
-                return tenant
+                return _attach_tenant(request, tenant)
         raise HTTPException(
             status_code=403,
             detail={"code": "AUTH_002", "message": "insufficient_permissions"},

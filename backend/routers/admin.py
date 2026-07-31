@@ -122,10 +122,13 @@ async def delete_api_key(
 async def list_api_keys(
     tenant: TenantContext = Depends(require_permission("admin:*")),
 ):
-    """列出当前租户的 API Key（不返回 key_hash）"""
+    """列出 API Key（不返回 key_hash）。
+
+    当前租户默认只看本租户；super_admin（跨租户）可看全部租户。
+    """
     session_factory = get_pg_session()
     with session_factory.Session() as session:
-        if tenant.role == "super_admin" and tenant.is_cross_tenant:
+        if tenant.is_cross_tenant:
             sql = text("""
                 SELECT id, key_prefix, role, tenant_id, user_id,
                        is_active, description, created_at
