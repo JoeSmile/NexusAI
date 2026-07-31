@@ -67,6 +67,9 @@ class PipelineState(TypedDict):
     llm_key_id: Optional[str]
     llm_key_version: Optional[int]
 
+    # ── 流式（07.07e）──
+    stream_mode: bool
+
 
 def make_initial_state(
     tenant_id: str,
@@ -119,4 +122,5 @@ def make_initial_state(
         "llm_base_url": None,
         "llm_key_id": None,
         "llm_key_version": None,
+        "stream_mode": False,
     }

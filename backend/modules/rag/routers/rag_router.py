@@ -5,7 +5,7 @@ RAG路由
 """
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Dict, Any, Optional
 import os
 import tempfile
@@ -56,14 +56,15 @@ class AskRequest(BaseModel):
     """问答请求"""
     question: str
     search_k: int = 3
-    
-    class Config:
-        json_schema_extra = {
+
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "question": "我最近总是失眠，怎么办？",
                 "search_k": 3
             }
         }
+    )
 
 
 class AskWithContextRequest(BaseModel):
@@ -72,9 +73,9 @@ class AskWithContextRequest(BaseModel):
     conversation_history: Optional[List[Dict[str, str]]] = None
     user_emotion: Optional[str] = None
     search_k: int = 3
-    
-    class Config:
-        json_schema_extra = {
+
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "question": "有什么具体的方法可以帮助我入睡吗？",
                 "conversation_history": [
@@ -85,32 +86,35 @@ class AskWithContextRequest(BaseModel):
                 "search_k": 3
             }
         }
+    )
 
 
 class SearchRequest(BaseModel):
     """搜索请求"""
     query: str
     k: int = 3
-    
-    class Config:
-        json_schema_extra = {
+
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "query": "焦虑应对方法",
                 "k": 3
             }
         }
+    )
 
 
 class LoadSampleRequest(BaseModel):
     """加载示例知识请求"""
     overwrite: bool = False
-    
-    class Config:
-        json_schema_extra = {
+
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "overwrite": False
             }
         }
+    )
 
 
 # ========== API端点 ==========

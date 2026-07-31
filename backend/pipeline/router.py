@@ -46,7 +46,6 @@ class ChatResponse(BaseModel):
 
 
 @router.post("/chat", response_model=ChatResponse)
-@observe(name="chat.pipeline")
 async def chat_pipeline(
     request: Request,
     body: ChatRequest,
@@ -54,6 +53,17 @@ async def chat_pipeline(
     tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
     """处理聊天请求 — 走 LangGraph 管线"""
+    # 注意: 不能把 @observe 直接挂在 FastAPI 路由上（会破坏签名/Depends）
+    return await _run_chat_pipeline(request, body, background_tasks, tenant)
+
+
+@observe(name="chat.pipeline")
+async def _run_chat_pipeline(
+    request: Request,
+    body: ChatRequest,
+    background_tasks: BackgroundTasks,
+    tenant: TenantContext,
+):
     start = time.time()
 
     initial = make_initial_state(
@@ -127,8 +137,8 @@ async def chat_streaming(
     tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
     """
-    SSE 骨架（04.11）+ abort/retraction（09.04）。
-    长路径假 token 流；完整 Harness stream 见 07.07e。
+    SSE（04.11）+ abort/retraction（09.04）+ LLMHarness.stream（07.07e）。
+    短路径 JSON；长路径真流式（有 key 时 OpenAI astream，否则 mock 切片）。
     """
     initial = make_initial_state(
         tenant_id=tenant.tenant_id,
@@ -143,17 +153,35 @@ async def chat_streaming(
         },
         trace_id=getattr(request.state, "trace_id", None),
     )
+    initial["stream_mode"] = True
 
     final = await compiled_graph.ainvoke(initial)
-    if final.get("finish_reason") in ("skill_executed", "cache_hit", "blocked"):
+    if final.get("finish_reason") in (
+        "skill_executed",
+        "cache_hit",
+        "blocked",
+        "PENDING_APPROVAL",
+        "AUTH_002",
+    ):
         return JSONResponse({"response": final.get("response", "")})
 
-    text = final.get("response") or ""
+    from backend.core.harness import LLMHarness
+    from backend.pipeline.nodes.write_memory import write_memory
+
+    harness = LLMHarness()
+    model = final.get("selected_model") or "deepseek-chat"
+    prompt = final.get("raw_input") or final.get("message") or ""
 
     async def event_stream() -> AsyncIterator[str]:
         buffer = ""
-        for ch in text:
-            buffer += ch
+        async for tok in harness.stream(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            tenant_id=final["tenant_id"],
+            api_key=final.get("llm_api_key") or "",
+            base_url=final.get("llm_base_url") or "",
+        ):
+            buffer += tok
             if _STREAM_FILTER.search(buffer):
                 yield (
                     "data: "
@@ -167,7 +195,7 @@ async def chat_streaming(
                 return
             yield (
                 "data: "
-                + json.dumps({"token": ch}, ensure_ascii=False)
+                + json.dumps({"token": tok}, ensure_ascii=False)
                 + "\n\n"
             )
 
@@ -180,6 +208,11 @@ async def chat_streaming(
                 )
                 + "\n\n"
             )
+            buffer = buffer[:4000]
+
+        final["response"] = buffer
+        final["finish_reason"] = "llm_generated"
+        await write_memory(final)
         background_tasks.add_task(lambda: None)
         yield "data: [DONE]\n\n"
 

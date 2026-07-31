@@ -6,7 +6,7 @@ LLM模块数据模型
 from typing import List, Dict, Any, Optional, Union
 from datetime import datetime
 from enum import Enum
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from backend.schemas.common_schemas import BaseResponse
 
@@ -40,8 +40,9 @@ class LLMRequest(BaseModel):
     stop: Optional[Union[str, List[str]]] = Field(None, description="停止词")
     stream: bool = Field(False, description="是否流式输出")
     provider: LLMProvider = Field(LLMProvider.OPENAI, description="LLM提供商")
-    
-    @validator('messages')
+
+    @field_validator('messages')
+    @classmethod
     def validate_messages(cls, v):
         if not v:
             raise ValueError('消息列表不能为空')
@@ -58,11 +59,6 @@ class LLMResponse(BaseModel):
     created_at: datetime = Field(default_factory=datetime.now, description="创建时间")
     response_time: float = Field(..., description="响应时间")
     metadata: Optional[Dict[str, Any]] = Field(None, description="元数据")
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
 
 
 class ChatMessage(BaseModel):
@@ -73,13 +69,9 @@ class ChatMessage(BaseModel):
     function_call: Optional[Dict[str, Any]] = Field(None, description="函数调用")
     tool_calls: Optional[List[Dict[str, Any]]] = Field(None, description="工具调用")
     timestamp: Optional[datetime] = Field(None, description="消息时间戳")
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
-    
-    @validator('content')
+
+    @field_validator('content')
+    @classmethod
     def validate_content(cls, v):
         if not v or not v.strip():
             raise ValueError('消息内容不能为空')
@@ -104,11 +96,6 @@ class LLMError(BaseModel):
     details: Optional[Dict[str, Any]] = Field(None, description="错误详情")
     timestamp: datetime = Field(default_factory=datetime.now, description="错误时间")
     request_id: Optional[str] = Field(None, description="请求ID")
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
 
 
 class CompletionRequest(BaseModel):
@@ -123,8 +110,9 @@ class CompletionRequest(BaseModel):
     stop: Optional[Union[str, List[str]]] = Field(None, description="停止词")
     stream: bool = Field(False, description="是否流式输出")
     provider: LLMProvider = Field(LLMProvider.OPENAI, description="LLM提供商")
-    
-    @validator('prompt')
+
+    @field_validator('prompt')
+    @classmethod
     def validate_prompt(cls, v):
         if not v.strip():
             raise ValueError('提示文本不能为空')
@@ -140,11 +128,6 @@ class CompletionResponse(BaseModel):
     finish_reason: str = Field(..., description="完成原因")
     created_at: datetime = Field(default_factory=datetime.now, description="创建时间")
     response_time: float = Field(..., description="响应时间")
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
 
 
 class LLMConfig(BaseModel):
@@ -160,9 +143,9 @@ class LLMConfig(BaseModel):
     rate_limit: Optional[int] = Field(None, description="速率限制")
     enable_streaming: bool = Field(True, description="是否启用流式输出")
     enable_function_calling: bool = Field(False, description="是否启用函数调用")
-    
-    class Config:
-        json_schema_extra = {
+
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "provider": "openai",
                 "api_key": "sk-...",
@@ -177,6 +160,7 @@ class LLMConfig(BaseModel):
                 "enable_function_calling": False
             }
         }
+    )
 
 
 class ModelInfo(BaseModel):
@@ -203,14 +187,7 @@ class LLMStats(BaseModel):
     requests_by_provider: Dict[str, int] = Field(default_factory=dict, description="按提供商统计")
     requests_by_model: Dict[str, int] = Field(default_factory=dict, description="按模型统计")
     last_updated: datetime = Field(default_factory=datetime.now, description="最后更新时间")
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
 
 
-# 更新前向引用（Pydantic v1 自动处理前向引用，不需要 model_rebuild）
-# 注意: model_rebuild() 是 Pydantic v2 的方法，v1 不需要
-# LLMRequest.model_rebuild()  # Pydantic v1 不需要此调用
-# LLMResponse.model_rebuild()  # Pydantic v1 不需要此调用
+LLMRequest.model_rebuild()
+LLMResponse.model_rebuild()

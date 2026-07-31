@@ -85,7 +85,7 @@ async def write_memory(state: PipelineState) -> PipelineState:
 
             fingerprint = state.get("fingerprint")
             if fingerprint:
-                template_key = f"template:{fingerprint}"
+                template_key = f"template:{tenant_id}:{fingerprint}"
                 session.execute(
                     text("DELETE FROM cache_entries WHERE cache_key = :k"),
                     {"k": template_key},

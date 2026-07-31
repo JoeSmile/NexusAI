@@ -1,9 +1,7 @@
 """
-Minimal StateGraph shim — Batch 4 可运行管线。
+LangGraph 兼容层。
 
-真实 `langgraph` 当前与项目 pydantic<2 锁冲突；API 对齐 batch-04 用法：
-add_node / add_edge / add_conditional_edges / set_entry_point / compile / ainvoke。
-Batch 6 升级 pydantic v2 后可切换为官方 langgraph。
+优先使用官方 `langgraph`；不可用时回退到本文件最小 StateGraph shim。
 """
 
 from __future__ import annotations
@@ -87,12 +85,17 @@ class StateGraph:
         )
 
 
+_USING_OFFICIAL = False
 try:
     from langgraph.graph import END as _LG_END  # type: ignore
     from langgraph.graph import StateGraph as _LG_StateGraph  # type: ignore
 
     StateGraph = _LG_StateGraph  # type: ignore
     END = _LG_END  # type: ignore
+    _USING_OFFICIAL = True
 except Exception:
-    # ImportError 或 pydantic 不兼容时继续用本文件 shim
     pass
+
+
+def using_official_langgraph() -> bool:
+    return _USING_OFFICIAL

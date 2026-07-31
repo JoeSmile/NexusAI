@@ -23,7 +23,7 @@ import uuid
 from typing import Dict, Any, Optional, List, Union, Tuple
 from datetime import datetime
 from enum import Enum
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 
 # 延迟导入上下文服务，避免循环导入
 try:
@@ -56,11 +56,6 @@ class MCPToolCall(BaseModel):
     tool_name: str = Field(..., description="工具名称")
     parameters: Dict[str, Any] = Field(default_factory=dict, description="工具参数")
     timestamp: datetime = Field(default_factory=datetime.now, description="调用时间")
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
 
 
 class MCPToolResponse(BaseModel):
@@ -72,11 +67,6 @@ class MCPToolResponse(BaseModel):
     error: Optional[str] = Field(None, description="错误信息")
     execution_time: Optional[float] = Field(None, description="执行时间（秒）")
     timestamp: datetime = Field(default_factory=datetime.now, description="响应时间")
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
 
 
 class MCPContext(BaseModel):
@@ -120,12 +110,7 @@ class MCPMessage(BaseModel):
     source_module: Optional[str] = Field(None, description="来源模块")
     target_module: Optional[str] = Field(None, description="目标模块")
     metadata: Optional[Dict[str, Any]] = Field(None, description="额外元数据")
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典（用于JSON序列化）"""
         return {
@@ -133,8 +118,8 @@ class MCPMessage(BaseModel):
             "message_type": self.message_type.value,
             "content": self.content,
             "context": self.context.to_dict(),
-            "tool_calls": [tc.dict() for tc in self.tool_calls],
-            "tool_responses": [tr.dict() for tr in self.tool_responses],
+            "tool_calls": [tc.model_dump() for tc in self.tool_calls],
+            "tool_responses": [tr.model_dump() for tr in self.tool_responses],
             "timestamp": self.timestamp.isoformat(),
             "source_module": self.source_module,
             "target_module": self.target_module,

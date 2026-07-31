@@ -1,19 +1,19 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
 class Message(BaseModel):
     role: str  # "user" or "assistant"
     content: str
-    timestamp: datetime = datetime.now()
+    timestamp: datetime = Field(default_factory=datetime.now)
     emotion: Optional[str] = None  # 情感标签
 
 class ChatSession(BaseModel):
     session_id: str
     user_id: Optional[str] = None
-    messages: List[Message] = []
-    created_at: datetime = datetime.now()
-    updated_at: datetime = datetime.now()
+    messages: List[Message] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
     emotion_state: Optional[Dict[str, Any]] = None  # 当前情感状态
 
 class ChatRequest(BaseModel):
@@ -29,7 +29,7 @@ class ChatResponse(BaseModel):
     emotion: Optional[str] = None
     emotion_intensity: Optional[float] = None
     suggestions: Optional[List[str]] = None
-    timestamp: datetime = datetime.now()
+    timestamp: datetime = Field(default_factory=datetime.now)
     context: Optional[Dict[str, Any]] = None
     plugin_used: Optional[str] = None  # 使用的插件名称
     plugin_result: Optional[Dict[str, Any]] = None  # 插件调用结果
@@ -52,7 +52,7 @@ class MultimodalResponse(BaseModel):
     emotion: Optional[str] = None
     emotion_intensity: Optional[float] = None
     suggestions: Optional[List[str]] = None
-    timestamp: datetime = datetime.now()
+    timestamp: datetime = Field(default_factory=datetime.now)
     context: Optional[Dict[str, Any]] = None
     audio_url: Optional[str] = None  # 语音回复URL
     multimodal_emotion: Optional[Dict[str, Any]] = None  # 多模态情感融合结果

@@ -6,7 +6,7 @@
 
 from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from enum import Enum
 
 
@@ -23,20 +23,15 @@ class BaseResponse(BaseModel):
     message: str = Field(..., description="响应消息")
     timestamp: datetime = Field(default_factory=datetime.now, description="响应时间戳")
     status_code: int = Field(200, description="HTTP状态码")
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
 
 
 class ErrorResponse(BaseResponse):
     """错误响应模型"""
     success: bool = Field(False, description="请求失败")
     error: Dict[str, Any] = Field(..., description="错误详情")
-    
-    class Config:
-        json_schema_extra = {
+
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "success": False,
                 "message": "请求失败",
@@ -52,20 +47,23 @@ class ErrorResponse(BaseResponse):
                 "status_code": 400
             }
         }
+    )
 
 
 class PaginationRequest(BaseModel):
     """分页请求模型"""
     page: int = Field(1, ge=1, description="页码，从1开始")
     page_size: int = Field(20, ge=1, le=100, description="每页大小，最大100")
-    
-    @validator('page')
+
+    @field_validator('page')
+    @classmethod
     def validate_page(cls, v):
         if v < 1:
             raise ValueError('页码必须大于0')
         return v
-    
-    @validator('page_size')
+
+    @field_validator('page_size')
+    @classmethod
     def validate_page_size(cls, v):
         if v < 1 or v > 100:
             raise ValueError('每页大小必须在1-100之间')
@@ -80,23 +78,14 @@ class PaginationResponse(BaseModel):
     total_pages: int = Field(..., description="总页数")
     has_next: bool = Field(..., description="是否有下一页")
     has_prev: bool = Field(..., description="是否有上一页")
-    
-    @validator('total_pages', always=True)
-    def calculate_total_pages(cls, v, values):
-        total = values.get('total', 0)
-        page_size = values.get('page_size', 1)
-        return (total + page_size - 1) // page_size
-    
-    @validator('has_next', always=True)
-    def calculate_has_next(cls, v, values):
-        page = values.get('page', 1)
-        total_pages = values.get('total_pages', 1)
-        return page < total_pages
-    
-    @validator('has_prev', always=True)
-    def calculate_has_prev(cls, v, values):
-        page = values.get('page', 1)
-        return page > 1
+
+    @model_validator(mode='after')
+    def compute_pagination(self):
+        total_pages = (self.total + self.page_size - 1) // self.page_size
+        self.total_pages = total_pages
+        self.has_next = self.page < total_pages
+        self.has_prev = self.page > 1
+        return self
 
 
 class HealthCheckResponse(BaseModel):
@@ -106,12 +95,9 @@ class HealthCheckResponse(BaseModel):
     uptime: Optional[str] = Field(None, description="运行时间")
     services: Dict[str, str] = Field(..., description="各服务状态")
     timestamp: datetime = Field(default_factory=datetime.now, description="检查时间")
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
-        json_schema_extra = {
+
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "status": "healthy",
                 "version": "3.0.0",
@@ -125,6 +111,7 @@ class HealthCheckResponse(BaseModel):
                 "timestamp": "2025-10-16T14:30:00Z"
             }
         }
+    )
 
 
 class SystemInfoResponse(BaseModel):
@@ -136,11 +123,6 @@ class SystemInfoResponse(BaseModel):
     architecture: str = Field(..., description="系统架构")
     agent_enabled: bool = Field(..., description="Agent模块是否启用")
     timestamp: datetime = Field(default_factory=datetime.now, description="响应时间")
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
 
 
 class StatisticsResponse(BaseModel):
@@ -152,11 +134,6 @@ class StatisticsResponse(BaseModel):
     emotion_distribution: Optional[Dict[str, int]] = Field(None, description="情绪分布")
     time_range: Optional[str] = Field(None, description="统计时间范围")
     timestamp: datetime = Field(default_factory=datetime.now, description="统计时间")
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
 
 
 class FileUploadResponse(BaseModel):
@@ -167,11 +144,6 @@ class FileUploadResponse(BaseModel):
     upload_id: str = Field(..., description="上传ID")
     url: Optional[str] = Field(None, description="文件访问URL")
     timestamp: datetime = Field(default_factory=datetime.now, description="上传时间")
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
 
 
 class SearchRequest(BaseModel):
@@ -181,8 +153,9 @@ class SearchRequest(BaseModel):
     sort_by: Optional[str] = Field(None, description="排序字段")
     sort_order: str = Field("desc", pattern="^(asc|desc)$", description="排序顺序")
     pagination: PaginationRequest = Field(default_factory=PaginationRequest, description="分页参数")
-    
-    @validator('query')
+
+    @field_validator('query')
+    @classmethod
     def validate_query(cls, v):
         if not v.strip():
             raise ValueError('搜索关键词不能为空')
@@ -204,8 +177,9 @@ class BatchRequest(BaseModel):
     items: List[Dict[str, Any]] = Field(..., description="批量操作项目")
     operation: str = Field(..., description="操作类型")
     options: Optional[Dict[str, Any]] = Field(None, description="操作选项")
-    
-    @validator('items')
+
+    @field_validator('items')
+    @classmethod
     def validate_items(cls, v):
         if not v:
             raise ValueError('批量操作项目不能为空')
@@ -234,9 +208,9 @@ class ValidationErrorResponse(BaseResponse):
     """验证错误响应"""
     success: bool = Field(False, description="验证失败")
     errors: List[ValidationErrorDetail] = Field(..., description="验证错误列表")
-    
-    class Config:
-        json_schema_extra = {
+
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "success": False,
                 "message": "输入验证失败",
@@ -256,3 +230,4 @@ class ValidationErrorResponse(BaseResponse):
                 "status_code": 422
             }
         }
+    )

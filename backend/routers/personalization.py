@@ -216,7 +216,7 @@ async def create_or_update_config(
         
         if config_db:
             # 更新现有配置
-            update_dict = update_data.dict(exclude_unset=True)
+            update_dict = update_data.model_dump(exclude_unset=True)
             
             for key, value in update_dict.items():
                 if value is not None:

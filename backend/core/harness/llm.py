@@ -1,4 +1,4 @@
-"""LLM Harness — token / cost / LangFuse + stream"""
+"""LLM Harness — token / cost / LangFuse + real stream"""
 
 from __future__ import annotations
 
@@ -98,18 +98,76 @@ class LLMHarness(Harness):
         base_url: str | None = None,
         **kwargs: Any,
     ) -> AsyncIterator[str]:
-        """边生成边 yield token（07.07e）；当前基于 generate 后切分 stub。"""
-        result = await self.generate(
-            model=model,
-            messages=messages,
-            tenant_id=tenant_id,
-            api_key=api_key,
-            base_url=base_url,
-            **kwargs,
-        )
-        text = str(result.output or "")
-        for ch in text:
-            yield ch
+        """真流式：优先 OpenAI-compatible astream；否则 mock/降级切片。"""
+        estimated = estimate_cost(model, kwargs.get("max_tokens", 1000))
+        if not await check_budget(tenant_id, estimated):
+            yield "预算超限，请求被拒绝。"
+            return
+
+        key = api_key or os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or ""
+        mock = os.getenv("LLM_MOCK", "true").lower() == "true"
+        input_tokens = sum(count_tokens(m.get("content", "")) for m in messages)
+        collected: list[str] = []
+
+        if mock or not key:
+            from backend.pipeline.llm_helper import generate_text
+
+            prompt = "\n".join(m.get("content", "") for m in messages)
+            text = await generate_text(
+                prompt, model=model, api_key=key, base_url=base_url or ""
+            )
+            for ch in text:
+                collected.append(ch)
+                yield ch
+        else:
+            try:
+                from openai import AsyncOpenAI
+
+                client = AsyncOpenAI(
+                    api_key=key,
+                    base_url=base_url or os.getenv("LLM_BASE_URL") or None,
+                )
+                stream = await client.chat.completions.create(
+                    model=model,
+                    messages=messages,  # type: ignore[arg-type]
+                    stream=True,
+                    max_tokens=int(kwargs.get("max_tokens", 1000)),
+                )
+                async for chunk in stream:
+                    delta = chunk.choices[0].delta.content if chunk.choices else None
+                    if delta:
+                        collected.append(delta)
+                        yield delta
+            except Exception:
+                # 失败时降级为非流式 generate
+                result = await self.generate(
+                    model=model,
+                    messages=messages,
+                    tenant_id=tenant_id,
+                    api_key=api_key,
+                    base_url=base_url,
+                    **kwargs,
+                )
+                text = str(result.output or "")
+                for ch in text:
+                    yield ch
+                return
+
+        output_text = "".join(collected)
+        output_tokens = count_tokens(output_text)
+        cost = calculate_cost(model, input_tokens + output_tokens)
+        record_consumption(tenant_id, cost, input_tokens + output_tokens, model)
+        try:
+            from backend.observability.decorators import langfuse_context
+
+            langfuse_context.update_current_generation(
+                model=model,
+                input=str(messages),
+                output=output_text,
+                usage={"input": input_tokens, "output": output_tokens},
+            )
+        except Exception:
+            pass
 
     async def _call_api(
         self,
@@ -118,7 +176,6 @@ class LLMHarness(Harness):
         api_key: str | None = None,
         base_url: str | None = None,
     ) -> str:
-        # 延迟导入，避免 harness ↔ pipeline 循环依赖
         from backend.pipeline.llm_helper import generate_text
 
         prompt = "\n".join(m.get("content", "") for m in messages)

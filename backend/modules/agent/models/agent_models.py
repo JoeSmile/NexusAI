@@ -6,7 +6,7 @@ Agent模块数据模型
 from typing import List, Dict, Any, Optional, Union
 from datetime import datetime
 from enum import Enum
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from backend.schemas.common_schemas import BaseResponse
 
@@ -50,8 +50,9 @@ class AgentRequest(BaseModel):
     user_emotion: Optional[str] = Field(None, description="用户情绪")
     available_tools: Optional[List[str]] = Field(None, description="可用工具列表")
     max_actions: int = Field(10, ge=1, le=50, description="最大动作数量")
-    
-    @validator('user_message', allow_reuse=True)
+
+    @field_validator('user_message')
+    @classmethod
     def validate_user_message(cls, v):
         """验证并清理用户消息"""
         if not v or not v.strip():
@@ -69,11 +70,6 @@ class AgentResponse(BaseModel):
     confidence: float = Field(..., ge=0, le=1, description="执行置信度")
     timestamp: datetime = Field(default_factory=datetime.now, description="响应时间")
     metadata: Optional[Dict[str, Any]] = Field(None, description="元数据")
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
 
 
 class AgentAction(BaseModel):
@@ -87,11 +83,6 @@ class AgentAction(BaseModel):
     error_message: Optional[str] = Field(None, description="错误信息")
     execution_time: Optional[float] = Field(None, description="执行时间")
     timestamp: datetime = Field(default_factory=datetime.now, description="执行时间")
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
 
 
 class AgentPlan(BaseModel):
@@ -103,11 +94,6 @@ class AgentPlan(BaseModel):
     estimated_time: Optional[float] = Field(None, description="预计执行时间")
     dependencies: Optional[List[str]] = Field(None, description="依赖关系")
     created_at: datetime = Field(default_factory=datetime.now, description="创建时间")
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
 
 
 class AgentMemory(BaseModel):
@@ -120,11 +106,6 @@ class AgentMemory(BaseModel):
     tags: Optional[List[str]] = Field(None, description="记忆标签")
     created_at: datetime = Field(default_factory=datetime.now, description="创建时间")
     last_accessed: Optional[datetime] = Field(None, description="最后访问时间")
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
 
 
 class AgentTool(BaseModel):
@@ -138,9 +119,9 @@ class AgentTool(BaseModel):
     enabled: bool = Field(True, description="是否启用")
     priority: int = Field(5, ge=1, le=10, description="工具优先级")
     max_execution_time: Optional[float] = Field(None, description="最大执行时间")
-    
-    class Config:
-        json_schema_extra = {
+
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "tool_name": "calendar_check",
                 "tool_type": "calendar",
@@ -159,6 +140,7 @@ class AgentTool(BaseModel):
                 "priority": 5
             }
         }
+    )
 
 
 class AgentConfig(BaseModel):
@@ -175,11 +157,6 @@ class AgentConfig(BaseModel):
     memory_enabled: bool = Field(True, description="是否启用记忆")
     learning_enabled: bool = Field(False, description="是否启用学习")
     created_at: datetime = Field(default_factory=datetime.now, description="创建时间")
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
 
 
 class AgentStats(BaseModel):
@@ -191,13 +168,6 @@ class AgentStats(BaseModel):
     average_response_time: float = Field(0.0, description="平均响应时间")
     tool_usage_stats: Dict[str, int] = Field(default_factory=dict, description="工具使用统计")
     last_active: Optional[datetime] = Field(None, description="最后活跃时间")
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
 
 
-# 更新前向引用（Pydantic v1 自动处理前向引用，不需要 model_rebuild）
-# 注意: model_rebuild() 是 Pydantic v2 的方法，v1 不需要
-# AgentResponse.model_rebuild()  # Pydantic v1 不需要此调用
+AgentResponse.model_rebuild()

@@ -5,7 +5,7 @@ RAG模块数据模型
 
 from typing import List, Dict, Any, Optional
 from datetime import datetime
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 from backend.schemas.common_schemas import BaseResponse, PaginationRequest
 
@@ -25,11 +25,6 @@ class DocumentInfo(BaseModel):
     upload_time: datetime = Field(default_factory=datetime.now, description="上传时间")
     chunk_count: Optional[int] = Field(None, description="文档块数量")
     metadata: Optional[Dict[str, Any]] = Field(None, description="文档元数据")
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
 
 
 class RAGRequest(BaseModel):
@@ -39,8 +34,9 @@ class RAGRequest(BaseModel):
     use_context: bool = Field(True, description="是否使用上下文")
     conversation_history: Optional[List[Dict[str, str]]] = Field(None, description="对话历史")
     user_emotion: Optional[str] = Field(None, description="用户情绪")
-    
-    @validator('question')
+
+    @field_validator('question')
+    @classmethod
     def validate_question(cls, v):
         if not v.strip():
             raise ValueError('问题不能为空')
@@ -56,11 +52,6 @@ class RAGResponse(BaseModel):
     used_context: bool = Field(..., description="是否使用了上下文")
     processing_time: Optional[float] = Field(None, description="处理时间（秒）")
     timestamp: datetime = Field(default_factory=datetime.now, description="响应时间")
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
 
 
 class KnowledgeSearchRequest(BaseModel):
@@ -69,8 +60,9 @@ class KnowledgeSearchRequest(BaseModel):
     k: int = Field(3, ge=1, le=20, description="返回结果数量")
     similarity_threshold: Optional[float] = Field(0.7, ge=0, le=1, description="相似度阈值")
     filters: Optional[Dict[str, Any]] = Field(None, description="搜索过滤器")
-    
-    @validator('query')
+
+    @field_validator('query')
+    @classmethod
     def validate_query(cls, v):
         if not v.strip():
             raise ValueError('搜索查询不能为空')
@@ -84,11 +76,6 @@ class KnowledgeSearchResponse(BaseModel):
     total: int = Field(..., ge=0, description="结果总数")
     search_time: float = Field(..., description="搜索时间（秒）")
     timestamp: datetime = Field(default_factory=datetime.now, description="搜索时间")
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
 
 
 class DocumentUploadRequest(BaseModel):
@@ -114,11 +101,6 @@ class KnowledgeBaseStats(BaseModel):
     last_updated: Optional[datetime] = Field(None, description="最后更新时间")
     embedding_model: str = Field(..., description="嵌入模型")
     collection_name: str = Field(..., description="集合名称")
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
 
 
 class RAGConfig(BaseModel):

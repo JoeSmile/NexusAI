@@ -342,7 +342,7 @@ async def chat_with_attachments(
         response = chat_engine.chat(chat_request)
         
         # 添加附件信息到响应
-        response_dict = response.dict()
+        response_dict = response.model_dump()
         response_dict["attachments"] = file_contents
         response_dict["url_contents"] = url_contents_list
         

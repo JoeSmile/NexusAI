@@ -67,7 +67,7 @@ async def cache_check(state: PipelineState) -> PipelineState:
         fingerprint = state.get("fingerprint") or _cheap_fingerprint(message)
         if fingerprint:
             state["fingerprint"] = fingerprint
-            template_key = f"template:{fingerprint}"
+            template_key = f"template:{tenant_id}:{fingerprint}"
             template = session.execute(
                 text(
                     "SELECT value FROM cache_entries "

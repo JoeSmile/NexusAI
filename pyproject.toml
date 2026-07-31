@@ -20,10 +20,10 @@ classifiers = [
 
 # 核心框架
 dependencies = [
-    # 核心框架
-    "fastapi>=0.95.0,<0.100.0",
-    "uvicorn[standard]>=0.17.0",
-    "pydantic>=1.9.2,<2.0.0",
+    # 核心框架 (pydantic v2)
+    "fastapi>=0.115.0,<0.116.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.7.0,<3.0.0",
     "python-dotenv>=0.20.0",
     "requests>=2.25.0",
 
@@ -32,6 +32,8 @@ dependencies = [
     "langchain>=0.2.0,<0.3.0",
     "langchain-openai>=0.1.10,<0.2.0",
     "langchain-community>=0.0.1,<0.3.0",
+    "langgraph>=0.2.0,<0.3.0",
+    "langfuse>=2.0.0,<3.0.0",
     "pandas>=2.0.0",
 
     # 数据库 (PostgreSQL + pgvector)
@@ -49,8 +51,8 @@ dependencies = [
     "idna>=2.10",
     "anyio>=3.0.0",
     "sniffio>=1.3.0",
-    "httpx>=0.25.0,<0.28.0",
-    "protobuf>=3.19.0,<=3.20.3",
+    "httpx>=0.27.0,<0.29.0",
+    "protobuf>=4.25.0,<6.0.0",
 
     # 轻量工具
     "Pillow>=9.0.0",
@@ -60,8 +62,7 @@ dependencies = [
     "typing-extensions>=4.0.0",
     "numpy>=1.21.0",
     "prometheus-client>=0.17.0",
-    # langgraph 官方包需 pydantic v2；Batch 4 使用 pipeline/langgraph_compat shim
-    # "langgraph>=0.2.0",  # 待 Batch 6/ pydantic v2 升级后启用
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]

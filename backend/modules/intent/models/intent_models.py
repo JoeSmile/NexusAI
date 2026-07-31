@@ -5,7 +5,7 @@ Intent Recognition Data Models
 
 from enum import Enum
 from typing import Optional, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class IntentType(str, Enum):
@@ -32,8 +32,8 @@ class IntentResult(BaseModel):
         description="额外的元数据信息"
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "intent": "advice",
                 "confidence": 0.92,
@@ -46,6 +46,7 @@ class IntentResult(BaseModel):
                 }
             }
         }
+    )
 
 
 class IntentRequest(BaseModel):
@@ -58,12 +59,12 @@ class IntentRequest(BaseModel):
         description="上下文信息"
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "text": "我最近总是睡不着，该怎么办？",
                 "user_id": "user_123",
                 "session_id": "session_456"
             }
         }
-
+    )

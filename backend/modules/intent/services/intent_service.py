@@ -70,7 +70,7 @@ class IntentService:
         result = {
             "success": True,
             "processed": processed,
-            "intent": intent_result.dict(),
+            "intent": intent_result.model_dump(),
             "action_required": action_required,
             "suggestion": suggestion
         }

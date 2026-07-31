@@ -6,7 +6,7 @@
 
 from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from enum import Enum
 
 from .common_schemas import BaseResponse, PaginationRequest, PaginationResponse
@@ -45,17 +45,13 @@ class ChatMessage(BaseModel):
     emotion_intensity: Optional[float] = Field(None, ge=0, le=10, description="情绪强度")
     timestamp: datetime = Field(default_factory=datetime.now, description="消息时间")
     metadata: Optional[Dict[str, Any]] = Field(None, description="元数据")
-    
-    @validator('content')
+
+    @field_validator('content')
+    @classmethod
     def validate_content(cls, v):
         if not v.strip():
             raise ValueError('消息内容不能为空')
         return v.strip()
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
 
 
 class ChatRequest(BaseModel):
@@ -68,21 +64,23 @@ class ChatRequest(BaseModel):
     use_memory: bool = Field(True, description="是否使用记忆系统")
     use_rag: bool = Field(True, description="是否使用RAG知识库")
     context: Optional[Dict[str, Any]] = Field(None, description="额外上下文")
-    
-    @validator('message')
+
+    @field_validator('message')
+    @classmethod
     def validate_message(cls, v):
         if not v.strip():
             raise ValueError('消息内容不能为空')
         return v.strip()
-    
-    @validator('user_id')
+
+    @field_validator('user_id')
+    @classmethod
     def validate_user_id(cls, v):
         if not v or len(v.strip()) < 3:
             raise ValueError('用户ID长度不能少于3个字符')
         return v.strip()
-    
-    class Config:
-        json_schema_extra = {
+
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "message": "我最近总是失眠，怎么办？",
                 "user_id": "user123",
@@ -99,6 +97,7 @@ class ChatRequest(BaseModel):
                 }
             }
         }
+    )
 
 
 class ChatResponse(BaseResponse):
@@ -109,12 +108,9 @@ class ChatResponse(BaseResponse):
     session_id: str = Field(..., description="会话ID")
     timestamp: datetime = Field(default_factory=datetime.now, description="响应时间")
     context: Optional[Dict[str, Any]] = Field(None, description="上下文信息")
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
-        json_schema_extra = {
+
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "success": True,
                 "message": "回复生成成功",
@@ -133,6 +129,7 @@ class ChatResponse(BaseResponse):
                 }
             }
         }
+    )
 
 
 class SessionInfo(BaseModel):
@@ -146,11 +143,6 @@ class SessionInfo(BaseModel):
     last_activity: Optional[datetime] = Field(None, description="最后活动时间")
     emotion_summary: Optional[Dict[str, Any]] = Field(None, description="情绪摘要")
     metadata: Optional[Dict[str, Any]] = Field(None, description="元数据")
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
 
 
 class UserProfile(BaseModel):
@@ -165,11 +157,6 @@ class UserProfile(BaseModel):
     last_active: Optional[datetime] = Field(None, description="最后活跃时间")
     profile_summary: Optional[str] = Field(None, description="档案摘要")
     metadata: Optional[Dict[str, Any]] = Field(None, description="元数据")
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
 
 
 class SessionHistoryRequest(BaseModel):
@@ -186,9 +173,9 @@ class SessionHistoryResponse(BaseResponse):
     messages: List[ChatMessage] = Field(..., description="消息列表")
     total: int = Field(..., description="总消息数")
     pagination: Optional[PaginationResponse] = Field(None, description="分页信息")
-    
-    class Config:
-        json_schema_extra = {
+
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "success": True,
                 "message": "获取会话历史成功",
@@ -214,6 +201,7 @@ class SessionHistoryResponse(BaseResponse):
                 "status_code": 200
             }
         }
+    )
 
 
 class UserSessionsRequest(BaseModel):
@@ -267,8 +255,9 @@ class BatchChatRequest(BaseModel):
     """批量聊天请求模型"""
     messages: List[ChatRequest] = Field(..., description="聊天请求列表")
     batch_options: Optional[Dict[str, Any]] = Field(None, description="批量处理选项")
-    
-    @validator('messages')
+
+    @field_validator('messages')
+    @classmethod
     def validate_messages(cls, v):
         if not v:
             raise ValueError('消息列表不能为空')
