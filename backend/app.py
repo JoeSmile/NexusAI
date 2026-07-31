@@ -6,7 +6,6 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from pathlib import Path
 import os
@@ -138,21 +137,18 @@ def create_app() -> FastAPI:
     app.add_middleware(MetricsMiddleware)
     app.add_middleware(TenantMiddleware)
     
-    # 配置静态文件
-    upload_dir = Path(project_root) / "uploads"
-    upload_dir.mkdir(exist_ok=True)
-    app.mount("/uploads", StaticFiles(directory=str(upload_dir)), name="uploads")
-
     from prometheus_client import make_asgi_app
 
     app.mount("/metrics", make_asgi_app())
 
     from backend.core.health import router as health_router
+    from backend.routers.files import router as files_router
 
     # 注册路由
     app.include_router(health_router)
     app.include_router(admin_router, prefix="/api")
     app.include_router(audit_router, prefix="/api")
+    app.include_router(files_router)
     # LangGraph 管线接管 /chat（旧 chat_router 保留但不再挂载主路径）
     app.include_router(chat_pipeline_router)
     # app.include_router(chat_router)  # DEPRECATED: 使用 chat_pipeline_router

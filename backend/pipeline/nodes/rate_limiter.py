@@ -6,6 +6,7 @@ import time
 from collections import defaultdict
 
 from backend.core.errors import ContextGateException
+from backend.observability.decorators import observe
 from backend.pipeline.state import PipelineState
 
 
@@ -35,6 +36,7 @@ class TokenBucket:
 _bucket = TokenBucket()
 
 
+@observe(name="pipeline.rate_limiter")
 async def rate_limiter(state: PipelineState) -> PipelineState:
     """桶令牌检查 — 超出抛 RATE_001"""
     if not _bucket.consume(state["tenant_id"]):

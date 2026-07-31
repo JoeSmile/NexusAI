@@ -6,10 +6,12 @@ import asyncio
 import json
 import os
 
+from backend.observability.decorators import observe
 from backend.pipeline.llm_helper import generate_text
 from backend.pipeline.state import PipelineState
 
 
+@observe(name="pipeline.analyze_parallel")
 async def analyze_parallel(state: PipelineState) -> PipelineState:
     """并发分析情绪和意图"""
     message = state["message"]
@@ -35,6 +37,13 @@ async def analyze_parallel(state: PipelineState) -> PipelineState:
         state["intent"] = "default"
         state["intent_confidence"] = 0.0
         state["entities"] = {}
+
+    from backend.pipeline.cache.fingerprint_cache import make_fingerprint
+
+    if state.get("intent") and state.get("entities") is not None:
+        state["fingerprint"] = make_fingerprint(
+            state["intent"], state["entities"]
+        )
 
     return state
 

@@ -14,9 +14,11 @@ from backend.database.pgvector_session import (
     ChatSession,
     get_pg_session,
 )
+from backend.observability.decorators import observe
 from backend.pipeline.state import PipelineState
 
 
+@observe(name="pipeline.write_memory")
 async def write_memory(state: PipelineState) -> PipelineState:
     """保存对话到 pgvector，写入缓存和审计日志。"""
     tenant_id = state["tenant_id"]
@@ -80,6 +82,24 @@ async def write_memory(state: PipelineState) -> PipelineState:
                     expires_at=datetime.utcnow() + timedelta(seconds=300),
                 )
             )
+
+            fingerprint = state.get("fingerprint")
+            if fingerprint:
+                template_key = f"template:{fingerprint}"
+                session.execute(
+                    text("DELETE FROM cache_entries WHERE cache_key = :k"),
+                    {"k": template_key},
+                )
+                session.add(
+                    CacheEntry(
+                        cache_key=template_key,
+                        cache_type="template",
+                        tenant_id=tenant_id,
+                        value=response,
+                        ttl_seconds=3600,
+                        expires_at=datetime.utcnow() + timedelta(seconds=3600),
+                    )
+                )
 
         session.execute(
             text("""

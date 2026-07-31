@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 
+from backend.observability.decorators import observe
 from backend.pipeline.state import PipelineState
 
 ROUTING_RULES = {
@@ -26,6 +27,7 @@ ROUTING_RULES = {
 }
 
 
+@observe(name="pipeline.model_router")
 async def model_router(state: PipelineState) -> PipelineState:
     """
     双路径路由:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from collections.abc import AsyncIterator
 
@@ -14,21 +15,17 @@ from backend.core.audit import log_audit
 from backend.core.auth.models import TenantContext
 from backend.core.auth.permissions import require_permission
 from backend.core.errors import ContextGateException
+from backend.core.guardrails.output_guard import DRIFT_PATTERNS, VIOLATION_PATTERNS
+from backend.observability.decorators import observe
 from backend.pipeline.graph import compiled_graph
 from backend.pipeline.state import make_initial_state
 
-try:
-    from langfuse.decorators import observe  # type: ignore
-except ImportError:
-
-    def observe(name: str = ""):  # type: ignore
-        def _wrap(fn):
-            return fn
-
-        return _wrap
-
-
 router = APIRouter(tags=["chat"])
+
+_STREAM_FILTER = re.compile(
+    "|".join(VIOLATION_PATTERNS + DRIFT_PATTERNS),
+    re.IGNORECASE,
+)
 
 
 class ChatRequest(BaseModel):
@@ -130,7 +127,8 @@ async def chat_streaming(
     tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
     """
-    SSE 骨架（04.11）。短路径 JSON；长路径假 token 流（07.07e 前 stub）。
+    SSE 骨架（04.11）+ abort/retraction（09.04）。
+    长路径假 token 流；完整 Harness stream 见 07.07e。
     """
     initial = make_initial_state(
         tenant_id=tenant.tenant_id,
@@ -153,9 +151,35 @@ async def chat_streaming(
     text = final.get("response") or ""
 
     async def event_stream() -> AsyncIterator[str]:
-        # stub: 按字吐出，等待 Batch 5b llm_harness.stream
+        buffer = ""
         for ch in text:
-            yield f"data: {json.dumps({'token': ch}, ensure_ascii=False)}\n\n"
+            buffer += ch
+            if _STREAM_FILTER.search(buffer):
+                yield (
+                    "data: "
+                    + json.dumps(
+                        {"type": "abort", "reason": "content_filter"},
+                        ensure_ascii=False,
+                    )
+                    + "\n\n"
+                )
+                yield "data: [DONE]\n\n"
+                return
+            yield (
+                "data: "
+                + json.dumps({"token": ch}, ensure_ascii=False)
+                + "\n\n"
+            )
+
+        if len(buffer) > 4000:
+            yield (
+                "data: "
+                + json.dumps(
+                    {"type": "retraction", "reason": "length_exceeded"},
+                    ensure_ascii=False,
+                )
+                + "\n\n"
+            )
         background_tasks.add_task(lambda: None)
         yield "data: [DONE]\n\n"
 

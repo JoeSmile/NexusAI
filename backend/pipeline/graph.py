@@ -7,7 +7,10 @@ from backend.pipeline.nodes.analyze_parallel import analyze_parallel
 from backend.pipeline.nodes.auth_check import auth_check
 from backend.pipeline.nodes.build_context import build_context
 from backend.pipeline.nodes.cache_check import cache_check, should_skip_to_end
-from backend.pipeline.nodes.guardrails_input import guardrails_input
+from backend.pipeline.nodes.guardrails_input import (
+    guardrails_input,
+    should_block_to_end,
+)
 from backend.pipeline.nodes.guardrails_output import guardrails_output
 from backend.pipeline.nodes.llm_generate import llm_generate
 from backend.pipeline.nodes.load_memory import load_memory
@@ -48,7 +51,14 @@ def build_pipeline():
         },
     )
 
-    builder.add_edge("guardrails_input", "analyze_parallel")
+    builder.add_conditional_edges(
+        "guardrails_input",
+        should_block_to_end,
+        {
+            "end": END,
+            "continue": "analyze_parallel",
+        },
+    )
     builder.add_edge("analyze_parallel", "build_context")
     builder.add_edge("build_context", "model_router")
 

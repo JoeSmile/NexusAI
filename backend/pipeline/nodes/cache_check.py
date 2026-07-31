@@ -1,4 +1,4 @@
-"""缓存检查节点 — 精确缓存"""
+"""缓存检查节点 — 精确 + 指纹缓存"""
 
 from __future__ import annotations
 
@@ -7,20 +7,44 @@ import hashlib
 from sqlalchemy import text
 
 from backend.database.pgvector_session import get_pg_session
+from backend.observability.decorators import observe
 from backend.pipeline.state import PipelineState
 
 
+def make_query_hash(message: str) -> str:
+    """生成查询哈希（前 16 位）"""
+    return hashlib.sha256(message.encode()).hexdigest()[:16]
+
+
+def _cheap_fingerprint(message: str) -> str | None:
+    """与 mock analyze 对齐的廉价意图指纹，供模板缓存预检"""
+    from backend.pipeline.cache.fingerprint_cache import make_fingerprint
+
+    greetings = ["你好", "嗨", "hello", "hi", "早上好", "晚上好"]
+    emotions = ["焦虑", "伤心", "害怕", "紧张", "压力", "孤独"]
+    advices = ["怎么办", "建议", "帮帮我", "有什么办法", "我该"]
+
+    if any(g in message for g in greetings):
+        return make_fingerprint("greeting", {})
+    if any(e in message for e in emotions):
+        return make_fingerprint("emotion", {"emotion": message})
+    if any(a in message for a in advices):
+        return make_fingerprint("advice", {"topic": message})
+    return None
+
+
+@observe(name="pipeline.cache_check")
 async def cache_check(state: PipelineState) -> PipelineState:
-    """检查缓存命中"""
+    """检查精确缓存 + 指纹缓存"""
     tenant_id = state["tenant_id"]
     user_id = state["user_id"]
     message = state["message"]
 
-    query_hash = hashlib.sha256(message.encode()).hexdigest()[:16]
-    exact_key = f"exact:{tenant_id}:{user_id}:{query_hash}"
+    query_hash = make_query_hash(message)
 
     session_factory = get_pg_session()
     with session_factory.Session() as session:
+        exact_key = f"exact:{tenant_id}:{user_id}:{query_hash}"
         exact = session.execute(
             text(
                 "SELECT value FROM cache_entries "
@@ -34,13 +58,38 @@ async def cache_check(state: PipelineState) -> PipelineState:
             state["cache_value"] = exact.value
             state["response"] = exact.value
             state["finish_reason"] = "cache_hit"
+            from backend.core.metrics import cache_hits
+
+            cache_hits.labels(tenant=tenant_id, cache_type="exact").inc()
             return state
 
+        # fingerprint 在 analyze 之后才完整；此处用廉价意图启发式预检模板缓存
+        fingerprint = state.get("fingerprint") or _cheap_fingerprint(message)
+        if fingerprint:
+            state["fingerprint"] = fingerprint
+            template_key = f"template:{fingerprint}"
+            template = session.execute(
+                text(
+                    "SELECT value FROM cache_entries "
+                    "WHERE cache_key = :key AND expires_at > now()"
+                ),
+                {"key": template_key},
+            ).fetchone()
+            if template:
+                state["cache_hit"] = True
+                state["cache_value"] = template.value
+                state["response"] = template.value
+                state["finish_reason"] = "cache_hit"
+                from backend.core.metrics import cache_hits
+
+                cache_hits.labels(tenant=tenant_id, cache_type="template").inc()
+                return state
+
+    from backend.core.metrics import cache_misses
+
+    cache_misses.labels(tenant=tenant_id).inc()
     return state
 
 
 def should_skip_to_end(state: PipelineState) -> str:
-    """条件边: 缓存命中 → END"""
-    if state.get("cache_hit"):
-        return "end"
-    return "continue"
+    return "end" if state.get("cache_hit") else "continue"

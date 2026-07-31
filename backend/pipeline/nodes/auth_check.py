@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from backend.observability.decorators import observe
 from backend.pipeline.state import PipelineState
 
 
+@observe(name="pipeline.auth_check")
 async def auth_check(state: PipelineState) -> PipelineState:
     """
     注入 user_context。

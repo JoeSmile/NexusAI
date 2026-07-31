@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from backend.observability.decorators import observe
 from backend.pipeline.state import PipelineState
 
 
+@observe(name="pipeline.build_context")
 async def build_context(state: PipelineState) -> PipelineState:
     """组装最终上下文"""
     context_parts = []

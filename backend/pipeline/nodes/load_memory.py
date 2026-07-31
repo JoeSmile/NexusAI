@@ -5,9 +5,11 @@ from __future__ import annotations
 from sqlalchemy import text
 
 from backend.database.pgvector_session import get_pg_session
+from backend.observability.decorators import observe
 from backend.pipeline.state import PipelineState
 
 
+@observe(name="pipeline.load_memory")
 async def load_memory(state: PipelineState) -> PipelineState:
     """加载用户记忆"""
     tenant_id = state["tenant_id"]
