@@ -1,0 +1,2 @@
+# Placeholder SSL directory for docker-compose.prod.yml.
+# Place cert.pem and key.pem here before starting nginx.

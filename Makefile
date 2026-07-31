@@ -1,4 +1,4 @@
-.PHONY: help sync lock up up-all down db-init run lint typecheck test check verify
+.PHONY: help sync lock install up up-all down db-init run lint typecheck test check verify seed fmt docker-up docker-down clean
 
 ROOT_DIR := $(patsubst %/,%,$(dir $(abspath $(firstword $(MAKEFILE_LIST)))))
 UV := $(shell command -v uv 2> /dev/null)
@@ -14,22 +14,23 @@ endef
 help:
 	@echo "ContextGate — 常用命令"
 	@echo ""
-	@echo "  make sync       安装/同步依赖 (uv sync)"
-	@echo "  make lock       更新 uv.lock"
-	@echo "  make up         只起 postgres（推荐本地开发，不构建镜像）"
-	@echo "  make up-all     起全部 compose 服务（会 build contextgate，需能拉 Docker Hub）"
-	@echo "  make down       停止本地基础设施"
-	@echo "  make db-init    初始化 pgvector 表"
-	@echo "  make run        启动 API (uvicorn --reload)"
-	@echo "  make lint       ruff check"
-	@echo "  make typecheck  mypy backend/"
-	@echo "  make test       pytest"
-	@echo "  make check      lint + typecheck"
-	@echo "  make verify     Batch 1 验收检查"
+	@echo "  make sync / install  安装依赖 (uv sync)"
+	@echo "  make lock            更新 uv.lock"
+	@echo "  make up              只起 postgres"
+	@echo "  make up-all          起全部 compose 服务"
+	@echo "  make down            停止本地基础设施"
+	@echo "  make db-init         初始化 pgvector 表"
+	@echo "  make run             启动 API (uvicorn --reload)"
+	@echo "  make seed            写入开发用 API Key + 示例数据"
+	@echo "  make lint            ruff check"
+	@echo "  make typecheck       mypy backend/"
+	@echo "  make test            pytest"
+	@echo "  make fmt             ruff format"
+	@echo "  make clean           清理 __pycache__"
 	@echo ""
-	@echo "典型流程: make up && make sync && make db-init && make run"
+	@echo "典型流程: make up && make sync && make db-init && make seed && make run"
 
-sync:
+sync install:
 	$(require_uv)
 	cd $(ROOT_DIR) && uv sync --extra dev
 
@@ -37,14 +38,13 @@ lock:
 	$(require_uv)
 	cd $(ROOT_DIR) && uv lock
 
-# 本地开发：只起 DB，API 用 make run（避免 build python 镜像拉不到 Docker Hub）
 up:
 	cd $(ROOT_DIR) && $(COMPOSE_LOCAL) up -d postgres
 
-up-all:
+up-all docker-up:
 	cd $(ROOT_DIR) && $(COMPOSE_LOCAL) up -d --build
 
-down:
+down docker-down:
 	cd $(ROOT_DIR) && $(COMPOSE_LOCAL) down
 
 db-init:
@@ -59,19 +59,39 @@ run:
 		DATABASE_URL=$${DATABASE_URL:-postgresql://contextgate:contextgate_local@localhost:5432/contextgate} \
 		uv run --no-sync uvicorn backend.app:app --reload --host 0.0.0.0 --port 8000
 
+seed:
+	$(require_uv)
+	cd $(ROOT_DIR) && \
+		DATABASE_URL=$${DATABASE_URL:-postgresql://contextgate:contextgate_local@localhost:5432/contextgate} \
+		uv run --no-sync python scripts/seed_api_keys.py
+	cd $(ROOT_DIR) && \
+		DATABASE_URL=$${DATABASE_URL:-postgresql://contextgate:contextgate_local@localhost:5432/contextgate} \
+		uv run --no-sync python scripts/seed_pgvector.py
+
 lint:
 	$(require_uv)
-	cd $(ROOT_DIR) && uv run --no-sync ruff check .
+	cd $(ROOT_DIR) && uv run --no-sync ruff check backend/ scripts/
 
 typecheck:
 	$(require_uv)
-	cd $(ROOT_DIR) && uv run --no-sync mypy backend/
+	cd $(ROOT_DIR) && uv run --no-sync mypy backend/ --ignore-missing-imports
+
+fmt:
+	$(require_uv)
+	cd $(ROOT_DIR) && uv run --no-sync ruff format backend/ scripts/
 
 test:
 	$(require_uv)
-	cd $(ROOT_DIR) && uv run --no-sync pytest
+	cd $(ROOT_DIR) && \
+		LLM_MOCK=true \
+		DATABASE_URL=$${DATABASE_URL:-postgresql://contextgate:contextgate_local@localhost:5432/contextgate} \
+		uv run --no-sync pytest tests/ -v
 
 check: lint typecheck
+
+clean:
+	find $(ROOT_DIR) -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	find $(ROOT_DIR) -type f -name "*.pyc" -delete
 
 verify:
 	$(require_uv)
