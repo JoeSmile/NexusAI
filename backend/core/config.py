@@ -5,10 +5,10 @@
 """
 
 import os
-from typing import Optional, Dict, Any
-from pathlib import Path
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
+from typing import Any
 
 from dotenv import load_dotenv
 
@@ -48,7 +48,7 @@ class RedisConfig:
     """Redis配置"""
     host: str = "localhost"
     port: int = 6379
-    password: Optional[str] = None
+    password: str | None = None
     db: int = 0
     max_connections: int = 10
     socket_timeout: int = 5
@@ -221,7 +221,7 @@ class Config:
         for directory in directories:
             directory.mkdir(parents=True, exist_ok=True)
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             "environment": self.environment.value,

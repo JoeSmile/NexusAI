@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
 """
 Fallback — 降级管理
 """
 
-from backend.runtime.fallback.manager import FallbackManager, FallbackConfig
+from backend.runtime.fallback.manager import FallbackConfig, FallbackManager
 
-__all__ = ["FallbackManager", "FallbackConfig"]
+__all__ = ["FallbackConfig", "FallbackManager"]

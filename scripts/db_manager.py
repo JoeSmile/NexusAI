@@ -4,10 +4,9 @@
 封装Alembic命令，提供便捷的数据库迁移管理
 """
 
-import sys
 import os
 import subprocess
-from pathlib import Path
+import sys
 
 if os.name == "nt" and hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -17,8 +16,8 @@ if os.name == "nt" and hasattr(sys.stdout, "reconfigure"):
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
+from backend.database import engine
 from config import Config
-from backend.database import engine, Base
 
 
 def run_alembic_command(command: str, *args):

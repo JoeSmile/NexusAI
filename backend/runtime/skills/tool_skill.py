@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 ToolSkill — 工具调用技能
 
@@ -14,11 +13,11 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from backend.runtime.skills.base import Skill, SkillContext, SkillResult
 from backend.runtime.config.guards import is_module_enabled
 from backend.runtime.protocols.tool_executor import ToolExecutor, ToolResult
+from backend.runtime.skills.base import Skill, SkillContext, SkillResult
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +35,7 @@ class ToolSkill(Skill):
     通过 ToolExecutor Protocol 与具体工具实现解耦。
     """
 
-    def __init__(self, tool_executor: Optional[ToolExecutor] = None):
+    def __init__(self, tool_executor: ToolExecutor | None = None):
         """
         初始化工具调用技能
 
@@ -122,7 +121,7 @@ class ToolSkill(Skill):
                 execution_time_ms=time.time() * 1000 - start_ms,
             )
 
-    def list_available_tools(self) -> List[Dict[str, Any]]:
+    def list_available_tools(self) -> list[dict[str, Any]]:
         """列出可用工具"""
         if self._executor:
             return self._executor.list_tools()

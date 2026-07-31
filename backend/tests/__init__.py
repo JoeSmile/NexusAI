@@ -3,10 +3,11 @@
 包含单元测试、集成测试和端到端测试
 """
 
-import pytest
 import asyncio
 from typing import Any, Dict, Optional
-from unittest.mock import Mock, AsyncMock
+from unittest.mock import AsyncMock, Mock
+
+import pytest
 
 # 测试配置
 pytest_plugins = ["pytest_asyncio"]
@@ -31,7 +32,6 @@ def event_loop():
 @pytest.fixture
 def mock_config():
     """模拟配置"""
-    from unittest.mock import Mock
     
     config = Mock()
     config.database.url = TestConfig.TEST_DATABASE_URL
@@ -46,7 +46,6 @@ def mock_config():
 @pytest.fixture
 def mock_logger():
     """模拟日志器"""
-    from unittest.mock import Mock
     
     logger = Mock()
     logger.debug = Mock()
@@ -61,7 +60,6 @@ def mock_logger():
 @pytest.fixture
 async def mock_database():
     """模拟数据库"""
-    from unittest.mock import AsyncMock
     
     db = AsyncMock()
     db.connect = AsyncMock(return_value=True)
@@ -75,7 +73,6 @@ async def mock_database():
 @pytest.fixture
 async def mock_cache():
     """模拟缓存"""
-    from unittest.mock import AsyncMock
     
     cache = AsyncMock()
     cache.get = AsyncMock(return_value=None)
@@ -159,7 +156,7 @@ def sample_rag_result():
 
 
 # 测试工具函数
-def assert_response_structure(response: Dict[str, Any]):
+def assert_response_structure(response: dict[str, Any]):
     """断言响应结构"""
     assert "success" in response
     assert "message" in response
@@ -167,7 +164,7 @@ def assert_response_structure(response: Dict[str, Any]):
     assert "status_code" in response
 
 
-def assert_error_response(response: Dict[str, Any], expected_status: int = 400):
+def assert_error_response(response: dict[str, Any], expected_status: int = 400):
     """断言错误响应"""
     assert_response_structure(response)
     assert response["success"] is False
@@ -175,7 +172,7 @@ def assert_error_response(response: Dict[str, Any], expected_status: int = 400):
     assert "error" in response
 
 
-def assert_success_response(response: Dict[str, Any], expected_status: int = 200):
+def assert_success_response(response: dict[str, Any], expected_status: int = 200):
     """断言成功响应"""
     assert_response_structure(response)
     assert response["success"] is True

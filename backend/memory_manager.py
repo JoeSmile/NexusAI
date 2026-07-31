@@ -7,14 +7,13 @@
 负责记忆的向量化存储、检索和更新（pgvector）
 """
 
-from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
 import json
-from backend.vector_store import VectorStore
-from backend.database import DatabaseManager
+from datetime import datetime, timedelta
+from typing import Any
+
 from backend.database import vector_ops
 from backend.memory_extractor import MemoryExtractor
-from config import Config
+from backend.vector_store import VectorStore
 
 
 class MemoryManager:
@@ -30,8 +29,8 @@ class MemoryManager:
     
     def process_conversation(self, session_id: str, user_id: str, 
                            user_message: str, bot_response: str,
-                           emotion: Optional[str] = None, 
-                           emotion_intensity: Optional[float] = None) -> List[Dict[str, Any]]:
+                           emotion: str | None = None, 
+                           emotion_intensity: float | None = None) -> list[dict[str, Any]]:
         """
         处理一次对话，提取并存储记忆
         
@@ -69,7 +68,7 @@ class MemoryManager:
         return stored_memories
     
     def store_memory(self, user_id: str, session_id: str, 
-                    memory: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+                    memory: dict[str, Any]) -> dict[str, Any] | None:
         """
         存储单条记忆到向量数据库
         
@@ -118,7 +117,7 @@ class MemoryManager:
                          n_results: int = 3,
                          days_limit: int = 7,
                          min_importance: float = 0.3,
-                         emotion_filter: Optional[str] = None) -> List[Dict[str, Any]]:
+                         emotion_filter: str | None = None) -> list[dict[str, Any]]:
         """
         检索相关记忆
         
@@ -175,7 +174,7 @@ class MemoryManager:
             print(f"检索记忆失败: {e}")
             return []
     
-    def get_user_emotion_trend(self, user_id: str, days: int = 7) -> Dict[str, Any]:
+    def get_user_emotion_trend(self, user_id: str, days: int = 7) -> dict[str, Any]:
         """
         获取用户的情绪变化趋势
         
@@ -245,7 +244,7 @@ class MemoryManager:
             print(f"获取情绪趋势失败: {e}")
             return {"emotions": [], "trend": "未知", "error": str(e)}
     
-    def get_important_memories(self, user_id: str, limit: int = 5) -> List[Dict[str, Any]]:
+    def get_important_memories(self, user_id: str, limit: int = 5) -> list[dict[str, Any]]:
         """
         获取用户最重要的记忆
         

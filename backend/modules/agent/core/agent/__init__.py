@@ -8,17 +8,17 @@ Agent模块 - ContextGate智能核心
 - Reflector: 反思优化
 """
 
+from .agent_core import AgentCore
 from .memory_hub import MemoryHub
 from .planner import Planner
-from .tool_caller import ToolCaller
 from .reflector import Reflector
-from .agent_core import AgentCore
+from .tool_caller import ToolCaller
 
 __all__ = [
+    "AgentCore",
     "MemoryHub",
-    "Planner", 
-    "ToolCaller",
+    "Planner",
     "Reflector",
-    "AgentCore"
+    "ToolCaller"
 ]
 

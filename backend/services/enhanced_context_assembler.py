@@ -4,8 +4,9 @@
 实现文档中提到的智能上下文管理功能
 """
 
-from typing import Dict, List, Optional, Any
 from datetime import datetime
+from typing import Any
+
 from backend.services.enhanced_memory_manager import EnhancedMemoryManager
 from backend.services.user_profile_builder import UserProfileBuilder
 
@@ -22,9 +23,9 @@ class EnhancedContextAssembler:
                               user_id: str,
                               session_id: str,
                               current_message: str,
-                              chat_history: List[Dict[str, Any]],
-                              emotion: Optional[str] = None,
-                              emotion_intensity: Optional[float] = None) -> Dict[str, Any]:
+                              chat_history: list[dict[str, Any]],
+                              emotion: str | None = None,
+                              emotion_intensity: float | None = None) -> dict[str, Any]:
         """
         组装完整的对话上下文
         
@@ -92,7 +93,7 @@ class EnhancedContextAssembler:
         
         return context
     
-    def _identify_important_turns(self, chat_history: List[Dict[str, Any]]) -> List[int]:
+    def _identify_important_turns(self, chat_history: list[dict[str, Any]]) -> list[int]:
         """
         识别重要的对话轮次
         
@@ -120,7 +121,7 @@ class EnhancedContextAssembler:
         
         return important_markers
     
-    def build_prompt_context(self, context: Dict[str, Any], system_prompt: str) -> str:
+    def build_prompt_context(self, context: dict[str, Any], system_prompt: str) -> str:
         """
         根据上下文构建完整的Prompt
         
@@ -177,7 +178,7 @@ class EnhancedContextAssembler:
         
         return "\n".join(prompt_parts)
     
-    def generate_context_summary(self, context: Dict[str, Any]) -> str:
+    def generate_context_summary(self, context: dict[str, Any]) -> str:
         """
         生成上下文摘要
         

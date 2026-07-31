@@ -8,14 +8,14 @@ External Tools - 外部工具模块
 - 定时提醒服务
 """
 
-from .calendar_api import CalendarAPI
 from .audio_player import AudioPlayer
+from .calendar_api import CalendarAPI
 from .psychology_db import PsychologyDB
 from .scheduler_service import SchedulerService
 
 __all__ = [
-    "CalendarAPI",
     "AudioPlayer",
+    "CalendarAPI",
     "PsychologyDB",
     "SchedulerService"
 ]

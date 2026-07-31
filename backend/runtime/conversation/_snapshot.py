@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 SnapshotMixin — 运行时状态快照
 
@@ -8,7 +7,7 @@ SnapshotMixin — 运行时状态快照
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +17,7 @@ class SnapshotMixin:
     快照 Mixin — 提供运行时状态查询
     """
 
-    def snapshot(self) -> Dict[str, Any]:
+    def snapshot(self) -> dict[str, Any]:
         """
         获取运行时当前状态快照
 
@@ -43,7 +42,7 @@ class SnapshotMixin:
             "toggles": self._toggles.list_modules() if self._toggles else {},
         }
 
-    def health_check(self) -> Dict[str, Any]:
+    def health_check(self) -> dict[str, Any]:
         """
         健康检查
 

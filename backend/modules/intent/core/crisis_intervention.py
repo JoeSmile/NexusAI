@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 危机干预模块 - 精简版（课程展示用）
 Crisis Intervention Module - Core Version
@@ -15,7 +14,6 @@ https://github.com/your-repo/emotional_chat/blob/main/backend/modules/intent/cor
 """
 
 import logging
-from typing import Dict, Optional, List
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +34,7 @@ class CrisisIntervention:
         {"name": "生命热线", "number": "400-821-1215"}
     ]
     
-    def __init__(self, emotion_strategy: Optional[Dict] = None):
+    def __init__(self, emotion_strategy: dict | None = None):
         """
         初始化危机干预处理器
         
@@ -49,7 +47,7 @@ class CrisisIntervention:
     def is_crisis_situation(self, 
                            user_emotion: str,
                            user_input: str = "",
-                           metadata: Optional[Dict] = None) -> bool:
+                           metadata: dict | None = None) -> bool:
         """
         判断是否为危机情况（核心逻辑）
         
@@ -114,7 +112,7 @@ class CrisisIntervention:
         
         return response
     
-    def get_crisis_hotlines(self) -> List[Dict[str, str]]:
+    def get_crisis_hotlines(self) -> list[dict[str, str]]:
         """
         获取危机干预热线列表
         
@@ -129,7 +127,7 @@ class CrisisIntervention:
 # 便捷函数
 def check_crisis(user_emotion: str, 
                 user_input: str = "",
-                metadata: Optional[Dict] = None) -> bool:
+                metadata: dict | None = None) -> bool:
     """
     便捷函数：检查是否为危机情况
     
@@ -147,7 +145,7 @@ def check_crisis(user_emotion: str,
 
 def get_crisis_response(user_input: str = "",
                        user_emotion: str = "high_risk_depression",
-                       emotion_strategy: Optional[Dict] = None) -> str:
+                       emotion_strategy: dict | None = None) -> str:
     """
     便捷函数：获取危机干预回复
     

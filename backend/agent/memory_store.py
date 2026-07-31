@@ -22,11 +22,10 @@ MemoryStore — 路径寻址记忆存储
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from typing import Any, Literal
 
 logger = logging.getLogger(__name__)
 
@@ -48,11 +47,11 @@ class MemoryEntry:
     id: str
     store_id: str
     path: str
-    content: Optional[str] = None  # None = soft-deleted
-    content_sha256: Optional[str] = None
+    content: str | None = None  # None = soft-deleted
+    content_sha256: str | None = None
     version: int = 1
-    updated_at: Optional[float] = None  # Unix timestamp
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    updated_at: float | None = None  # Unix timestamp
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 # ── InMemoryStore — 基于内存的轻量存储 ────────────────────────────────────────
@@ -74,7 +73,7 @@ class InMemoryStore:
         self._scope = scope
         self._target_id = target_id
         self._description = description
-        self._entries: Dict[str, MemoryEntry] = {}
+        self._entries: dict[str, MemoryEntry] = {}
         self._counter = 0
 
     @property
@@ -120,7 +119,7 @@ class InMemoryStore:
         self._entries[path] = entry
         return entry
 
-    async def read(self, path: str) -> Optional[MemoryEntry]:
+    async def read(self, path: str) -> MemoryEntry | None:
         """按路径精确读取"""
         return self._entries.get(path)
 
@@ -142,7 +141,7 @@ class InMemoryStore:
         entry.version += 1
         entry.updated_at = time.time()
 
-    async def list_entries(self, path_prefix: str = "") -> List[MemoryEntry]:
+    async def list_entries(self, path_prefix: str = "") -> list[MemoryEntry]:
         """列出所有条目（可按前缀过滤）"""
         results = []
         for path, entry in self._entries.items():
@@ -151,7 +150,7 @@ class InMemoryStore:
                     results.append(entry)
         return sorted(results, key=lambda e: e.path)
 
-    async def search(self, query: str) -> List[MemoryEntry]:
+    async def search(self, query: str) -> list[MemoryEntry]:
         """搜索：路径 + 内容子串匹配"""
         q = query.lower()
         results = []

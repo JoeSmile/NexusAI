@@ -5,11 +5,9 @@
 适用于瞬时会话场景
 """
 
-from typing import Dict, List, Optional, Any
-import os
 import re
 from pathlib import Path
-import subprocess
+from typing import Any
 
 
 class FileSystemRetriever:
@@ -25,7 +23,7 @@ class FileSystemRetriever:
         self.base_dir = Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
     
-    def glob_search(self, pattern: str, directory: Optional[str] = None) -> List[str]:
+    def glob_search(self, pattern: str, directory: str | None = None) -> list[str]:
         """
         使用glob模式搜索文件
         
@@ -49,8 +47,8 @@ class FileSystemRetriever:
         self,
         pattern: str,
         file_pattern: str = "*.json",
-        directory: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+        directory: str | None = None
+    ) -> list[dict[str, Any]]:
         """
         使用grep搜索文件内容
         
@@ -70,7 +68,7 @@ class FileSystemRetriever:
         
         for file_path in files:
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with open(file_path, encoding='utf-8') as f:
                     for line_num, line in enumerate(f, 1):
                         if re.search(pattern, line, re.IGNORECASE):
                             results.append({
@@ -88,8 +86,8 @@ class FileSystemRetriever:
         self,
         file_path: str,
         start_line: int = 1,
-        end_line: Optional[int] = None
-    ) -> List[str]:
+        end_line: int | None = None
+    ) -> list[str]:
         """
         按行范围读取文件（适用于大文件）
         
@@ -102,7 +100,7 @@ class FileSystemRetriever:
             行内容列表
         """
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, encoding='utf-8') as f:
                 lines = f.readlines()
                 if end_line is None:
                     return lines[start_line - 1:]
@@ -114,9 +112,9 @@ class FileSystemRetriever:
     
     def search_context_by_keywords(
         self,
-        keywords: List[str],
-        context_type: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+        keywords: list[str],
+        context_type: str | None = None
+    ) -> list[dict[str, Any]]:
         """
         根据关键词搜索上下文
         
@@ -158,7 +156,7 @@ class ContextRetrievalOptimizer:
     
     def __init__(
         self,
-        file_retriever: Optional[FileSystemRetriever] = None,
+        file_retriever: FileSystemRetriever | None = None,
         use_vector_search: bool = False
     ):
         """
@@ -174,9 +172,9 @@ class ContextRetrievalOptimizer:
     def retrieve_relevant_context(
         self,
         query: str,
-        context_type: Optional[str] = None,
+        context_type: str | None = None,
         max_results: int = 5
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         检索相关上下文
         
@@ -203,8 +201,8 @@ class ContextRetrievalOptimizer:
     def retrieve_by_file_path(
         self,
         file_path: str,
-        start_line: Optional[int] = None,
-        end_line: Optional[int] = None
+        start_line: int | None = None,
+        end_line: int | None = None
     ) -> str:
         """
         根据文件路径检索内容
@@ -222,13 +220,13 @@ class ContextRetrievalOptimizer:
             return "\n".join(lines)
         else:
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with open(file_path, encoding='utf-8') as f:
                     return f.read()
             except Exception as e:
                 print(f"读取文件失败: {e}")
                 return ""
     
-    def _extract_keywords(self, text: str, max_keywords: int = 5) -> List[str]:
+    def _extract_keywords(self, text: str, max_keywords: int = 5) -> list[str]:
         """
         从文本中提取关键词
         

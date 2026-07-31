@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Prompt组合器服务
 根据用户个性化配置动态生成情境化Prompt
@@ -7,8 +6,7 @@ Prompt组合器服务
 
 import json
 import logging
-from typing import Dict, Optional, Any
-from datetime import datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +17,7 @@ class PromptComposer:
     将用户个性化配置转化为有效的Prompt指令
     """
     
-    def __init__(self, user_config: Dict[str, Any]):
+    def __init__(self, user_config: dict[str, Any]):
         """
         初始化Prompt组合器
         
@@ -33,7 +31,7 @@ class PromptComposer:
         """获取基础Prompt"""
         return "你是一个专业、温暖、富有同理心的AILLM Gateway者。"
     
-    def compose(self, context: str = "", emotion_state: Optional[Dict] = None) -> str:
+    def compose(self, context: str = "", emotion_state: dict | None = None) -> str:
         """
         组合生成最终Prompt
         
@@ -168,7 +166,7 @@ class PromptComposer:
         
         return prompt
     
-    def _build_emotion_prompt(self, emotion_state: Dict) -> str:
+    def _build_emotion_prompt(self, emotion_state: dict) -> str:
         """
         构建情绪感知Prompt
         
@@ -291,7 +289,7 @@ class PromptComposer:
 - 对于超出能力范围的问题，引导用户寻求专业帮助
 """
     
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """获取当前配置摘要"""
         return {
             "role": self.config.get("role", "温暖倾听者"),
@@ -414,7 +412,7 @@ ROLE_TEMPLATES = {
 }
 
 
-def get_role_template(template_id: str) -> Optional[Dict]:
+def get_role_template(template_id: str) -> dict | None:
     """
     获取角色模板
     

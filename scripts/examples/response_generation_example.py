@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 响应生成模块示例代码
 Response Generation Module Examples
@@ -7,13 +6,15 @@ Response Generation Module Examples
 展示如何使用响应生成模块的各种功能
 """
 
-import sys
 import os
+import sys
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from backend.modules.intent.core.response_generator import ResponseGenerator
-from backend.modules.intent.core.enhanced_input_processor import EnhancedInputProcessor
 from backend.emotion_analyzer import EmotionAnalyzer
+
+from backend.modules.intent.core.enhanced_input_processor import EnhancedInputProcessor
+from backend.modules.intent.core.response_generator import ResponseGenerator
 
 try:
     from langchain_openai import ChatOpenAI
@@ -48,8 +49,8 @@ def example_1_basic_usage():
         emotion_intensity=7.5
     )
     
-    print(f"用户: 我今天被领导批评了，觉得自己一无是处")
-    print(f"情绪: 悲伤 (强度: 7.5)")
+    print("用户: 我今天被领导批评了，觉得自己一无是处")
+    print("情绪: 悲伤 (强度: 7.5)")
     print(f"\n心语: {result['response']}")
     print(f"\n生成方法: {result['generation_method']}")
     print(f"是否有效: {result['is_valid']}")
@@ -92,8 +93,8 @@ def example_2_with_history():
         role = "用户" if turn["role"] == "user" else "心语"
         print(f"  {role}: {turn['content']}")
     
-    print(f"\n用户: 我觉得快撑不下去了")
-    print(f"情绪: 沮丧 (强度: 8.0)")
+    print("\n用户: 我觉得快撑不下去了")
+    print("情绪: 沮丧 (强度: 8.0)")
     print(f"\n心语: {result['response']}")
 
 
@@ -139,8 +140,8 @@ def example_3_with_memory():
     for memory in retrieved_memories:
         print(f"  - {memory['content']}")
     
-    print(f"\n用户: 项目终于上线了，但感觉很累")
-    print(f"情绪: 沮丧 (强度: 6.0)")
+    print("\n用户: 项目终于上线了，但感觉很累")
+    print("情绪: 沮丧 (强度: 6.0)")
     print(f"\n心语: {result['response']}")
 
 
@@ -180,8 +181,8 @@ def example_4_user_profile():
     for key, value in user_profile.items():
         print(f"  {key}: {value}")
     
-    print(f"\n用户: 我最近心情不好")
-    print(f"情绪: 悲伤 (强度: 5.5)")
+    print("\n用户: 我最近心情不好")
+    print("情绪: 悲伤 (强度: 5.5)")
     print(f"\n心语: {result['response']}")
 
 
@@ -347,7 +348,7 @@ def main():
     print("\n可用示例:")
     for i, (name, _) in enumerate(examples, 1):
         print(f"  {i}. {name}")
-    print(f"  0. 运行所有示例")
+    print("  0. 运行所有示例")
     
     try:
         choice = input("\n请选择要运行的示例 (0-7): ").strip()

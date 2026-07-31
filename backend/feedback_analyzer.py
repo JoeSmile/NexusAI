@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 用户反馈分析工具
 分析用户反馈，识别常见问题，生成改进建议
 """
 
 import json
-from typing import List, Dict, Any
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
+from typing import Any
+
 from backend.database import DatabaseManager
 
 
@@ -18,7 +18,7 @@ class FeedbackAnalyzer:
     def __init__(self):
         self.db_manager = DatabaseManager()
     
-    def analyze_all_feedback(self, days: int = 30) -> Dict[str, Any]:
+    def analyze_all_feedback(self, days: int = 30) -> dict[str, Any]:
         """
         分析所有反馈数据
         
@@ -98,7 +98,7 @@ class FeedbackAnalyzer:
         
         return report
     
-    def _analyze_irrelevant_issues(self, feedbacks: List) -> Dict[str, Any]:
+    def _analyze_irrelevant_issues(self, feedbacks: list) -> dict[str, Any]:
         """分析答非所问的问题"""
         if not feedbacks:
             return {"count": 0, "examples": [], "patterns": []}
@@ -134,7 +134,7 @@ class FeedbackAnalyzer:
             "severity": "high" if len(feedbacks) > 10 else "medium" if len(feedbacks) > 5 else "low"
         }
     
-    def _analyze_empathy_issues(self, feedbacks: List) -> Dict[str, Any]:
+    def _analyze_empathy_issues(self, feedbacks: list) -> dict[str, Any]:
         """分析缺乏共情的问题"""
         if not feedbacks:
             return {"count": 0, "examples": [], "patterns": []}
@@ -171,7 +171,7 @@ class FeedbackAnalyzer:
             "severity": "high" if len(feedbacks) > 10 else "medium" if len(feedbacks) > 5 else "low"
         }
     
-    def _analyze_overstepping_issues(self, feedbacks: List) -> Dict[str, Any]:
+    def _analyze_overstepping_issues(self, feedbacks: list) -> dict[str, Any]:
         """分析越界提供建议的问题"""
         if not feedbacks:
             return {"count": 0, "examples": [], "patterns": []}
@@ -208,14 +208,14 @@ class FeedbackAnalyzer:
             "severity": "high" if len(feedbacks) > 10 else "medium" if len(feedbacks) > 5 else "low"
         }
     
-    def _extract_keywords(self, text: str) -> List[str]:
+    def _extract_keywords(self, text: str) -> list[str]:
         """从文本中提取关键词"""
         # 简单的关键词提取，可以后续优化为使用NLP工具
         common_words = ['的', '了', '是', '在', '有', '和', '我', '你', '他', '她', '它', '这', '那', '就', '不', '很', '太']
         words = [w for w in text.split() if len(w) > 1 and w not in common_words]
         return words[:5]  # 返回前5个关键词
     
-    def _generate_recommendations(self, problem_analysis: Dict, type_counter: Counter) -> List[Dict[str, str]]:
+    def _generate_recommendations(self, problem_analysis: dict, type_counter: Counter) -> list[dict[str, str]]:
         """生成改进建议"""
         recommendations = []
         
@@ -388,9 +388,9 @@ class FeedbackAnalyzer:
                 f"\n### 建议 {i}: {rec.get('issue', 'N/A')}",
                 f"严重程度: {rec.get('severity', 'N/A')}",
                 f"优先级: {rec.get('priority', 'N/A')}",
-                f"\n建议内容:",
+                "\n建议内容:",
                 rec.get('recommendation', 'N/A'),
-                f"\n行动项:"
+                "\n行动项:"
             ])
             for action in rec.get('action_items', []):
                 report_lines.append(f"  - {action}")

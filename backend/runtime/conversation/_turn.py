@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 TurnMixin — ReAct loop (替代原 7 阶段线性 Workflow)
 
@@ -12,16 +11,14 @@ TurnMixin — ReAct loop (替代原 7 阶段线性 Workflow)
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from typing import Any
 
-from backend.runtime.skills.base import SkillContext, SkillResult
-from backend.runtime.session.fsm import SessionState
 from backend.runtime.config.guards import is_module_enabled
+from backend.runtime.conversation._helpers import TurnResult
 from backend.runtime.hooks.base import HookContext
-from backend.runtime.conversation._helpers import TurnResult, _done_dict, _error_dict
+from backend.runtime.skills.base import SkillContext, SkillResult
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +73,7 @@ class TurnMixin:
             )
 
             # ── 2. 执行 Skill 链 ──
-            skill_results: Dict[str, SkillResult] = {}
+            skill_results: dict[str, SkillResult] = {}
 
             # 获取适用的 Skills
             applicable_skills = self._skill_registry.get_applicable_skills(context)
@@ -194,7 +191,7 @@ class TurnMixin:
         self,
         user_input: str,
         context: SkillContext,
-        skill_results: Dict[str, SkillResult],
+        skill_results: dict[str, SkillResult],
     ) -> str:
         """使用 LLM 生成响应"""
         if not self._llm:
@@ -248,8 +245,8 @@ class TurnMixin:
         self,
         user_input: str,
         context: SkillContext,
-        skill_results: Dict[str, SkillResult],
-    ) -> List[Dict[str, Any]]:
+        skill_results: dict[str, SkillResult],
+    ) -> list[dict[str, Any]]:
         """构建 LLM 消息列表"""
         messages = [{"role": "user", "content": user_input}]
 
@@ -278,7 +275,7 @@ class TurnMixin:
 
     def _build_policy_context(
         self, context: SkillContext, skill_name: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """构建策略评估上下文"""
         return {
             "tool": skill_name,
@@ -290,7 +287,7 @@ class TurnMixin:
     def _build_system_prompt(
         self,
         context: SkillContext,
-        skill_results: Dict[str, SkillResult],
+        skill_results: dict[str, SkillResult],
     ) -> str:
         """使用 SystemPromptBuilder 构建系统提示"""
         from runtime.prompt_builder import SystemPromptBuilder

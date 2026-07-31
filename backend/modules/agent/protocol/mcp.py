@@ -20,9 +20,10 @@ MCP协议结构：
 
 import json
 import uuid
-from typing import Dict, Any, Optional, List, Union, Tuple
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 # 延迟导入上下文服务，避免循环导入
@@ -39,7 +40,7 @@ except ImportError:
         ContextAssembler = None
 
 
-class MCPMessageType(str, Enum):
+class MCPMessageType(StrEnum):
     """MCP消息类型"""
     USER_INPUT = "user_input"           # 用户输入
     AGENT_RESPONSE = "agent_response"   # Agent回复
@@ -54,7 +55,7 @@ class MCPToolCall(BaseModel):
     """工具调用定义"""
     tool_id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="工具调用ID")
     tool_name: str = Field(..., description="工具名称")
-    parameters: Dict[str, Any] = Field(default_factory=dict, description="工具参数")
+    parameters: dict[str, Any] = Field(default_factory=dict, description="工具参数")
     timestamp: datetime = Field(default_factory=datetime.now, description="调用时间")
 
 
@@ -63,22 +64,22 @@ class MCPToolResponse(BaseModel):
     tool_id: str = Field(..., description="对应的工具调用ID")
     tool_name: str = Field(..., description="工具名称")
     success: bool = Field(..., description="是否成功")
-    result: Optional[Any] = Field(None, description="执行结果")
-    error: Optional[str] = Field(None, description="错误信息")
-    execution_time: Optional[float] = Field(None, description="执行时间（秒）")
+    result: Any | None = Field(None, description="执行结果")
+    error: str | None = Field(None, description="错误信息")
+    execution_time: float | None = Field(None, description="执行时间（秒）")
     timestamp: datetime = Field(default_factory=datetime.now, description="响应时间")
 
 
 class MCPContext(BaseModel):
     """MCP上下文结构"""
-    user_profile: Optional[Dict[str, Any]] = Field(None, description="用户画像")
-    emotion_state: Optional[Dict[str, Any]] = Field(None, description="情感状态")
-    task_goal: Optional[Dict[str, Any]] = Field(None, description="任务目标")
-    memory_summary: Optional[Dict[str, Any]] = Field(None, description="记忆摘要")
-    conversation_history: Optional[List[Dict[str, Any]]] = Field(None, description="对话历史")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="元数据")
+    user_profile: dict[str, Any] | None = Field(None, description="用户画像")
+    emotion_state: dict[str, Any] | None = Field(None, description="情感状态")
+    task_goal: dict[str, Any] | None = Field(None, description="任务目标")
+    memory_summary: dict[str, Any] | None = Field(None, description="记忆摘要")
+    conversation_history: list[dict[str, Any]] | None = Field(None, description="对话历史")
+    metadata: dict[str, Any] | None = Field(None, description="元数据")
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             "user_profile": self.user_profile,
@@ -104,14 +105,14 @@ class MCPMessage(BaseModel):
     message_type: MCPMessageType = Field(..., description="消息类型")
     content: str = Field(..., description="自然语言内容")
     context: MCPContext = Field(default_factory=MCPContext, description="结构化上下文")
-    tool_calls: List[MCPToolCall] = Field(default_factory=list, description="工具调用指令")
-    tool_responses: List[MCPToolResponse] = Field(default_factory=list, description="工具执行结果")
+    tool_calls: list[MCPToolCall] = Field(default_factory=list, description="工具调用指令")
+    tool_responses: list[MCPToolResponse] = Field(default_factory=list, description="工具执行结果")
     timestamp: datetime = Field(default_factory=datetime.now, description="消息时间戳")
-    source_module: Optional[str] = Field(None, description="来源模块")
-    target_module: Optional[str] = Field(None, description="目标模块")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="额外元数据")
+    source_module: str | None = Field(None, description="来源模块")
+    target_module: str | None = Field(None, description="目标模块")
+    metadata: dict[str, Any] | None = Field(None, description="额外元数据")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典（用于JSON序列化）"""
         return {
             "message_id": self.message_id,
@@ -131,7 +132,7 @@ class MCPMessage(BaseModel):
         return json.dumps(self.to_dict(), ensure_ascii=False, indent=indent)
     
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'MCPMessage':
+    def from_dict(cls, data: dict[str, Any]) -> 'MCPMessage':
         """从字典创建MCP消息"""
         # 处理tool_calls
         tool_calls = []
@@ -186,7 +187,7 @@ class MCPProtocol:
     支持自动上下文填充（通过ContextService）
     """
     
-    def __init__(self, context_service: Optional[Any] = None):
+    def __init__(self, context_service: Any | None = None):
         """
         初始化MCP协议处理器
         
@@ -207,8 +208,8 @@ class MCPProtocol:
         user_id: str,
         session_id: str,
         current_message: str,
-        emotion: Optional[str] = None,
-        emotion_intensity: Optional[float] = None
+        emotion: str | None = None,
+        emotion_intensity: float | None = None
     ) -> MCPContext:
         """
         从上下文服务获取并填充上下文
@@ -262,9 +263,9 @@ class MCPProtocol:
     @staticmethod
     def create_user_input(
         content: str,
-        user_profile: Optional[Dict[str, Any]] = None,
-        emotion_state: Optional[Dict[str, Any]] = None,
-        conversation_history: Optional[List[Dict[str, Any]]] = None
+        user_profile: dict[str, Any] | None = None,
+        emotion_state: dict[str, Any] | None = None,
+        conversation_history: list[dict[str, Any]] | None = None
     ) -> MCPMessage:
         """
         创建用户输入MCP消息（静态方法，不自动填充上下文）
@@ -297,11 +298,11 @@ class MCPProtocol:
         content: str,
         user_id: str,
         session_id: str,
-        emotion: Optional[str] = None,
-        emotion_intensity: Optional[float] = None,
-        user_profile: Optional[Dict[str, Any]] = None,
-        emotion_state: Optional[Dict[str, Any]] = None,
-        conversation_history: Optional[List[Dict[str, Any]]] = None
+        emotion: str | None = None,
+        emotion_intensity: float | None = None,
+        user_profile: dict[str, Any] | None = None,
+        emotion_state: dict[str, Any] | None = None,
+        conversation_history: list[dict[str, Any]] | None = None
     ) -> MCPMessage:
         """
         创建用户输入MCP消息（自动填充上下文）
@@ -357,9 +358,9 @@ class MCPProtocol:
     @staticmethod
     def create_planner_output(
         content: str,
-        task_goal: Dict[str, Any],
-        tool_calls: List[MCPToolCall],
-        context: Optional[MCPContext] = None
+        task_goal: dict[str, Any],
+        tool_calls: list[MCPToolCall],
+        context: MCPContext | None = None
     ) -> MCPMessage:
         """
         创建Planner输出MCP消息
@@ -389,8 +390,8 @@ class MCPProtocol:
     
     @staticmethod
     def create_tool_request(
-        tool_calls: List[MCPToolCall],
-        context: Optional[MCPContext] = None
+        tool_calls: list[MCPToolCall],
+        context: MCPContext | None = None
     ) -> MCPMessage:
         """
         创建工具请求MCP消息
@@ -416,8 +417,8 @@ class MCPProtocol:
     
     @staticmethod
     def create_tool_response(
-        tool_responses: List[MCPToolResponse],
-        context: Optional[MCPContext] = None
+        tool_responses: list[MCPToolResponse],
+        context: MCPContext | None = None
     ) -> MCPMessage:
         """
         创建工具响应MCP消息
@@ -447,8 +448,8 @@ class MCPProtocol:
     @staticmethod
     def create_agent_response(
         content: str,
-        context: Optional[MCPContext] = None,
-        tool_responses: Optional[List[MCPToolResponse]] = None
+        context: MCPContext | None = None,
+        tool_responses: list[MCPToolResponse] | None = None
     ) -> MCPMessage:
         """
         创建Agent回复MCP消息
@@ -476,8 +477,8 @@ class MCPProtocol:
     @staticmethod
     def create_reflector_evaluation(
         content: str,
-        evaluation_result: Dict[str, Any],
-        context: Optional[MCPContext] = None
+        evaluation_result: dict[str, Any],
+        context: MCPContext | None = None
     ) -> MCPMessage:
         """
         创建Reflector评估MCP消息
@@ -503,7 +504,7 @@ class MCPProtocol:
         )
     
     @staticmethod
-    def validate_message(message: MCPMessage) -> Tuple[bool, Optional[str]]:
+    def validate_message(message: MCPMessage) -> tuple[bool, str | None]:
         """
         验证MCP消息
         
@@ -572,7 +573,7 @@ class MCPLogger:
     记录所有MCP消息，支持可追溯性和可重放性
     """
     
-    def __init__(self, log_file: Optional[str] = None):
+    def __init__(self, log_file: str | None = None):
         """
         初始化日志记录器
         
@@ -580,7 +581,7 @@ class MCPLogger:
             log_file: 日志文件路径（可选，如果为None则只记录到内存）
         """
         self.log_file = log_file
-        self.message_log: List[MCPMessage] = []
+        self.message_log: list[MCPMessage] = []
         self.max_memory_logs = 1000  # 内存中最多保存的日志数量
     
     def log(self, message: MCPMessage):
@@ -608,14 +609,14 @@ class MCPLogger:
                 with open(self.log_file, 'a', encoding='utf-8') as f:
                     f.write(message.to_json() + '\n')
             except Exception as e:
-                print(f"[MCP Logger] 写入日志文件失败: {str(e)}")
+                print(f"[MCP Logger] 写入日志文件失败: {e!s}")
     
     def get_logs(
         self,
-        message_type: Optional[MCPMessageType] = None,
-        source_module: Optional[str] = None,
+        message_type: MCPMessageType | None = None,
+        source_module: str | None = None,
         limit: int = 100
-    ) -> List[MCPMessage]:
+    ) -> list[MCPMessage]:
         """
         获取日志
         
@@ -637,7 +638,7 @@ class MCPLogger:
         
         return logs[-limit:]
     
-    def get_interaction_trace(self, interaction_id: str) -> List[MCPMessage]:
+    def get_interaction_trace(self, interaction_id: str) -> list[MCPMessage]:
         """
         获取完整交互链
         
@@ -665,16 +666,15 @@ class MCPLogger:
         """
         try:
             with open(output_file, 'w', encoding='utf-8') as f:
-                for msg in self.message_log:
-                    f.write(msg.to_json() + '\n')
+                f.writelines(msg.to_json() + '\n' for msg in self.message_log)
         except Exception as e:
-            print(f"[MCP Logger] 导出日志失败: {str(e)}")
+            print(f"[MCP Logger] 导出日志失败: {e!s}")
 
 
 # 全局MCP日志记录器实例
-_mcp_logger_instance: Optional[MCPLogger] = None
+_mcp_logger_instance: MCPLogger | None = None
 
-def get_mcp_logger(log_file: Optional[str] = None) -> MCPLogger:
+def get_mcp_logger(log_file: str | None = None) -> MCPLogger:
     """
     获取全局MCP日志记录器
     
@@ -690,7 +690,7 @@ def get_mcp_logger(log_file: Optional[str] = None) -> MCPLogger:
     return _mcp_logger_instance
 
 
-def create_mcp_protocol_with_context(context_service: Optional[Any] = None) -> MCPProtocol:
+def create_mcp_protocol_with_context(context_service: Any | None = None) -> MCPProtocol:
     """
     创建带上下文服务的MCP协议处理器
     

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tool Call Repair — 模糊修复工具名称
 
@@ -8,15 +7,15 @@ Tool Call Repair — 模糊修复工具名称
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
 def repair_tool_calls(
-    tool_calls: List[Dict[str, Any]],
-    available_tools: Optional[List[str]] = None,
-) -> List[Dict[str, Any]]:
+    tool_calls: list[dict[str, Any]],
+    available_tools: list[str] | None = None,
+) -> list[dict[str, Any]]:
     """
     修复工具调用中的拼写错误
 
@@ -30,7 +29,7 @@ def repair_tool_calls(
     if not tool_calls or not available_tools:
         return tool_calls
 
-    repaired: List[Dict[str, Any]] = []
+    repaired: list[dict[str, Any]] = []
     for call in tool_calls:
         name = call.get("name", "") or call.get("function", {}).get("name", "")
 
@@ -46,7 +45,7 @@ def repair_tool_calls(
     return repaired
 
 
-def _fuzzy_match(name: str, available: List[str], threshold: float = 0.7) -> Optional[str]:
+def _fuzzy_match(name: str, available: list[str], threshold: float = 0.7) -> str | None:
     """模糊匹配工具名称"""
     name_lower = name.lower()
 
@@ -91,7 +90,7 @@ def _similarity(a: str, b: str) -> float:
     return len(intersection) / len(union)
 
 
-def _replace_tool_name(call: Dict[str, Any], new_name: str) -> Dict[str, Any]:
+def _replace_tool_name(call: dict[str, Any], new_name: str) -> dict[str, Any]:
     """替换工具调用中的名称"""
     call = dict(call)
     if "name" in call:

@@ -7,7 +7,7 @@ Audio Player - 音频播放服务
 - 舒缓音乐
 """
 
-from typing import List, Dict, Any, Optional
+from typing import Any
 
 
 class AudioPlayer:
@@ -21,7 +21,7 @@ class AudioPlayer:
         # 播放历史
         self.play_history = {}
     
-    def _init_audio_library(self) -> Dict[str, List[Dict[str, Any]]]:
+    def _init_audio_library(self) -> dict[str, list[dict[str, Any]]]:
         """初始化音频资源库"""
         return {
             "meditation": [
@@ -110,11 +110,11 @@ class AudioPlayer:
     
     def search_audio(
         self,
-        theme: Optional[str] = None,
-        category: Optional[str] = None,
-        max_duration: Optional[int] = None,
-        tags: Optional[List[str]] = None
-    ) -> List[Dict[str, Any]]:
+        theme: str | None = None,
+        category: str | None = None,
+        max_duration: int | None = None,
+        tags: list[str] | None = None
+    ) -> list[dict[str, Any]]:
         """
         搜索音频资源
         
@@ -164,7 +164,7 @@ class AudioPlayer:
         user_id: str,
         emotion: str,
         duration: int = 10
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         根据用户情绪推荐音频
         
@@ -213,7 +213,7 @@ class AudioPlayer:
         self,
         user_id: str,
         audio_id: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         播放音频
         
@@ -253,7 +253,7 @@ class AudioPlayer:
         self,
         user_id: str,
         limit: int = 10
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         获取播放历史
         
@@ -278,7 +278,7 @@ class AudioPlayer:
         
         return detailed_history
     
-    def _find_audio_by_id(self, audio_id: str) -> Optional[Dict[str, Any]]:
+    def _find_audio_by_id(self, audio_id: str) -> dict[str, Any] | None:
         """根据ID查找音频"""
         for category, audios in self.audio_library.items():
             for audio in audios:

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 动态Prompt构建器
 Dynamic Prompt Builder
@@ -12,8 +11,7 @@ Dynamic Prompt Builder
 """
 
 import logging
-from typing import Dict, List, Optional, Any
-from datetime import datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +101,7 @@ ContextGate："""
 
 ContextGate："""
     
-    def __init__(self, emotion_strategy: Dict[str, Any]):
+    def __init__(self, emotion_strategy: dict[str, Any]):
         """
         初始化动态Prompt构建器
         
@@ -118,11 +116,11 @@ ContextGate："""
                     user_input: str,
                     emotion: str,
                     emotion_intensity: float = 5.0,
-                    conversation_history: Optional[List[Dict]] = None,
-                    retrieved_memories: Optional[List[Dict]] = None,
-                    user_profile: Optional[Dict] = None,
+                    conversation_history: list[dict] | None = None,
+                    retrieved_memories: list[dict] | None = None,
+                    user_profile: dict | None = None,
                     is_crisis: bool = False,
-                    risk_keywords: Optional[List[str]] = None) -> str:
+                    risk_keywords: list[str] | None = None) -> str:
         """
         构建完整的动态Prompt
         
@@ -209,7 +207,7 @@ ContextGate："""
     def _build_crisis_prompt(self, 
                             user_input: str, 
                             emotion: str,
-                            risk_keywords: List[str]) -> str:
+                            risk_keywords: list[str]) -> str:
         """
         构建危机干预Prompt
         
@@ -229,7 +227,7 @@ ContextGate："""
         )
     
     def _build_context_section(self, 
-                              user_profile: Optional[Dict],
+                              user_profile: dict | None,
                               emotion_intensity: float) -> str:
         """
         构建上下文信息部分
@@ -268,7 +266,7 @@ ContextGate："""
         else:
             return ""
     
-    def _build_memory_section(self, retrieved_memories: Optional[List[Dict]]) -> str:
+    def _build_memory_section(self, retrieved_memories: list[dict] | None) -> str:
         """
         构建记忆部分
         
@@ -285,7 +283,7 @@ ContextGate："""
         for i, memory in enumerate(retrieved_memories[:3], 1):  # 最多3条
             content = memory.get("content", "")
             timestamp = memory.get("timestamp", "")
-            importance = memory.get("importance", 0.5)
+            memory.get("importance", 0.5)
             
             # 格式化时间
             time_str = ""
@@ -294,14 +292,14 @@ ContextGate："""
                     from datetime import datetime
                     dt = datetime.fromisoformat(timestamp)
                     time_str = f"({dt.strftime('%m月%d日')})"
-                except:
+                except Exception:
                     pass
             
             memory_texts.append(f"{i}. {content} {time_str}")
         
         return "\n## 相关历史记忆\n" + "\n".join(memory_texts)
     
-    def _build_example_section(self, strategy: Dict[str, Any]) -> str:
+    def _build_example_section(self, strategy: dict[str, Any]) -> str:
         """
         构建示例部分
         
@@ -324,7 +322,7 @@ ContextGate："""
         return "\n## 参考示例\n" + "\n\n".join(example_texts)
     
     def _format_conversation_history(self, 
-                                    conversation_history: Optional[List[Dict]]) -> str:
+                                    conversation_history: list[dict] | None) -> str:
         """
         格式化对话历史
         
@@ -421,7 +419,7 @@ ContextGate："""
 
 
 # 便捷函数
-def create_prompt_builder(emotion_strategy: Dict[str, Any]) -> DynamicPromptBuilder:
+def create_prompt_builder(emotion_strategy: dict[str, Any]) -> DynamicPromptBuilder:
     """
     创建Prompt构建器实例
     
@@ -441,7 +439,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     
     # 加载策略配置
-    with open("../../config/emotion_strategy.yaml", 'r', encoding='utf-8') as f:
+    with open("../../config/emotion_strategy.yaml", encoding='utf-8') as f:
         strategy = yaml.safe_load(f)
     
     # 创建构建器

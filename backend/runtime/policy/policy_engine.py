@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 PolicyEngine — 声明式规则引擎
 
@@ -27,13 +26,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class ActionType(str, Enum):
+class ActionType(StrEnum):
     """策略动作类型"""
 
     ALLOW = "allow"
@@ -50,7 +49,7 @@ class PolicyAction:
     """策略动作"""
 
     type: ActionType
-    params: Dict[str, Any] = field(default_factory=dict)
+    params: dict[str, Any] = field(default_factory=dict)
     reason: str = ""
 
 
@@ -62,7 +61,7 @@ class PolicyRule:
     priority: int  # 数字越大优先级越高
     description: str
     condition: str  # 表达式字符串 (e.g., "tool == 'psychological_assessment' && args.urgency == 'critical'")
-    action_chain: List[PolicyAction] = field(default_factory=list)
+    action_chain: list[PolicyAction] = field(default_factory=list)
     enabled: bool = True
 
 
@@ -90,7 +89,7 @@ class PolicyEngine:
     """
 
     # LLM Gateway场景的默认规则
-    _DEFAULT_RULES: List[PolicyRule] = [
+    _DEFAULT_RULES: list[PolicyRule] = [
         PolicyRule(
             rule_id="crisis_intervention",
             priority=100,
@@ -150,9 +149,9 @@ class PolicyEngine:
         ),
     ]
 
-    def __init__(self, rules: Optional[List[PolicyRule]] = None):
+    def __init__(self, rules: list[PolicyRule] | None = None):
         if rules is not None:
-            self._rules: List[PolicyRule] = sorted(rules, key=lambda r: -r.priority)
+            self._rules: list[PolicyRule] = sorted(rules, key=lambda r: -r.priority)
         else:
             self._rules = sorted(self._DEFAULT_RULES, key=lambda r: -r.priority)
 
@@ -166,7 +165,7 @@ class PolicyEngine:
         """移除规则"""
         self._rules = [r for r in self._rules if r.rule_id != rule_id]
 
-    def evaluate(self, context: Dict[str, Any]) -> List[PolicyAction]:
+    def evaluate(self, context: dict[str, Any]) -> list[PolicyAction]:
         """
         按优先级评估所有规则，返回触发的动作链
 
@@ -182,7 +181,7 @@ class PolicyEngine:
         Returns:
             触发的动作列表（按优先级排序）
         """
-        actions: List[PolicyAction] = []
+        actions: list[PolicyAction] = []
 
         for rule in self._rules:
             if not rule.enabled:
@@ -202,7 +201,7 @@ class PolicyEngine:
 
         return actions
 
-    def _evaluate_condition(self, condition: str, context: Dict[str, Any]) -> bool:
+    def _evaluate_condition(self, condition: str, context: dict[str, Any]) -> bool:
         """
         评估条件表达式
 
@@ -249,7 +248,7 @@ class PolicyEngine:
             logger.warning("Failed to evaluate condition '%s': %s", condition, e)
             return False
 
-    def _resolve_path(self, path: str, context: Dict[str, Any]) -> Any:
+    def _resolve_path(self, path: str, context: dict[str, Any]) -> Any:
         """解析点分隔路径，如 'emotion.is_crisis' → context['emotion']['is_crisis']"""
         parts = path.split(".")
         value = context

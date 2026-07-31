@@ -10,13 +10,13 @@
 4. 上下文卸载（Context Offloading）：文件系统外部化
 """
 
-from typing import Dict, List, Optional, Any, Tuple
-from datetime import datetime
+import hashlib
 import json
 import os
-import hashlib
-from pathlib import Path
+from datetime import datetime
 from enum import Enum
+from pathlib import Path
+from typing import Any
 
 
 class ContextRotThreshold(Enum):
@@ -39,7 +39,7 @@ class ContextCompactionStrategy:
         self.storage_dir = Path(storage_dir)
         self.storage_dir.mkdir(parents=True, exist_ok=True)
     
-    def compact_tool_call(self, tool_call: Dict[str, Any]) -> Dict[str, Any]:
+    def compact_tool_call(self, tool_call: dict[str, Any]) -> dict[str, Any]:
         """
         压缩工具调用 - 将可重建信息外部化
         
@@ -87,7 +87,7 @@ class ContextCompactionStrategy:
         
         return compacted
     
-    def expand_tool_call(self, compacted_call: Dict[str, Any]) -> Dict[str, Any]:
+    def expand_tool_call(self, compacted_call: dict[str, Any]) -> dict[str, Any]:
         """
         展开压缩的工具调用 - 从外部存储恢复
         
@@ -104,7 +104,7 @@ class ContextCompactionStrategy:
         storage_path = compacted_call.get("result", {}).get("storage_path")
         
         if storage_path and os.path.exists(storage_path):
-            with open(storage_path, 'r', encoding='utf-8') as f:
+            with open(storage_path, encoding='utf-8') as f:
                 stored_data = json.load(f)
             
             # 从存储的JSON中提取内容
@@ -164,9 +164,9 @@ class ContextSummarizer:
     
     def summarize_conversation_turns(
         self,
-        turns: List[Dict[str, Any]],
-        schema: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        turns: list[dict[str, Any]],
+        schema: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         摘要对话轮次 - 使用结构化模式确保一致性
         
@@ -211,7 +211,7 @@ class ContextSummarizer:
         
         return summary
     
-    def _extract_topics(self, turns: List[Dict[str, Any]]) -> List[str]:
+    def _extract_topics(self, turns: list[dict[str, Any]]) -> list[str]:
         """提取主要话题"""
         topics = []
         for turn in turns:
@@ -221,7 +221,7 @@ class ContextSummarizer:
                 topics.append(content[:50])
         return list(set(topics))[:5]  # 去重并限制数量
     
-    def _extract_goals(self, turns: List[Dict[str, Any]]) -> List[str]:
+    def _extract_goals(self, turns: list[dict[str, Any]]) -> list[str]:
         """提取用户目标"""
         goals = []
         keywords = ["想要", "希望", "需要", "目标", "计划"]
@@ -233,7 +233,7 @@ class ContextSummarizer:
                     break
         return goals[:3]
     
-    def _extract_decisions(self, turns: List[Dict[str, Any]]) -> List[str]:
+    def _extract_decisions(self, turns: list[dict[str, Any]]) -> list[str]:
         """提取重要决定"""
         decisions = []
         keywords = ["决定", "选择", "同意", "确定"]
@@ -245,7 +245,7 @@ class ContextSummarizer:
                     break
         return decisions[:3]
     
-    def _extract_unresolved(self, turns: List[Dict[str, Any]]) -> List[str]:
+    def _extract_unresolved(self, turns: list[dict[str, Any]]) -> list[str]:
         """提取未解决问题"""
         unresolved = []
         keywords = ["问题", "困难", "不知道", "怎么办", "困惑"]
@@ -257,7 +257,7 @@ class ContextSummarizer:
                     break
         return unresolved[:3]
     
-    def _extract_emotion_trend(self, turns: List[Dict[str, Any]]) -> str:
+    def _extract_emotion_trend(self, turns: list[dict[str, Any]]) -> str:
         """提取情绪趋势"""
         emotions = [turn.get("emotion", "neutral") for turn in turns if turn.get("emotion")]
         if not emotions:
@@ -272,7 +272,7 @@ class ContextSummarizer:
         else:
             return f"从{unique_emotions[0]}到{unique_emotions[1]}"
     
-    def _calculate_time_span(self, turns: List[Dict[str, Any]]) -> str:
+    def _calculate_time_span(self, turns: list[dict[str, Any]]) -> str:
         """计算时间跨度"""
         timestamps = [turn.get("timestamp") for turn in turns if turn.get("timestamp")]
         if len(timestamps) < 2:
@@ -288,15 +288,15 @@ class ContextSummarizer:
                 return f"{delta.seconds // 3600}小时"
             else:
                 return f"{delta.seconds // 60}分钟"
-        except:
+        except Exception:
             return "未知"
     
     def _llm_enhance_summary(
         self,
-        summary: Dict[str, Any],
-        turns: List[Dict[str, Any]],
-        schema: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        summary: dict[str, Any],
+        turns: list[dict[str, Any]],
+        schema: dict[str, Any]
+    ) -> dict[str, Any]:
         """使用LLM增强摘要（可选）"""
         # TODO: 实现LLM增强摘要
         return summary
@@ -308,8 +308,8 @@ class ContextRotSolver:
     def __init__(
         self,
         pre_rot_threshold: int = ContextRotThreshold.SAFE.value,
-        compaction_strategy: Optional[ContextCompactionStrategy] = None,
-        summarizer: Optional[ContextSummarizer] = None
+        compaction_strategy: ContextCompactionStrategy | None = None,
+        summarizer: ContextSummarizer | None = None
     ):
         """
         初始化上下文腐烂解决方案
@@ -323,7 +323,7 @@ class ContextRotSolver:
         self.compaction = compaction_strategy or ContextCompactionStrategy()
         self.summarizer = summarizer or ContextSummarizer()
     
-    def estimate_tokens(self, context: Dict[str, Any]) -> int:
+    def estimate_tokens(self, context: dict[str, Any]) -> int:
         """
         估算上下文的token数量
         
@@ -334,7 +334,6 @@ class ContextRotSolver:
             估算的token数
         """
         # 简化估算：每个中文字符约1.5个token，每个英文字符约0.5个token
-        total_chars = 0
         
         def count_chars(obj):
             if isinstance(obj, str):
@@ -351,7 +350,7 @@ class ContextRotSolver:
         
         return int(count_chars(context))
     
-    def should_compact(self, context: Dict[str, Any]) -> bool:
+    def should_compact(self, context: dict[str, Any]) -> bool:
         """
         判断是否需要压缩
         
@@ -364,7 +363,7 @@ class ContextRotSolver:
         token_count = self.estimate_tokens(context)
         return token_count > self.pre_rot_threshold * 0.8  # 达到80%阈值时开始压缩
     
-    def should_summarize(self, context: Dict[str, Any]) -> bool:
+    def should_summarize(self, context: dict[str, Any]) -> bool:
         """
         判断是否需要摘要
         
@@ -379,9 +378,9 @@ class ContextRotSolver:
     
     def reduce_context(
         self,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         preserve_recent_turns: int = 5
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         缩减上下文 - 先压缩，再摘要
         
@@ -406,9 +405,9 @@ class ContextRotSolver:
     
     def _apply_compaction(
         self,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         preserve_recent: int
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         应用压缩策略
         
@@ -441,9 +440,9 @@ class ContextRotSolver:
     
     def _apply_summarization(
         self,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         preserve_recent: int
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         应用摘要策略
         
@@ -483,9 +482,9 @@ class ContextRotSolver:
     
     def offload_to_file(
         self,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         identifier: str
-    ) -> Tuple[Dict[str, Any], str]:
+    ) -> tuple[dict[str, Any], str]:
         """
         将上下文卸载到文件系统
         
@@ -523,7 +522,7 @@ class ContextRotSolver:
         
         return offloaded, str(file_path)
     
-    def load_from_file(self, file_path: str) -> Dict[str, Any]:
+    def load_from_file(self, file_path: str) -> dict[str, Any]:
         """
         从文件系统加载上下文
         
@@ -533,11 +532,11 @@ class ContextRotSolver:
         Returns:
             完整的上下文数据
         """
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, encoding='utf-8') as f:
             data = json.load(f)
             return data.get("context", {})
     
-    def get_context_status(self, context: Dict[str, Any]) -> Dict[str, Any]:
+    def get_context_status(self, context: dict[str, Any]) -> dict[str, Any]:
         """
         获取上下文状态报告
         

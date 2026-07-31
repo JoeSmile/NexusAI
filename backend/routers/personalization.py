@@ -1,27 +1,24 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 个性化配置API路由
 提供用户个性化配置的CRUD接口
 """
 
-from fastapi import APIRouter, HTTPException, Depends
-from sqlalchemy.orm import Session
 import json
 import logging
-from typing import List, Optional
 
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from backend.database import UserPersonalization, get_db
 from backend.models import (
-    PersonalizationConfig,
     PersonalizationUpdateRequest,
-    PersonalizationResponse,
-    RoleTemplate
+    RoleTemplate,
 )
-from backend.database import get_db, UserPersonalization
 from backend.services.prompt_composer import (
     PromptComposer,
+    get_all_role_templates,
     get_role_template,
-    get_all_role_templates
 )
 
 logger = logging.getLogger(__name__)
@@ -37,7 +34,7 @@ router = APIRouter(
 # API端点
 # ============================================
 
-@router.get("/templates", response_model=List[RoleTemplate])
+@router.get("/templates", response_model=list[RoleTemplate])
 async def get_role_templates():
     """
     获取所有预设角色模板
@@ -63,7 +60,7 @@ async def get_role_templates():
         return templates
     except Exception as e:
         logger.error(f"获取角色模板失败: {e}")
-        raise HTTPException(status_code=500, detail=f"获取角色模板失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取角色模板失败: {e!s}")
 
 
 @router.get("/template/{template_id}", response_model=RoleTemplate)
@@ -178,7 +175,7 @@ async def get_user_config(user_id: str, db: Session = Depends(get_db)):
         
     except Exception as e:
         logger.error(f"获取用户配置失败: {e}")
-        raise HTTPException(status_code=500, detail=f"获取配置失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取配置失败: {e!s}")
 
 
 @router.post("/config/{user_id}")
@@ -279,7 +276,7 @@ async def create_or_update_config(
     except Exception as e:
         db.rollback()
         logger.error(f"更新用户配置失败: {e}")
-        raise HTTPException(status_code=500, detail=f"更新配置失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"更新配置失败: {e!s}")
 
 
 @router.post("/config/{user_id}/apply-template")
@@ -327,7 +324,7 @@ async def apply_template(
         raise
     except Exception as e:
         logger.error(f"应用模板失败: {e}")
-        raise HTTPException(status_code=500, detail=f"应用模板失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"应用模板失败: {e!s}")
 
 
 @router.delete("/config/{user_id}")
@@ -362,15 +359,15 @@ async def delete_user_config(user_id: str, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         logger.error(f"删除用户配置失败: {e}")
-        raise HTTPException(status_code=500, detail=f"删除配置失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"删除配置失败: {e!s}")
 
 
 @router.get("/preview/{user_id}")
 async def preview_prompt(
     user_id: str,
     context: str = "用户说：今天心情不太好...",
-    emotion: Optional[str] = None,
-    intensity: Optional[float] = None,
+    emotion: str | None = None,
+    intensity: float | None = None,
     db: Session = Depends(get_db)
 ):
     """
@@ -421,7 +418,7 @@ async def preview_prompt(
         
     except Exception as e:
         logger.error(f"预览Prompt失败: {e}")
-        raise HTTPException(status_code=500, detail=f"预览失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"预览失败: {e!s}")
 
 
 @router.post("/feedback/{user_id}")
@@ -472,7 +469,7 @@ async def record_feedback(
     except Exception as e:
         db.rollback()
         logger.error(f"记录反馈失败: {e}")
-        raise HTTPException(status_code=500, detail=f"记录反馈失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"记录反馈失败: {e!s}")
 
 
 @router.get("/health")

@@ -25,8 +25,8 @@ from .agent_core_v2 import AgentCore, get_agent_core
 # 旧版组件（仍可单独使用）
 from .memory_hub import MemoryHub, get_memory_hub
 from .planner import Planner
-from .tool_caller import ToolCaller, get_tool_caller
 from .reflector import Reflector, get_reflector
+from .tool_caller import ToolCaller, get_tool_caller
 
 # 旧版 AgentCore 可通过显式导入使用
 # from backend.agent.agent_core import AgentCore as LegacyAgentCore

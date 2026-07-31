@@ -3,29 +3,20 @@
 OpenAI提供商实现
 """
 
-import json
-from typing import List, Dict, Any, Optional, AsyncGenerator
+from collections.abc import AsyncGenerator
 from datetime import datetime
+from typing import Any
 
-import openai
 from openai import AsyncOpenAI
 
+from ..models.llm_models import ChatMessage, CompletionResponse, LLMProvider, LLMResponse, LLMUsage
 from .base_provider import BaseLLMProvider
-from ..models.llm_models import (
-    LLMRequest,
-    LLMResponse,
-    CompletionRequest,
-    CompletionResponse,
-    ChatMessage,
-    LLMUsage,
-    LLMProvider
-)
 
 
 class OpenAIProvider(BaseLLMProvider):
     """OpenAI提供商"""
     
-    def __init__(self, api_key: str, base_url: Optional[str] = None):
+    def __init__(self, api_key: str, base_url: str | None = None):
         """
         初始化OpenAI提供商
         
@@ -44,10 +35,10 @@ class OpenAIProvider(BaseLLMProvider):
     
     async def chat_completion(
         self,
-        messages: List[ChatMessage],
+        messages: list[ChatMessage],
         model: str,
         temperature: float = 0.7,
-        max_tokens: Optional[int] = None,
+        max_tokens: int | None = None,
         **kwargs
     ) -> LLMResponse:
         """
@@ -109,10 +100,10 @@ class OpenAIProvider(BaseLLMProvider):
     
     async def stream_chat_completion(
         self,
-        messages: List[ChatMessage],
+        messages: list[ChatMessage],
         model: str,
         temperature: float = 0.7,
-        max_tokens: Optional[int] = None,
+        max_tokens: int | None = None,
         **kwargs
     ) -> AsyncGenerator[str, None]:
         """
@@ -194,7 +185,7 @@ class OpenAIProvider(BaseLLMProvider):
         except Exception as e:
             raise self._create_error("openai_completion_error", str(e))
     
-    async def list_models(self) -> List[str]:
+    async def list_models(self) -> list[str]:
         """
         获取可用模型列表
         """
@@ -204,7 +195,7 @@ class OpenAIProvider(BaseLLMProvider):
         except Exception as e:
             raise self._create_error("openai_models_error", str(e))
     
-    async def get_model_info(self, model: str) -> Dict[str, Any]:
+    async def get_model_info(self, model: str) -> dict[str, Any]:
         """
         获取模型信息
         """

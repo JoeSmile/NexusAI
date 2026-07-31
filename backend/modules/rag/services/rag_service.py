@@ -4,11 +4,9 @@ RAG服务层
 负责检索增强生成的业务逻辑
 """
 
-from typing import List, Dict, Any, Optional
-import logging
+from typing import Any
 
 # 使用兼容层处理 langchain 导入
-from ..core.langchain_compat import Document
 
 try:
     from langchain.chains import RetrievalQA
@@ -23,10 +21,11 @@ try:
 except ImportError:  # pragma: no cover
     PromptTemplate = None
 
-from ..core.knowledge_base import KnowledgeBaseManager
 from backend.logging_config import get_logger
 from backend.modules.llm.harness import try_create_chat_openai
 from config import Config
+
+from ..core.knowledge_base import KnowledgeBaseManager
 
 logger = get_logger(__name__)
 
@@ -34,7 +33,7 @@ logger = get_logger(__name__)
 class RAGService:
     """RAG检索增强生成服务"""
     
-    def __init__(self, kb_manager: Optional[KnowledgeBaseManager] = None):
+    def __init__(self, kb_manager: KnowledgeBaseManager | None = None):
         """
         初始化RAG服务
         
@@ -109,7 +108,7 @@ class RAGService:
             logger.error(f"创建QA链失败: {e}")
             raise
     
-    def ask(self, question: str, search_k: int = 3) -> Dict[str, Any]:
+    def ask(self, question: str, search_k: int = 3) -> dict[str, Any]:
         """
         向知识库提问
         
@@ -155,7 +154,7 @@ class RAGService:
             logger.error(f"回答问题失败: {e}")
             raise
     
-    def search_knowledge(self, query: str, k: int = 3) -> List[Dict[str, Any]]:
+    def search_knowledge(self, query: str, k: int = 3) -> list[dict[str, Any]]:
         """
         仅搜索知识库，不生成回答
         
@@ -192,10 +191,10 @@ class RAGService:
     def ask_with_context(
         self,
         question: str,
-        conversation_history: Optional[List[Dict[str, str]]] = None,
-        user_emotion: Optional[str] = None,
+        conversation_history: list[dict[str, str]] | None = None,
+        user_emotion: str | None = None,
         search_k: int = 3
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         结合对话上下文和用户情绪的知识问答
         
@@ -311,7 +310,7 @@ class RAGService:
                 }
                 sources.append(source_info)
             
-            logger.info(f"结合上下文的回答生成成功")
+            logger.info("结合上下文的回答生成成功")
             
             return {
                 "answer": response,
@@ -326,7 +325,7 @@ class RAGService:
             logger.error(f"结合上下文回答失败: {e}")
             raise
     
-    def get_knowledge_stats(self) -> Dict[str, Any]:
+    def get_knowledge_stats(self) -> dict[str, Any]:
         """
         获取知识库统计信息
         
@@ -377,7 +376,7 @@ class RAGService:
 class RAGIntegrationService:
     """RAG集成服务 - 将RAG功能集成到ContextGate机器人"""
     
-    def __init__(self, rag_service: Optional[RAGService] = None):
+    def __init__(self, rag_service: RAGService | None = None):
         """
         初始化RAG集成服务
         
@@ -387,7 +386,7 @@ class RAGIntegrationService:
         self.rag_service = rag_service or RAGService()
         logger.info("RAG集成服务初始化完成")
     
-    def should_use_rag(self, message: str, emotion: Optional[str] = None) -> bool:
+    def should_use_rag(self, message: str, emotion: str | None = None) -> bool:
         """
         判断是否应该使用RAG
         
@@ -448,9 +447,9 @@ class RAGIntegrationService:
     def enhance_response(
         self,
         message: str,
-        emotion: Optional[str] = None,
-        conversation_history: Optional[List[Dict[str, str]]] = None
-    ) -> Dict[str, Any]:
+        emotion: str | None = None,
+        conversation_history: list[dict[str, str]] | None = None
+    ) -> dict[str, Any]:
         """
         增强回复 - 结合知识库生成更专业的回答
         

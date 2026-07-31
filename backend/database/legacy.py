@@ -2,12 +2,23 @@
 """
 数据库配置和模型定义
 """
-import os
 import json
-from sqlalchemy import create_engine, Column, Integer, BigInteger, String, Text, DateTime, Float, Boolean
+import os
+from datetime import datetime
+
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    Integer,
+    String,
+    Text,
+    create_engine,
+)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from datetime import datetime
 
 
 def _project_root() -> str:
@@ -494,7 +505,7 @@ class DatabaseManager:
     
     def search_knowledge(self, query, category=None, limit=10):
         """搜索知识"""
-        q = self.db.query(Knowledge).filter(Knowledge.is_active == True)
+        q = self.db.query(Knowledge).filter(Knowledge.is_active)
         if category:
             q = q.filter(Knowledge.category == category)
         # 简单的文本搜索，可以后续优化为全文搜索
@@ -622,7 +633,6 @@ class DatabaseManager:
     
     def save_evaluation(self, evaluation_data):
         """保存评估结果"""
-        import json
         
         evaluation = ResponseEvaluation(
             session_id=evaluation_data.get("session_id"),
@@ -663,7 +673,6 @@ class DatabaseManager:
     
     def get_evaluation_statistics(self, start_date=None, end_date=None):
         """获取评估统计信息"""
-        from sqlalchemy import func
         
         query = self.db.query(ResponseEvaluation)
         if start_date:

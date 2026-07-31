@@ -11,13 +11,13 @@ from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
+    JSON,
     Boolean,
     Column,
     DateTime,
     Float,
     Index,
     Integer,
-    JSON,
     String,
     Text,
     UniqueConstraint,

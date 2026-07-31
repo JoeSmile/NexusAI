@@ -4,15 +4,15 @@ Rule-Based Intent Engine for fast pattern matching
 """
 
 import re
-from typing import Dict, List, Optional, Tuple
-from ..models.intent_models import IntentType, IntentResult
+
+from ..models.intent_models import IntentResult, IntentType
 
 
 class RuleBasedIntentEngine:
     """基于规则的意图识别引擎"""
     
     # 意图关键词规则表
-    INTENT_RULES: Dict[IntentType, List[str]] = {
+    INTENT_RULES: dict[IntentType, list[str]] = {
         IntentType.CRISIS: [
             "不想活", "自杀", "结束生命", "撑不下去", "想死",
             "自残", "割腕", "跳楼", "了结", "没有意义",
@@ -53,7 +53,7 @@ class RuleBasedIntentEngine:
         # 编译正则表达式以提高性能
         self.crisis_regex = [re.compile(pattern) for pattern in self.CRISIS_PATTERNS]
     
-    def detect_intent(self, text: str) -> Optional[IntentResult]:
+    def detect_intent(self, text: str) -> IntentResult | None:
         """
         使用规则检测意图
         
@@ -122,7 +122,7 @@ class RuleBasedIntentEngine:
         
         return False
     
-    def get_matched_keywords(self, text: str, intent: IntentType) -> List[str]:
+    def get_matched_keywords(self, text: str, intent: IntentType) -> list[str]:
         """
         获取文本中匹配的关键词
         

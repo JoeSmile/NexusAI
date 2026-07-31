@@ -8,20 +8,17 @@ Memory Hub - 记忆中枢
 - 行为日志
 """
 
-import json
-from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
-from pathlib import Path
+from typing import Any
 
+from backend.database import User, get_db
 from backend.memory_manager import MemoryManager
-from backend.database import get_db, User, ChatSession, ChatMessage
-from backend.vector_store import VectorStore
 
 
 class MemoryHub:
     """记忆中枢 - Agent的记忆系统核心"""
     
-    def __init__(self, memory_manager: Optional[MemoryManager] = None):
+    def __init__(self, memory_manager: MemoryManager | None = None):
         """
         初始化记忆中枢
         
@@ -46,7 +43,7 @@ class MemoryHub:
             "conversation": "对话记忆"   # 对话历史
         }
     
-    def encode(self, experience: Dict[str, Any]) -> Dict[str, Any]:
+    def encode(self, experience: dict[str, Any]) -> dict[str, Any]:
         """
         编码：将新经验转换为记忆
         
@@ -69,7 +66,7 @@ class MemoryHub:
         
         return memory
     
-    def consolidate(self, memory: Dict[str, Any]) -> bool:
+    def consolidate(self, memory: dict[str, Any]) -> bool:
         """
         巩固：将工作记忆转移到长期记忆
         
@@ -109,16 +106,16 @@ class MemoryHub:
             return True
             
         except Exception as e:
-            print(f"记忆巩固失败: {str(e)}")
+            print(f"记忆巩固失败: {e!s}")
             return False
     
     def retrieve(
         self, 
         query: str, 
         user_id: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         top_k: int = 5
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         检索：基于查询和上下文检索相关记忆
         
@@ -144,7 +141,7 @@ class MemoryHub:
             )
             results.extend(semantic_results)
         except Exception as e:
-            print(f"语义检索失败: {str(e)}")
+            print(f"语义检索失败: {e!s}")
         
         # 2. 时间序列检索（近期优先）
         if context.get("time_range"):
@@ -156,7 +153,7 @@ class MemoryHub:
                 )
                 results.extend(temporal_results)
             except Exception as e:
-                print(f"时间检索失败: {str(e)}")
+                print(f"时间检索失败: {e!s}")
         
         # 3. 情绪关联检索（情绪一致性）
         if context.get("emotion"):
@@ -168,7 +165,7 @@ class MemoryHub:
                 )
                 results.extend(emotion_results)
             except Exception as e:
-                print(f"情绪检索失败: {str(e)}")
+                print(f"情绪检索失败: {e!s}")
         
         # 合并去重，按重要性和相似度排序
         unique_results = self._merge_and_rank(results, top_k)
@@ -177,9 +174,9 @@ class MemoryHub:
     
     def update_working_memory(
         self, 
-        conversation: Optional[List[Dict]] = None,
-        tasks: Optional[List[Dict]] = None,
-        variables: Optional[Dict] = None
+        conversation: list[dict] | None = None,
+        tasks: list[dict] | None = None,
+        variables: dict | None = None
     ):
         """
         更新短期记忆（工作记忆）
@@ -199,7 +196,7 @@ class MemoryHub:
         if variables is not None:
             self.working_memory["temp_variables"].update(variables)
     
-    def get_working_memory(self) -> Dict[str, Any]:
+    def get_working_memory(self) -> dict[str, Any]:
         """获取当前工作记忆"""
         return self.working_memory.copy()
     
@@ -211,7 +208,7 @@ class MemoryHub:
             "temp_variables": {}
         }
     
-    def get_user_profile(self, user_id: str) -> Dict[str, Any]:
+    def get_user_profile(self, user_id: str) -> dict[str, Any]:
         """
         获取用户画像
         
@@ -241,7 +238,7 @@ class MemoryHub:
             return profile
             
         except Exception as e:
-            print(f"获取用户画像失败: {str(e)}")
+            print(f"获取用户画像失败: {e!s}")
             return {}
     
     def get_action_log(
@@ -249,7 +246,7 @@ class MemoryHub:
         user_id: str, 
         days: int = 7,
         limit: int = 10
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         获取用户行为日志
         
@@ -283,12 +280,12 @@ class MemoryHub:
             return action_log
             
         except Exception as e:
-            print(f"获取行为日志失败: {str(e)}")
+            print(f"获取行为日志失败: {e!s}")
             return []
     
     # ==================== 私有辅助方法 ====================
     
-    def _calculate_importance(self, experience: Dict[str, Any]) -> float:
+    def _calculate_importance(self, experience: dict[str, Any]) -> float:
         """
         计算记忆重要性
         
@@ -317,7 +314,7 @@ class MemoryHub:
         
         return min(importance, 1.0)
     
-    def _infer_memory_type(self, experience: Dict[str, Any]) -> str:
+    def _infer_memory_type(self, experience: dict[str, Any]) -> str:
         """推断记忆类型"""
         content = experience.get("content", "")
         
@@ -333,7 +330,7 @@ class MemoryHub:
         # 默认为语义记忆
         return "semantic"
     
-    def _extract_knowledge(self, memory: Dict[str, Any]) -> Optional[str]:
+    def _extract_knowledge(self, memory: dict[str, Any]) -> str | None:
         """从记忆中提取知识"""
         # 简化实现：如果包含"学到"、"发现"等关键词，提取知识
         content = memory.get("content", "")
@@ -344,7 +341,7 @@ class MemoryHub:
         
         return None
     
-    def _save_conversation_memory(self, memory: Dict[str, Any]):
+    def _save_conversation_memory(self, memory: dict[str, Any]):
         """保存对话记忆到数据库"""
         try:
             db = next(get_db())
@@ -367,14 +364,14 @@ class MemoryHub:
                 db.commit()
         
         except Exception as e:
-            print(f"保存对话记忆失败: {str(e)}")
+            print(f"保存对话记忆失败: {e!s}")
     
     def _search_recent(
         self, 
         user_id: str, 
         days: int = 7, 
         limit: int = 5
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """搜索近期记忆"""
         try:
             db = next(get_db())
@@ -401,7 +398,7 @@ class MemoryHub:
             return results
             
         except Exception as e:
-            print(f"近期记忆搜索失败: {str(e)}")
+            print(f"近期记忆搜索失败: {e!s}")
             return []
     
     def _search_by_emotion(
@@ -409,7 +406,7 @@ class MemoryHub:
         user_id: str, 
         emotion: str, 
         limit: int = 3
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """根据情绪搜索记忆"""
         try:
             db = next(get_db())
@@ -435,14 +432,14 @@ class MemoryHub:
             return results
             
         except Exception as e:
-            print(f"情绪记忆搜索失败: {str(e)}")
+            print(f"情绪记忆搜索失败: {e!s}")
             return []
     
     def _merge_and_rank(
         self, 
-        results: List[Dict[str, Any]], 
+        results: list[dict[str, Any]], 
         top_k: int
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """合并去重并排序记忆"""
         # 简单去重（基于内容）
         seen_contents = set()
@@ -476,7 +473,7 @@ class MemoryHub:
         except:
             return 0
     
-    def _get_emotion_baseline(self, user_id: str) -> Dict[str, Any]:
+    def _get_emotion_baseline(self, user_id: str) -> dict[str, Any]:
         """获取用户情绪基线"""
         try:
             db = next(get_db())
@@ -513,10 +510,10 @@ class MemoryHub:
             }
             
         except Exception as e:
-            print(f"获取情绪基线失败: {str(e)}")
+            print(f"获取情绪基线失败: {e!s}")
             return {}
     
-    def _extract_interests(self, user_id: str) -> List[str]:
+    def _extract_interests(self, user_id: str) -> list[str]:
         """提取用户兴趣"""
         # 简化实现：基于关键词统计
         try:
@@ -548,10 +545,10 @@ class MemoryHub:
             return interests
             
         except Exception as e:
-            print(f"提取兴趣失败: {str(e)}")
+            print(f"提取兴趣失败: {e!s}")
             return []
     
-    def _extract_personality_traits(self, user_id: str) -> List[str]:
+    def _extract_personality_traits(self, user_id: str) -> list[str]:
         """提取用户性格特征"""
         # 简化实现：基于情绪和表达分析
         try:
@@ -581,7 +578,7 @@ class MemoryHub:
             return traits
             
         except Exception as e:
-            print(f"提取性格特征失败: {str(e)}")
+            print(f"提取性格特征失败: {e!s}")
             return []
 
 

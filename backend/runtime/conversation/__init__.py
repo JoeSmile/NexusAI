@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 runtime.conversation — ConversationRuntime package
 
@@ -8,10 +7,10 @@ runtime.conversation — ConversationRuntime package
     from runtime.conversation import ConversationRuntime
 """
 
-from backend.runtime.conversation._lifecycle import LifecycleMixin
-from backend.runtime.conversation._turn import TurnMixin
-from backend.runtime.conversation._snapshot import SnapshotMixin
 from backend.runtime.conversation._helpers import TurnResult
+from backend.runtime.conversation._lifecycle import LifecycleMixin
+from backend.runtime.conversation._snapshot import SnapshotMixin
+from backend.runtime.conversation._turn import TurnMixin
 
 
 class ConversationRuntime(
@@ -35,7 +34,6 @@ class ConversationRuntime(
     - SnapshotMixin: 运行时状态快照
     """
 
-    pass
 
 
 __all__ = ["ConversationRuntime", "TurnResult"]

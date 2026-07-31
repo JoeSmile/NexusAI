@@ -6,11 +6,10 @@
 
 import re
 import uuid
-from typing import Optional, List, Tuple, Any, Dict
 from datetime import datetime
+from typing import Any
 
 from ..exceptions import ValidationError
-
 
 # 正则表达式模式
 EMAIL_PATTERN = re.compile(
@@ -38,7 +37,7 @@ EMOTION_KEYWORDS = {
 }
 
 
-def validate_email(email: str) -> Tuple[bool, str]:
+def validate_email(email: str) -> tuple[bool, str]:
     """验证邮箱格式"""
     if not email or not isinstance(email, str):
         return False, "邮箱不能为空"
@@ -52,7 +51,7 @@ def validate_email(email: str) -> Tuple[bool, str]:
     return True, "邮箱格式正确"
 
 
-def validate_phone(phone: str) -> Tuple[bool, str]:
+def validate_phone(phone: str) -> tuple[bool, str]:
     """验证手机号格式"""
     if not phone or not isinstance(phone, str):
         return False, "手机号不能为空"
@@ -70,7 +69,7 @@ def validate_text_length(
     text: str,
     min_length: int = 1,
     max_length: int = 1000
-) -> Tuple[bool, str]:
+) -> tuple[bool, str]:
     """验证文本长度"""
     if not isinstance(text, str):
         return False, "文本必须是字符串"
@@ -84,7 +83,7 @@ def validate_text_length(
     return True, "文本长度符合要求"
 
 
-def validate_session_id(session_id: str) -> Tuple[bool, str]:
+def validate_session_id(session_id: str) -> tuple[bool, str]:
     """验证会话ID格式"""
     if not session_id or not isinstance(session_id, str):
         return False, "会话ID不能为空"
@@ -95,7 +94,7 @@ def validate_session_id(session_id: str) -> Tuple[bool, str]:
     return True, "会话ID格式正确"
 
 
-def validate_user_id(user_id: str) -> Tuple[bool, str]:
+def validate_user_id(user_id: str) -> tuple[bool, str]:
     """验证用户ID格式"""
     if not user_id or not isinstance(user_id, str):
         return False, "用户ID不能为空"
@@ -106,7 +105,7 @@ def validate_user_id(user_id: str) -> Tuple[bool, str]:
     return True, "用户ID格式正确"
 
 
-def validate_message_content(message: str) -> Tuple[bool, str]:
+def validate_message_content(message: str) -> tuple[bool, str]:
     """验证消息内容"""
     # 基本验证
     valid, error = validate_text_length(message, 1, 2000)
@@ -126,7 +125,7 @@ def validate_message_content(message: str) -> Tuple[bool, str]:
     return True, "消息内容验证通过"
 
 
-def validate_emotion_value(emotion: str) -> Tuple[bool, str]:
+def validate_emotion_value(emotion: str) -> tuple[bool, str]:
     """验证情绪值"""
     valid_emotions = [
         "开心", "快乐", "兴奋", "满足", "幸福", "愉悦", "轻松", "平静",
@@ -143,7 +142,7 @@ def validate_emotion_value(emotion: str) -> Tuple[bool, str]:
     return True, "情绪值验证通过"
 
 
-def validate_emotion_intensity(intensity: float) -> Tuple[bool, str]:
+def validate_emotion_intensity(intensity: float) -> tuple[bool, str]:
     """验证情绪强度"""
     if not isinstance(intensity, (int, float)):
         return False, "情绪强度必须是数字"
@@ -154,7 +153,7 @@ def validate_emotion_intensity(intensity: float) -> Tuple[bool, str]:
     return True, "情绪强度验证通过"
 
 
-def validate_rating(rating: int) -> Tuple[bool, str]:
+def validate_rating(rating: int) -> tuple[bool, str]:
     """验证评分"""
     if not isinstance(rating, int):
         return False, "评分必须是整数"
@@ -165,7 +164,7 @@ def validate_rating(rating: int) -> Tuple[bool, str]:
     return True, "评分验证通过"
 
 
-def validate_timestamp(timestamp: str) -> Tuple[bool, str]:
+def validate_timestamp(timestamp: str) -> tuple[bool, str]:
     """验证时间戳格式"""
     if not timestamp or not isinstance(timestamp, str):
         return False, "时间戳不能为空"
@@ -177,7 +176,7 @@ def validate_timestamp(timestamp: str) -> Tuple[bool, str]:
         return False, "时间戳格式不正确，应为ISO格式"
 
 
-def validate_pagination_params(page: int, page_size: int) -> Tuple[bool, str]:
+def validate_pagination_params(page: int, page_size: int) -> tuple[bool, str]:
     """验证分页参数"""
     if not isinstance(page, int) or page < 1:
         return False, "页码必须是大于0的整数"
@@ -188,7 +187,7 @@ def validate_pagination_params(page: int, page_size: int) -> Tuple[bool, str]:
     return True, "分页参数验证通过"
 
 
-def validate_search_query(query: str) -> Tuple[bool, str]:
+def validate_search_query(query: str) -> tuple[bool, str]:
     """验证搜索查询"""
     if not query or not isinstance(query, str):
         return False, "搜索查询不能为空"
@@ -205,9 +204,9 @@ def validate_search_query(query: str) -> Tuple[bool, str]:
 def validate_file_upload(
     filename: str,
     file_size: int,
-    allowed_extensions: List[str] = None,
+    allowed_extensions: list[str] = None,
     max_size: int = 10 * 1024 * 1024  # 10MB
-) -> Tuple[bool, str]:
+) -> tuple[bool, str]:
     """验证文件上传"""
     if not filename or not isinstance(filename, str):
         return False, "文件名不能为空"
@@ -226,7 +225,7 @@ def validate_file_upload(
     return True, "文件上传验证通过"
 
 
-def validate_config_value(key: str, value: Any, config_type: str) -> Tuple[bool, str]:
+def validate_config_value(key: str, value: Any, config_type: str) -> tuple[bool, str]:
     """验证配置值"""
     if not key or not isinstance(key, str):
         return False, "配置键不能为空"
@@ -246,7 +245,7 @@ def validate_config_value(key: str, value: Any, config_type: str) -> Tuple[bool,
     return True, "配置值验证通过"
 
 
-def validate_json_schema(data: Dict[str, Any], schema: Dict[str, Any]) -> Tuple[bool, str]:
+def validate_json_schema(data: dict[str, Any], schema: dict[str, Any]) -> tuple[bool, str]:
     """简单的JSON模式验证"""
     try:
         for field, rules in schema.items():
@@ -297,7 +296,7 @@ def validate_json_schema(data: Dict[str, Any], schema: Dict[str, Any]) -> Tuple[
         return True, "JSON模式验证通过"
     
     except Exception as e:
-        return False, f"验证过程中发生错误：{str(e)}"
+        return False, f"验证过程中发生错误：{e!s}"
 
 
 def sanitize_input(text: str) -> str:
@@ -318,7 +317,7 @@ def sanitize_input(text: str) -> str:
     return text
 
 
-def extract_emotion_keywords(text: str) -> List[str]:
+def extract_emotion_keywords(text: str) -> list[str]:
     """从文本中提取情绪关键词"""
     if not isinstance(text, str):
         return []
@@ -326,7 +325,7 @@ def extract_emotion_keywords(text: str) -> List[str]:
     text_lower = text.lower()
     found_keywords = []
     
-    for category, keywords in EMOTION_KEYWORDS.items():
+    for _category, keywords in EMOTION_KEYWORDS.items():
         for keyword in keywords:
             if keyword in text_lower:
                 found_keywords.append(keyword)
@@ -335,7 +334,7 @@ def extract_emotion_keywords(text: str) -> List[str]:
 
 
 # 验证装饰器
-def validate_request_data(schema: Dict[str, Any]):
+def validate_request_data(schema: dict[str, Any]):
     """请求数据验证装饰器"""
     def decorator(func):
         def wrapper(*args, **kwargs):

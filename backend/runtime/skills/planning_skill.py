@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 PlanningSkill — 任务规划技能
 
@@ -14,11 +13,11 @@ from __future__ import annotations
 
 import logging
 import time
-from enum import Enum
-from typing import Any, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 
-from backend.runtime.skills.base import Skill, SkillContext, SkillResult
 from backend.runtime.config.guards import is_module_enabled
+from backend.runtime.skills.base import Skill, SkillContext, SkillResult
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +25,7 @@ logger = logging.getLogger(__name__)
 # ────────────────── Enums ──────────────────
 
 
-class GoalType(str, Enum):
+class GoalType(StrEnum):
     """目标类型"""
     INFORMATION_QUERY = "information_query"
     EMOTIONAL_SUPPORT = "emotional_support"
@@ -35,14 +34,14 @@ class GoalType(str, Enum):
     CASUAL_CHAT = "casual_chat"
 
 
-class Complexity(str, Enum):
+class Complexity(StrEnum):
     """任务复杂度"""
     SIMPLE = "simple"
     MEDIUM = "medium"
     COMPLEX = "complex"
 
 
-class Strategy(str, Enum):
+class Strategy(StrEnum):
     """执行策略"""
     DIRECT_RESPONSE = "direct_response"
     EMPATHY_FIRST = "empathy_first"
@@ -59,17 +58,17 @@ class ExecutionPlan:
 
     def __init__(
         self,
-        goal: Dict[str, Any],
+        goal: dict[str, Any],
         strategy: Strategy,
-        steps: List[Dict[str, Any]],
-        metadata: Optional[Dict[str, Any]] = None,
+        steps: list[dict[str, Any]],
+        metadata: dict[str, Any] | None = None,
     ):
         self.goal = goal
         self.strategy = strategy
         self.steps = steps
         self.metadata = metadata or {}
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "goal": self.goal,
             "strategy": self.strategy.value,
@@ -173,9 +172,9 @@ class PlanningSkill(Skill):
                 execution_time_ms=time.time() * 1000 - start_ms,
             )
 
-    def _identify_goal(self, user_input: str, emotion_data: Dict) -> Dict[str, Any]:
+    def _identify_goal(self, user_input: str, emotion_data: dict) -> dict[str, Any]:
         """识别用户目标（规则优先）"""
-        emotion = emotion_data.get("emotion", "") if emotion_data else ""
+        emotion_data.get("emotion", "") if emotion_data else ""
         intensity = emotion_data.get("emotion_intensity", 5.0) if emotion_data else 5.0
 
         # 规则1：高情绪强度 → 情感支持
@@ -225,7 +224,7 @@ class PlanningSkill(Skill):
             "description": "日常对话",
         }
 
-    def _select_strategy(self, goal: Dict, emotion_data: Dict) -> Strategy:
+    def _select_strategy(self, goal: dict, emotion_data: dict) -> Strategy:
         """选择执行策略"""
         goal_type = goal.get("goal_type", "")
 
@@ -241,8 +240,8 @@ class PlanningSkill(Skill):
             return Strategy.DIRECT_RESPONSE
 
     def _generate_steps(
-        self, goal: Dict, strategy: Strategy, context: SkillContext
-    ) -> List[Dict[str, Any]]:
+        self, goal: dict, strategy: Strategy, context: SkillContext
+    ) -> list[dict[str, Any]]:
         """生成执行步骤"""
         steps = []
 

@@ -4,11 +4,12 @@
 提供增强版多轮对话API
 """
 
+
 from fastapi import APIRouter, HTTPException
-from typing import Optional
+
+from backend.logging_config import get_logger
 from backend.models import ChatRequest, ChatResponse
 from backend.services.enhanced_chat_service import EnhancedChatService
-from backend.logging_config import get_logger
 
 router = APIRouter(prefix="/enhanced-chat", tags=["增强版聊天"])
 logger = get_logger(__name__)

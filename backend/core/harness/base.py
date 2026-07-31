@@ -55,7 +55,7 @@ class Harness:
                 self._retry(_protected),
                 timeout=float(meta.get("timeout", 30)),
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self._record_error(tenant_id, type, name, "timeout")
             return HarnessResult(
                 output=meta.get("fallback", ""),

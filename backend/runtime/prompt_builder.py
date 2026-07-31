@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 SystemPromptBuilder — 动态系统提示构建
 
@@ -13,8 +12,7 @@ SystemPromptBuilder — 动态系统提示构建
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
@@ -46,12 +44,12 @@ class SystemPromptBuilder:
     def __init__(
         self,
         base_identity: str = "你是一个温暖的LLM GatewayAI，致力于倾听和理解用户的感受。",
-        language_hint: Optional[str] = None,
-        memory_block: Optional[str] = None,
-        skill_summaries: Optional[List[Dict]] = None,
-        workspace_root: Optional[str] = None,
-        session_id: Optional[str] = None,
-        append_system_prompt: Optional[str] = None,
+        language_hint: str | None = None,
+        memory_block: str | None = None,
+        skill_summaries: list[dict] | None = None,
+        workspace_root: str | None = None,
+        session_id: str | None = None,
+        append_system_prompt: str | None = None,
     ):
         self._base_identity = base_identity
         self._language_hint = language_hint
@@ -60,7 +58,7 @@ class SystemPromptBuilder:
         self._workspace_root = workspace_root
         self._session_id = session_id
         self._append_system_prompt = append_system_prompt
-        self._extra_layers: List[PromptLayer] = []
+        self._extra_layers: list[PromptLayer] = []
 
     def add_layer(self, layer: PromptLayer) -> None:
         """添加额外的提示层"""
@@ -68,7 +66,7 @@ class SystemPromptBuilder:
 
     def remove_layer(self, name: str) -> None:
         """按名称移除层"""
-        self._extra_layers = [l for l in self._extra_layers if l.name != name]
+        self._extra_layers = [layer for layer in self._extra_layers if layer.name != name]
 
     def set_base_identity(self, identity: str) -> None:
         """覆盖基础身份"""
@@ -78,7 +76,7 @@ class SystemPromptBuilder:
         """设置记忆注入块"""
         self._memory_block = block
 
-    def set_skill_summaries(self, summaries: List[Dict]) -> None:
+    def set_skill_summaries(self, summaries: list[dict]) -> None:
         """设置 Skill 描述"""
         self._skill_summaries = summaries
 
@@ -88,7 +86,7 @@ class SystemPromptBuilder:
 
         层按优先级排序（高优先级在前），然后用分隔符连接。
         """
-        layers: List[PromptLayer] = []
+        layers: list[PromptLayer] = []
 
         # 1. 基础身份（优先级最高）
         layers.append(PromptLayer(
@@ -147,7 +145,7 @@ class SystemPromptBuilder:
             ))
 
         # 按优先级排序（高在前）
-        layers.sort(key=lambda l: -l.priority)
+        layers.sort(key=lambda layer: -layer.priority)
 
         # 用分隔符连接
         parts = []

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 LifecycleMixin — 初始化、注册、FSM 转换
 
@@ -7,17 +6,15 @@ LifecycleMixin — 初始化、注册、FSM 转换
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import uuid
-from typing import Any, Dict, List, Optional
 
-from backend.runtime.session.fsm import SessionFSM, SessionState, IllegalTransitionError
-from backend.runtime.config.toggles import ModuleToggles
 from backend.runtime.config.guards import init_guards, is_module_enabled
-from backend.runtime.hooks.base import HookContext, HookDispatcher
-from backend.runtime.skills.base import Skill, SkillRegistry
+from backend.runtime.config.toggles import ModuleToggles
+from backend.runtime.hooks.base import HookDispatcher
 from backend.runtime.policy.policy_engine import PolicyEngine
+from backend.runtime.session.fsm import SessionFSM, SessionState
+from backend.runtime.skills.base import Skill, SkillRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +36,10 @@ class LifecycleMixin:
         workspace_id: str = "",
         user_id: str = "",
         max_iterations: int = 10,
-        toggles: Optional[ModuleToggles] = None,
-        hooks: Optional[list] = None,
-        skills: Optional[List[Skill]] = None,
-        policy_engine: Optional[PolicyEngine] = None,
+        toggles: ModuleToggles | None = None,
+        hooks: list | None = None,
+        skills: list[Skill] | None = None,
+        policy_engine: PolicyEngine | None = None,
         llm_client=None,
         tool_executor=None,
         memory_hub=None,
@@ -101,7 +98,7 @@ class LifecycleMixin:
 
     def _register_default_skills(
         self,
-        skills: Optional[List[Skill]] = None,
+        skills: list[Skill] | None = None,
         llm_client=None,
         tool_executor=None,
         memory_hub=None,

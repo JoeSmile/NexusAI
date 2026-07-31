@@ -4,8 +4,8 @@
 自动完成数据库初始化、RAG知识库初始化，并启动服务
 """
 
-import sys
 import os
+import sys
 
 if os.name == "nt" and hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -17,10 +17,8 @@ sys.path.insert(0, project_root)
 import os
 import subprocess
 import time
-from pathlib import Path
 
 # 项目根目录已在上方根据 scripts/ 的父目录解析。
-
 from config import Config
 
 
@@ -70,8 +68,7 @@ def init_database():
         result = subprocess.run(
             [sys.executable, os.path.join(project_root, "scripts", "db_manager.py"), "check"],
             cwd=project_root,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            capture_output=True
         )
         
         if result.returncode != 0:
@@ -105,7 +102,10 @@ def init_rag_knowledge():
         print("→ 检查知识库状态...")
         
         # 导入RAG模块
-        from backend.modules.rag.core.knowledge_base import KnowledgeBaseManager, PsychologyKnowledgeLoader
+        from backend.modules.rag.core.knowledge_base import (
+            KnowledgeBaseManager,
+            PsychologyKnowledgeLoader,
+        )
         
         kb_manager = KnowledgeBaseManager()
         stats = kb_manager.get_stats()
@@ -131,7 +131,7 @@ def init_rag_knowledge():
         
         # 验证
         final_stats = kb_manager.get_stats()
-        print(f"✓ RAG知识库初始化完成")
+        print("✓ RAG知识库初始化完成")
         print(f"  文档数量: {final_stats.get('document_count', 0)}")
         print(f"  存储位置: {final_stats.get('persist_directory')}")
         
@@ -148,7 +148,7 @@ def start_backend():
     print_header("启动后端服务")
     
     print(f"📍 服务地址: http://{Config.HOST}:{Config.PORT}")
-    print("🔗 API文档: http://localhost:{}/docs".format(Config.PORT))
+    print(f"🔗 API文档: http://localhost:{Config.PORT}/docs")
     print("\n💡 提示: 按 Ctrl+C 停止服务")
     print("=" * 70 + "\n")
     

@@ -5,18 +5,18 @@ RAG分块策略模块
 """
 
 import re
-from typing import List, Dict, Any, Optional, Tuple
-from datetime import datetime
+from typing import Any
+
+from backend.logging_config import get_logger
 
 from .langchain_compat import Document
-from backend.logging_config import get_logger
 
 logger = get_logger(__name__)
 
 
 # ==================== 中文分句工具 ====================
 
-def split_sentences_zh(text: str) -> List[str]:
+def split_sentences_zh(text: str) -> list[str]:
     """
     中文分句函数
     基于正则表达式识别中文标点进行分句
@@ -49,7 +49,7 @@ class CharacterTextSplitter:
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
     
-    def split_text(self, text: str) -> List[str]:
+    def split_text(self, text: str) -> list[str]:
         """按固定长度切分文本"""
         if len(text) <= self.chunk_size:
             return [text]
@@ -69,7 +69,7 @@ class CharacterTextSplitter:
         
         return chunks
     
-    def split_documents(self, documents: List[Document]) -> List[Document]:
+    def split_documents(self, documents: list[Document]) -> list[Document]:
         """分割文档列表"""
         all_chunks = []
         for doc in documents:
@@ -102,7 +102,7 @@ class SentenceTextSplitter:
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
     
-    def split_text(self, text: str) -> List[str]:
+    def split_text(self, text: str) -> list[str]:
         """按句子切分文本"""
         sentences = split_sentences_zh(text)
         if not sentences:
@@ -132,7 +132,7 @@ class SentenceTextSplitter:
         
         return chunks
     
-    def split_documents(self, documents: List[Document]) -> List[Document]:
+    def split_documents(self, documents: list[Document]) -> list[Document]:
         """分割文档列表"""
         all_chunks = []
         for doc in documents:
@@ -178,7 +178,7 @@ class MarkdownStructureSplitter:
         self.heading_pat = re.compile(r'^(#{1,6})\s+(.*)$')
         self.fence_pat = re.compile(r'^```')
     
-    def split_text(self, text: str) -> List[Dict[str, Any]]:
+    def split_text(self, text: str) -> list[dict[str, Any]]:
         """
         按Markdown结构切分文本
         
@@ -285,7 +285,7 @@ class MarkdownStructureSplitter:
                 merged.append(ch)
         
         # 添加标题路径前缀和重叠
-        overlap = int(self.chunk_size * self.overlap_ratio)
+        int(self.chunk_size * self.overlap_ratio)
         for ch in merged:
             bc = " > ".join(ch["meta"]["breadcrumbs"][-3:])
             prefix = f"[{bc}]\n" if bc else ""
@@ -294,7 +294,7 @@ class MarkdownStructureSplitter:
         
         return merged
     
-    def split_documents(self, documents: List[Document]) -> List[Document]:
+    def split_documents(self, documents: list[Document]) -> list[Document]:
         """分割文档列表"""
         all_chunks = []
         for doc in documents:
@@ -335,7 +335,7 @@ class DialogueSplitter:
         self.max_chars = max_chars
         self.overlap_turns = overlap_turns
     
-    def parse_dialogue(self, text: str) -> List[Dict[str, Any]]:
+    def parse_dialogue(self, text: str) -> list[dict[str, Any]]:
         """
         解析对话文本，提取轮次
         
@@ -385,7 +385,7 @@ class DialogueSplitter:
         
         return turns
     
-    def split_text(self, text: str) -> List[Dict[str, Any]]:
+    def split_text(self, text: str) -> list[dict[str, Any]]:
         """按对话轮次切分文本"""
         turns = self.parse_dialogue(text)
         if not turns:
@@ -440,7 +440,7 @@ class DialogueSplitter:
         
         return chunks
     
-    def split_documents(self, documents: List[Document]) -> List[Document]:
+    def split_documents(self, documents: list[Document]) -> list[Document]:
         """分割文档列表"""
         all_chunks = []
         for doc in documents:
@@ -503,7 +503,7 @@ class SmallBigChunking:
             separators=["\n\n", "\n", "。", "！", "？", "；", ".", "!", "?", ";", " ", ""]
         )
     
-    def split_documents(self, documents: List[Document]) -> List[Document]:
+    def split_documents(self, documents: list[Document]) -> list[Document]:
         """
         分割文档，同时生成小块和大块
         
@@ -584,7 +584,7 @@ class ParentChildChunking:
             chunk_overlap=child_overlap
         )
     
-    def split_documents(self, documents: List[Document]) -> List[Document]:
+    def split_documents(self, documents: list[Document]) -> list[Document]:
         """
         分割文档，创建父子块结构
         

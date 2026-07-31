@@ -4,12 +4,13 @@
 处理所有与记忆相关的业务逻辑
 """
 
-from typing import Dict, List, Optional, Any
-from backend.memory_manager import MemoryManager
-from backend.memory_extractor import MemoryExtractor
-from backend.database import DatabaseManager, MemoryItem
-from datetime import datetime
 import json
+from datetime import datetime
+from typing import Any
+
+from backend.database import DatabaseManager, MemoryItem
+from backend.memory_extractor import MemoryExtractor
+from backend.memory_manager import MemoryManager
 
 
 class MemoryService:
@@ -26,9 +27,9 @@ class MemoryService:
         user_id: str,
         user_message: str,
         bot_response: str,
-        emotion: Optional[str] = None,
-        emotion_intensity: Optional[float] = None
-    ) -> List[Dict[str, Any]]:
+        emotion: str | None = None,
+        emotion_intensity: float | None = None
+    ) -> list[dict[str, Any]]:
         """
         处理对话并存储记忆
         
@@ -66,7 +67,7 @@ class MemoryService:
         
         return memories
     
-    def _sync_memories_to_db(self, memories: List[Dict[str, Any]]) -> set[str]:
+    def _sync_memories_to_db(self, memories: list[dict[str, Any]]) -> set[str]:
         """将记忆同步到关系数据库，返回已确认持久化的 ID。"""
         synced_ids: set[str] = set()
         try:
@@ -108,7 +109,7 @@ class MemoryService:
         query: str,
         n_results: int = 3,
         days_limit: int = 7
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         检索相关记忆
         
@@ -134,7 +135,7 @@ class MemoryService:
         
         return memories
     
-    def _update_access_stats(self, memories: List[Dict[str, Any]]):
+    def _update_access_stats(self, memories: list[dict[str, Any]]):
         """更新记忆的访问统计"""
         try:
             with DatabaseManager() as db:
@@ -152,7 +153,7 @@ class MemoryService:
         except Exception as e:
             print(f"更新访问统计失败: {e}")
     
-    async def get_emotion_trend(self, user_id: str, days: int = 7) -> Dict[str, Any]:
+    async def get_emotion_trend(self, user_id: str, days: int = 7) -> dict[str, Any]:
         """
         获取用户情绪趋势
         
@@ -165,7 +166,7 @@ class MemoryService:
         """
         return self.memory_manager.get_user_emotion_trend(user_id, days)
     
-    async def get_important_memories(self, user_id: str, limit: int = 5) -> List[Dict[str, Any]]:
+    async def get_important_memories(self, user_id: str, limit: int = 5) -> list[dict[str, Any]]:
         """
         获取用户最重要的记忆
         
@@ -196,7 +197,7 @@ class MemoryService:
                 memory_item = db.db.query(MemoryItem).filter(
                     MemoryItem.memory_id == memory_id,
                     MemoryItem.user_id == user_id,
-                    MemoryItem.is_active == True,
+                    MemoryItem.is_active,
                 ).first()
                 if not memory_item:
                     return False
@@ -223,7 +224,7 @@ class MemoryService:
                 memory_item = db.db.query(MemoryItem).filter(
                     MemoryItem.memory_id == memory_id,
                     MemoryItem.user_id == user_id,
-                    MemoryItem.is_active == True,
+                    MemoryItem.is_active,
                 ).first()
                 if not memory_item:
                     return False
@@ -244,9 +245,9 @@ class MemoryService:
     async def get_user_memories_list(
         self,
         user_id: str,
-        memory_type: Optional[str] = None,
+        memory_type: str | None = None,
         limit: int = 50
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         获取用户记忆列表（用于管理界面）
         
@@ -262,7 +263,7 @@ class MemoryService:
             with DatabaseManager() as db:
                 query = db.db.query(MemoryItem).filter(
                     MemoryItem.user_id == user_id,
-                    MemoryItem.is_active == True
+                    MemoryItem.is_active
                 )
                 
                 if memory_type:
@@ -292,7 +293,7 @@ class MemoryService:
             print(f"获取记忆列表失败: {e}")
             return []
     
-    async def get_memory_statistics(self, user_id: str) -> Dict[str, Any]:
+    async def get_memory_statistics(self, user_id: str) -> dict[str, Any]:
         """
         获取用户记忆统计信息
         
@@ -309,7 +310,7 @@ class MemoryService:
                 # 总记忆数
                 total_count = db.db.query(func.count(MemoryItem.id)).filter(
                     MemoryItem.user_id == user_id,
-                    MemoryItem.is_active == True
+                    MemoryItem.is_active
                 ).scalar()
                 
                 # 按类型统计
@@ -318,13 +319,13 @@ class MemoryService:
                     func.count(MemoryItem.id).label('count')
                 ).filter(
                     MemoryItem.user_id == user_id,
-                    MemoryItem.is_active == True
+                    MemoryItem.is_active
                 ).group_by(MemoryItem.memory_type).all()
                 
                 # 平均重要性
                 avg_importance = db.db.query(func.avg(MemoryItem.importance)).filter(
                     MemoryItem.user_id == user_id,
-                    MemoryItem.is_active == True
+                    MemoryItem.is_active
                 ).scalar()
                 
                 return {

@@ -11,20 +11,18 @@ Reflector - 反思模块
 """
 
 import json
-from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta
-from enum import Enum
+import os
 
 # 导入MCP协议
 import sys
-import os
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any
+
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 sys.path.insert(0, project_root)
 
-from backend.modules.agent.protocol.mcp import (
-    MCPMessage, MCPProtocol, MCPContext,
-    MCPMessageType, get_mcp_logger
-)
+from backend.modules.agent.protocol.mcp import MCPContext, MCPMessage, MCPProtocol, get_mcp_logger
 
 
 class InteractionResult(Enum):
@@ -56,7 +54,7 @@ class Reflector:
         self.llm = llm_client
         
         # 经验数据库（内存存储，实际应该持久化）
-        self.experience_db: List[Dict[str, Any]] = []
+        self.experience_db: list[dict[str, Any]] = []
         
         # 评估规则
         self.evaluation_rules = self._init_evaluation_rules()
@@ -67,8 +65,8 @@ class Reflector:
     
     async def evaluate(
         self, 
-        interaction: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        interaction: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         评估交互效果
         
@@ -192,8 +190,8 @@ class Reflector:
     async def plan_followup(
         self, 
         user_id: str, 
-        context: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+        context: dict[str, Any]
+    ) -> dict[str, Any] | None:
         """
         规划回访任务
         
@@ -267,7 +265,7 @@ class Reflector:
     
     # ==================== 私有方法 ====================
     
-    def _collect_metrics(self, interaction: Dict[str, Any]) -> Dict[str, float]:
+    def _collect_metrics(self, interaction: dict[str, Any]) -> dict[str, float]:
         """
         收集评估指标
         
@@ -303,7 +301,7 @@ class Reflector:
         
         return metrics
     
-    def _calculate_emotion_change(self, interaction: Dict[str, Any]) -> float:
+    def _calculate_emotion_change(self, interaction: dict[str, Any]) -> float:
         """
         计算情绪变化
         
@@ -311,7 +309,7 @@ class Reflector:
         """
         perception = interaction.get("perception", {})
         initial_emotion = perception.get("emotion", "")
-        initial_intensity = perception.get("emotion_intensity", 5.0)
+        perception.get("emotion_intensity", 5.0)
         
         # 简化实现：假设负面情绪强度降低是好的
         negative_emotions = ["焦虑", "抑郁", "愤怒", "恐惧", "难过"]
@@ -324,7 +322,7 @@ class Reflector:
             # 正面或中性情绪，保持稳定
             return 0.0
     
-    def _determine_result(self, metrics: Dict[str, float]) -> InteractionResult:
+    def _determine_result(self, metrics: dict[str, float]) -> InteractionResult:
         """
         判断交互结果
         
@@ -342,7 +340,7 @@ class Reflector:
         else:
             return InteractionResult.FAILURE
     
-    def _calculate_score(self, metrics: Dict[str, float]) -> float:
+    def _calculate_score(self, metrics: dict[str, float]) -> float:
         """
         计算综合评分
         
@@ -368,10 +366,10 @@ class Reflector:
     
     def _analyze_interaction(
         self,
-        interaction: Dict[str, Any],
-        metrics: Dict[str, float],
+        interaction: dict[str, Any],
+        metrics: dict[str, float],
         result: InteractionResult
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         分析交互过程
         
@@ -421,7 +419,7 @@ class Reflector:
         
         return analysis
     
-    def _generate_improvements(self, analysis: Dict[str, Any]) -> List[str]:
+    def _generate_improvements(self, analysis: dict[str, Any]) -> list[str]:
         """
         生成改进建议
         
@@ -451,9 +449,9 @@ class Reflector:
     
     def _assess_followup_need(
         self, 
-        memory: Dict[str, Any], 
+        memory: dict[str, Any], 
         user_id: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         评估单个记忆是否需要回访
         
@@ -491,7 +489,7 @@ class Reflector:
                 "user_id": user_id,
                 "memory_id": memory.get("id"),
                 "reason": "重要事件结果跟踪",
-                "message": f"你的考试/面试怎么样了？结果还顺利吗？",
+                "message": "你的考试/面试怎么样了？结果还顺利吗？",
                 "schedule_time": (datetime.now() + timedelta(hours=12)).isoformat(),
                 "priority": "high"
             }
@@ -525,7 +523,7 @@ class Reflector:
         
         return None
     
-    def _detect_emotional_crisis(self, emotion_log: List[Dict[str, Any]]) -> bool:
+    def _detect_emotional_crisis(self, emotion_log: list[dict[str, Any]]) -> bool:
         """
         检测情绪危机
         
@@ -566,7 +564,7 @@ class Reflector:
             天数
         """
         try:
-            from backend.database import get_db, Message, Conversation
+            from backend.database import Conversation, Message, get_db
             
             db = next(get_db())
             
@@ -581,10 +579,10 @@ class Reflector:
             return 999  # 如果没有记录，返回很大的值
             
         except Exception as e:
-            print(f"获取最后交互时间失败: {str(e)}")
+            print(f"获取最后交互时间失败: {e!s}")
             return 0
     
-    def _init_evaluation_rules(self) -> Dict[str, Any]:
+    def _init_evaluation_rules(self) -> dict[str, Any]:
         """
         初始化评估规则
         
@@ -604,7 +602,7 @@ class Reflector:
             }
         }
     
-    def get_experience_summary(self, limit: int = 10) -> Dict[str, Any]:
+    def get_experience_summary(self, limit: int = 10) -> dict[str, Any]:
         """
         获取经验总结
         

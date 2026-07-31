@@ -75,7 +75,7 @@ async def verify_request_signature(request: Request) -> bytes | None:
     timestamp_str = request.headers.get("X-CG-Timestamp")
     nonce = request.headers.get("X-CG-Nonce")
 
-    if not all([signature, timestamp_str, nonce]):
+    if signature is None or timestamp_str is None or nonce is None:
         raise HTTPException(
             status_code=400,
             detail={"code": "AUTH_005", "message": "missing_signature_headers"},

@@ -9,7 +9,7 @@ from .services.intent_service import IntentService
 
 __all__ = [
     "IntentClassifier",
-    "RuleBasedIntentEngine",
     "IntentService",
+    "RuleBasedIntentEngine",
 ]
 

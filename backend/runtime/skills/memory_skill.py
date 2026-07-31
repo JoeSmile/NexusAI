@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 MemorySkill — 记忆检索与巩固技能
 
@@ -15,10 +14,10 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from backend.runtime.skills.base import Skill, SkillContext, SkillResult
 from backend.runtime.config.guards import is_module_enabled
+from backend.runtime.skills.base import Skill, SkillContext, SkillResult
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +112,7 @@ class MemorySkill(Skill):
                 execution_time_ms=time.time() * 1000 - start_ms,
             )
 
-    async def _retrieve(self, context: SkillContext, **kwargs) -> List[Dict[str, Any]]:
+    async def _retrieve(self, context: SkillContext, **kwargs) -> list[dict[str, Any]]:
         """检索相关记忆"""
         if self._memory_hub:
             try:
@@ -133,7 +132,7 @@ class MemorySkill(Skill):
         # 无 memory_hub 时返回空列表
         return []
 
-    async def _encode(self, context: SkillContext, **kwargs) -> Dict[str, Any]:
+    async def _encode(self, context: SkillContext, **kwargs) -> dict[str, Any]:
         """编码新记忆"""
         content = kwargs.get("content", context.user_input)
 
@@ -151,7 +150,7 @@ class MemorySkill(Skill):
 
         return {"memory_id": "fallback"}
 
-    async def _consolidate(self, context: SkillContext, **kwargs) -> Dict[str, Any]:
+    async def _consolidate(self, context: SkillContext, **kwargs) -> dict[str, Any]:
         """巩固记忆"""
         if self._memory_hub:
             try:

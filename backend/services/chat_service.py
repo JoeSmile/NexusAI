@@ -7,7 +7,8 @@
 处理所有与聊天相关的业务逻辑
 """
 
-from typing import Dict, Optional, Any, List
+from typing import Any
+
 # 优先使用带插件支持的引擎
 try:
     from backend.modules.llm.core.llm_with_plugins import ChatEngineWithTools
@@ -16,13 +17,14 @@ except ImportError:
     PLUGIN_ENGINE_AVAILABLE = False
     ChatEngineWithTools = None
 
-from backend.modules.llm.core.llm_core import ChatEngine
-from backend.services.memory_service import MemoryService
-from backend.services.context_service import ContextService
-from backend.models import ChatRequest, ChatResponse
-from backend.database import DatabaseManager, ChatSession
 import uuid
 from datetime import datetime
+
+from backend.database import ChatSession, DatabaseManager
+from backend.models import ChatRequest, ChatResponse
+from backend.modules.llm.core.llm_core import ChatEngine
+from backend.services.context_service import ContextService
+from backend.services.memory_service import MemoryService
 
 # 尝试导入RAG服务（可选功能）
 try:
@@ -54,8 +56,8 @@ class ChatService:
     
     def __init__(
         self,
-        memory_service: Optional[MemoryService] = None,
-        context_service: Optional[ContextService] = None,
+        memory_service: MemoryService | None = None,
+        context_service: ContextService | None = None,
         use_rag: bool = True,
         use_intent: bool = True,
         use_enhanced_processor: bool = True
@@ -201,9 +203,9 @@ class ChatService:
 
         hermes_hd = None
         try:
+            from backend.hermes.dispatch import run_hermes_dispatch
             from backend.hermes.intent import workspace_automation_intent
             from backend.hermes.settings import hermes_ready
-            from backend.hermes.dispatch import run_hermes_dispatch
 
             if workspace_automation_intent(message):
                 if hermes_ready():
@@ -340,10 +342,10 @@ class ChatService:
                     if not request.session_id:
                         print(f"ChatService创建新会话: {session_id} for user: {user_id}")
                         db.create_session(session_id, user_id)
-                        print(f"ChatService会话创建完成")
+                        print("ChatService会话创建完成")
                     
                     # RAG分支需要保存用户消息和AI回复
-                    print(f"ChatService RAG分支：保存用户消息和AI回复")
+                    print("ChatService RAG分支：保存用户消息和AI回复")
                     db.save_message(
                         session_id=session_id,
                         user_id=user_id,
@@ -359,7 +361,7 @@ class ChatService:
                         content=response.response,
                         emotion=emotion
                     )
-                    print(f"ChatService RAG分支：消息保存完成")
+                    print("ChatService RAG分支：消息保存完成")
                     
             except Exception as e:
                 print(f"ChatService数据库操作失败: {e}")
@@ -388,9 +390,9 @@ class ChatService:
                 if not existing_session:
                     print(f"ChatService手动创建会话: {session_id} for user: {user_id}")
                     db.create_session(session_id, user_id)
-                    print(f"ChatService手动会话创建完成")
+                    print("ChatService手动会话创建完成")
                     # 消息已经在 llm_with_plugins.py 中保存，这里不再重复保存
-                    print(f"ChatService：消息已在llm引擎中保存，跳过重复保存")
+                    print("ChatService：消息已在llm引擎中保存，跳过重复保存")
                 else:
                     print(f"ChatService会话已存在: {session_id}")
                     
@@ -401,7 +403,7 @@ class ChatService:
         
         return response
     
-    async def _get_conversation_history(self, session_id: str, limit: int = 5) -> List[Dict[str, str]]:
+    async def _get_conversation_history(self, session_id: str, limit: int = 5) -> list[dict[str, str]]:
         """
         获取最近的对话历史（用于RAG上下文）
         
@@ -428,7 +430,7 @@ class ChatService:
             print(f"获取对话历史失败: {e}")
             return []
     
-    async def get_session_summary(self, session_id: str) -> Dict[str, Any]:
+    async def get_session_summary(self, session_id: str) -> dict[str, Any]:
         """
         获取会话摘要
         
@@ -444,7 +446,7 @@ class ChatService:
         self,
         session_id: str,
         limit: int = 20
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         获取会话历史
         
@@ -494,7 +496,7 @@ class ChatService:
         self,
         user_id: str,
         limit: int = 50
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         获取用户的所有会话
         
@@ -587,7 +589,7 @@ class ChatService:
         user_id: str,
         keyword: str = "",
         limit: int = 50
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         搜索用户会话
         
@@ -673,7 +675,7 @@ class ChatService:
                 "error": str(e)
             }
     
-    async def delete_sessions_batch(self, session_ids: List[str]) -> Dict[str, Any]:
+    async def delete_sessions_batch(self, session_ids: list[str]) -> dict[str, Any]:
         """
         批量删除会话
         
@@ -717,7 +719,7 @@ class ChatService:
                 "error": str(e)
             }
     
-    async def get_user_emotion_trends(self, user_id: str, days: int = 7) -> Dict[str, Any]:
+    async def get_user_emotion_trends(self, user_id: str, days: int = 7) -> dict[str, Any]:
         """
         获取用户情绪趋势
         

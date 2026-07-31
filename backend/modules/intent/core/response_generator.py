@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 响应生成器 - 核心模块
 Response Generator Core Module
@@ -18,11 +17,12 @@ Response Generator Core Module
 5. 角色稳定性监控
 """
 
-import yaml
 import logging
 import random
-from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime
+from typing import Any
+
+import yaml
 
 from .dynamic_prompt_builder import DynamicPromptBuilder
 
@@ -57,7 +57,7 @@ class ResponseGenerator:
         
         # 加载情感策略
         try:
-            with open(strategy_file, 'r', encoding='utf-8') as f:
+            with open(strategy_file, encoding='utf-8') as f:
                 self.emotion_strategy = yaml.safe_load(f)
             logger.info(f"✓ 加载情感策略配置: {strategy_file}")
         except Exception as e:
@@ -95,10 +95,10 @@ class ResponseGenerator:
                          user_emotion: str,
                          user_id: str,
                          emotion_intensity: float = 5.0,
-                         conversation_history: Optional[List[Dict]] = None,
-                         retrieved_memories: Optional[List[Dict]] = None,
-                         user_profile: Optional[Dict] = None,
-                         metadata: Optional[Dict] = None) -> Dict[str, Any]:
+                         conversation_history: list[dict] | None = None,
+                         retrieved_memories: list[dict] | None = None,
+                         user_profile: dict | None = None,
+                         metadata: dict | None = None) -> dict[str, Any]:
         """
         生成AI回复（主入口）
         
@@ -207,7 +207,7 @@ class ResponseGenerator:
             result["response"] = self._get_fallback_response(user_emotion)
             result["generation_method"] = "fallback_error"
             result["is_valid"] = False
-            result["warnings"].append(f"生成异常: {str(e)}")
+            result["warnings"].append(f"生成异常: {e!s}")
             result["metadata"]["error"] = str(e)
             self.stats["fallback_used"] += 1
         
@@ -215,7 +215,7 @@ class ResponseGenerator:
     
     def _is_crisis_situation(self, 
                             user_emotion: str, 
-                            metadata: Optional[Dict]) -> bool:
+                            metadata: dict | None) -> bool:
         """
         判断是否为危机情况（核心逻辑）
         
@@ -241,7 +241,7 @@ class ResponseGenerator:
     def _handle_crisis(self, 
                       user_input: str, 
                       user_emotion: str,
-                      metadata: Optional[Dict]) -> str:
+                      metadata: dict | None) -> str:
         """
         处理危机情况，返回预设的危机干预回复（核心逻辑）
         
@@ -272,7 +272,7 @@ class ResponseGenerator:
     
     def _match_cached_response(self, 
                                user_input: str, 
-                               user_emotion: str) -> Optional[str]:
+                               user_emotion: str) -> str | None:
         """
         匹配缓存的固定回复
         
@@ -395,7 +395,7 @@ class ResponseGenerator:
     def _validate_response(self, 
                           response: str, 
                           user_emotion: str,
-                          expected_tone: str) -> Tuple[bool, List[str]]:
+                          expected_tone: str) -> tuple[bool, list[str]]:
         """
         验证回复的情感一致性
         
@@ -450,7 +450,7 @@ class ResponseGenerator:
         
         return default_fallbacks.get(user_emotion, "我在这里倾听。请继续说吧。")
     
-    def _load_cached_responses(self) -> Dict[str, List[str]]:
+    def _load_cached_responses(self) -> dict[str, list[str]]:
         """
         加载缓存的固定回复
         
@@ -467,7 +467,7 @@ class ResponseGenerator:
         
         return cached
     
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """
         获取生成器统计信息
         
@@ -495,7 +495,7 @@ class ResponseGenerator:
 
 # 便捷函数
 def create_response_generator(llm_client, 
-                             strategy_file: Optional[str] = None,
+                             strategy_file: str | None = None,
                              **kwargs) -> ResponseGenerator:
     """
     创建响应生成器实例

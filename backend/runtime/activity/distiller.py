@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 ActivityDistiller — 活动蒸馏器
 
@@ -21,10 +20,8 @@ from __future__ import annotations
 
 import json
 import logging
-import time
-from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from backend.runtime.config.guards import is_module_enabled
 
@@ -40,7 +37,7 @@ class TurnDigest:
     workspace_id: str
     query: str
     timestamp: float
-    tool_calls: List[Dict[str, Any]] = field(default_factory=list)  # [{name, success}]
+    tool_calls: list[dict[str, Any]] = field(default_factory=list)  # [{name, success}]
     emotion_tag: str = ""
     final_status: str = "success"  # "success" | "failed" | "timeout"
 
@@ -73,9 +70,9 @@ class ActivityDistiller:
         self,
         digest: TurnDigest,
         *,
-        user_store: Optional[Any] = None,
-        agent_instance_store: Optional[Any] = None,
-    ) -> Dict[str, bool]:
+        user_store: Any | None = None,
+        agent_instance_store: Any | None = None,
+    ) -> dict[str, bool]:
         """
         蒸馏一轮对话为 L3/L4 记忆更新
 
@@ -122,9 +119,9 @@ class ActivityDistiller:
 
         return result
 
-    def _merge_recent_topics(self, prior_json: Optional[str], digest: TurnDigest) -> str:
+    def _merge_recent_topics(self, prior_json: str | None, digest: TurnDigest) -> str:
         """合并新话题到现有列表"""
-        items: List[Dict[str, Any]] = []
+        items: list[dict[str, Any]] = []
         if prior_json:
             try:
                 parsed = json.loads(prior_json)
@@ -152,9 +149,9 @@ class ActivityDistiller:
 
         return json.dumps(items, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
-    def _merge_emotion_trends(self, prior_json: Optional[str], digest: TurnDigest) -> str:
+    def _merge_emotion_trends(self, prior_json: str | None, digest: TurnDigest) -> str:
         """合并情感趋势"""
-        items: List[Dict[str, Any]] = []
+        items: list[dict[str, Any]] = []
         if prior_json:
             try:
                 parsed = json.loads(prior_json)
@@ -173,9 +170,9 @@ class ActivityDistiller:
         items = items[:_EMOTION_TRENDS_LIMIT]
         return json.dumps(items, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
-    def _merge_tool_patterns(self, prior_json: Optional[str], digest: TurnDigest) -> str:
+    def _merge_tool_patterns(self, prior_json: str | None, digest: TurnDigest) -> str:
         """合并工具使用统计"""
-        patterns: Dict[str, Dict[str, Any]] = {}
+        patterns: dict[str, dict[str, Any]] = {}
         if prior_json:
             try:
                 parsed = json.loads(prior_json)
@@ -196,7 +193,7 @@ class ActivityDistiller:
                 bucket["failure"] = int(bucket.get("failure", 0)) + 1
             bucket["last_seen"] = digest.timestamp
 
-        for name, bucket in patterns.items():
+        for _name, bucket in patterns.items():
             total = bucket.get("count", 0) or 1
             bucket["success_rate"] = round(bucket.get("success", 0) / total, 3)
 
@@ -215,7 +212,7 @@ class ActivityDistiller:
         cleaned = " ".join(query.split())
         return cleaned[:50]
 
-    async def _read_store(self, store: Any, path: str) -> Optional[str]:
+    async def _read_store(self, store: Any, path: str) -> str | None:
         """从存储读取"""
         try:
             if hasattr(store, "read"):
@@ -240,4 +237,4 @@ class ActivityDistiller:
             logger.warning("Store write failed for '%s': %s", path, e)
 
 
-import asyncio  # noqa: E402 — needed for iscoroutinefunction check
+import asyncio

@@ -4,22 +4,23 @@
 定义聊天API的请求和响应模型
 """
 
-from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
+from enum import StrEnum
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from enum import Enum
 
 from .common_schemas import BaseResponse, PaginationRequest, PaginationResponse
 
 
-class MessageRole(str, Enum):
+class MessageRole(StrEnum):
     """消息角色枚举"""
     USER = "user"
     ASSISTANT = "assistant"
     SYSTEM = "system"
 
 
-class EmotionType(str, Enum):
+class EmotionType(StrEnum):
     """情绪类型枚举"""
     HAPPY = "开心"
     SAD = "难过"
@@ -41,10 +42,10 @@ class ChatMessage(BaseModel):
     id: str = Field(..., description="消息ID")
     role: MessageRole = Field(..., description="消息角色")
     content: str = Field(..., min_length=1, max_length=2000, description="消息内容")
-    emotion: Optional[EmotionType] = Field(None, description="情绪类型")
-    emotion_intensity: Optional[float] = Field(None, ge=0, le=10, description="情绪强度")
+    emotion: EmotionType | None = Field(None, description="情绪类型")
+    emotion_intensity: float | None = Field(None, ge=0, le=10, description="情绪强度")
     timestamp: datetime = Field(default_factory=datetime.now, description="消息时间")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="元数据")
+    metadata: dict[str, Any] | None = Field(None, description="元数据")
 
     @field_validator('content')
     @classmethod
@@ -58,12 +59,12 @@ class ChatRequest(BaseModel):
     """聊天请求模型"""
     message: str = Field(..., min_length=1, max_length=2000, description="用户消息")
     user_id: str = Field(..., min_length=3, max_length=50, description="用户ID")
-    session_id: Optional[str] = Field(None, description="会话ID，不提供则自动生成")
-    emotion: Optional[EmotionType] = Field(None, description="用户当前情绪")
-    emotion_intensity: Optional[float] = Field(None, ge=0, le=10, description="情绪强度")
+    session_id: str | None = Field(None, description="会话ID，不提供则自动生成")
+    emotion: EmotionType | None = Field(None, description="用户当前情绪")
+    emotion_intensity: float | None = Field(None, ge=0, le=10, description="情绪强度")
     use_memory: bool = Field(True, description="是否使用记忆系统")
     use_rag: bool = Field(True, description="是否使用RAG知识库")
-    context: Optional[Dict[str, Any]] = Field(None, description="额外上下文")
+    context: dict[str, Any] | None = Field(None, description="额外上下文")
 
     @field_validator('message')
     @classmethod
@@ -107,7 +108,7 @@ class ChatResponse(BaseResponse):
     emotion_intensity: float = Field(..., ge=0, le=10, description="情绪强度")
     session_id: str = Field(..., description="会话ID")
     timestamp: datetime = Field(default_factory=datetime.now, description="响应时间")
-    context: Optional[Dict[str, Any]] = Field(None, description="上下文信息")
+    context: dict[str, Any] | None = Field(None, description="上下文信息")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -136,27 +137,27 @@ class SessionInfo(BaseModel):
     """会话信息模型"""
     session_id: str = Field(..., description="会话ID")
     user_id: str = Field(..., description="用户ID")
-    title: Optional[str] = Field(None, description="会话标题")
+    title: str | None = Field(None, description="会话标题")
     message_count: int = Field(0, ge=0, description="消息数量")
     created_at: datetime = Field(default_factory=datetime.now, description="创建时间")
     updated_at: datetime = Field(default_factory=datetime.now, description="更新时间")
-    last_activity: Optional[datetime] = Field(None, description="最后活动时间")
-    emotion_summary: Optional[Dict[str, Any]] = Field(None, description="情绪摘要")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="元数据")
+    last_activity: datetime | None = Field(None, description="最后活动时间")
+    emotion_summary: dict[str, Any] | None = Field(None, description="情绪摘要")
+    metadata: dict[str, Any] | None = Field(None, description="元数据")
 
 
 class UserProfile(BaseModel):
     """用户档案模型"""
     user_id: str = Field(..., description="用户ID")
-    nickname: Optional[str] = Field(None, description="昵称")
-    preferences: Optional[Dict[str, Any]] = Field(None, description="用户偏好")
-    emotion_history: Optional[List[Dict[str, Any]]] = Field(None, description="情绪历史")
+    nickname: str | None = Field(None, description="昵称")
+    preferences: dict[str, Any] | None = Field(None, description="用户偏好")
+    emotion_history: list[dict[str, Any]] | None = Field(None, description="情绪历史")
     session_count: int = Field(0, ge=0, description="会话数量")
     total_messages: int = Field(0, ge=0, description="总消息数")
     created_at: datetime = Field(default_factory=datetime.now, description="创建时间")
-    last_active: Optional[datetime] = Field(None, description="最后活跃时间")
-    profile_summary: Optional[str] = Field(None, description="档案摘要")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="元数据")
+    last_active: datetime | None = Field(None, description="最后活跃时间")
+    profile_summary: str | None = Field(None, description="档案摘要")
+    metadata: dict[str, Any] | None = Field(None, description="元数据")
 
 
 class SessionHistoryRequest(BaseModel):
@@ -170,9 +171,9 @@ class SessionHistoryRequest(BaseModel):
 class SessionHistoryResponse(BaseResponse):
     """会话历史响应模型"""
     session_id: str = Field(..., description="会话ID")
-    messages: List[ChatMessage] = Field(..., description="消息列表")
+    messages: list[ChatMessage] = Field(..., description="消息列表")
     total: int = Field(..., description="总消息数")
-    pagination: Optional[PaginationResponse] = Field(None, description="分页信息")
+    pagination: PaginationResponse | None = Field(None, description="分页信息")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -214,7 +215,7 @@ class UserSessionsRequest(BaseModel):
 class UserSessionsResponse(BaseResponse):
     """用户会话列表响应模型"""
     user_id: str = Field(..., description="用户ID")
-    sessions: List[SessionInfo] = Field(..., description="会话列表")
+    sessions: list[SessionInfo] = Field(..., description="会话列表")
     pagination: PaginationResponse = Field(..., description="分页信息")
 
 
@@ -229,9 +230,9 @@ class EmotionTrendResponse(BaseResponse):
     """情绪趋势响应模型"""
     user_id: str = Field(..., description="用户ID")
     time_range: str = Field(..., description="时间范围")
-    emotion_distribution: Dict[str, int] = Field(..., description="情绪分布")
-    trend_data: List[Dict[str, Any]] = Field(..., description="趋势数据")
-    summary: Optional[Dict[str, Any]] = Field(None, description="趋势摘要")
+    emotion_distribution: dict[str, int] = Field(..., description="情绪分布")
+    trend_data: list[dict[str, Any]] = Field(..., description="趋势数据")
+    summary: dict[str, Any] | None = Field(None, description="趋势摘要")
 
 
 class SessionSummaryRequest(BaseModel):
@@ -245,16 +246,16 @@ class SessionSummaryResponse(BaseResponse):
     """会话摘要响应模型"""
     session_id: str = Field(..., description="会话ID")
     summary: str = Field(..., description="会话摘要")
-    key_topics: List[str] = Field(..., description="主要话题")
-    emotion_summary: Optional[Dict[str, Any]] = Field(None, description="情绪摘要")
+    key_topics: list[str] = Field(..., description="主要话题")
+    emotion_summary: dict[str, Any] | None = Field(None, description="情绪摘要")
     message_count: int = Field(..., description="消息数量")
-    duration: Optional[str] = Field(None, description="会话时长")
+    duration: str | None = Field(None, description="会话时长")
 
 
 class BatchChatRequest(BaseModel):
     """批量聊天请求模型"""
-    messages: List[ChatRequest] = Field(..., description="聊天请求列表")
-    batch_options: Optional[Dict[str, Any]] = Field(None, description="批量处理选项")
+    messages: list[ChatRequest] = Field(..., description="聊天请求列表")
+    batch_options: dict[str, Any] | None = Field(None, description="批量处理选项")
 
     @field_validator('messages')
     @classmethod
@@ -268,7 +269,7 @@ class BatchChatRequest(BaseModel):
 
 class BatchChatResponse(BaseResponse):
     """批量聊天响应模型"""
-    responses: List[ChatResponse] = Field(..., description="响应列表")
+    responses: list[ChatResponse] = Field(..., description="响应列表")
     total_processed: int = Field(..., description="处理总数")
     successful: int = Field(..., description="成功数量")
     failed: int = Field(..., description="失败数量")

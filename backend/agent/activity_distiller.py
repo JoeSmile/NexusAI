@@ -25,10 +25,8 @@ from __future__ import annotations
 
 import json
 import logging
-import time
-from collections import Counter, defaultdict
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +52,7 @@ class TurnDigest:
     emotion: str = "neutral"       # 用户情绪标签
     emotion_intensity: float = 5.0 # 情绪强度 (0-10)
     bot_empathy_score: float = 0.0 # 共情评分 (0-1, 可选)
-    tool_calls: List[Dict[str, Any]] = ()  # [{name, success}]
+    tool_calls: list[dict[str, Any]] = ()  # [{name, success}]
     final_status: str = "success"  # success / failed / timeout
 
 
@@ -68,12 +66,12 @@ def _extract_topic(query: str) -> str:
     return cleaned[:50]
 
 
-def merge_recent_topics(prior_json: Optional[str], digest: TurnDigest) -> str:
+def merge_recent_topics(prior_json: str | None, digest: TurnDigest) -> str:
     """合并新话题到已有列表，去重并排序。
 
     Returns: canonical JSON (sort_keys, separators) 保证幂等 sha256。
     """
-    items: List[Dict[str, Any]] = []
+    items: list[dict[str, Any]] = []
     if prior_json:
         try:
             parsed = json.loads(prior_json)
@@ -108,10 +106,10 @@ def merge_recent_topics(prior_json: Optional[str], digest: TurnDigest) -> str:
     return json.dumps(items, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
-def merge_emotion_baseline(prior_json: Optional[str], digest: TurnDigest) -> str:
+def merge_emotion_baseline(prior_json: str | None, digest: TurnDigest) -> str:
     """合并情绪基线数据"""
-    distribution: Dict[str, int] = {}
-    intensities: Dict[str, List[float]] = {}
+    distribution: dict[str, int] = {}
+    intensities: dict[str, list[float]] = {}
     total_intensity = 0.0
     count = 0
 
@@ -157,9 +155,9 @@ def merge_emotion_baseline(prior_json: Optional[str], digest: TurnDigest) -> str
     return json.dumps(result, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
-def merge_emotion_response_patterns(prior_json: Optional[str], digest: TurnDigest) -> str:
+def merge_emotion_response_patterns(prior_json: str | None, digest: TurnDigest) -> str:
     """合并情绪响应模式到 L4"""
-    patterns: Dict[str, Dict[str, Any]] = {}
+    patterns: dict[str, dict[str, Any]] = {}
     if prior_json:
         try:
             parsed = json.loads(prior_json)
@@ -195,9 +193,9 @@ def merge_emotion_response_patterns(prior_json: Optional[str], digest: TurnDiges
 async def distill_turn(
     digest: TurnDigest,
     *,
-    user_store: Optional[Any] = None,
-    agent_instance_store: Optional[Any] = None,
-) -> Dict[str, bool]:
+    user_store: Any | None = None,
+    agent_instance_store: Any | None = None,
+) -> dict[str, bool]:
     """蒸馏一轮对话到 L3/L4 store。
 
     Args:

@@ -6,17 +6,14 @@
 - 明确别名: VectorBase / VectorChatMessage / VectorChatSession
 """
 
-from backend.database.legacy import (  # noqa: F401
+from backend.database.legacy import (
+    DATABASE_URL,
     ABTestEvent,
     ABTestExperiment,
     ABTestGroupAssignment,
-    DATABASE_URL,
     Base,
-    Base as LegacyBase,
     ChatMessage,
-    ChatMessage as LegacyChatMessage,
     ChatSession,
-    ChatSession as LegacyChatSession,
     DatabaseManager,
     EmotionAnalysis,
     Knowledge,
@@ -33,19 +30,34 @@ from backend.database.legacy import (  # noqa: F401
     engine,
     get_db,
 )
-from backend.database.pgvector_session import (  # noqa: F401
+from backend.database.legacy import (
+    Base as LegacyBase,
+)
+from backend.database.legacy import (
+    ChatMessage as LegacyChatMessage,
+)
+from backend.database.legacy import (
+    ChatSession as LegacyChatSession,
+)
+from backend.database.pgvector_session import (
     Base as VectorBase,
+)
+from backend.database.pgvector_session import (
     ChatMessage as VectorChatMessage,
+)
+from backend.database.pgvector_session import (
     ChatSession as VectorChatSession,
+)
+from backend.database.pgvector_session import (
     PGVectorSession,
     get_pg_session,
 )
 
 __all__ = [
+    "DATABASE_URL",
     "ABTestEvent",
     "ABTestExperiment",
     "ABTestGroupAssignment",
-    "DATABASE_URL",
     "Base",
     "ChatMessage",
     "ChatSession",

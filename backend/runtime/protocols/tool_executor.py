@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Protocol 2: Tool Executor — 工具执行抽象
 

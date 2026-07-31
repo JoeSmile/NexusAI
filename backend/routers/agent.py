@@ -4,12 +4,11 @@ Agent Router - Agent路由
 提供Agent相关的API端点
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import Optional
 
 from backend.services.agent_service import AgentService, get_agent_service
-
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 
@@ -20,7 +19,7 @@ class MessageRequest(BaseModel):
     """消息请求"""
     user_id: str
     message: str
-    conversation_id: Optional[str] = None
+    conversation_id: str | None = None
 
 
 class FollowupRequest(BaseModel):

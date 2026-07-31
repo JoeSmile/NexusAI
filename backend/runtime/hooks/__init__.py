@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Hooks — 生命周期钩子系统
 
@@ -7,14 +6,14 @@ Hooks — 生命周期钩子系统
 
 from backend.runtime.hooks.base import (
     HookContext,
-    ToolFailureContext,
-    PluginHook,
     HookDispatcher,
+    PluginHook,
+    ToolFailureContext,
 )
 
 __all__ = [
     "HookContext",
-    "ToolFailureContext",
-    "PluginHook",
     "HookDispatcher",
+    "PluginHook",
+    "ToolFailureContext",
 ]

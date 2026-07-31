@@ -3,11 +3,11 @@
 Intent Recognition Data Models
 """
 
-from .intent_models import IntentType, IntentResult, IntentRequest
+from .intent_models import IntentRequest, IntentResult, IntentType
 
 __all__ = [
-    "IntentType",
-    "IntentResult",
     "IntentRequest",
+    "IntentResult",
+    "IntentType",
 ]
 

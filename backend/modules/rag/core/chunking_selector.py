@@ -5,18 +5,19 @@ RAG分块策略选择器
 """
 
 import re
-from typing import List, Dict, Any, Optional
+from typing import Any
 
-from .langchain_compat import Document, RecursiveCharacterTextSplitter
+from backend.logging_config import get_logger
+
 from .chunking_strategies import (
     CharacterTextSplitter,
-    SentenceTextSplitter,
-    MarkdownStructureSplitter,
     DialogueSplitter,
+    MarkdownStructureSplitter,
+    ParentChildChunking,
+    SentenceTextSplitter,
     SmallBigChunking,
-    ParentChildChunking
 )
-from backend.logging_config import get_logger
+from .langchain_compat import Document, RecursiveCharacterTextSplitter
 
 logger = get_logger(__name__)
 
@@ -85,7 +86,7 @@ class ChunkingStrategySelector:
             )
         }
     
-    def detect_document_type(self, text: str) -> Dict[str, Any]:
+    def detect_document_type(self, text: str) -> dict[str, Any]:
         """
         检测文档类型和特征
         
@@ -145,9 +146,9 @@ class ChunkingStrategySelector:
     
     def select_strategy(
         self,
-        documents: Optional[List[Document]] = None,
-        text: Optional[str] = None,
-        strategy: Optional[str] = None
+        documents: list[Document] | None = None,
+        text: str | None = None,
+        strategy: str | None = None
     ) -> str:
         """
         选择分块策略
@@ -209,7 +210,7 @@ class ChunkingStrategySelector:
         logger.info("使用默认recursive策略")
         return "recursive"
     
-    def get_splitter(self, strategy: Optional[str] = None) -> Any:
+    def get_splitter(self, strategy: str | None = None) -> Any:
         """
         获取分块器实例
         
@@ -230,9 +231,9 @@ class ChunkingStrategySelector:
     
     def split_documents(
         self,
-        documents: List[Document],
-        strategy: Optional[str] = None
-    ) -> List[Document]:
+        documents: list[Document],
+        strategy: str | None = None
+    ) -> list[Document]:
         """
         分割文档列表
         

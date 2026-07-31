@@ -3,18 +3,23 @@
 评估相关路由
 """
 
-from fastapi import APIRouter, HTTPException
-from typing import Optional
-from backend.models import (
-    EvaluationRequest, EvaluationResponse, BatchEvaluationRequest,
-    ComparePromptsRequest, HumanVerificationRequest,
-    EvaluationStatistics, EvaluationListResponse
-)
-from backend.database import DatabaseManager, ResponseEvaluation, ChatMessage
-from backend.evaluation_engine import EvaluationEngine
-from backend.logging_config import get_logger
 import json
 from datetime import datetime
+
+from fastapi import APIRouter, HTTPException
+
+from backend.database import ChatMessage, DatabaseManager, ResponseEvaluation
+from backend.evaluation_engine import EvaluationEngine
+from backend.logging_config import get_logger
+from backend.models import (
+    BatchEvaluationRequest,
+    ComparePromptsRequest,
+    EvaluationListResponse,
+    EvaluationRequest,
+    EvaluationResponse,
+    EvaluationStatistics,
+    HumanVerificationRequest,
+)
 
 router = APIRouter(prefix="/evaluation", tags=["评估"])
 logger = get_logger(__name__)
@@ -233,8 +238,8 @@ async def get_evaluations(session_id: str = None, limit: int = 100):
 
 @router.get("/statistics", response_model=EvaluationStatistics)
 async def get_evaluation_statistics(
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None
+    start_date: str | None = None,
+    end_date: str | None = None
 ):
     """获取评估统计信息"""
     try:
@@ -343,7 +348,7 @@ async def human_verify_evaluation(evaluation_id: int, request: HumanVerification
 
 @router.get("/report/generate")
 async def generate_evaluation_report(
-    session_id: Optional[str] = None,
+    session_id: str | None = None,
     limit: int = 100
 ):
     """生成评估报告"""

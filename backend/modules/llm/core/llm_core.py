@@ -2,16 +2,14 @@
 """
 简化版LangChain聊天引擎（支持LCEL表达式，Python 3.10+）
 """
-import json
 import uuid
-from typing import List, Dict, Any, Optional
-from datetime import datetime
+
 import requests
 
 # 导入 LangChain (Python 3.10+, langchain 0.2.x+)
 try:
-    from langchain_core.prompts import ChatPromptTemplate
     from langchain_core.output_parsers import StrOutputParser
+    from langchain_core.prompts import ChatPromptTemplate
     LANGCHAIN_AVAILABLE = True
 except ImportError:
     LANGCHAIN_AVAILABLE = False
@@ -21,15 +19,14 @@ except ImportError:
 
 # 数据库和模型
 from backend.database import DatabaseManager, create_tables
-from backend.models import ChatRequest, ChatResponse
+from backend.models import ChatResponse
 from backend.modules.llm.harness import resolve_llm_settings, try_create_chat_openai
 
 # 导入ContextGatePrompt配置
 from backend.xinyu_prompt import (
-    get_system_prompt,
+    XINYU_SYSTEM_PROMPT,
     build_full_prompt,
     validate_and_filter_input,
-    XINYU_SYSTEM_PROMPT
 )
 
 # 尝试导入向量数据库（可选）
@@ -38,7 +35,7 @@ try:
     VECTOR_STORE_AVAILABLE = True
 except ImportError as e:
     VECTOR_STORE_AVAILABLE = False
-    print("提示: 向量数据库模块未安装 ({}), 将仅使用MySQL短期记忆".format(e))
+    print(f"提示: 向量数据库模块未安装 ({e}), 将仅使用MySQL短期记忆")
 
 
 class ChatEngine:
@@ -62,7 +59,7 @@ class ChatEngine:
                 self.vector_store = VectorStore()
                 print("✓ 向量数据库 (pgvector) 初始化成功")
             except Exception as e:
-                print("警告: 向量数据库初始化失败: {}，将仅使用MySQL".format(e))
+                print(f"警告: 向量数据库初始化失败: {e}，将仅使用MySQL")
                 self.vector_store = None
         else:
             self.vector_store = None
@@ -78,7 +75,7 @@ class ChatEngine:
                     self.chain = None
                 else:
                     # 2. 定义 AI 人格与行为准则（使用完整的ContextGatePrompt）
-                    self.template = """{system_prompt}
+                    self.template = f"""{XINYU_SYSTEM_PROMPT}
 
 {{long_term_memory}}
 
@@ -86,7 +83,7 @@ class ChatEngine:
 {{history}}
 
 用户：{{input}}
-ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
+ContextGate："""
 
                     # 3. 创建提示模板和链（LCEL表达式）
                     self.prompt = ChatPromptTemplate.from_template(self.template)
@@ -94,7 +91,7 @@ ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
                     self.chain = self.prompt | self.llm | self.output_parser
                     print("✓ LangChain LCEL 链初始化成功")
             except Exception as e:
-                print("警告: LangChain 初始化失败，将使用传统方式: {}".format(e))
+                print(f"警告: LangChain 初始化失败，将使用传统方式: {e}")
                 self.llm = None
                 self.chain = None
         else:
@@ -238,10 +235,10 @@ ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
                 if similar_conversations and similar_conversations['documents']:
                     long_term_context = "\n相关历史对话参考：\n"
                     for doc in similar_conversations['documents'][0][:2]:  # 取前2个最相似的
-                        long_term_context += "- {}\n".format(doc[:100])  # 限制长度
+                        long_term_context += f"- {doc[:100]}\n"  # 限制长度
                     long_term_context += "\n"
             except Exception as e:
-                print("向量检索失败: {}".format(e))
+                print(f"向量检索失败: {e}")
         
         # 优先使用 LCEL 链（如果可用）
         if self.chain:
@@ -254,7 +251,7 @@ ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
                 })
                 return response
             except Exception as e:
-                print("LangChain调用失败 ({}): {}，尝试传统方式".format(self.model, e))
+                print(f"LangChain调用失败 ({self.model}): {e}，尝试传统方式")
                 # 继续使用传统方式
         
         # 使用传统 HTTP 请求方式（兼容模式）
@@ -272,7 +269,7 @@ ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
         # 调用API (支持Qwen和OpenAI)
         try:
             headers = {
-                "Authorization": "Bearer {}".format(self.api_key),
+                "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json"
             }
             
@@ -285,7 +282,7 @@ ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
                 "max_tokens": 300  # 控制响应长度（3-4句话）
             }
             
-            api_url = "{}/chat/completions".format(self.api_base_url)
+            api_url = f"{self.api_base_url}/chat/completions"
             response = requests.post(
                 api_url,
                 headers=headers,
@@ -297,11 +294,11 @@ ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
                 result = response.json()
                 return result["choices"][0]["message"]["content"].strip()
             else:
-                print("API错误 ({}): {} - {}".format(self.model, response.status_code, response.text))
+                print(f"API错误 ({self.model}): {response.status_code} - {response.text}")
                 return self._get_fallback_response(user_input)
                 
         except Exception as e:
-            print("API调用失败 ({}): {}".format(self.model, e))
+            print(f"API调用失败 ({self.model}): {e}")
             return self._get_fallback_response(user_input)
     
     def _get_fallback_response(self, user_input, emotion_data=None):
@@ -367,7 +364,7 @@ ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
         }
         
         # 根据情感选择回应，如果没有对应的情感则使用建议或默认回应
-        if emotion in fallback_responses and fallback_responses[emotion]:
+        if fallback_responses.get(emotion):
             import random
             return random.choice(fallback_responses[emotion])
         elif suggestions:
@@ -394,7 +391,7 @@ ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
                 if not request.session_id:
                     print(f"创建新会话: {session_id} for user: {user_id}")
                     db.create_session(session_id, user_id)
-                    print(f"会话创建完成")
+                    print("会话创建完成")
                 
                 user_message = db.save_message(
                     session_id=session_id,
@@ -426,7 +423,7 @@ ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
         # 保存助手消息到数据库
         db_manager = DatabaseManager()
         with db_manager as db:
-            assistant_message = db.save_message(
+            db.save_message(
                 session_id=session_id,
                 user_id=user_id,
                 role="assistant",
@@ -444,7 +441,7 @@ ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
                     emotion=emotion_data["emotion"]
                 )
             except Exception as e:
-                print("保存到向量数据库失败: {}".format(e))
+                print(f"保存到向量数据库失败: {e}")
         
         return ChatResponse(
             response=response_text,

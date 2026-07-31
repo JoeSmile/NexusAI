@@ -4,15 +4,16 @@
 提供性能指标、健康检查、缓存管理等功能
 """
 
-from fastapi import APIRouter, HTTPException, Depends
-from fastapi.responses import JSONResponse
-from typing import Dict, List, Optional, Any
+import asyncio
 import time
 from datetime import datetime
+from typing import Any
 
-from backend.services.optimized_chat_service import optimized_chat_service
-from backend.services.performance_optimizer import performance_optimizer, cache_manager
+from fastapi import APIRouter, HTTPException
+
 from backend.logging_config import get_logger
+from backend.services.optimized_chat_service import optimized_chat_service
+from backend.services.performance_optimizer import cache_manager, performance_optimizer
 
 logger = get_logger(__name__)
 
@@ -81,7 +82,7 @@ async def get_cache_stats():
 
 
 @router.post("/cache/clear")
-async def clear_cache(pattern: Optional[str] = None):
+async def clear_cache(pattern: str | None = None):
     """
     清除缓存
     
@@ -160,7 +161,7 @@ async def get_optimization_config():
 
 
 @router.post("/optimization/config")
-async def update_optimization_config(config: Dict[str, Any]):
+async def update_optimization_config(config: dict[str, Any]):
     """
     更新优化配置
     
@@ -252,8 +253,9 @@ async def get_system_info():
         系统信息
     """
     try:
-        import psutil
         import platform
+
+        import psutil
         
         # 系统信息
         system_info = {

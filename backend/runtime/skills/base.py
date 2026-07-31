@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Skill Protocol — 技能系统的核心抽象
 
@@ -26,7 +25,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -44,13 +43,13 @@ class SkillContext:
     iteration: int = 0  # 当前 ReAct 迭代次数 (1-based)
     # LLM Gateway上下文
     user_input: str = ""
-    emotion_data: Dict[str, Any] = field(default_factory=dict)
-    memories: List[Dict[str, Any]] = field(default_factory=list)
-    user_profile: Dict[str, Any] = field(default_factory=dict)
+    emotion_data: dict[str, Any] = field(default_factory=dict)
+    memories: list[dict[str, Any]] = field(default_factory=list)
+    user_profile: dict[str, Any] = field(default_factory=dict)
     # 执行上下文
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     # 前序 Skill 结果
-    prev_results: Dict[str, "SkillResult"] = field(default_factory=dict)
+    prev_results: dict[str, SkillResult] = field(default_factory=dict)
 
 
 @dataclass
@@ -59,16 +58,16 @@ class SkillResult:
 
     success: bool
     output: Any = None
-    error: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    error: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
     # LLM Gateway扩展
-    emotion_tag: Optional[str] = None  # 当前情感标签
+    emotion_tag: str | None = None  # 当前情感标签
     confidence: float = 1.0  # 结果置信度 [0, 1]
     # Skill 调用信息
     skill_name: str = ""
     execution_time_ms: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             "success": self.success,
@@ -135,11 +134,11 @@ class Skill(ABC):
 
     def on_activate(self) -> None:
         """Skill 被激活时调用 — 可用于初始化资源"""
-        pass
+        return None
 
     def on_deactivate(self) -> None:
         """Skill 被停用时调用 — 可用于释放资源"""
-        pass
+        return None
 
     def __repr__(self) -> str:
         return f"Skill(name={self.name!r})"
@@ -165,10 +164,10 @@ class SkillRegistry:
     """
 
     def __init__(self):
-        self._skills: Dict[str, Skill] = {}
-        self._execution_order: List[str] = []  # 默认执行顺序
+        self._skills: dict[str, Skill] = {}
+        self._execution_order: list[str] = []  # 默认执行顺序
 
-    def register(self, skill: Skill, order: Optional[int] = None) -> None:
+    def register(self, skill: Skill, order: int | None = None) -> None:
         """
         注册 Skill
 
@@ -199,11 +198,11 @@ class SkillRegistry:
             self._execution_order.remove(name)
             logger.info("Unregistered skill '%s'", name)
 
-    def get_skill(self, name: str) -> Optional[Skill]:
+    def get_skill(self, name: str) -> Skill | None:
         """按名称获取 Skill"""
         return self._skills.get(name)
 
-    def get_applicable_skills(self, context: SkillContext) -> List[Skill]:
+    def get_applicable_skills(self, context: SkillContext) -> list[Skill]:
         """获取当前上下文适用的所有 Skill（按执行顺序）"""
         result = []
         for name in self._execution_order:
@@ -212,7 +211,7 @@ class SkillRegistry:
                 result.append(skill)
         return result
 
-    def list_skills(self) -> List[Dict[str, Any]]:
+    def list_skills(self) -> list[dict[str, Any]]:
         """列出所有已注册的 Skill"""
         return [
             {
@@ -227,5 +226,5 @@ class SkillRegistry:
         return len(self._skills)
 
     @property
-    def skill_names(self) -> List[str]:
+    def skill_names(self) -> list[str]:
         return list(self._execution_order)

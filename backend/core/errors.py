@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 
-class ErrorCode(str, Enum):
+class ErrorCode(StrEnum):
     # ── 认证 (AUTH_0xx) ──
     AUTH_INVALID_KEY = "AUTH_001"
     AUTH_INSUFFICIENT_PERMISSIONS = "AUTH_002"

@@ -7,10 +7,10 @@
 从对话中提取关键信息，包括情绪、事件、承诺等
 """
 
-from typing import Dict, List, Optional, Any
-from datetime import datetime
 import json
 import re
+from datetime import datetime
+from typing import Any
 
 from backend.modules.llm.harness import resolve_llm_settings, try_create_openai_sync_client
 
@@ -37,8 +37,8 @@ class MemoryExtractor:
         }
         
     def extract_memories(self, user_message: str, bot_response: str, 
-                        emotion: Optional[str] = None, 
-                        emotion_intensity: Optional[float] = None) -> List[Dict[str, Any]]:
+                        emotion: str | None = None, 
+                        emotion_intensity: float | None = None) -> list[dict[str, Any]]:
         """
         从对话中提取记忆条目
         
@@ -66,8 +66,8 @@ class MemoryExtractor:
         
         return memories
     
-    def _extract_by_rules(self, message: str, emotion: Optional[str] = None, 
-                         intensity: Optional[float] = None) -> List[Dict[str, Any]]:
+    def _extract_by_rules(self, message: str, emotion: str | None = None, 
+                         intensity: float | None = None) -> list[dict[str, Any]]:
         """基于规则提取记忆"""
         memories = []
         
@@ -156,8 +156,8 @@ class MemoryExtractor:
         return memories
     
     def _extract_by_llm(self, user_message: str, bot_response: str, 
-                       emotion: Optional[str] = None, 
-                       intensity: Optional[float] = None) -> List[Dict[str, Any]]:
+                       emotion: str | None = None, 
+                       intensity: float | None = None) -> list[dict[str, Any]]:
         """使用LLM提取记忆（用于复杂场景）"""
         if not self.client:
             return []
@@ -256,8 +256,8 @@ class MemoryExtractor:
         words = message[:50]
         return f"用户担忧: {words}..."
     
-    def _calculate_importance(self, message: str, emotion: Optional[str], 
-                            intensity: Optional[float]) -> float:
+    def _calculate_importance(self, message: str, emotion: str | None, 
+                            intensity: float | None) -> float:
         """计算记忆重要性（0-1）"""
         importance = 0.5  # 基础重要性
         
@@ -272,7 +272,7 @@ class MemoryExtractor:
         # 限制在0-1范围
         return min(max(importance, 0.0), 1.0)
     
-    def _deduplicate_and_rank(self, memories: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _deduplicate_and_rank(self, memories: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """去重并按重要性排序"""
         if not memories:
             return []
@@ -291,8 +291,8 @@ class MemoryExtractor:
         
         return sorted_memories
     
-    def should_extract_memory(self, user_message: str, emotion: Optional[str] = None, 
-                            intensity: Optional[float] = None) -> bool:
+    def should_extract_memory(self, user_message: str, emotion: str | None = None, 
+                            intensity: float | None = None) -> bool:
         """
         判断是否应该从这次对话中提取记忆
         

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Runtime Config — 模块配置与开关
 
@@ -6,12 +5,12 @@ Runtime Config — 模块配置与开关
 - Guards: 统一的开关检查入口
 """
 
+from backend.runtime.config.guards import ModuleDisabledError, is_module_enabled, require_module
 from backend.runtime.config.toggles import ModuleToggles
-from backend.runtime.config.guards import is_module_enabled, require_module, ModuleDisabledError
 
 __all__ = [
+    "ModuleDisabledError",
     "ModuleToggles",
     "is_module_enabled",
     "require_module",
-    "ModuleDisabledError",
 ]

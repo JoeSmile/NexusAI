@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Session FSM — 6-state finite state machine
 
@@ -20,11 +19,10 @@ LLM Gateway场景状态流：
 
 from __future__ import annotations
 
-from enum import Enum
-from typing import FrozenSet
+from enum import StrEnum
 
 
-class SessionState(str, Enum):
+class SessionState(StrEnum):
     """所有有效的会话状态"""
 
     IDLE = "idle"
@@ -49,14 +47,14 @@ class IllegalTransitionError(Exception):
 
 
 # ── 终态 — 不允许进一步转换 ──────────────────────────
-TERMINAL_STATES: FrozenSet[SessionState] = frozenset(
+TERMINAL_STATES: frozenset[SessionState] = frozenset(
     {
         SessionState.TERMINATED,
     }
 )
 
 # ── 有效转换 (from_state → set of allowed to_states) ──────
-_TRANSITIONS: dict[SessionState, FrozenSet[SessionState]] = {
+_TRANSITIONS: dict[SessionState, frozenset[SessionState]] = {
     SessionState.IDLE: frozenset(
         {
             SessionState.RUNNING,

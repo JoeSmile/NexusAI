@@ -8,8 +8,8 @@ RAG模块
 __all__ = [
     "KnowledgeBaseManager",
     "PsychologyKnowledgeLoader",
-    "RAGService",
     "RAGIntegrationService",
+    "RAGService",
     "rag_router",
 ]
 
@@ -23,7 +23,7 @@ def __getattr__(name: str):
             "PsychologyKnowledgeLoader": PsychologyKnowledgeLoader,
         }[name]
     if name in ("RAGService", "RAGIntegrationService"):
-        from .services.rag_service import RAGService, RAGIntegrationService
+        from .services.rag_service import RAGIntegrationService, RAGService
 
         return {"RAGService": RAGService, "RAGIntegrationService": RAGIntegrationService}[name]
     if name == "rag_router":

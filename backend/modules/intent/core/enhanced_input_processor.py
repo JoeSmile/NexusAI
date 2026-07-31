@@ -11,18 +11,16 @@ Enhanced Input Processor with typo correction, tokenization, duplicate detection
 - 友好的错误提示
 """
 
-import re
 import logging
-from typing import Dict, List, Optional, Tuple, Any
+import re
 from collections import deque
-from datetime import datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 # 尝试导入jieba（可选依赖）
 try:
     import jieba
-    import jieba.posseg as pseg
     JIEBA_AVAILABLE = True
     logger.info("✓ jieba分词引擎可用")
 except ImportError:
@@ -114,7 +112,7 @@ class EnhancedInputProcessor:
         
         logger.info(f"✓ 增强版输入处理器已初始化 (jieba={self.enable_jieba}, duplicate_check={self.enable_duplicate_check})")
     
-    def preprocess(self, text: str, user_id: Optional[str] = None) -> Dict[str, Any]:
+    def preprocess(self, text: str, user_id: str | None = None) -> dict[str, Any]:
         """
         完整的预处理流程
         
@@ -268,7 +266,7 @@ class EnhancedInputProcessor:
         
         return corrected
     
-    def _check_duplicate(self, text: str, user_id: str) -> Tuple[bool, int]:
+    def _check_duplicate(self, text: str, user_id: str) -> tuple[bool, int]:
         """
         检查是否为重复内容
         
@@ -325,7 +323,7 @@ class EnhancedInputProcessor:
         
         return False
     
-    def _detect_question_type(self, text: str) -> Optional[str]:
+    def _detect_question_type(self, text: str) -> str | None:
         """
         检测问句类型
         
@@ -379,7 +377,7 @@ class EnhancedInputProcessor:
         
         return chinese_count / len(text)
     
-    def _check_high_risk(self, text: str) -> Tuple[bool, List[str]]:
+    def _check_high_risk(self, text: str) -> tuple[bool, list[str]]:
         """
         检查高风险关键词（危机干预相关）
         
@@ -398,7 +396,7 @@ class EnhancedInputProcessor:
         
         return len(matched_keywords) > 0, matched_keywords
     
-    def _filter_sensitive_words(self, text: str) -> Tuple[str, List[str]]:
+    def _filter_sensitive_words(self, text: str) -> tuple[str, list[str]]:
         """
         过滤敏感词（使用星号替换）
         
@@ -418,7 +416,7 @@ class EnhancedInputProcessor:
         
         return filtered, filtered_words
     
-    def validate_input(self, text: str) -> Tuple[bool, Optional[str]]:
+    def validate_input(self, text: str) -> tuple[bool, str | None]:
         """
         快速验证输入是否合规（轻量级检查）
         
@@ -452,7 +450,7 @@ class EnhancedInputProcessor:
             del self.user_history[user_id]
             logger.info(f"已清除用户 {user_id} 的输入历史")
     
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """
         获取处理器统计信息
         

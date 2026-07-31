@@ -8,8 +8,8 @@ Calendar API - 日历服务
 - 删除事件
 """
 
-from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
+from typing import Any
 
 
 class CalendarAPI:
@@ -24,9 +24,9 @@ class CalendarAPI:
     def get_events(
         self,
         user_id: str,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None
-    ) -> List[Dict[str, Any]]:
+        start_date: datetime | None = None,
+        end_date: datetime | None = None
+    ) -> list[dict[str, Any]]:
         """
         获取用户日历事件
         
@@ -63,9 +63,9 @@ class CalendarAPI:
         title: str,
         date: str,
         time: str,
-        description: Optional[str] = None,
+        description: str | None = None,
         event_type: str = "personal"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         创建日历事件
         
@@ -101,8 +101,8 @@ class CalendarAPI:
         self,
         user_id: str,
         event_id: str,
-        updates: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+        updates: dict[str, Any]
+    ) -> dict[str, Any] | None:
         """
         更新日历事件
         
@@ -152,7 +152,7 @@ class CalendarAPI:
         self,
         user_id: str,
         days: int = 7
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         获取即将到来的事件
         
@@ -173,7 +173,7 @@ class CalendarAPI:
         user_id: str,
         date: str,
         duration: int = 60
-    ) -> List[str]:
+    ) -> list[str]:
         """
         建议可用时间段
         

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 FallbackManager — 模型降级管理
 
@@ -13,7 +12,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +22,7 @@ class FallbackConfig:
     """降级配置"""
 
     primary_model: str = "gpt-4"
-    fallback_models: List[str] = field(default_factory=lambda: ["gpt-3.5-turbo"])
+    fallback_models: list[str] = field(default_factory=lambda: ["gpt-3.5-turbo"])
     max_retries: int = 1
     timeout_seconds: float = 30.0
     # LLM Gateway扩展：最终降级使用规则式回应
@@ -41,7 +40,7 @@ class FallbackManager:
         manager.on_failure(reason="rate_limit")
     """
 
-    def __init__(self, config: Optional[FallbackConfig] = None, llm_client=None):
+    def __init__(self, config: FallbackConfig | None = None, llm_client=None):
         self._config = config or FallbackConfig()
         self._llm = llm_client
         self._current_model = self._config.primary_model

@@ -4,10 +4,11 @@
 实现依赖注入模式，管理服务生命周期
 """
 
-from typing import Any, Callable, Dict, Type, TypeVar, Optional, Union
-from functools import wraps
 import inspect
+from collections.abc import Callable
+from functools import wraps
 from threading import Lock
+from typing import Any, TypeVar
 
 T = TypeVar('T')
 
@@ -19,12 +20,12 @@ class Dependency:
         self,
         factory: Callable[..., Any],
         lifetime: str = "transient",
-        dependencies: Optional[Dict[str, Any]] = None
+        dependencies: dict[str, Any] | None = None
     ):
         self.factory = factory
         self.lifetime = lifetime
         self.dependencies = dependencies or {}
-        self._instance: Optional[Any] = None
+        self._instance: Any | None = None
         self._lock = Lock()
     
     def get_instance(self, container: 'Container') -> Any:
@@ -57,34 +58,34 @@ class Container:
     """依赖注入容器"""
     
     def __init__(self):
-        self._services: Dict[Type, Dependency] = {}
-        self._instances: Dict[Type, Any] = {}
+        self._services: dict[type, Dependency] = {}
+        self._instances: dict[type, Any] = {}
         self._lock = Lock()
     
     def register_singleton(
         self,
-        service_type: Type[T],
-        factory: Union[Type[T], Callable[..., T]],
-        dependencies: Optional[Dict[str, Type]] = None
+        service_type: type[T],
+        factory: type[T] | Callable[..., T],
+        dependencies: dict[str, type] | None = None
     ) -> 'Container':
         """注册单例服务"""
         return self._register(service_type, factory, "singleton", dependencies)
     
     def register_transient(
         self,
-        service_type: Type[T],
-        factory: Union[Type[T], Callable[..., T]],
-        dependencies: Optional[Dict[str, Type]] = None
+        service_type: type[T],
+        factory: type[T] | Callable[..., T],
+        dependencies: dict[str, type] | None = None
     ) -> 'Container':
         """注册瞬时服务"""
         return self._register(service_type, factory, "transient", dependencies)
     
     def _register(
         self,
-        service_type: Type[T],
-        factory: Union[Type[T], Callable[..., T]],
+        service_type: type[T],
+        factory: type[T] | Callable[..., T],
         lifetime: str,
-        dependencies: Optional[Dict[str, Type]] = None
+        dependencies: dict[str, type] | None = None
     ) -> 'Container':
         """注册服务"""
         with self._lock:
@@ -95,7 +96,7 @@ class Container:
             )
         return self
     
-    def get(self, service_type: Type[T]) -> T:
+    def get(self, service_type: type[T]) -> T:
         """获取服务实例"""
         with self._lock:
             if service_type not in self._services:
@@ -104,18 +105,18 @@ class Container:
             dependency = self._services[service_type]
             return dependency.get_instance(self)
     
-    def get_optional(self, service_type: Type[T]) -> Optional[T]:
+    def get_optional(self, service_type: type[T]) -> T | None:
         """获取可选服务实例"""
         try:
             return self.get(service_type)
         except ValueError:
             return None
     
-    def is_registered(self, service_type: Type[T]) -> bool:
+    def is_registered(self, service_type: type[T]) -> bool:
         """检查服务是否已注册"""
         return service_type in self._services
     
-    def unregister(self, service_type: Type[T]) -> bool:
+    def unregister(self, service_type: type[T]) -> bool:
         """取消注册服务"""
         with self._lock:
             return self._services.pop(service_type, None) is not None
@@ -126,7 +127,7 @@ class Container:
             self._services.clear()
             self._instances.clear()
     
-    def get_all_registered(self) -> Dict[Type, str]:
+    def get_all_registered(self) -> dict[type, str]:
         """获取所有已注册的服务"""
         return {
             service_type: dependency.lifetime
@@ -144,7 +145,7 @@ def get_container() -> Container:
 
 
 # 装饰器
-def Singleton(cls: Type[T]) -> Type[T]:
+def Singleton(cls: type[T]) -> type[T]:
     """单例装饰器"""
     original_new = cls.__new__
     instance = None
@@ -163,13 +164,13 @@ def Singleton(cls: Type[T]) -> Type[T]:
     return cls
 
 
-def Transient(cls: Type[T]) -> Type[T]:
+def Transient(cls: type[T]) -> type[T]:
     """瞬时装饰器（默认行为）"""
     return cls
 
 
 # 注入装饰器
-def inject(*dependencies: Type):
+def inject(*dependencies: type):
     """依赖注入装饰器"""
     def decorator(func: Callable) -> Callable:
         @wraps(func)
@@ -189,7 +190,7 @@ def inject(*dependencies: Type):
 # 自动注册装饰器
 def auto_register(lifetime: str = "transient"):
     """自动注册装饰器"""
-    def decorator(cls: Type[T]) -> Type[T]:
+    def decorator(cls: type[T]) -> type[T]:
         # 自动分析依赖
         signature = inspect.signature(cls.__init__)
         dependencies = {}

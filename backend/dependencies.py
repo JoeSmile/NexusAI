@@ -4,12 +4,11 @@
 提供全局的服务实例和依赖管理
 """
 
-from functools import lru_cache
-from backend.services.chat_service import ChatService
-from backend.services.memory_service import MemoryService
-from backend.services.context_service import ContextService
-from backend.evaluation_engine import EvaluationEngine
 from backend.database import DatabaseManager
+from backend.evaluation_engine import EvaluationEngine
+from backend.services.chat_service import ChatService
+from backend.services.context_service import ContextService
+from backend.services.memory_service import MemoryService
 
 
 class ServiceContainer:

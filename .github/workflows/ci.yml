@@ -39,8 +39,8 @@ jobs:
         run: uv run ruff check backend/ scripts/ --output-format=github
 
       - name: MyPy type check
-        run: uv run mypy backend/ --ignore-missing-imports
-        continue-on-error: true
+        # 使用 pyproject files + overrides（勿传 backend/，否则会绕过 files 收敛）
+        run: uv run mypy --ignore-missing-imports
 
       - name: Init database
         run: |

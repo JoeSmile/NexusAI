@@ -5,22 +5,24 @@ RAG知识库管理模块
 """
 
 import os
-from typing import List, Dict, Any, Optional, Tuple
-from pathlib import Path
-import logging
 from datetime import datetime
+from pathlib import Path
+from typing import Any
 
-# 使用兼容层统一处理 langchain 导入（无 Chroma）
-from .langchain_compat import (
-    PyPDFLoader, DirectoryLoader, TextLoader,
-    OpenAIEmbeddings, RecursiveCharacterTextSplitter, Document
-)
+from backend.database import vector_ops
+from backend.logging_config import get_logger
+from config import Config
 
 from .chunking_selector import ChunkingStrategySelector
 
-from backend.logging_config import get_logger
-from backend.database import vector_ops
-from config import Config
+# 使用兼容层统一处理 langchain 导入（无 Chroma）
+from .langchain_compat import (
+    Document,
+    OpenAIEmbeddings,
+    PyPDFLoader,
+    RecursiveCharacterTextSplitter,
+    TextLoader,
+)
 
 logger = get_logger(__name__)
 
@@ -96,7 +98,7 @@ class KnowledgeBaseManager:
         
         logger.info(f"知识库管理器初始化完成，持久化目录: {persist_directory}, 分块策略: {chunking_strategy}")
     
-    def load_pdf_documents(self, pdf_path: str) -> List[Document]:
+    def load_pdf_documents(self, pdf_path: str) -> list[Document]:
         """
         加载单个PDF文档
         
@@ -116,7 +118,7 @@ class KnowledgeBaseManager:
             logger.error(f"加载PDF文档失败: {e}")
             raise
     
-    def load_directory_documents(self, directory_path: str, glob_pattern: str = "**/*") -> List[Document]:
+    def load_directory_documents(self, directory_path: str, glob_pattern: str = "**/*") -> list[Document]:
         """
         批量加载目录下的文档（自动根据文件类型选择加载器）
         
@@ -183,7 +185,7 @@ class KnowledgeBaseManager:
             logger.error(f"加载目录文档失败: {e}")
             raise
     
-    def load_text_documents(self, text_path: str) -> List[Document]:
+    def load_text_documents(self, text_path: str) -> list[Document]:
         """
         加载文本文档
         
@@ -197,7 +199,7 @@ class KnowledgeBaseManager:
             logger.info(f"开始加载文本文档: {text_path}")
             loader = TextLoader(text_path, encoding='utf-8')
             documents = loader.load()
-            logger.info(f"成功加载文本文档")
+            logger.info("成功加载文本文档")
             return documents
         except Exception as e:
             logger.error(f"加载文本文档失败: {e}")
@@ -205,9 +207,9 @@ class KnowledgeBaseManager:
     
     def split_documents(
         self,
-        documents: List[Document],
-        strategy: Optional[str] = None
-    ) -> List[Document]:
+        documents: list[Document],
+        strategy: str | None = None
+    ) -> list[Document]:
         """
         分割文档为小块
         
@@ -253,7 +255,7 @@ class KnowledgeBaseManager:
                 logger.error(f"传统分块器也失败: {e2}")
                 raise
     
-    def create_vectorstore(self, chunks: List[Document]):
+    def create_vectorstore(self, chunks: list[Document]):
         """将文档块写入 pgvector knowledge_chunks"""
         try:
             logger.info(f"开始写入 pgvector 知识库，共 {len(chunks)} 个文档块")
@@ -284,7 +286,7 @@ class KnowledgeBaseManager:
         logger.info("pgvector 知识库就绪")
         return self.vectorstore
     
-    def add_documents(self, documents: List[Document]) -> None:
+    def add_documents(self, documents: list[Document]) -> None:
         """向 pgvector 添加文档"""
         try:
             logger.info(f"向知识库添加 {len(documents)} 个文档")
@@ -295,14 +297,14 @@ class KnowledgeBaseManager:
             logger.error(f"添加文档失败: {e}")
             raise
     
-    def search_similar(self, query: str, k: int = 3, filter: Optional[Dict[str, Any]] = None) -> List[Document]:
+    def search_similar(self, query: str, k: int = 3, filter: dict[str, Any] | None = None) -> list[Document]:
         """pgvector 相似度搜索"""
         try:
             logger.info(f"执行相似度搜索: {query[:50]}...")
             raw = vector_ops.search_knowledge(
                 query=query, tenant_id=self.tenant_id, n_results=k
             )
-            docs: List[Document] = []
+            docs: list[Document] = []
             documents = (raw.get("documents") or [[]])[0]
             metadatas = (raw.get("metadatas") or [[]])[0]
             for i, content in enumerate(documents):
@@ -317,7 +319,7 @@ class KnowledgeBaseManager:
             logger.error(f"相似度搜索失败: {e}")
             return []
     
-    def search_with_score(self, query: str, k: int = 3) -> List[Tuple[Document, float]]:
+    def search_with_score(self, query: str, k: int = 3) -> list[tuple[Document, float]]:
         """带评分的相似度搜索"""
         try:
             raw = vector_ops.search_knowledge(
@@ -336,7 +338,7 @@ class KnowledgeBaseManager:
             logger.error(f"带评分的相似度搜索失败: {e}")
             return []
     
-    def get_retriever(self, search_kwargs: Optional[Dict[str, Any]] = None):
+    def get_retriever(self, search_kwargs: dict[str, Any] | None = None):
         """返回简易可调用检索器（兼容 as_retriever 用法）"""
         k = (search_kwargs or {}).get("k", 3)
 
@@ -368,7 +370,7 @@ class KnowledgeBaseManager:
             logger.error(f"删除向量集合失败: {e}")
             raise
     
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """获取知识库统计信息"""
         try:
             from backend.database.pgvector_session import KnowledgeChunk, get_pg_session

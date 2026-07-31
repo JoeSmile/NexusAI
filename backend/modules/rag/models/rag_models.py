@@ -3,18 +3,17 @@
 RAG模块数据模型
 """
 
-from typing import List, Dict, Any, Optional
 from datetime import datetime
-from pydantic import BaseModel, Field, field_validator
+from typing import Any
 
-from backend.schemas.common_schemas import BaseResponse, PaginationRequest
+from pydantic import BaseModel, Field, field_validator
 
 
 class KnowledgeSource(BaseModel):
     """知识来源模型"""
     content: str = Field(..., description="知识内容")
-    metadata: Dict[str, Any] = Field(..., description="元数据")
-    relevance_score: Optional[float] = Field(None, description="相关度分数")
+    metadata: dict[str, Any] = Field(..., description="元数据")
+    relevance_score: float | None = Field(None, description="相关度分数")
 
 
 class DocumentInfo(BaseModel):
@@ -23,8 +22,8 @@ class DocumentInfo(BaseModel):
     file_size: int = Field(..., description="文件大小")
     file_type: str = Field(..., description="文件类型")
     upload_time: datetime = Field(default_factory=datetime.now, description="上传时间")
-    chunk_count: Optional[int] = Field(None, description="文档块数量")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="文档元数据")
+    chunk_count: int | None = Field(None, description="文档块数量")
+    metadata: dict[str, Any] | None = Field(None, description="文档元数据")
 
 
 class RAGRequest(BaseModel):
@@ -32,8 +31,8 @@ class RAGRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=1000, description="用户问题")
     search_k: int = Field(3, ge=1, le=10, description="检索文档数量")
     use_context: bool = Field(True, description="是否使用上下文")
-    conversation_history: Optional[List[Dict[str, str]]] = Field(None, description="对话历史")
-    user_emotion: Optional[str] = Field(None, description="用户情绪")
+    conversation_history: list[dict[str, str]] | None = Field(None, description="对话历史")
+    user_emotion: str | None = Field(None, description="用户情绪")
 
     @field_validator('question')
     @classmethod
@@ -46,11 +45,11 @@ class RAGRequest(BaseModel):
 class RAGResponse(BaseModel):
     """RAG问答响应"""
     answer: str = Field(..., description="生成的回答")
-    sources: List[KnowledgeSource] = Field(..., description="知识来源")
+    sources: list[KnowledgeSource] = Field(..., description="知识来源")
     confidence: float = Field(..., ge=0, le=1, description="回答置信度")
     knowledge_count: int = Field(..., ge=0, description="使用的知识源数量")
     used_context: bool = Field(..., description="是否使用了上下文")
-    processing_time: Optional[float] = Field(None, description="处理时间（秒）")
+    processing_time: float | None = Field(None, description="处理时间（秒）")
     timestamp: datetime = Field(default_factory=datetime.now, description="响应时间")
 
 
@@ -58,8 +57,8 @@ class KnowledgeSearchRequest(BaseModel):
     """知识搜索请求"""
     query: str = Field(..., min_length=1, max_length=200, description="搜索查询")
     k: int = Field(3, ge=1, le=20, description="返回结果数量")
-    similarity_threshold: Optional[float] = Field(0.7, ge=0, le=1, description="相似度阈值")
-    filters: Optional[Dict[str, Any]] = Field(None, description="搜索过滤器")
+    similarity_threshold: float | None = Field(0.7, ge=0, le=1, description="相似度阈值")
+    filters: dict[str, Any] | None = Field(None, description="搜索过滤器")
 
     @field_validator('query')
     @classmethod
@@ -72,7 +71,7 @@ class KnowledgeSearchRequest(BaseModel):
 class KnowledgeSearchResponse(BaseModel):
     """知识搜索响应"""
     query: str = Field(..., description="搜索查询")
-    results: List[KnowledgeSource] = Field(..., description="搜索结果")
+    results: list[KnowledgeSource] = Field(..., description="搜索结果")
     total: int = Field(..., ge=0, description="结果总数")
     search_time: float = Field(..., description="搜索时间（秒）")
     timestamp: datetime = Field(default_factory=datetime.now, description="搜索时间")
@@ -83,7 +82,7 @@ class DocumentUploadRequest(BaseModel):
     filename: str = Field(..., description="文件名")
     file_type: str = Field(..., description="文件类型")
     content: bytes = Field(..., description="文件内容")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="文档元数据")
+    metadata: dict[str, Any] | None = Field(None, description="文档元数据")
     auto_chunk: bool = Field(True, description="是否自动分块")
     chunk_size: int = Field(500, ge=100, le=2000, description="分块大小")
     chunk_overlap: int = Field(50, ge=0, le=200, description="分块重叠")
@@ -98,7 +97,7 @@ class KnowledgeBaseStats(BaseModel):
     total_documents: int = Field(..., description="总文档数")
     total_chunks: int = Field(..., description="总文档块数")
     storage_size: int = Field(..., description="存储大小（字节）")
-    last_updated: Optional[datetime] = Field(None, description="最后更新时间")
+    last_updated: datetime | None = Field(None, description="最后更新时间")
     embedding_model: str = Field(..., description="嵌入模型")
     collection_name: str = Field(..., description="集合名称")
 
@@ -121,14 +120,14 @@ class RAGConfig(BaseModel):
 
 class RAGTriggerConfig(BaseModel):
     """RAG触发配置"""
-    emotion_triggers: List[str] = Field(
+    emotion_triggers: list[str] = Field(
         default=[
             "焦虑", "抑郁", "压力大", "紧张", "恐惧", 
             "悲伤", "愤怒", "失眠", "孤独"
         ],
         description="情绪触发词"
     )
-    keyword_triggers: List[str] = Field(
+    keyword_triggers: list[str] = Field(
         default=[
             "怎么办", "如何", "方法", "建议", "技巧", "练习",
             "正念", "冥想", "放松", "呼吸", "认知", "行为",

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 ReflectSkill — 反思评估技能
 
@@ -15,16 +14,16 @@ from __future__ import annotations
 
 import logging
 import time
-from enum import Enum
-from typing import Any, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 
-from backend.runtime.skills.base import Skill, SkillContext, SkillResult
 from backend.runtime.config.guards import is_module_enabled
+from backend.runtime.skills.base import Skill, SkillContext, SkillResult
 
 logger = logging.getLogger(__name__)
 
 
-class InteractionResult(str, Enum):
+class InteractionResult(StrEnum):
     """交互结果"""
     SUCCESS = "success"
     PARTIAL_SUCCESS = "partial"
@@ -32,7 +31,7 @@ class InteractionResult(str, Enum):
     UNKNOWN = "unknown"
 
 
-class FollowupType(str, Enum):
+class FollowupType(StrEnum):
     """回访类型"""
     ROUTINE_CHECK = "routine_check"
     GOAL_TRACKING = "goal_tracking"
@@ -53,7 +52,7 @@ class ReflectSkill(Skill):
 
     def __init__(self, llm_client=None):
         self._llm = llm_client
-        self._experience_db: List[Dict[str, Any]] = []
+        self._experience_db: list[dict[str, Any]] = []
 
     @property
     def name(self) -> str:
@@ -120,7 +119,7 @@ class ReflectSkill(Skill):
                 execution_time_ms=time.time() * 1000 - start_ms,
             )
 
-    async def _evaluate(self, context: SkillContext, **kwargs) -> Dict[str, Any]:
+    async def _evaluate(self, context: SkillContext, **kwargs) -> dict[str, Any]:
         """评估交互效果"""
         interaction = kwargs.get("interaction", {})
 
@@ -153,7 +152,7 @@ class ReflectSkill(Skill):
             "improvements": improvements,
         }
 
-    async def _plan_followup(self, context: SkillContext, **kwargs) -> Optional[Dict[str, Any]]:
+    async def _plan_followup(self, context: SkillContext, **kwargs) -> dict[str, Any] | None:
         """规划回访任务"""
         emotion_data = context.emotion_data
 
@@ -183,7 +182,7 @@ class ReflectSkill(Skill):
             "priority": "low",
         }
 
-    def _collect_metrics(self, interaction: Dict) -> Dict[str, Any]:
+    def _collect_metrics(self, interaction: dict) -> dict[str, Any]:
         """收集交互指标"""
         return {
             "response_time": interaction.get("response_time", 0),
@@ -192,7 +191,7 @@ class ReflectSkill(Skill):
             "goal_achieved": interaction.get("goal_achieved", False),
         }
 
-    def _determine_result(self, metrics: Dict) -> InteractionResult:
+    def _determine_result(self, metrics: dict) -> InteractionResult:
         """判断交互结果"""
         if metrics.get("goal_achieved"):
             return InteractionResult.SUCCESS
@@ -202,7 +201,7 @@ class ReflectSkill(Skill):
             return InteractionResult.FAILURE
         return InteractionResult.UNKNOWN
 
-    def _calculate_score(self, metrics: Dict) -> float:
+    def _calculate_score(self, metrics: dict) -> float:
         """计算评分"""
         score = 0.5
         if metrics.get("goal_achieved"):
@@ -210,7 +209,7 @@ class ReflectSkill(Skill):
         score += metrics.get("feedback_score", 0.5) * 0.2
         return min(score, 1.0)
 
-    def _generate_improvements(self, result: InteractionResult, metrics: Dict) -> List[str]:
+    def _generate_improvements(self, result: InteractionResult, metrics: dict) -> list[str]:
         """生成改进建议"""
         improvements = []
         if result == InteractionResult.FAILURE:

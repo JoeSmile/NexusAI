@@ -4,7 +4,7 @@
 包初始化不做重型导入，避免循环依赖。
 """
 
-__all__ = ["RAGModule", "AgentModule", "LLMModule", "IntentService"]
+__all__ = ["AgentModule", "IntentService", "LLMModule", "RAGModule"]
 
 
 def __getattr__(name: str):

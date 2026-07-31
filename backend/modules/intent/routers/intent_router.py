@@ -3,9 +3,10 @@
 Intent Recognition API Router
 """
 
-from fastapi import APIRouter, HTTPException, Depends
-from typing import Dict, Any, Optional, List
 import logging
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException
 
 from ..models.intent_models import IntentRequest, IntentResult, IntentType
 from ..services.intent_service import IntentService
@@ -20,7 +21,7 @@ router = APIRouter(
 )
 
 # 全局意图服务实例
-_intent_service: Optional[IntentService] = None
+_intent_service: IntentService | None = None
 
 
 def get_intent_service() -> IntentService:
@@ -31,7 +32,7 @@ def get_intent_service() -> IntentService:
     return _intent_service
 
 
-@router.post("/analyze", response_model=Dict[str, Any])
+@router.post("/analyze", response_model=dict[str, Any])
 async def analyze_intent(
     request: IntentRequest,
     intent_service: IntentService = Depends(get_intent_service)
@@ -67,10 +68,10 @@ async def analyze_intent(
         }
     
     except Exception as e:
-        logger.error(f"意图识别失败: {str(e)}", exc_info=True)
+        logger.error(f"意图识别失败: {e!s}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"意图识别失败: {str(e)}"
+            detail=f"意图识别失败: {e!s}"
         )
 
 
@@ -94,16 +95,16 @@ async def detect_intent(
         return result
     
     except Exception as e:
-        logger.error(f"意图检测失败: {str(e)}", exc_info=True)
+        logger.error(f"意图检测失败: {e!s}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"意图检测失败: {str(e)}"
+            detail=f"意图检测失败: {e!s}"
         )
 
 
 @router.post("/build_prompt")
 async def build_prompt(
-    user_context: Dict[str, Any],
+    user_context: dict[str, Any],
     intent_service: IntentService = Depends(get_intent_service)
 ):
     """
@@ -141,10 +142,10 @@ async def build_prompt(
         }
     
     except Exception as e:
-        logger.error(f"Prompt构建失败: {str(e)}", exc_info=True)
+        logger.error(f"Prompt构建失败: {e!s}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Prompt构建失败: {str(e)}"
+            detail=f"Prompt构建失败: {e!s}"
         )
 
 
@@ -227,7 +228,7 @@ async def get_status(
 
 @router.post("/batch")
 async def batch_analyze(
-    texts: List[str],
+    texts: list[str],
     intent_service: IntentService = Depends(get_intent_service)
 ):
     """
@@ -256,9 +257,9 @@ async def batch_analyze(
         }
     
     except Exception as e:
-        logger.error(f"批量意图分析失败: {str(e)}", exc_info=True)
+        logger.error(f"批量意图分析失败: {e!s}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"批量意图分析失败: {str(e)}"
+            detail=f"批量意图分析失败: {e!s}"
         )
 

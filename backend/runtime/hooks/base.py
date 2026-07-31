@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Hook Protocol — 生命周期钩子
 
@@ -20,7 +19,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Optional, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +64,7 @@ class PluginHook(Protocol):
     asyncio.create_task() 在 Hook 体内执行。
     """
 
-    def on_pre_llm_call(self, context: HookContext) -> Optional[dict]:
+    def on_pre_llm_call(self, context: HookContext) -> dict | None:
         """
         在每次 LLM API 调用之前被调用。
 
@@ -98,7 +97,7 @@ class PluginHook(Protocol):
         """会话结束时被调用（在最后一个 turn 之后）"""
         ...
 
-    def on_tool_use_failure(self, context: ToolFailureContext) -> Optional[dict]:
+    def on_tool_use_failure(self, context: ToolFailureContext) -> dict | None:
         """
         工具执行抛出未处理异常时被调用。
 
@@ -131,7 +130,7 @@ class HookDispatcher:
         dispatcher.dispatch_post_llm_call(context, response)
     """
 
-    def __init__(self, hooks: Optional[list] = None):
+    def __init__(self, hooks: list | None = None):
         self._hooks: list = hooks or []
 
     def add_hook(self, hook) -> None:
@@ -142,7 +141,7 @@ class HookDispatcher:
         """移除 Hook"""
         self._hooks.remove(hook)
 
-    def dispatch_pre_llm_call(self, context: HookContext) -> Optional[dict]:
+    def dispatch_pre_llm_call(self, context: HookContext) -> dict | None:
         """分发 pre_llm_call 事件"""
         merged: dict = {}
         for hook in self._hooks:
@@ -188,7 +187,7 @@ class HookDispatcher:
 
     def dispatch_tool_use_failure(
         self, context: ToolFailureContext
-    ) -> Optional[dict]:
+    ) -> dict | None:
         """分发 tool_use_failure 事件"""
         for hook in self._hooks:
             try:

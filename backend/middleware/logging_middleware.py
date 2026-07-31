@@ -4,10 +4,11 @@
 记录HTTP请求和响应
 """
 
-import time
 import logging
+import time
 import uuid
-from typing import Callable
+from collections.abc import Callable
+
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -57,7 +58,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         
         # 记录请求日志
         logger.info(
-            f"请求开始",
+            "请求开始",
             extra={
                 "request_id": request_id,
                 "method": request.method,
@@ -80,7 +81,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         """记录响应信息"""
         # 记录响应日志
         logger.info(
-            f"请求完成",
+            "请求完成",
             extra={
                 "request_id": request_id,
                 "method": request.method,
@@ -95,7 +96,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         # 记录慢请求警告
         if process_time > 5.0:
             logger.warning(
-                f"慢请求检测",
+                "慢请求检测",
                 extra={
                     "request_id": request_id,
                     "method": request.method,
@@ -108,7 +109,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         # 记录错误响应
         if response.status_code >= 400:
             logger.error(
-                f"错误响应",
+                "错误响应",
                 extra={
                     "request_id": request_id,
                     "method": request.method,

@@ -4,27 +4,26 @@
 创建和管理各种服务的实例
 """
 
-from typing import Any, Dict, Type, TypeVar, Optional, Callable
-from abc import ABC, abstractmethod
 import threading
+from abc import ABC, abstractmethod
 from functools import lru_cache
+from typing import Any, TypeVar
+
+from backend.modules.rag import RAGService
 
 from .config import get_config
-from .interfaces import (
-    IChatEngine,
-    IMemoryService,
-    IContextService,
-    IEmotionAnalyzer,
-    IRAGService,
-    IEvaluationService,
-    IFeedbackService,
-    IDatabaseService,
-    ICacheService,
-    ILogger,
-    IValidationService
-)
 from .exceptions import ConfigurationError
-from backend.modules.rag import RAGService
+from .interfaces import (
+    ICacheService,
+    IChatEngine,
+    IContextService,
+    IDatabaseService,
+    IEmotionAnalyzer,
+    ILogger,
+    IMemoryService,
+    IRAGService,
+    IValidationService,
+)
 
 T = TypeVar('T')
 
@@ -35,12 +34,10 @@ class ServiceFactory(ABC):
     @abstractmethod
     def create_service(self, *args, **kwargs) -> Any:
         """创建服务实例"""
-        pass
     
     @abstractmethod
-    def get_service_type(self) -> Type:
+    def get_service_type(self) -> type:
         """获取服务类型"""
-        pass
 
 
 class ChatEngineFactory(ServiceFactory):
@@ -54,7 +51,7 @@ class ChatEngineFactory(ServiceFactory):
         except ImportError as e:
             raise ConfigurationError(f"无法导入聊天引擎: {e}")
     
-    def get_service_type(self) -> Type[IChatEngine]:
+    def get_service_type(self) -> type[IChatEngine]:
         return IChatEngine
 
 
@@ -69,22 +66,22 @@ class MemoryServiceFactory(ServiceFactory):
         except ImportError as e:
             raise ConfigurationError(f"无法导入记忆服务: {e}")
     
-    def get_service_type(self) -> Type[IMemoryService]:
+    def get_service_type(self) -> type[IMemoryService]:
         return IMemoryService
 
 
 class ContextServiceFactory(ServiceFactory):
     """上下文服务工厂"""
     
-    def create_service(self, memory_service: Optional[IMemoryService] = None, *args, **kwargs) -> IContextService:
+    def create_service(self, memory_service: IMemoryService | None = None, *args, **kwargs) -> IContextService:
         """创建上下文服务实例"""
         try:
             from ..services.context_service import ContextService
-            return ContextService(memory_service=memory_service, *args, **kwargs)
+            return ContextService(*args, memory_service=memory_service, **kwargs)
         except ImportError as e:
             raise ConfigurationError(f"无法导入上下文服务: {e}")
     
-    def get_service_type(self) -> Type[IContextService]:
+    def get_service_type(self) -> type[IContextService]:
         return IContextService
 
 
@@ -95,7 +92,7 @@ class EmotionAnalyzerFactory(ServiceFactory):
         """创建情绪分析器实例"""
         raise ConfigurationError("EmotionAnalyzer 已在 Batch 3.1 移除")
     
-    def get_service_type(self) -> Type[IEmotionAnalyzer]:
+    def get_service_type(self) -> type[IEmotionAnalyzer]:
         return IEmotionAnalyzer
 
 
@@ -106,7 +103,7 @@ class RAGServiceFactory(ServiceFactory):
         """创建RAG服务实例"""
         return RAGService(*args, **kwargs)
     
-    def get_service_type(self) -> Type[IRAGService]:
+    def get_service_type(self) -> type[IRAGService]:
         return IRAGService
 
 
@@ -121,7 +118,7 @@ class DatabaseServiceFactory(ServiceFactory):
         except ImportError as e:
             raise ConfigurationError(f"无法导入数据库服务: {e}")
     
-    def get_service_type(self) -> Type[IDatabaseService]:
+    def get_service_type(self) -> type[IDatabaseService]:
         return IDatabaseService
 
 
@@ -144,7 +141,7 @@ class CacheServiceFactory(ServiceFactory):
                     "请确保 cache_service.py 或 core/utils/memory_cache.py 存在。"
                 )
     
-    def get_service_type(self) -> Type[ICacheService]:
+    def get_service_type(self) -> type[ICacheService]:
         return ICacheService
 
 
@@ -159,7 +156,7 @@ class LoggerFactory(ServiceFactory):
         except ImportError as e:
             raise ConfigurationError(f"无法导入日志服务: {e}")
     
-    def get_service_type(self) -> Type[ILogger]:
+    def get_service_type(self) -> type[ILogger]:
         return ILogger
 
 
@@ -182,7 +179,7 @@ class ValidationServiceFactory(ServiceFactory):
                     "请确保 validation_service.py 或 core/utils/simple_validator.py 存在。"
                 )
     
-    def get_service_type(self) -> Type[IValidationService]:
+    def get_service_type(self) -> type[IValidationService]:
         return IValidationService
 
 
@@ -190,19 +187,19 @@ class ServiceRegistry:
     """服务注册表"""
     
     def __init__(self):
-        self._factories: Dict[Type, ServiceFactory] = {}
-        self._instances: Dict[Type, Any] = {}
-        self._singletons: Dict[Type, Any] = {}
+        self._factories: dict[type, ServiceFactory] = {}
+        self._instances: dict[type, Any] = {}
+        self._singletons: dict[type, Any] = {}
         self._lock = threading.Lock()
     
-    def register_factory(self, service_type: Type[T], factory: ServiceFactory, singleton: bool = False):
+    def register_factory(self, service_type: type[T], factory: ServiceFactory, singleton: bool = False):
         """注册服务工厂"""
         with self._lock:
             self._factories[service_type] = factory
             if singleton:
                 self._singletons[service_type] = None
     
-    def get_service(self, service_type: Type[T], *args, **kwargs) -> T:
+    def get_service(self, service_type: type[T], *args, **kwargs) -> T:
         """获取服务实例"""
         with self._lock:
             # 检查是否为单例
@@ -221,20 +218,20 @@ class ServiceRegistry:
             
             return factory.create_service(*args, **kwargs)
     
-    def register_instance(self, service_type: Type[T], instance: T):
+    def register_instance(self, service_type: type[T], instance: T):
         """注册服务实例"""
         with self._lock:
             self._instances[service_type] = instance
     
-    def get_instance(self, service_type: Type[T]) -> Optional[T]:
+    def get_instance(self, service_type: type[T]) -> T | None:
         """获取已注册的实例"""
         return self._instances.get(service_type)
     
-    def is_registered(self, service_type: Type[T]) -> bool:
+    def is_registered(self, service_type: type[T]) -> bool:
         """检查服务是否已注册"""
         return service_type in self._factories or service_type in self._instances
     
-    def clear_singleton(self, service_type: Type[T]):
+    def clear_singleton(self, service_type: type[T]):
         """清除单例实例"""
         with self._lock:
             if service_type in self._singletons:
@@ -296,17 +293,17 @@ class ApplicationContext:
             # 记录错误但不阻止初始化
             print(f"预加载服务时出错: {e}")
     
-    def get_service(self, service_type: Type[T], *args, **kwargs) -> T:
+    def get_service(self, service_type: type[T], *args, **kwargs) -> T:
         """获取服务实例"""
         if not self._initialized:
             self.initialize()
         return self._registry.get_service(service_type, *args, **kwargs)
     
-    def register_service(self, service_type: Type[T], factory: ServiceFactory, singleton: bool = False):
+    def register_service(self, service_type: type[T], factory: ServiceFactory, singleton: bool = False):
         """注册服务"""
         self._registry.register_factory(service_type, factory, singleton)
     
-    def register_instance(self, service_type: Type[T], instance: T):
+    def register_instance(self, service_type: type[T], instance: T):
         """注册服务实例"""
         self._registry.register_instance(service_type, instance)
     
@@ -323,7 +320,7 @@ class ApplicationContext:
 
 
 # 全局应用程序上下文
-_app_context: Optional[ApplicationContext] = None
+_app_context: ApplicationContext | None = None
 
 
 def get_app_context() -> ApplicationContext:
@@ -335,8 +332,8 @@ def get_app_context() -> ApplicationContext:
     return _app_context
 
 
-@lru_cache()
-def get_service(service_type: Type[T]) -> T:
+@lru_cache
+def get_service(service_type: type[T]) -> T:
     """获取服务实例（缓存版本）"""
     return get_app_context().get_service(service_type)
 

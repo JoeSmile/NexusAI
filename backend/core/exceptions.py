@@ -4,7 +4,7 @@
 定义系统的自定义异常类
 """
 
-from typing import Optional, Dict, Any
+from typing import Any
 
 
 class EmotionalChatException(Exception):
@@ -13,15 +13,15 @@ class EmotionalChatException(Exception):
     def __init__(
         self,
         message: str,
-        error_code: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None
+        error_code: str | None = None,
+        details: dict[str, Any] | None = None
     ):
         super().__init__(message)
         self.message = message
         self.error_code = error_code or self.__class__.__name__
         self.details = details or {}
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
         return {
             "error_code": self.error_code,
@@ -32,17 +32,14 @@ class EmotionalChatException(Exception):
 
 class ConfigurationError(EmotionalChatException):
     """配置错误"""
-    pass
 
 
 class DatabaseError(EmotionalChatException):
     """数据库错误"""
-    pass
 
 
 class RAGError(EmotionalChatException):
     """RAG知识库错误"""
-    pass
 
 
 class ValidationError(EmotionalChatException):
@@ -51,15 +48,15 @@ class ValidationError(EmotionalChatException):
     def __init__(
         self,
         message: str,
-        field: Optional[str] = None,
-        value: Optional[Any] = None,
+        field: str | None = None,
+        value: Any | None = None,
         **kwargs
     ):
         super().__init__(message, **kwargs)
         self.field = field
         self.value = value
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
         result = super().to_dict()
         if self.field:
@@ -71,12 +68,10 @@ class ValidationError(EmotionalChatException):
 
 class AuthenticationError(EmotionalChatException):
     """认证错误"""
-    pass
 
 
 class AuthorizationError(EmotionalChatException):
     """授权错误"""
-    pass
 
 
 class RateLimitError(EmotionalChatException):
@@ -85,13 +80,13 @@ class RateLimitError(EmotionalChatException):
     def __init__(
         self,
         message: str = "请求频率过高",
-        retry_after: Optional[int] = None,
+        retry_after: int | None = None,
         **kwargs
     ):
         super().__init__(message, **kwargs)
         self.retry_after = retry_after
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
         result = super().to_dict()
         if self.retry_after:
@@ -106,14 +101,14 @@ class ExternalServiceError(EmotionalChatException):
         self,
         message: str,
         service_name: str,
-        status_code: Optional[int] = None,
+        status_code: int | None = None,
         **kwargs
     ):
         super().__init__(message, **kwargs)
         self.service_name = service_name
         self.status_code = status_code
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
         result = super().to_dict()
         result["service_name"] = self.service_name
@@ -124,37 +119,30 @@ class ExternalServiceError(EmotionalChatException):
 
 class MemoryError(EmotionalChatException):
     """记忆系统错误"""
-    pass
 
 
 class EmotionAnalysisError(EmotionalChatException):
     """情绪分析错误"""
-    pass
 
 
 class ContextError(EmotionalChatException):
     """上下文管理错误"""
-    pass
 
 
 class ChatError(EmotionalChatException):
     """聊天服务错误"""
-    pass
 
 
 class EvaluationError(EmotionalChatException):
     """评估系统错误"""
-    pass
 
 
 class FeedbackError(EmotionalChatException):
     """反馈系统错误"""
-    pass
 
 
 class AgentError(EmotionalChatException):
     """Agent系统错误"""
-    pass
 
 
 # 异常处理器映射

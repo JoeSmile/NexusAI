@@ -3,12 +3,13 @@
 Intent Recognition Data Models
 """
 
-from enum import Enum
-from typing import Optional, Dict, Any
+from enum import StrEnum
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class IntentType(str, Enum):
+class IntentType(StrEnum):
     """用户意图类型枚举"""
     EMOTION = "emotion"          # 情感表达（倾诉、抱怨）
     ADVICE = "advice"            # 寻求建议
@@ -23,11 +24,11 @@ class IntentResult(BaseModel):
     intent: IntentType = Field(..., description="识别的意图类型")
     confidence: float = Field(..., ge=0.0, le=1.0, description="置信度（0-1）")
     source: str = Field(..., description="识别来源：rule（规则）或 model（模型）")
-    secondary_intents: Optional[Dict[IntentType, float]] = Field(
+    secondary_intents: dict[IntentType, float] | None = Field(
         default=None, 
         description="次要意图及其置信度"
     )
-    metadata: Optional[Dict[str, Any]] = Field(
+    metadata: dict[str, Any] | None = Field(
         default=None,
         description="额外的元数据信息"
     )
@@ -52,9 +53,9 @@ class IntentResult(BaseModel):
 class IntentRequest(BaseModel):
     """意图识别请求"""
     text: str = Field(..., min_length=1, description="待识别的文本")
-    user_id: Optional[str] = Field(default=None, description="用户ID")
-    session_id: Optional[str] = Field(default=None, description="会话ID")
-    context: Optional[Dict[str, Any]] = Field(
+    user_id: str | None = Field(default=None, description="用户ID")
+    session_id: str | None = Field(default=None, description="会话ID")
+    context: dict[str, Any] | None = Field(
         default=None,
         description="上下文信息"
     )

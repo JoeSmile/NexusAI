@@ -5,12 +5,13 @@
 集成上下文腐烂（Context Rot）解决方案
 """
 
-from typing import Dict, List, Optional, Any
+from typing import Any
+
 from backend.context_assembler import ContextAssembler, UserProfile
-from backend.services.memory_service import MemoryService
-from backend.services.context_rot_solver import ContextRotSolver, ContextRotThreshold
-from backend.services.context_retrieval_optimizer import ContextRetrievalOptimizer
 from backend.database import DatabaseManager
+from backend.services.context_retrieval_optimizer import ContextRetrievalOptimizer
+from backend.services.context_rot_solver import ContextRotSolver, ContextRotThreshold
+from backend.services.memory_service import MemoryService
 
 
 class ContextService:
@@ -18,7 +19,7 @@ class ContextService:
     
     def __init__(
         self,
-        memory_service: Optional[MemoryService] = None,
+        memory_service: MemoryService | None = None,
         enable_rot_solver: bool = True,
         rot_threshold: int = ContextRotThreshold.SAFE.value
     ):
@@ -47,10 +48,10 @@ class ContextService:
         user_id: str,
         session_id: str,
         current_message: str,
-        emotion: Optional[str] = None,
-        emotion_intensity: Optional[float] = None,
+        emotion: str | None = None,
+        emotion_intensity: float | None = None,
         auto_reduce: bool = True
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         构建完整的对话上下文
         
@@ -86,9 +87,9 @@ class ContextService:
     
     def _apply_context_optimization(
         self,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         session_id: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         应用上下文优化（压缩/摘要）
         
@@ -128,7 +129,7 @@ class ContextService:
     
     async def build_prompt(
         self,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         system_prompt: str
     ) -> str:
         """
@@ -143,7 +144,7 @@ class ContextService:
         """
         return self.assembler.build_prompt_context(context, system_prompt)
     
-    async def _get_chat_history(self, session_id: str, limit: int = 10) -> List[Dict[str, str]]:
+    async def _get_chat_history(self, session_id: str, limit: int = 10) -> list[dict[str, str]]:
         """获取对话历史"""
         try:
             with DatabaseManager() as db:
@@ -177,7 +178,7 @@ class ContextService:
     async def update_user_profile(
         self,
         user_id: str,
-        updates: Dict[str, Any]
+        updates: dict[str, Any]
     ) -> UserProfile:
         """
         更新用户画像
@@ -191,7 +192,7 @@ class ContextService:
         """
         return self.assembler.update_user_profile(user_id, updates)
     
-    async def get_context_summary(self, context: Dict[str, Any]) -> str:
+    async def get_context_summary(self, context: dict[str, Any]) -> str:
         """
         获取上下文摘要
         
@@ -203,7 +204,7 @@ class ContextService:
         """
         return self.assembler.generate_context_summary(context)
     
-    def get_context_status(self, context: Dict[str, Any]) -> Dict[str, Any]:
+    def get_context_status(self, context: dict[str, Any]) -> dict[str, Any]:
         """
         获取上下文状态报告（包括token计数和腐烂风险）
         
@@ -220,9 +221,9 @@ class ContextService:
     
     async def offload_context(
         self,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         session_id: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         将上下文卸载到文件系统
         
@@ -239,7 +240,7 @@ class ContextService:
         offloaded, file_path = self.rot_solver.offload_to_file(context, session_id)
         return offloaded
     
-    async def load_offloaded_context(self, file_path: str) -> Dict[str, Any]:
+    async def load_offloaded_context(self, file_path: str) -> dict[str, Any]:
         """
         从文件系统加载已卸载的上下文
         
@@ -257,9 +258,9 @@ class ContextService:
     async def retrieve_relevant_context(
         self,
         query: str,
-        context_type: Optional[str] = None,
+        context_type: str | None = None,
         max_results: int = 5
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         检索相关上下文（使用优化的检索策略）
         

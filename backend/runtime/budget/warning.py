@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Budget Warning Strip — 在 turn 开始时移除过期预算警告
 """
@@ -6,12 +5,11 @@ Budget Warning Strip — 在 turn 开始时移除过期预算警告
 from __future__ import annotations
 
 import logging
-from typing import List
 
 logger = logging.getLogger(__name__)
 
 
-def strip_budget_warnings(messages: List[dict]) -> List[dict]:
+def strip_budget_warnings(messages: list[dict]) -> list[dict]:
     """
     移除消息中的预算警告标记
 

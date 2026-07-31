@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 "ContextGate"LLM Gateway机器人 - 完整Prompt配置
 包含角色设定、核心目标、行为准则、安全机制和示例

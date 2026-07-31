@@ -6,7 +6,7 @@ Chroma 已移除；向量检索改用 pgvector。
 """
 
 try:
-    from langchain_community.document_loaders import PyPDFLoader, DirectoryLoader, TextLoader
+    from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader, TextLoader
 except ImportError:  # pragma: no cover
     PyPDFLoader = DirectoryLoader = TextLoader = None
 
@@ -27,7 +27,6 @@ try:
     from langchain_core.documents import Document
 except ImportError:  # pragma: no cover
     from dataclasses import dataclass, field
-    from typing import Any
 
     @dataclass
     class Document:
@@ -44,13 +43,13 @@ IS_NEW_VERSION = True
 Chroma = None
 
 __all__ = [
-    "PyPDFLoader",
-    "DirectoryLoader",
-    "TextLoader",
-    "Chroma",
-    "OpenAIEmbeddings",
-    "RecursiveCharacterTextSplitter",
-    "Document",
     "IS_NEW_VERSION",
     "LANGCHAIN_VERSION",
+    "Chroma",
+    "DirectoryLoader",
+    "Document",
+    "OpenAIEmbeddings",
+    "PyPDFLoader",
+    "RecursiveCharacterTextSplitter",
+    "TextLoader",
 ]

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 TaskPacket — 结构化任务定义
 
@@ -18,13 +17,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class TaskPriority(str, Enum):
+class TaskPriority(StrEnum):
     """任务优先级"""
 
     LOW = "low"
@@ -33,7 +32,7 @@ class TaskPriority(str, Enum):
     CRITICAL = "critical"
 
 
-class TaskStatus(str, Enum):
+class TaskStatus(StrEnum):
     """任务状态"""
 
     PENDING = "pending"
@@ -79,24 +78,24 @@ class TaskPacket:
     task_id: str = ""
     objective: str = ""
     description: str = ""
-    skills: List[str] = field(default_factory=list)  # 需要的 Skill 列表
+    skills: list[str] = field(default_factory=list)  # 需要的 Skill 列表
     priority: TaskPriority = TaskPriority.MEDIUM
     status: TaskStatus = TaskStatus.PENDING
     # 上下文
     user_input: str = ""
     user_id: str = ""
     session_id: str = ""
-    emotion_context: Dict[str, Any] = field(default_factory=dict)
+    emotion_context: dict[str, Any] = field(default_factory=dict)
     # 约束
     max_iterations: int = 10
     timeout_seconds: float = 300.0
     # 策略
     escalation: EscalationPolicy = field(default_factory=EscalationPolicy)
-    acceptance_tests: List[AcceptanceTest] = field(default_factory=list)
+    acceptance_tests: list[AcceptanceTest] = field(default_factory=list)
     # 元数据
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             "task_id": self.task_id,

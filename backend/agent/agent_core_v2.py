@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Agent Core — Runtime + Skills 适配层
 
@@ -21,7 +20,7 @@ import asyncio
 import logging
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -185,7 +184,7 @@ class AgentCore:
         # Serialize turns while its Runtime/Skill dependencies are rebound to a
         # user scope, preventing concurrent requests from crossing scopes.
         self._process_lock = asyncio.Lock()
-        self._execution_history: List[Dict[str, Any]] = []
+        self._execution_history: list[dict[str, Any]] = []
 
         # MCP 兼容字段
         self.use_mcp = False  # Runtime 模式不需要 MCP
@@ -222,15 +221,15 @@ class AgentCore:
 
         # 旧系统组件
         try:
-            from backend.emotion_analyzer import EmotionAnalyzer
             from backend.context_assembler import ContextAssembler
+            from backend.emotion_analyzer import EmotionAnalyzer
             self.emotion_analyzer = EmotionAnalyzer()
             self.context_assembler = ContextAssembler()
         except ImportError:
             self.emotion_analyzer = None
             self.context_assembler = None
 
-    def _build_runtime(self, user_id: str, session_id: Optional[str] = None):
+    def _build_runtime(self, user_id: str, session_id: str | None = None):
         """
         构建 ConversationRuntime 实例
 
@@ -268,8 +267,8 @@ class AgentCore:
         self,
         user_input: str,
         user_id: str,
-        conversation_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        conversation_id: str | None = None,
+    ) -> dict[str, Any]:
         """
         处理用户输入 — Runtime 版
 
@@ -301,10 +300,10 @@ class AgentCore:
         self,
         user_input: str,
         user_id: str,
-        conversation_id: Optional[str],
+        conversation_id: str | None,
         interaction_id: str,
         start_time: datetime,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """使用 ConversationRuntime 处理"""
         try:
             runtime_key = (user_id, conversation_id or "")
@@ -403,10 +402,10 @@ class AgentCore:
         self,
         user_input: str,
         user_id: str,
-        conversation_id: Optional[str],
+        conversation_id: str | None,
         interaction_id: str,
         start_time: datetime,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         旧模式处理 — 7 阶段线性 Workflow（向后兼容回退）
 
@@ -525,7 +524,7 @@ class AgentCore:
         self,
         user_input: str,
         user_id: str,
-        conversation_id: Optional[str] = None,
+        conversation_id: str | None = None,
     ):
         """
         MCP 协议处理（兼容旧接口）
@@ -536,7 +535,7 @@ class AgentCore:
 
         # 尝试返回 MCP 消息格式
         try:
-            from backend.modules.agent.protocol.mcp import MCPMessage, MCPContext, MCPMessageType
+            from backend.modules.agent.protocol.mcp import MCPContext, MCPMessage, MCPMessageType
             return MCPMessage(
                 message_type=MCPMessageType.AGENT_RESPONSE,
                 content=result.get("response", ""),
@@ -549,7 +548,7 @@ class AgentCore:
 
     # ── 旧版辅助方法（向后兼容）────────────────────────────────
 
-    async def _perceive(self, user_input: str, user_id: str) -> Dict[str, Any]:
+    async def _perceive(self, user_input: str, user_id: str) -> dict[str, Any]:
         """感知层 — 情绪分析 + 意图识别"""
         perception = {}
         if self.emotion_analyzer:
@@ -568,7 +567,7 @@ class AgentCore:
         perception["entities"] = self._extract_entities(user_input)
         return perception
 
-    async def _execute_plan(self, execution_plan, context: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_plan(self, execution_plan, context: dict[str, Any]) -> dict[str, Any]:
         """执行计划"""
         results = {"response": "", "actions": [], "tool_outputs": []}
         tool_outputs = []
@@ -599,7 +598,7 @@ class AgentCore:
         results["tool_outputs"] = tool_outputs
         return results
 
-    async def _generate_response(self, user_input: str, context: Dict, tool_outputs: list) -> str:
+    async def _generate_response(self, user_input: str, context: dict, tool_outputs: list) -> str:
         """生成回复"""
         if self.llm:
             return await self._call_llm("", user_input)
@@ -609,7 +608,7 @@ class AgentCore:
         """调用 LLM"""
         return "我理解你的感受。让我们一起面对这个问题。"
 
-    def _template_response(self, perception: Dict, tool_outputs: list) -> str:
+    def _template_response(self, perception: dict, tool_outputs: list) -> str:
         """模板回复"""
         emotion = perception.get("emotion", "")
         templates = {
@@ -644,7 +643,7 @@ class AgentCore:
             return "behavior_change"
         return "emotional_support"
 
-    def _extract_entities(self, text: str) -> List[str]:
+    def _extract_entities(self, text: str) -> list[str]:
         """实体提取"""
         entities = []
         for kw in ["今天", "昨天", "明天"]:
@@ -659,16 +658,16 @@ class AgentCore:
 
     def get_execution_history(
         self,
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
         limit: int = 10,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """获取执行历史"""
         history = self._execution_history
         if user_id:
             history = [h for h in history if h.get("user_id") == user_id]
         return history[-limit:]
 
-    def get_agent_status(self) -> Dict[str, Any]:
+    def get_agent_status(self) -> dict[str, Any]:
         """获取 Agent 状态"""
         status = {
             "status": "running",

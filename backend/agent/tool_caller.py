@@ -10,20 +10,24 @@ Tool Caller - 工具调用模块
 支持MCP协议：接收MCP工具请求，返回标准化的MCP工具响应
 """
 
-import json
-from typing import List, Dict, Any, Optional, Callable
-from datetime import datetime
 import inspect
+import json
+import os
 
 # 导入MCP协议
 import sys
-import os
+from collections.abc import Callable
+from datetime import datetime
+from typing import Any
+
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 sys.path.insert(0, project_root)
 
 from backend.modules.agent.protocol.mcp import (
-    MCPMessage, MCPProtocol, MCPToolCall, MCPToolResponse, MCPContext,
-    MCPMessageType, get_mcp_logger
+    MCPMessage,
+    MCPProtocol,
+    MCPToolResponse,
+    get_mcp_logger,
 )
 
 
@@ -35,7 +39,7 @@ class Tool:
         name: str,
         description: str,
         function: Callable,
-        parameters: Dict[str, Any],
+        parameters: dict[str, Any],
         category: str = "general"
     ):
         self.name = name
@@ -45,7 +49,7 @@ class Tool:
         self.category = category
         self.created_at = datetime.now()
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             "name": self.name,
@@ -59,31 +63,31 @@ class ToolRegistry:
     """工具注册表"""
     
     def __init__(self):
-        self.tools: Dict[str, Tool] = {}
+        self.tools: dict[str, Tool] = {}
     
     def register(
         self,
         name: str,
         description: str,
         function: Callable,
-        parameters: Dict[str, Any],
+        parameters: dict[str, Any],
         category: str = "general"
     ):
         """注册工具"""
         tool = Tool(name, description, function, parameters, category)
         self.tools[name] = tool
     
-    def get_tool(self, name: str) -> Optional[Tool]:
+    def get_tool(self, name: str) -> Tool | None:
         """获取工具"""
         return self.tools.get(name)
     
-    def list_tools(self, category: Optional[str] = None) -> List[Tool]:
+    def list_tools(self, category: str | None = None) -> list[Tool]:
         """列出所有工具"""
         if category:
             return [t for t in self.tools.values() if t.category == category]
         return list(self.tools.values())
     
-    def get_available_tools(self) -> List[str]:
+    def get_available_tools(self) -> list[str]:
         """获取可用工具名称列表"""
         return list(self.tools.keys())
 
@@ -96,7 +100,7 @@ class ToolCaller:
         self._register_builtin_tools()
         
         # 调用历史
-        self.call_history: List[Dict[str, Any]] = []
+        self.call_history: list[dict[str, Any]] = []
         
         # MCP协议支持
         self.mcp_protocol = MCPProtocol()
@@ -311,13 +315,13 @@ class ToolCaller:
                 category="hermes",
             )
         except Exception as e:
-            print("提示: Hermes 工具注册跳过: {}".format(e))
+            print(f"提示: Hermes 工具注册跳过: {e}")
     
     async def call(
         self, 
         tool_name: str, 
-        parameters: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        parameters: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         调用工具
         
@@ -441,7 +445,7 @@ class ToolCaller:
         
         return output_message
     
-    def _validate_parameters(self, tool: Tool, parameters: Dict[str, Any]):
+    def _validate_parameters(self, tool: Tool, parameters: dict[str, Any]):
         """
         验证工具参数
         
@@ -479,8 +483,8 @@ class ToolCaller:
     def get_call_history(
         self, 
         limit: int = 10, 
-        tool_name: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+        tool_name: str | None = None
+    ) -> list[dict[str, Any]]:
         """
         获取调用历史
         
@@ -505,8 +509,8 @@ class ToolCaller:
         query: str,
         user_id: str,
         time_range: int = 30,
-        emotion_filter: Optional[str] = None
-    ) -> Dict[str, Any]:
+        emotion_filter: str | None = None
+    ) -> dict[str, Any]:
         """搜索记忆工具实现"""
         try:
             from .memory_hub import get_memory_hub
@@ -548,8 +552,8 @@ class ToolCaller:
         self,
         user_id: str,
         days: int = 7,
-        emotion_type: Optional[str] = None
-    ) -> Dict[str, Any]:
+        emotion_type: str | None = None
+    ) -> dict[str, Any]:
         """获取情绪日志工具实现"""
         try:
             from .memory_hub import get_memory_hub
@@ -594,7 +598,7 @@ class ToolCaller:
         user_id: str,
         schedule_time: str,
         repeat: bool = False
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """设置提醒工具实现"""
         try:
             # 这里应该集成实际的定时任务系统（APScheduler等）
@@ -620,8 +624,8 @@ class ToolCaller:
         self,
         theme: str = "relaxation",
         duration: int = 10,
-        user_id: Optional[str] = None
-    ) -> Dict[str, Any]:
+        user_id: str | None = None
+    ) -> dict[str, Any]:
         """推荐冥想音频工具实现"""
         # 冥想资源数据库（实际应该从数据库或API获取）
         meditation_db = {
@@ -688,8 +692,8 @@ class ToolCaller:
         self,
         theme: str,
         resource_type: str = "article",
-        user_id: Optional[str] = None
-    ) -> Dict[str, Any]:
+        user_id: str | None = None
+    ) -> dict[str, Any]:
         """推荐心理健康资源"""
         # 资源数据库（简化实现）
         resources = {
@@ -724,7 +728,7 @@ class ToolCaller:
         assessment_type: str,
         user_id: str,
         urgency: str = "medium"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """心理健康评估工具"""
         # 这里应该返回评估问卷或触发评估流程
         assessments = {
@@ -766,9 +770,9 @@ class ToolCaller:
     async def _check_calendar(
         self,
         user_id: str,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None
-    ) -> Dict[str, Any]:
+        start_date: str | None = None,
+        end_date: str | None = None
+    ) -> dict[str, Any]:
         """查看日历事件"""
         # 简化实现：返回模拟数据
         # 实际应该对接用户日历API

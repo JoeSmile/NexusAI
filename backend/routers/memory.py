@@ -3,12 +3,13 @@
 记忆系统相关路由
 """
 
+
 from fastapi import APIRouter, HTTPException
-from typing import Optional
 from pydantic import BaseModel, Field
-from backend.services.memory_service import MemoryService
-from backend.services.context_service import ContextService
+
 from backend.logging_config import get_logger
+from backend.services.context_service import ContextService
+from backend.services.memory_service import MemoryService
 
 router = APIRouter(prefix="/memory", tags=["memory"])
 logger = get_logger(__name__)
@@ -25,7 +26,7 @@ class MemoryImportanceUpdate(BaseModel):
 @router.get("/users/{user_id}/memories")
 async def get_user_memories(
     user_id: str,
-    memory_type: Optional[str] = None,
+    memory_type: str | None = None,
     limit: int = 50
 ):
     """

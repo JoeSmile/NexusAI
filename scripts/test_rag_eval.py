@@ -1,6 +1,6 @@
-import requests
-import json
 import time
+
+import requests
 
 # 测试集定义 (扩充到 20 个不同难度的用例)
 TEST_CASES = [
@@ -69,8 +69,8 @@ def run_evaluation():
             else:
                 print(f"❌ 请求失败: {response.status_code} - {response.text}")
                 
-        except requests.exceptions.RequestException as e:
-            print(f"❌ 连接后端失败: 请确保先开启 python run_backend.py 这项服务！")
+        except requests.exceptions.RequestException:
+            print("❌ 连接后端失败: 请确保先开启 python run_backend.py 这项服务！")
             return
 
     # 打印总结

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Protocol 1: LLM Client — LLM 调用抽象
 
@@ -13,8 +12,9 @@ Adapted for emotional chat:
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
-from typing import AsyncIterator, Literal, Protocol
+from typing import Literal, Protocol
 
 
 @dataclass

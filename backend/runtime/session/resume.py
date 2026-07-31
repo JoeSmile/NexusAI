@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Session resume — 从检查点恢复会话
 """
@@ -8,7 +7,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +22,10 @@ class SessionResumer:
         state = resumer.load(session_id="session_123")
     """
 
-    def __init__(self, checkpoint_dir: Optional[Path] = None):
+    def __init__(self, checkpoint_dir: Path | None = None):
         self._checkpoint_dir = checkpoint_dir or Path("data/checkpoints")
 
-    def save(self, session_id: str, state: Dict[str, Any]) -> None:
+    def save(self, session_id: str, state: dict[str, Any]) -> None:
         """保存会话状态到检查点"""
         try:
             self._checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -37,12 +36,12 @@ class SessionResumer:
         except Exception as e:
             logger.warning("Failed to save checkpoint for %s: %s", session_id, e)
 
-    def load(self, session_id: str) -> Optional[Dict[str, Any]]:
+    def load(self, session_id: str) -> dict[str, Any] | None:
         """从检查点加载会话状态"""
         try:
             path = self._checkpoint_dir / f"{session_id}.json"
             if path.exists():
-                with open(path, "r", encoding="utf-8") as f:
+                with open(path, encoding="utf-8") as f:
                     return json.load(f)
         except Exception as e:
             logger.warning("Failed to load checkpoint for %s: %s", session_id, e)

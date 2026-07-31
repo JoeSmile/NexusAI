@@ -7,11 +7,11 @@
 整合用户画像、长期记忆、对话历史，生成完整的上下文
 """
 
-from typing import Dict, List, Optional, Any
-from datetime import datetime
 import json
+from datetime import datetime
+from typing import Any
+
 from backend.memory_manager import MemoryManager
-from backend.database import DatabaseManager
 
 
 class UserProfile:
@@ -30,7 +30,7 @@ class UserProfile:
         self.created_at = datetime.now()
         self.updated_at = datetime.now()
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             "user_id": self.user_id,
@@ -68,7 +68,7 @@ class UserProfile:
         return "；".join(summary_parts) if summary_parts else "暂无用户画像信息"
     
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'UserProfile':
+    def from_dict(cls, data: dict[str, Any]) -> 'UserProfile':
         """从字典创建"""
         profile = cls(data.get("user_id", "unknown"))
         profile.name = data.get("name")
@@ -101,9 +101,9 @@ class ContextAssembler:
     
     def assemble_context(self, user_id: str, session_id: str, 
                         current_message: str,
-                        chat_history: Optional[List[Dict[str, str]]] = None,
-                        emotion: Optional[str] = None,
-                        emotion_intensity: Optional[float] = None) -> Dict[str, Any]:
+                        chat_history: list[dict[str, str]] | None = None,
+                        emotion: str | None = None,
+                        emotion_intensity: float | None = None) -> dict[str, Any]:
         """
         组装完整上下文
         
@@ -161,7 +161,7 @@ class ContextAssembler:
         
         return context
     
-    def build_prompt_context(self, context: Dict[str, Any], 
+    def build_prompt_context(self, context: dict[str, Any], 
                            system_prompt: str) -> str:
         """
         根据上下文构建完整的prompt
@@ -227,8 +227,8 @@ class ContextAssembler:
         return full_prompt
     
     def _retrieve_relevant_memories(self, user_id: str, query: str, 
-                                   emotion: Optional[str] = None,
-                                   intensity: Optional[float] = None) -> List[Dict[str, Any]]:
+                                   emotion: str | None = None,
+                                   intensity: float | None = None) -> list[dict[str, Any]]:
         """检索相关记忆"""
         # 优先检索高情绪强度的事件
         if intensity and intensity >= 7.0:
@@ -250,8 +250,8 @@ class ContextAssembler:
                 min_importance=0.5
             )
     
-    def _process_chat_history(self, history: List[Dict[str, str]], 
-                             max_turns: int = 5) -> List[Dict[str, str]]:
+    def _process_chat_history(self, history: list[dict[str, str]], 
+                             max_turns: int = 5) -> list[dict[str, str]]:
         """处理对话历史，只保留最近的几轮"""
         # 按时间倒序排列，取最新的
         recent = history[-max_turns*2:] if len(history) > max_turns*2 else history
@@ -314,7 +314,7 @@ class ContextAssembler:
         
         return profile
     
-    def update_user_profile(self, user_id: str, updates: Dict[str, Any]) -> UserProfile:
+    def update_user_profile(self, user_id: str, updates: dict[str, Any]) -> UserProfile:
         """
         更新用户画像
         
@@ -360,7 +360,7 @@ class ContextAssembler:
         except Exception as e:
             print(f"保存用户画像失败: {e}")
     
-    def generate_context_summary(self, context: Dict[str, Any]) -> str:
+    def generate_context_summary(self, context: dict[str, Any]) -> str:
         """
         生成上下文摘要（用于日志和调试）
         

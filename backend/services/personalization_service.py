@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 个性化服务
 处理用户个性化配置的获取和应用
@@ -7,7 +6,8 @@
 
 import json
 import logging
-from typing import Dict, Optional, Any
+from typing import Any
+
 from sqlalchemy.orm import Session
 
 from backend.database import UserPersonalization
@@ -26,7 +26,7 @@ class PersonalizationService:
         """初始化个性化服务"""
         self._cache = {}  # 简单的内存缓存
     
-    def get_user_config(self, user_id: str, db: Session) -> Dict[str, Any]:
+    def get_user_config(self, user_id: str, db: Session) -> dict[str, Any]:
         """
         获取用户个性化配置
         
@@ -63,7 +63,7 @@ class PersonalizationService:
             logger.error(f"获取用户配置失败: {e}")
             return self._get_default_config(user_id)
     
-    def _db_to_dict(self, config_db: UserPersonalization) -> Dict[str, Any]:
+    def _db_to_dict(self, config_db: UserPersonalization) -> dict[str, Any]:
         """将数据库记录转换为配置字典"""
         return {
             "user_id": config_db.user_id,
@@ -91,7 +91,7 @@ class PersonalizationService:
             "active_role": config_db.active_role
         }
     
-    def _get_default_config(self, user_id: str) -> Dict[str, Any]:
+    def _get_default_config(self, user_id: str) -> dict[str, Any]:
         """获取默认配置"""
         return {
             "user_id": user_id,
@@ -141,7 +141,7 @@ class PersonalizationService:
         self,
         user_id: str,
         context: str,
-        emotion_state: Optional[Dict] = None,
+        emotion_state: dict | None = None,
         db: Session = None
     ) -> str:
         """
@@ -166,7 +166,7 @@ class PersonalizationService:
         
         return composer.compose(context=context, emotion_state=emotion_state)
     
-    def clear_cache(self, user_id: Optional[str] = None):
+    def clear_cache(self, user_id: str | None = None):
         """
         清除缓存
         
@@ -178,7 +178,7 @@ class PersonalizationService:
         else:
             self._cache.clear()
     
-    def update_config_in_cache(self, user_id: str, config: Dict[str, Any]):
+    def update_config_in_cache(self, user_id: str, config: dict[str, Any]):
         """
         更新缓存中的配置
         

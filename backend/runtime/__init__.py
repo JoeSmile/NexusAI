@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Runtime — Emotional Chat Agent Runtime
 
@@ -12,6 +11,16 @@ Runtime — Emotional Chat Agent Runtime
 - Workspace-isolated: 用户/会话工作区隔离
 """
 
+from backend.runtime.activity.distiller import ActivityDistiller, TurnDigest
+from backend.runtime.activity.tracker import ActivityTracker
+from backend.runtime.budget.pressure import BudgetPressure
+from backend.runtime.config.guards import is_module_enabled, require_module
+from backend.runtime.config.toggles import ModuleToggles
+from backend.runtime.conversation import ConversationRuntime
+from backend.runtime.fallback.manager import FallbackConfig, FallbackManager
+from backend.runtime.hooks.base import HookContext, HookDispatcher, PluginHook
+from backend.runtime.policy.policy_engine import PolicyEngine, PolicyRule
+from backend.runtime.prompt_builder import PromptLayer, SystemPromptBuilder
 from backend.runtime.protocols import (
     AssistantEvent,
     LLMClient,
@@ -22,24 +31,14 @@ from backend.runtime.protocols import (
     ToolResult,
     TurnSummary,
 )
-from backend.runtime.session.fsm import SessionFSM, SessionState, IllegalTransitionError
-from backend.runtime.config.toggles import ModuleToggles
-from backend.runtime.config.guards import is_module_enabled, require_module
-from backend.runtime.skills.base import Skill, SkillContext, SkillResult, SkillRegistry
+from backend.runtime.session.fsm import IllegalTransitionError, SessionFSM, SessionState
+from backend.runtime.skills.base import Skill, SkillContext, SkillRegistry, SkillResult
 from backend.runtime.skills.memory_skill import MemorySkill
 from backend.runtime.skills.planning_skill import PlanningSkill
 from backend.runtime.skills.reflect_skill import ReflectSkill
 from backend.runtime.skills.tool_skill import ToolSkill
-from backend.runtime.policy.policy_engine import PolicyEngine, PolicyRule
-from backend.runtime.hooks.base import PluginHook, HookDispatcher, HookContext
-from backend.runtime.conversation import ConversationRuntime
-from backend.runtime.budget.pressure import BudgetPressure
-from backend.runtime.fallback.manager import FallbackManager, FallbackConfig
-from backend.runtime.workspace.manager import WorkspaceManager, WorkspaceInfo
-from backend.runtime.activity.tracker import ActivityTracker
-from backend.runtime.activity.distiller import ActivityDistiller, TurnDigest
-from backend.runtime.prompt_builder import SystemPromptBuilder, PromptLayer
 from backend.runtime.task_packet import TaskPacket, TaskPriority, TaskStatus
+from backend.runtime.workspace.manager import WorkspaceInfo, WorkspaceManager
 
 __all__ = [
     # Protocols

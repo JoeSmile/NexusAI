@@ -119,7 +119,7 @@ async def _run_chat_pipeline(
     except Exception as e:
         latency = (time.time() - start) * 1000
         return ChatResponse(
-            response=f"系统错误: {str(e)}",
+            response=f"系统错误: {e!s}",
             trace_id=initial["trace_id"],
             finish_reason="error",
             total_tokens=0,

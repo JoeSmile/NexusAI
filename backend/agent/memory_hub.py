@@ -26,20 +26,16 @@ import logging
 import threading
 import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
-from backend.agent.memory_store import (
-    InMemoryStore,
-    MemoryEntry,
-    Scope,
-    MAX_ENTRIES_PER_STORE,
-)
 from backend.agent.activity_distiller import (
+    PREFS_EMOTION_PATH,
+    PREFS_TOPICS_PATH,
     TurnDigest,
     distill_turn,
-    PREFS_TOPICS_PATH,
-    PREFS_EMOTION_PATH,
-    PATTERNS_EMOTION_RESPONSE_PATH,
+)
+from backend.agent.memory_store import (
+    InMemoryStore,
 )
 
 # 惰性导入：MemoryManager / Database 允许在缺依赖时降级
@@ -49,7 +45,7 @@ except ImportError:
     MemoryManager = None  # type: ignore
 
 try:
-    from backend.database import get_db, User, ChatSession, ChatMessage
+    from backend.database import ChatMessage, ChatSession, User, get_db
 except ImportError:
     get_db = None  # type: ignore
     User = None  # type: ignore
@@ -108,8 +104,8 @@ class MemoryHub:
         user_id: str = "",
         session_id: str = "",
         agent_type: str = "xinyu",
-        memory_manager: Optional[MemoryManager] = None,
-        toggles: Optional[ModuleToggles] = None,
+        memory_manager: MemoryManager | None = None,
+        toggles: ModuleToggles | None = None,
     ):
         self._user_id = user_id
         self._session_id = session_id
@@ -118,13 +114,13 @@ class MemoryHub:
         self._toggles = toggles or ModuleToggles()
 
         # 六层 Store 实例（惰性初始化）
-        self._stores: Dict[str, InMemoryStore] = {}
+        self._stores: dict[str, InMemoryStore] = {}
 
         # L6 当轮上下文（虚拟层，不持久化）
-        self._turn_context: Dict[str, Any] = {}
+        self._turn_context: dict[str, Any] = {}
 
         # L2 活动日志缓冲（本轮累积，蒸馏后清空）
-        self._activity_log: List[Dict[str, Any]] = []
+        self._activity_log: list[dict[str, Any]] = []
 
         self._persistent_loaded = False
 
@@ -147,7 +143,7 @@ class MemoryHub:
 
         # L2 工作区级 — 活动日志，不暴露
         self._stores["workspace"] = InMemoryStore(
-            store_id=f"ws_default",
+            store_id="ws_default",
             scope="workspace",
             target_id="default",
             description="工作区级活动日志",
@@ -193,33 +189,33 @@ class MemoryHub:
 
     # ── 六层 Store 访问 ──────────────────────────────────────────────────
 
-    def get_store(self, scope: str) -> Optional[InMemoryStore]:
+    def get_store(self, scope: str) -> InMemoryStore | None:
         """获取指定作用域的 Store"""
         return self._stores.get(scope)
 
     @property
-    def user_store(self) -> Optional[InMemoryStore]:
+    def user_store(self) -> InMemoryStore | None:
         """L3 用户级 Store"""
         return self._stores.get("user")
 
     @property
-    def agent_store(self) -> Optional[InMemoryStore]:
+    def agent_store(self) -> InMemoryStore | None:
         """L4 Agent 实例级 Store"""
         return self._stores.get("agent_instance")
 
     @property
-    def session_store(self) -> Optional[InMemoryStore]:
+    def session_store(self) -> InMemoryStore | None:
         """L5 会话级 Store"""
         return self._stores.get("session")
 
     @property
-    def organization_store(self) -> Optional[InMemoryStore]:
+    def organization_store(self) -> InMemoryStore | None:
         """L1 组织级 Store（只读）"""
         return self._stores.get("organization")
 
     # ── 记忆工具接口（LLM 可见，6 个 memory_* 工具） ─────────────────────
 
-    def get_tool_schemas(self) -> List[dict]:
+    def get_tool_schemas(self) -> list[dict]:
         """返回 6 个 memory_* 工具的 schema（用于 LLM function calling）"""
         if not self._toggles.is_enabled("memory_tool_exposure"):
             return []
@@ -311,7 +307,7 @@ class MemoryHub:
             ])
         return schemas
 
-    async def call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    async def call_tool(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         """执行 memory_* 工具调用"""
         scope = arguments.get("scope", "")
 
@@ -382,9 +378,9 @@ class MemoryHub:
 
     async def update_session_context(
         self,
-        current_task: Optional[str] = None,
-        user_state: Optional[Dict[str, Any]] = None,
-        session_summary: Optional[str] = None,
+        current_task: str | None = None,
+        user_state: dict[str, Any] | None = None,
+        session_summary: str | None = None,
     ) -> None:
         """更新 L5 会话级工作记忆"""
         store = self.session_store
@@ -399,7 +395,7 @@ class MemoryHub:
         if session_summary is not None:
             await store.write(self.PATH_SESSION_SUMMARY, session_summary)
 
-    async def get_session_context(self) -> Dict[str, Any]:
+    async def get_session_context(self) -> dict[str, Any]:
         """读取 L5 会话上下文"""
         store = self.session_store
         if store is None:
@@ -427,7 +423,7 @@ class MemoryHub:
         """更新 L6 当轮上下文（虚拟层，不持久化）"""
         self._turn_context.update(kwargs)
 
-    def get_turn_context(self) -> Dict[str, Any]:
+    def get_turn_context(self) -> dict[str, Any]:
         """获取 L6 当轮上下文"""
         return self._turn_context.copy()
 
@@ -442,7 +438,7 @@ class MemoryHub:
         query: str,
         top_k: int = 5,
         min_importance: float = 0.3,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """向量语义检索（使用已有的 MemoryManager 向量能力）"""
         if not self._memory_manager or not self._toggles.vector_search:
             return []
@@ -466,9 +462,9 @@ class MemoryHub:
         emotion: str = "neutral",
         emotion_intensity: float = 5.0,
         bot_empathy_score: float = 0.0,
-        tool_calls: Optional[List[Dict[str, Any]]] = None,
+        tool_calls: list[dict[str, Any]] | None = None,
         final_status: str = "success",
-    ) -> Dict[str, bool]:
+    ) -> dict[str, bool]:
         """每轮对话结束后调用：触发蒸馏管道。
 
         Args:
@@ -532,7 +528,7 @@ class MemoryHub:
         if not self._toggles.is_enabled("memory_prompt_injection"):
             return ""
 
-        parts: List[str] = ["## 记忆上下文"]
+        parts: list[str] = ["## 记忆上下文"]
 
         # L3 用户偏好
         user_store = self.user_store
@@ -559,13 +555,13 @@ class MemoryHub:
 
     # ── 用户画像（兼容旧接口） ──────────────────────────────────────────
 
-    async def get_user_profile(self, user_id: Optional[str] = None) -> Dict[str, Any]:
+    async def get_user_profile(self, user_id: str | None = None) -> dict[str, Any]:
         """获取用户画像，综合 L3 记忆 + 数据库数据"""
         uid = user_id or self._user_id
         if not uid:
             return {}
 
-        profile: Dict[str, Any] = {"user_id": uid}
+        profile: dict[str, Any] = {"user_id": uid}
 
         # 从 L3 Store 读取偏好
         user_store = self.user_store
@@ -605,10 +601,10 @@ class MemoryHub:
 
     async def get_action_log(
         self,
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
         days: int = 7,
         limit: int = 10,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """获取用户行为日志"""
         uid = user_id or self._user_id
         if not uid:
@@ -643,7 +639,7 @@ class MemoryHub:
 
     # ── 兼容旧接口 ────────────────────────────────────────────────────
 
-    def encode(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def encode(self, data: dict[str, Any]) -> dict[str, Any]:
         """兼容旧接口：编码记忆。
 
         旧代码调用 memory_hub.encode({...})，现在映射到语义检索 + L3 写入。
@@ -654,7 +650,7 @@ class MemoryHub:
         role = data.get("role", "user")
 
         # 简化处理：直接返回结构化记忆
-        emotion_label = emotion.get("emotion", "neutral") if isinstance(emotion, dict) else str(emotion)
+        emotion.get("emotion", "neutral") if isinstance(emotion, dict) else str(emotion)
         intensity = emotion.get("intensity", 5.0) if isinstance(emotion, dict) else 5.0
 
         importance = min(1.0, intensity / 10.0)
@@ -671,10 +667,10 @@ class MemoryHub:
     def retrieve(
         self,
         query: str,
-        user_id: Optional[str] = None,
-        context: Optional[Dict[str, Any]] = None,
+        user_id: str | None = None,
+        context: dict[str, Any] | None = None,
         top_k: int = 5,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """兼容旧接口：检索记忆（同步版本，优先使用 semantic_search）"""
         import asyncio
         try:
@@ -687,7 +683,7 @@ class MemoryHub:
                     store = self._stores.get(scope_name)
                     if store:
                         try:
-                            entries = asyncio.ensure_future(store.search(query))
+                            asyncio.ensure_future(store.search(query))
                         except RuntimeError:
                             continue
                 return results[:top_k]
@@ -699,7 +695,7 @@ class MemoryHub:
             for scope_name in ["user", "agent_instance", "session"]:
                 store = self._stores.get(scope_name)
                 if store:
-                    for path, entry in store._entries.items():
+                    for _path, entry in store._entries.items():
                         if entry.content and query.lower() in entry.content.lower():
                             results.append({
                                 "content": entry.content,
@@ -710,9 +706,9 @@ class MemoryHub:
                             })
             return results[:top_k]
 
-    def get_working_memory(self) -> Dict[str, Any]:
+    def get_working_memory(self) -> dict[str, Any]:
         """兼容旧接口：获取工作记忆"""
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "conversation": [],
             "active_tasks": [],
             "current_context": self._turn_context,
@@ -814,7 +810,7 @@ class MemoryHub:
 
 # ── 隔离注册表 ───────────────────────────────────────────────────────────────
 
-_memory_hub_registry: Dict[Tuple[str, str, str], MemoryHub] = {}
+_memory_hub_registry: dict[tuple[str, str, str], MemoryHub] = {}
 _memory_hub_registry_lock = threading.RLock()
 
 
@@ -854,9 +850,9 @@ async def get_memory_hub_async(
 
 
 def reset_memory_hub(
-    user_id: Optional[str] = None,
-    session_id: Optional[str] = None,
-    agent_type: Optional[str] = None,
+    user_id: str | None = None,
+    session_id: str | None = None,
+    agent_type: str | None = None,
 ) -> None:
     """Reset matching hubs, or the complete registry when no filter is given."""
     with _memory_hub_registry_lock:

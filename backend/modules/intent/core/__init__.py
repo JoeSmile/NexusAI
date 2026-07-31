@@ -3,13 +3,13 @@
 Intent Recognition Core Components
 """
 
-from .rule_engine import RuleBasedIntentEngine
-from .intent_classifier import IntentClassifier
 from .input_processor import InputProcessor
+from .intent_classifier import IntentClassifier
+from .rule_engine import RuleBasedIntentEngine
 
 __all__ = [
-    "RuleBasedIntentEngine",
-    "IntentClassifier",
     "InputProcessor",
+    "IntentClassifier",
+    "RuleBasedIntentEngine",
 ]
 

@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 from backend.database import vector_ops
 
@@ -58,7 +58,7 @@ class VectorStore:
             n_results=n_results,
         )
 
-    def add_knowledge(self, text: str, category: str = "general", metadata: Dict = None):
+    def add_knowledge(self, text: str, category: str = "general", metadata: dict = None):
         return vector_ops.add_knowledge(
             text=text,
             category=category,
@@ -89,7 +89,7 @@ class VectorStore:
             n_results=n_results,
         )
 
-    def get_session_history(self, session_id: str, limit: int = 50) -> list[Dict[str, Any]]:
+    def get_session_history(self, session_id: str, limit: int = 50) -> list[dict[str, Any]]:
         from backend.database.pgvector_session import ChatMessage, get_pg_session
 
         sf = get_pg_session()

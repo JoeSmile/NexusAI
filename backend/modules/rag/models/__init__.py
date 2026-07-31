@@ -3,21 +3,21 @@ RAG模块数据模型
 """
 
 from .rag_models import (
-    RAGRequest,
-    RAGResponse,
+    DocumentInfo,
+    DocumentUploadRequest,
     KnowledgeSearchRequest,
     KnowledgeSearchResponse,
-    DocumentUploadRequest,
-    DocumentInfo,
-    KnowledgeSource
+    KnowledgeSource,
+    RAGRequest,
+    RAGResponse,
 )
 
 __all__ = [
-    "RAGRequest",
-    "RAGResponse",
+    "DocumentInfo",
+    "DocumentUploadRequest",
     "KnowledgeSearchRequest",
     "KnowledgeSearchResponse",
-    "DocumentUploadRequest",
-    "DocumentInfo",
-    "KnowledgeSource"
+    "KnowledgeSource",
+    "RAGRequest",
+    "RAGResponse"
 ]

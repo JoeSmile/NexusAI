@@ -8,9 +8,9 @@ Scheduler Service - 定时提醒服务
 - 回访任务管理
 """
 
-from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from enum import Enum
+from typing import Any
 
 
 class ReminderStatus(Enum):
@@ -45,8 +45,8 @@ class SchedulerService:
         content: str,
         schedule_time: datetime,
         reminder_type: ReminderType = ReminderType.ONE_TIME,
-        repeat_interval: Optional[int] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        repeat_interval: int | None = None,
+        metadata: dict[str, Any] | None = None
     ) -> str:
         """
         创建提醒
@@ -89,7 +89,7 @@ class SchedulerService:
         self,
         user_id: str,
         reminder_id: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         获取提醒详情
         
@@ -111,10 +111,10 @@ class SchedulerService:
     def get_reminders(
         self,
         user_id: str,
-        status: Optional[ReminderStatus] = None,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None
-    ) -> List[Dict[str, Any]]:
+        status: ReminderStatus | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None
+    ) -> list[dict[str, Any]]:
         """
         获取用户的提醒列表
         
@@ -154,7 +154,7 @@ class SchedulerService:
         self,
         user_id: str,
         hours: int = 24
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         获取即将到来的提醒
         
@@ -230,7 +230,7 @@ class SchedulerService:
         
         return False
     
-    def _schedule_next_reminder(self, reminder: Dict[str, Any]):
+    def _schedule_next_reminder(self, reminder: dict[str, Any]):
         """安排下一次提醒"""
         reminder_type = reminder["reminder_type"]
         current_time = reminder["schedule_time"]
@@ -255,7 +255,7 @@ class SchedulerService:
             metadata=reminder.get("metadata")
         )
     
-    def check_due_reminders(self) -> List[Dict[str, Any]]:
+    def check_due_reminders(self) -> list[dict[str, Any]]:
         """
         检查到期的提醒
         
@@ -265,7 +265,7 @@ class SchedulerService:
         now = datetime.now()
         due_reminders = []
         
-        for user_id, user_reminders in self.reminders.items():
+        for _user_id, user_reminders in self.reminders.items():
             for reminder in user_reminders:
                 if (reminder["status"] == ReminderStatus.SCHEDULED.value and
                     reminder["schedule_time"] <= now):
@@ -277,7 +277,7 @@ class SchedulerService:
         self,
         user_id: str,
         reminder_id: str,
-        updates: Dict[str, Any]
+        updates: dict[str, Any]
     ) -> bool:
         """
         更新提醒

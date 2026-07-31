@@ -4,12 +4,14 @@
 实现文档中提到的动态用户画像和对话脉络功能
 """
 
-from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
-from collections import Counter
 import json
-from backend.database import DatabaseManager, UserProfileDB, ChatMessage, MemoryItem
-from sqlalchemy import func, and_
+from collections import Counter
+from datetime import datetime, timedelta
+from typing import Any
+
+from sqlalchemy import func
+
+from backend.database import ChatMessage, DatabaseManager, MemoryItem, UserProfileDB
 
 
 class ConversationGraph:
@@ -32,7 +34,7 @@ class ConversationGraph:
         """添加边（关系）"""
         self.edges.append((from_id, to_id, relation_type))
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             "nodes": self.nodes,
@@ -45,9 +47,8 @@ class UserProfileBuilder:
     
     def __init__(self):
         """初始化用户画像构建器"""
-        pass
     
-    async def build_profile(self, user_id: str, force_rebuild: bool = False) -> Dict[str, Any]:
+    async def build_profile(self, user_id: str, force_rebuild: bool = False) -> dict[str, Any]:
         """
         构建或更新用户画像
         
@@ -91,7 +92,7 @@ class UserProfileBuilder:
             traceback.print_exc()
             return self._get_default_profile(user_id)
     
-    async def _analyze_user_data(self, user_id: str, db: DatabaseManager) -> Dict[str, Any]:
+    async def _analyze_user_data(self, user_id: str, db: DatabaseManager) -> dict[str, Any]:
         """
         分析用户数据，提取画像特征
         
@@ -113,7 +114,7 @@ class UserProfileBuilder:
         # 2. 获取用户的所有记忆
         memories = db.db.query(MemoryItem).filter(
             MemoryItem.user_id == user_id,
-            MemoryItem.is_active == True
+            MemoryItem.is_active
         ).all()
         
         # 3. 分析核心关注点
@@ -149,7 +150,7 @@ class UserProfileBuilder:
             "avg_emotion_intensity": avg_emotion_intensity
         }
     
-    def _extract_core_concerns(self, memories: List[MemoryItem]) -> List[str]:
+    def _extract_core_concerns(self, memories: list[MemoryItem]) -> list[str]:
         """
         提取核心关注点
         
@@ -168,7 +169,7 @@ class UserProfileBuilder:
         # 返回前5个
         return concerns[:5]
     
-    def _analyze_emotional_trend(self, messages: List[ChatMessage]) -> str:
+    def _analyze_emotional_trend(self, messages: list[ChatMessage]) -> str:
         """
         分析情绪趋势
         
@@ -221,7 +222,7 @@ class UserProfileBuilder:
         
         return f"{emotion_trend}，{intensity_trend}"
     
-    def _analyze_communication_style(self, messages: List[ChatMessage]) -> str:
+    def _analyze_communication_style(self, messages: list[ChatMessage]) -> str:
         """
         分析沟通风格
         
@@ -267,7 +268,7 @@ class UserProfileBuilder:
         
         return f"{length_style}，{interaction_style}"
     
-    def _extract_important_events(self, memories: List[MemoryItem]) -> List[Dict[str, Any]]:
+    def _extract_important_events(self, memories: list[MemoryItem]) -> list[dict[str, Any]]:
         """
         提取重要事件
         
@@ -291,7 +292,7 @@ class UserProfileBuilder:
         events.sort(key=lambda x: x["importance"], reverse=True)
         return events[:5]
     
-    def _create_profile_db(self, user_id: str, profile_data: Dict[str, Any]) -> UserProfileDB:
+    def _create_profile_db(self, user_id: str, profile_data: dict[str, Any]) -> UserProfileDB:
         """创建数据库记录"""
         return UserProfileDB(
             user_id=user_id,
@@ -305,7 +306,7 @@ class UserProfileBuilder:
             avg_emotion_intensity=profile_data.get("avg_emotion_intensity", 5.0)
         )
     
-    def _update_profile_db(self, profile_db: UserProfileDB, profile_data: Dict[str, Any]):
+    def _update_profile_db(self, profile_db: UserProfileDB, profile_data: dict[str, Any]):
         """更新数据库记录"""
         profile_db.concerns = json.dumps(profile_data.get("core_concerns", []), ensure_ascii=False)
         profile_db.communication_style = profile_data.get("communication_style", "默认")
@@ -315,11 +316,11 @@ class UserProfileBuilder:
         profile_db.avg_emotion_intensity = profile_data.get("avg_emotion_intensity", 5.0)
         profile_db.updated_at = datetime.utcnow()
     
-    def _profile_db_to_dict(self, profile_db: UserProfileDB) -> Dict[str, Any]:
+    def _profile_db_to_dict(self, profile_db: UserProfileDB) -> dict[str, Any]:
         """将数据库记录转为字典"""
         try:
             concerns = json.loads(profile_db.concerns) if profile_db.concerns else []
-        except:
+        except Exception:
             concerns = []
         
         return {
@@ -333,7 +334,7 @@ class UserProfileBuilder:
             "updated_at": profile_db.updated_at.isoformat() if profile_db.updated_at else None
         }
     
-    def _get_default_profile(self, user_id: str) -> Dict[str, Any]:
+    def _get_default_profile(self, user_id: str) -> dict[str, Any]:
         """获取默认画像"""
         return {
             "user_id": user_id,
@@ -346,7 +347,7 @@ class UserProfileBuilder:
             "updated_at": None
         }
     
-    async def build_conversation_graph(self, user_id: str) -> Dict[str, Any]:
+    async def build_conversation_graph(self, user_id: str) -> dict[str, Any]:
         """
         构建对话脉络图谱
         
@@ -361,7 +362,7 @@ class UserProfileBuilder:
                 # 获取用户的重要记忆
                 memories = db.db.query(MemoryItem).filter(
                     MemoryItem.user_id == user_id,
-                    MemoryItem.is_active == True,
+                    MemoryItem.is_active,
                     MemoryItem.importance > 0.6
                 ).order_by(MemoryItem.created_at).all()
                 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 动作采样示例 - 展示正确的概率采样实现
 
@@ -7,7 +6,6 @@
 """
 
 import torch
-import torch.distributions as dist
 
 
 def sample_action_correct(action_probs):
@@ -84,7 +82,6 @@ def demonstrate_sampling():
     
     # 示例3: 批量采样
     print("\n【示例3：批量采样】")
-    batch_size = 5
     batch_action_probs = torch.tensor([
         [0.1, 0.3, 0.5, 0.1],
         [0.2, 0.2, 0.2, 0.4],

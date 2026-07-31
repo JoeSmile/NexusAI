@@ -3,15 +3,14 @@
 LLM模块数据模型
 """
 
-from typing import List, Dict, Any, Optional, Union
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from backend.schemas.common_schemas import BaseResponse
 
-
-class LLMProvider(str, Enum):
+class LLMProvider(StrEnum):
     """LLM提供商枚举"""
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
@@ -20,7 +19,7 @@ class LLMProvider(str, Enum):
     LOCAL = "local"
 
 
-class MessageRole(str, Enum):
+class MessageRole(StrEnum):
     """消息角色枚举"""
     SYSTEM = "system"
     USER = "user"
@@ -30,14 +29,14 @@ class MessageRole(str, Enum):
 
 class LLMRequest(BaseModel):
     """LLM请求模型"""
-    messages: List['ChatMessage'] = Field(..., description="消息列表")
+    messages: list['ChatMessage'] = Field(..., description="消息列表")
     model: str = Field(..., description="模型名称")
     temperature: float = Field(0.7, ge=0, le=2, description="温度参数")
-    max_tokens: Optional[int] = Field(None, ge=1, le=32000, description="最大令牌数")
+    max_tokens: int | None = Field(None, ge=1, le=32000, description="最大令牌数")
     top_p: float = Field(1.0, ge=0, le=1, description="Top-p参数")
     frequency_penalty: float = Field(0.0, ge=-2, le=2, description="频率惩罚")
     presence_penalty: float = Field(0.0, ge=-2, le=2, description="存在惩罚")
-    stop: Optional[Union[str, List[str]]] = Field(None, description="停止词")
+    stop: str | list[str] | None = Field(None, description="停止词")
     stream: bool = Field(False, description="是否流式输出")
     provider: LLMProvider = Field(LLMProvider.OPENAI, description="LLM提供商")
 
@@ -58,17 +57,17 @@ class LLMResponse(BaseModel):
     finish_reason: str = Field(..., description="完成原因")
     created_at: datetime = Field(default_factory=datetime.now, description="创建时间")
     response_time: float = Field(..., description="响应时间")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="元数据")
+    metadata: dict[str, Any] | None = Field(None, description="元数据")
 
 
 class ChatMessage(BaseModel):
     """聊天消息模型"""
     role: MessageRole = Field(..., description="消息角色")
     content: str = Field(..., description="消息内容")
-    name: Optional[str] = Field(None, description="消息发送者名称")
-    function_call: Optional[Dict[str, Any]] = Field(None, description="函数调用")
-    tool_calls: Optional[List[Dict[str, Any]]] = Field(None, description="工具调用")
-    timestamp: Optional[datetime] = Field(None, description="消息时间戳")
+    name: str | None = Field(None, description="消息发送者名称")
+    function_call: dict[str, Any] | None = Field(None, description="函数调用")
+    tool_calls: list[dict[str, Any]] | None = Field(None, description="工具调用")
+    timestamp: datetime | None = Field(None, description="消息时间戳")
 
     @field_validator('content')
     @classmethod
@@ -93,9 +92,9 @@ class LLMError(BaseModel):
     error_type: str = Field(..., description="错误类型")
     error_code: str = Field(..., description="错误代码")
     message: str = Field(..., description="错误消息")
-    details: Optional[Dict[str, Any]] = Field(None, description="错误详情")
+    details: dict[str, Any] | None = Field(None, description="错误详情")
     timestamp: datetime = Field(default_factory=datetime.now, description="错误时间")
-    request_id: Optional[str] = Field(None, description="请求ID")
+    request_id: str | None = Field(None, description="请求ID")
 
 
 class CompletionRequest(BaseModel):
@@ -107,7 +106,7 @@ class CompletionRequest(BaseModel):
     top_p: float = Field(1.0, ge=0, le=1, description="Top-p参数")
     frequency_penalty: float = Field(0.0, ge=-2, le=2, description="频率惩罚")
     presence_penalty: float = Field(0.0, ge=-2, le=2, description="存在惩罚")
-    stop: Optional[Union[str, List[str]]] = Field(None, description="停止词")
+    stop: str | list[str] | None = Field(None, description="停止词")
     stream: bool = Field(False, description="是否流式输出")
     provider: LLMProvider = Field(LLMProvider.OPENAI, description="LLM提供商")
 
@@ -134,13 +133,13 @@ class LLMConfig(BaseModel):
     """LLM配置模型"""
     provider: LLMProvider = Field(LLMProvider.OPENAI, description="默认提供商")
     api_key: str = Field(..., description="API密钥")
-    base_url: Optional[str] = Field(None, description="API基础URL")
+    base_url: str | None = Field(None, description="API基础URL")
     default_model: str = Field("gpt-4", description="默认模型")
     max_tokens: int = Field(4000, ge=1, le=32000, description="默认最大令牌数")
     temperature: float = Field(0.7, ge=0, le=2, description="默认温度")
     timeout: int = Field(30, ge=1, le=300, description="请求超时时间")
     max_retries: int = Field(3, ge=0, le=10, description="最大重试次数")
-    rate_limit: Optional[int] = Field(None, description="速率限制")
+    rate_limit: int | None = Field(None, description="速率限制")
     enable_streaming: bool = Field(True, description="是否启用流式输出")
     enable_function_calling: bool = Field(False, description="是否启用函数调用")
 
@@ -171,9 +170,9 @@ class ModelInfo(BaseModel):
     context_length: int = Field(..., description="上下文长度")
     supports_streaming: bool = Field(True, description="是否支持流式输出")
     supports_function_calling: bool = Field(False, description="是否支持函数调用")
-    cost_per_token: Optional[float] = Field(None, description="每令牌成本")
-    description: Optional[str] = Field(None, description="模型描述")
-    created_at: Optional[datetime] = Field(None, description="创建时间")
+    cost_per_token: float | None = Field(None, description="每令牌成本")
+    description: str | None = Field(None, description="模型描述")
+    created_at: datetime | None = Field(None, description="创建时间")
 
 
 class LLMStats(BaseModel):
@@ -184,8 +183,8 @@ class LLMStats(BaseModel):
     total_tokens: int = Field(0, description="总令牌数")
     total_cost: float = Field(0.0, description="总成本")
     average_response_time: float = Field(0.0, description="平均响应时间")
-    requests_by_provider: Dict[str, int] = Field(default_factory=dict, description="按提供商统计")
-    requests_by_model: Dict[str, int] = Field(default_factory=dict, description="按模型统计")
+    requests_by_provider: dict[str, int] = Field(default_factory=dict, description="按提供商统计")
+    requests_by_model: dict[str, int] = Field(default_factory=dict, description="按模型统计")
     last_updated: datetime = Field(default_factory=datetime.now, description="最后更新时间")
 
 

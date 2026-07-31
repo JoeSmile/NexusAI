@@ -4,8 +4,7 @@ Agent Service - Agent服务层
 提供Agent功能的服务接口，集成到现有系统
 """
 
-from typing import Dict, Any, Optional
-from datetime import datetime
+from typing import Any
 
 from ..core.agent.agent_core import AgentCore, get_agent_core
 
@@ -17,7 +16,7 @@ class AgentService:
     封装Agent Core，提供业务层接口
     """
     
-    def __init__(self, agent_core: Optional[AgentCore] = None):
+    def __init__(self, agent_core: AgentCore | None = None):
         """
         初始化Agent服务
         
@@ -30,8 +29,8 @@ class AgentService:
         self,
         user_id: str,
         message: str,
-        conversation_id: Optional[str] = None
-    ) -> Dict[str, Any]:
+        conversation_id: str | None = None
+    ) -> dict[str, Any]:
         """
         处理用户消息（Agent模式）
         
@@ -58,7 +57,7 @@ class AgentService:
             }
         
         except Exception as e:
-            print(f"Agent处理失败: {str(e)}")
+            print(f"Agent处理失败: {e!s}")
             
             # 降级到普通模式
             return {
@@ -67,7 +66,7 @@ class AgentService:
                 "mode": "fallback"
             }
     
-    def get_agent_status(self) -> Dict[str, Any]:
+    def get_agent_status(self) -> dict[str, Any]:
         """
         获取Agent状态
         
@@ -78,9 +77,9 @@ class AgentService:
     
     def get_execution_history(
         self,
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
         limit: int = 10
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         获取执行历史
         
@@ -112,7 +111,7 @@ class AgentService:
             "history": formatted_history
         }
     
-    def get_memory_summary(self, user_id: str) -> Dict[str, Any]:
+    def get_memory_summary(self, user_id: str) -> dict[str, Any]:
         """
         获取用户记忆摘要
         
@@ -143,7 +142,7 @@ class AgentService:
             "recent_actions": len(action_log)
         }
     
-    def get_available_tools(self) -> Dict[str, Any]:
+    def get_available_tools(self) -> dict[str, Any]:
         """
         获取可用工具列表
         
@@ -169,7 +168,7 @@ class AgentService:
     async def schedule_followup(
         self,
         user_id: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         规划回访任务
         

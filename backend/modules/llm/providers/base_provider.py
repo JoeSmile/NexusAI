@@ -4,24 +4,23 @@ LLM提供商基类
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Optional, AsyncGenerator
+from collections.abc import AsyncGenerator
 from datetime import datetime
+from typing import Any
 
 from ..models.llm_models import (
-    LLMRequest,
-    LLMResponse,
-    CompletionRequest,
-    CompletionResponse,
     ChatMessage,
+    CompletionResponse,
+    LLMError,
+    LLMResponse,
     LLMUsage,
-    LLMError
 )
 
 
 class BaseLLMProvider(ABC):
     """LLM提供商基类"""
     
-    def __init__(self, api_key: str, base_url: Optional[str] = None):
+    def __init__(self, api_key: str, base_url: str | None = None):
         """
         初始化提供商
         
@@ -36,10 +35,10 @@ class BaseLLMProvider(ABC):
     @abstractmethod
     async def chat_completion(
         self,
-        messages: List[ChatMessage],
+        messages: list[ChatMessage],
         model: str,
         temperature: float = 0.7,
-        max_tokens: Optional[int] = None,
+        max_tokens: int | None = None,
         **kwargs
     ) -> LLMResponse:
         """
@@ -55,15 +54,14 @@ class BaseLLMProvider(ABC):
         Returns:
             LLM响应
         """
-        pass
     
     @abstractmethod
     async def stream_chat_completion(
         self,
-        messages: List[ChatMessage],
+        messages: list[ChatMessage],
         model: str,
         temperature: float = 0.7,
-        max_tokens: Optional[int] = None,
+        max_tokens: int | None = None,
         **kwargs
     ) -> AsyncGenerator[str, None]:
         """
@@ -79,7 +77,6 @@ class BaseLLMProvider(ABC):
         Yields:
             流式响应文本
         """
-        pass
     
     @abstractmethod
     async def text_completion(
@@ -103,20 +100,18 @@ class BaseLLMProvider(ABC):
         Returns:
             补全响应
         """
-        pass
     
     @abstractmethod
-    async def list_models(self) -> List[str]:
+    async def list_models(self) -> list[str]:
         """
         获取可用模型列表
         
         Returns:
             模型名称列表
         """
-        pass
     
     @abstractmethod
-    async def get_model_info(self, model: str) -> Dict[str, Any]:
+    async def get_model_info(self, model: str) -> dict[str, Any]:
         """
         获取模型信息
         
@@ -126,9 +121,8 @@ class BaseLLMProvider(ABC):
         Returns:
             模型信息
         """
-        pass
     
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """
         健康检查
         
@@ -142,7 +136,7 @@ class BaseLLMProvider(ABC):
             ]
             
             start_time = datetime.now()
-            response = await self.chat_completion(
+            await self.chat_completion(
                 messages=messages,
                 model="gpt-3.5-turbo",
                 max_tokens=10,
@@ -165,7 +159,7 @@ class BaseLLMProvider(ABC):
                 "timestamp": datetime.now().isoformat()
             }
     
-    def _parse_usage(self, usage_data: Dict[str, Any]) -> LLMUsage:
+    def _parse_usage(self, usage_data: dict[str, Any]) -> LLMUsage:
         """
         解析使用统计
         
@@ -184,7 +178,7 @@ class BaseLLMProvider(ABC):
             total_cost=usage_data.get("total_cost", 0.0)
         )
     
-    def _create_error(self, error_type: str, message: str, details: Optional[Dict[str, Any]] = None) -> LLMError:
+    def _create_error(self, error_type: str, message: str, details: dict[str, Any] | None = None) -> LLMError:
         """
         创建错误对象
         

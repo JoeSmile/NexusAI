@@ -9,11 +9,10 @@ Agent Tools - Agent工具函数集合
 5. send_follow_up_message() - 发送回访消息
 """
 
-from typing import Dict, List, Any, Optional
-from datetime import datetime, timedelta
-import json
-import sys
 import os
+import sys
+from datetime import datetime, timedelta
+from typing import Any
 
 # 添加项目根目录到路径
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -22,6 +21,7 @@ sys.path.insert(0, project_root)
 # 延迟导入，避免循环依赖
 # 使用 importlib 直接加载文件，避免触发 backend/agent/__init__.py
 import importlib.util
+
 
 def _load_module_from_file(module_name: str, file_path: str):
     """直接从文件加载模块，避免包导入触发 __init__.py"""
@@ -57,7 +57,7 @@ def _get_psychology_db():
     return module.get_psychology_db()
 
 
-def get_user_mood_trend(user_id: str, days: int = 7) -> Dict[str, Any]:
+def get_user_mood_trend(user_id: str, days: int = 7) -> dict[str, Any]:
     """
     获取近N天情绪变化曲线，判断是否需干预
     
@@ -199,7 +199,7 @@ def get_user_mood_trend(user_id: str, days: int = 7) -> Dict[str, Any]:
             "average_intensity": 5.0,
             "trend_direction": "stable",
             "needs_intervention": False,
-            "intervention_reason": f"查询出错: {str(e)}",
+            "intervention_reason": f"查询出错: {e!s}",
             "summary": "无法获取情绪趋势数据",
             "error": str(e)
         }
@@ -207,7 +207,7 @@ def get_user_mood_trend(user_id: str, days: int = 7) -> Dict[str, Any]:
         db.close()
 
 
-def play_meditation_audio(genre: str, user_id: Optional[str] = None) -> Dict[str, Any]:
+def play_meditation_audio(genre: str, user_id: str | None = None) -> dict[str, Any]:
     """
     播放冥想音频，缓解焦虑
     
@@ -281,7 +281,7 @@ def play_meditation_audio(genre: str, user_id: Optional[str] = None) -> Dict[str
         }
 
 
-def set_daily_reminder(time: str, message: str, user_id: str) -> Dict[str, Any]:
+def set_daily_reminder(time: str, message: str, user_id: str) -> dict[str, Any]:
     """
     设置每日提醒，养成作息习惯
     
@@ -340,7 +340,7 @@ def set_daily_reminder(time: str, message: str, user_id: str) -> Dict[str, Any]:
         }
 
 
-def search_mental_health_resources(query: str, resource_type: Optional[str] = None) -> Dict[str, Any]:
+def search_mental_health_resources(query: str, resource_type: str | None = None) -> dict[str, Any]:
     """
     检索专业心理文章，提供知识支持
     
@@ -419,7 +419,7 @@ def search_mental_health_resources(query: str, resource_type: Optional[str] = No
         }
 
 
-def send_follow_up_message(user_id: str, days_ago: int = 1, custom_message: Optional[str] = None) -> Dict[str, Any]:
+def send_follow_up_message(user_id: str, days_ago: int = 1, custom_message: str | None = None) -> dict[str, Any]:
     """
     发送回访消息，验证效果
     
@@ -447,7 +447,7 @@ def send_follow_up_message(user_id: str, days_ago: int = 1, custom_message: Opti
             mood_trend = get_user_mood_trend(user_id, days=days_ago + 1)
             
             if mood_trend.get("needs_intervention"):
-                custom_message = f"你好，我注意到你最近的情绪有些波动。现在感觉怎么样？有什么想聊的吗？"
+                custom_message = "你好，我注意到你最近的情绪有些波动。现在感觉怎么样？有什么想聊的吗？"
             else:
                 custom_message = f"你好，距离我们上次聊天已经过去{days_ago}天了。最近感觉怎么样？有什么想分享的吗？"
         
@@ -484,8 +484,8 @@ def send_follow_up_message(user_id: str, days_ago: int = 1, custom_message: Opti
 __all__ = [
     "get_user_mood_trend",
     "play_meditation_audio",
-    "set_daily_reminder",
     "search_mental_health_resources",
-    "send_follow_up_message"
+    "send_follow_up_message",
+    "set_daily_reminder"
 ]
 

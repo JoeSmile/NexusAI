@@ -11,23 +11,28 @@ Agent Core - Agent核心控制器
 """
 
 import json
-import uuid
-from typing import Dict, Any, Optional, List
-from datetime import datetime
-
-from .memory_hub import MemoryHub, get_memory_hub
-from .planner import Planner
-from .tool_caller import ToolCaller, get_tool_caller
-from .reflector import Reflector, get_reflector
+import os
 
 # 导入MCP协议
 import sys
-import os
+import uuid
+from datetime import datetime
+from typing import Any
+
+from .memory_hub import MemoryHub, get_memory_hub
+from .planner import Planner
+from .reflector import Reflector, get_reflector
+from .tool_caller import ToolCaller, get_tool_caller
+
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 sys.path.insert(0, project_root)
 
 from backend.modules.agent.protocol.mcp import (
-    MCPMessage, MCPProtocol, MCPContext, MCPMessageType, get_mcp_logger
+    MCPContext,
+    MCPMessage,
+    MCPMessageType,
+    MCPProtocol,
+    get_mcp_logger,
 )
 
 
@@ -40,10 +45,10 @@ class AgentCore:
     
     def __init__(
         self,
-        memory_hub: Optional[MemoryHub] = None,
-        planner: Optional[Planner] = None,
-        tool_caller: Optional[ToolCaller] = None,
-        reflector: Optional[Reflector] = None,
+        memory_hub: MemoryHub | None = None,
+        planner: Planner | None = None,
+        tool_caller: ToolCaller | None = None,
+        reflector: Reflector | None = None,
         llm_client = None
     ):
         """
@@ -69,7 +74,7 @@ class AgentCore:
         self._init_legacy_components()
         
         # 执行历史
-        self.execution_history: List[Dict[str, Any]] = []
+        self.execution_history: list[dict[str, Any]] = []
         
         # MCP协议支持
         self.mcp_protocol = MCPProtocol()
@@ -80,12 +85,13 @@ class AgentCore:
         """初始化现有系统组件"""
         try:
             from backend.emotion_analyzer import EmotionAnalyzer
+
             from backend.context_assembler import ContextAssembler
             
             self.emotion_analyzer = EmotionAnalyzer()
             self.context_assembler = ContextAssembler()
         except ImportError as e:
-            print(f"警告：无法导入现有组件: {str(e)}")
+            print(f"警告：无法导入现有组件: {e!s}")
             self.emotion_analyzer = None
             self.context_assembler = None
     
@@ -93,8 +99,8 @@ class AgentCore:
         self, 
         user_input: str, 
         user_id: str,
-        conversation_id: Optional[str] = None
-    ) -> Dict[str, Any]:
+        conversation_id: str | None = None
+    ) -> dict[str, Any]:
         """
         处理用户输入的完整流程
         
@@ -214,7 +220,7 @@ class AgentCore:
             }
         
         except Exception as e:
-            print(f"Agent处理错误: {str(e)}")
+            print(f"Agent处理错误: {e!s}")
             import traceback
             traceback.print_exc()
             
@@ -231,7 +237,7 @@ class AgentCore:
         self,
         user_input: str,
         user_id: str,
-        conversation_id: Optional[str] = None
+        conversation_id: str | None = None
     ) -> MCPMessage:
         """
         使用MCP协议处理用户输入（新接口）
@@ -385,7 +391,7 @@ class AgentCore:
             return agent_response
         
         except Exception as e:
-            print(f"Agent MCP处理错误: {str(e)}")
+            print(f"Agent MCP处理错误: {e!s}")
             import traceback
             traceback.print_exc()
             
@@ -411,7 +417,7 @@ class AgentCore:
         self,
         user_input: str,
         context: MCPContext,
-        tool_responses: List
+        tool_responses: list
     ) -> str:
         """
         基于MCP上下文生成回复
@@ -460,10 +466,10 @@ class AgentCore:
             return response
         
         except Exception as e:
-            print(f"生成回复失败: {str(e)}")
+            print(f"生成回复失败: {e!s}")
             return "我理解你的感受。能多告诉我一些吗？"
     
-    def _template_response(self, emotion: str, tool_responses: List) -> str:
+    def _template_response(self, emotion: str, tool_responses: list) -> str:
         """模板回复（降级方案）"""
         templates = {
             "焦虑": "我能感受到你的焦虑。深呼吸，我们一起来面对。有什么具体让你担心的吗？",
@@ -486,7 +492,7 @@ class AgentCore:
         self, 
         user_input: str, 
         user_id: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         感知层：分析用户输入
         
@@ -505,7 +511,7 @@ class AgentCore:
                 perception["emotion_intensity"] = emotion_result.get("intensity", 5.0)
                 perception["emotion_data"] = emotion_result
             except Exception as e:
-                print(f"情绪分析失败: {str(e)}")
+                print(f"情绪分析失败: {e!s}")
                 perception["emotion"] = "平静"
                 perception["emotion_intensity"] = 5.0
         else:
@@ -524,8 +530,8 @@ class AgentCore:
     async def _execute_plan(
         self,
         execution_plan,
-        context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        context: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         执行计划
         
@@ -558,7 +564,7 @@ class AgentCore:
                         "result": tool_result.get("result")
                     })
                 except Exception as e:
-                    print(f"工具调用失败 {tool_name}: {str(e)}")
+                    print(f"工具调用失败 {tool_name}: {e!s}")
                     results["actions"].append({
                         "type": "tool_call",
                         "tool": tool_name,
@@ -585,8 +591,8 @@ class AgentCore:
     async def _generate_response(
         self,
         user_input: str,
-        context: Dict[str, Any],
-        tool_outputs: List[Dict[str, Any]]
+        context: dict[str, Any],
+        tool_outputs: list[dict[str, Any]]
     ) -> str:
         """
         生成回复
@@ -616,13 +622,13 @@ class AgentCore:
             return response
         
         except Exception as e:
-            print(f"生成回复失败: {str(e)}")
+            print(f"生成回复失败: {e!s}")
             return "我理解你的感受。能多告诉我一些吗？"
     
     def _simple_context_assembly(
         self,
-        context: Dict[str, Any],
-        tool_outputs: List[Dict[str, Any]]
+        context: dict[str, Any],
+        tool_outputs: list[dict[str, Any]]
     ) -> str:
         """简化的上下文组装"""
         parts = []
@@ -652,16 +658,6 @@ class AgentCore:
         """调用LLM生成回复"""
         # 这里应该调用实际的LLM服务
         # 简化实现
-        prompt = f"""
-你是一位温暖、耐心的心理陪伴者，名叫"ContextGate"。
-
-上下文：
-{context}
-
-用户说：{user_input}
-
-请用共情、支持性的语气回复用户，控制在3-4句话。
-"""
         
         # 如果有LLM客户端，调用它
         # response = await self.llm.generate(prompt)
@@ -671,8 +667,8 @@ class AgentCore:
     
     def _template_response(
         self,
-        context: Dict[str, Any],
-        tool_outputs: List[Dict[str, Any]]
+        context: dict[str, Any],
+        tool_outputs: list[dict[str, Any]]
     ) -> str:
         """模板回复（降级方案）"""
         perception = context.get("perception", {})
@@ -715,7 +711,7 @@ class AgentCore:
         else:
             return "emotional_support"
     
-    def _extract_entities(self, text: str) -> List[str]:
+    def _extract_entities(self, text: str) -> list[str]:
         """提取实体（简化实现）"""
         entities = []
         
@@ -735,9 +731,9 @@ class AgentCore:
     
     def get_execution_history(
         self,
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
         limit: int = 10
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         获取执行历史
         
@@ -755,7 +751,7 @@ class AgentCore:
         
         return history[-limit:]
     
-    def get_agent_status(self) -> Dict[str, Any]:
+    def get_agent_status(self) -> dict[str, Any]:
         """
         获取Agent状态
         
@@ -810,7 +806,7 @@ if __name__ == "__main__":
             user_input="我最近心情很不好，感觉很焦虑",
             user_id=user_id
         )
-        print(f"用户：我最近心情很不好，感觉很焦虑")
+        print("用户：我最近心情很不好，感觉很焦虑")
         print(f"ContextGate：{result1['response']}")
         print(f"情绪：{result1['emotion']} (强度: {result1['emotion_intensity']})")
         print(f"执行了 {len(result1['actions'])} 个行动")
@@ -823,7 +819,7 @@ if __name__ == "__main__":
             user_input="我最近睡不好，怎么办？",
             user_id=user_id
         )
-        print(f"用户：我最近睡不好，怎么办？")
+        print("用户：我最近睡不好，怎么办？")
         print(f"ContextGate：{result2['response']}")
         print(f"情绪：{result2['emotion']} (强度: {result2['emotion_intensity']})")
         print(f"执行了 {len(result2['actions'])} 个行动")

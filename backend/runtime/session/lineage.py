@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Session lineage — 会话血缘追踪
 
@@ -9,7 +8,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -19,9 +17,9 @@ class SessionLineage:
     """会话血缘记录"""
 
     session_id: str
-    parent_id: Optional[str] = None
-    fork_point: Optional[str] = None  # 分叉点的消息 ID
-    children: List[str] = field(default_factory=list)
+    parent_id: str | None = None
+    fork_point: str | None = None  # 分叉点的消息 ID
+    children: list[str] = field(default_factory=list)
     created_at: str = ""
 
 
@@ -36,9 +34,9 @@ class LineageTracker:
     """
 
     def __init__(self):
-        self._lineages: Dict[str, SessionLineage] = {}
+        self._lineages: dict[str, SessionLineage] = {}
 
-    def register(self, session_id: str, parent_id: Optional[str] = None) -> SessionLineage:
+    def register(self, session_id: str, parent_id: str | None = None) -> SessionLineage:
         """注册新会话"""
         lineage = SessionLineage(
             session_id=session_id,
@@ -51,11 +49,11 @@ class LineageTracker:
 
         return lineage
 
-    def get_lineage(self, session_id: str) -> Optional[SessionLineage]:
+    def get_lineage(self, session_id: str) -> SessionLineage | None:
         """获取会话血缘"""
         return self._lineages.get(session_id)
 
-    def get_ancestors(self, session_id: str) -> List[str]:
+    def get_ancestors(self, session_id: str) -> list[str]:
         """获取所有祖先会话"""
         ancestors = []
         current = self._lineages.get(session_id)

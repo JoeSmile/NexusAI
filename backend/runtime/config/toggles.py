@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module Toggles — per-module enable/disable switches
 
@@ -31,8 +30,7 @@ from __future__ import annotations
 
 import logging
 import os
-from dataclasses import dataclass, field
-from typing import Dict, Optional
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +61,7 @@ class ModuleToggles:
     """
 
     # 所有模块的默认状态
-    _DEFAULTS: Dict[str, bool] = {
+    _DEFAULTS: dict[str, bool] = {
         # Skills — 默认启用
         "emotion_skill": True,
         "memory_skill": True,
@@ -86,9 +84,9 @@ class ModuleToggles:
 
     ENV_PREFIX = "EMOTIONAL_CHAT__MODULES__"
 
-    def __init__(self, overrides: Optional[Dict[str, bool]] = None):
+    def __init__(self, overrides: dict[str, bool] | None = None):
         # 初始化为默认值
-        self._toggles: Dict[str, ModuleToggle] = {}
+        self._toggles: dict[str, ModuleToggle] = {}
         for name, default in self._DEFAULTS.items():
             self._toggles[name] = ModuleToggle(
                 name=name,
@@ -138,7 +136,7 @@ class ModuleToggles:
         """禁用模块"""
         self.set_enabled(module, False)
 
-    def list_modules(self) -> Dict[str, bool]:
+    def list_modules(self) -> dict[str, bool]:
         """列出所有模块及其状态"""
         return {name: toggle.enabled for name, toggle in self._toggles.items()}
 

@@ -11,19 +11,23 @@ Planner - 规划模块
 """
 
 import json
-from typing import List, Dict, Any, Optional
-from datetime import datetime
-from enum import Enum
+import os
 
 # 导入MCP协议
 import sys
-import os
+from datetime import datetime
+from enum import Enum
+from typing import Any
+
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 sys.path.insert(0, project_root)
 
 from backend.modules.agent.protocol.mcp import (
-    MCPMessage, MCPProtocol, MCPToolCall, MCPContext, 
-    MCPMessageType, get_mcp_logger
+    MCPContext,
+    MCPMessage,
+    MCPProtocol,
+    MCPToolCall,
+    get_mcp_logger,
 )
 
 
@@ -57,10 +61,10 @@ class ExecutionPlan:
     
     def __init__(
         self,
-        goal: Dict[str, Any],
+        goal: dict[str, Any],
         strategy: Strategy,
-        steps: List[Dict[str, Any]],
-        metadata: Optional[Dict[str, Any]] = None
+        steps: list[dict[str, Any]],
+        metadata: dict[str, Any] | None = None
     ):
         self.goal = goal
         self.strategy = strategy
@@ -68,7 +72,7 @@ class ExecutionPlan:
         self.metadata = metadata or {}
         self.created_at = datetime.now()
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             "goal": self.goal,
@@ -101,7 +105,7 @@ class Planner:
     async def plan(
         self, 
         user_input: str, 
-        context: Dict[str, Any]
+        context: dict[str, Any]
     ) -> ExecutionPlan:
         """
         生成执行计划（传统接口，保持向后兼容）
@@ -149,15 +153,15 @@ class Planner:
     def _identify_goal(
         self, 
         user_input: str, 
-        context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        context: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         识别用户目标
         
         使用规则匹配，避免每次都调用LLM
         """
         perception = context.get("perception", {})
-        emotion = perception.get("emotion", "")
+        perception.get("emotion", "")
         emotion_intensity = perception.get("emotion_intensity", 0)
         
         # 规则1：高情绪强度 -> 情感支持
@@ -209,9 +213,9 @@ class Planner:
     
     def _decompose_goal(
         self, 
-        goal: Dict[str, Any], 
-        context: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
+        goal: dict[str, Any], 
+        context: dict[str, Any]
+    ) -> list[dict[str, Any]]:
         """
         目标分解
         
@@ -328,7 +332,7 @@ class Planner:
         
         return sub_goals
     
-    def _build_task_graph(self, sub_goals: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def _build_task_graph(self, sub_goals: list[dict[str, Any]]) -> dict[str, Any]:
         """
         构建任务依赖图
         
@@ -366,8 +370,8 @@ class Planner:
     
     def _select_strategy(
         self, 
-        task_graph: Dict[str, Any], 
-        context: Dict[str, Any]
+        task_graph: dict[str, Any], 
+        context: dict[str, Any]
     ) -> Strategy:
         """
         策略选择
@@ -399,9 +403,9 @@ class Planner:
     
     def _generate_plan(
         self,
-        task_graph: Dict[str, Any],
+        task_graph: dict[str, Any],
         strategy: Strategy,
-        context: Dict[str, Any]
+        context: dict[str, Any]
     ) -> ExecutionPlan:
         """
         生成执行计划
@@ -549,9 +553,9 @@ class Planner:
     def _generate_tool_parameters(
         self,
         tool_name: str,
-        task: Dict[str, Any],
-        context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        task: dict[str, Any],
+        context: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         生成工具调用参数
         
@@ -592,7 +596,7 @@ class Planner:
         else:
             return {}
     
-    def _calculate_followup_time(self, task: Dict[str, Any]) -> str:
+    def _calculate_followup_time(self, task: dict[str, Any]) -> str:
         """
         计算回访时间
         
@@ -620,7 +624,7 @@ class Planner:
         
         return followup_time.isoformat()
     
-    def _init_rules(self) -> Dict[str, Any]:
+    def _init_rules(self) -> dict[str, Any]:
         """
         初始化规则库
         

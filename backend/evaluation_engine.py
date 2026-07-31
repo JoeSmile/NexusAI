@@ -4,24 +4,24 @@
 评估维度：共情程度、自然度、安全性
 """
 import json
-import requests
-from typing import Dict, List, Optional, Any
 from datetime import datetime
+from typing import Any
+
+import requests
 
 # 导入 LangChain (Python 3.10+, langchain 0.2.x+)
 try:
-    from langchain_core.prompts import ChatPromptTemplate
     from langchain_core.output_parsers import StrOutputParser
+    from langchain_core.prompts import ChatPromptTemplate
     LANGCHAIN_AVAILABLE = True
 except ImportError:
     LANGCHAIN_AVAILABLE = False
     ChatPromptTemplate = None
     StrOutputParser = None
 
-from backend.modules.llm.harness import resolve_llm_settings, try_create_chat_openai
-
 # 导入日志配置
 from backend.logging_config import get_logger
+from backend.modules.llm.harness import resolve_llm_settings, try_create_chat_openai
 
 logger = get_logger(__name__)
 
@@ -121,9 +121,9 @@ class EvaluationEngine:
                     self.prompt = ChatPromptTemplate.from_template(EVALUATION_PROMPT_TEMPLATE)
                     self.output_parser = StrOutputParser()
                     self.chain = self.prompt | self.llm | self.output_parser
-                    logger.info("✓ 评估引擎初始化成功 (模型: {})".format(self.model))
+                    logger.info(f"✓ 评估引擎初始化成功 (模型: {self.model})")
             except Exception as e:
-                logger.error("评估引擎初始化失败: {}".format(e))
+                logger.error(f"评估引擎初始化失败: {e}")
                 self.llm = None
                 self.chain = None
         else:
@@ -137,8 +137,8 @@ class EvaluationEngine:
         bot_response: str,
         user_emotion: str = "neutral",
         emotion_intensity: float = 5.0,
-        additional_context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        additional_context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         评估机器人回应
         
@@ -196,7 +196,7 @@ class EvaluationEngine:
             return evaluation_result
             
         except Exception as e:
-            logger.error("评估失败: {}".format(e))
+            logger.error(f"评估失败: {e}")
             return {
                 "error": str(e),
                 "empathy_score": 0,
@@ -219,7 +219,7 @@ class EvaluationEngine:
         
         try:
             headers = {
-                "Authorization": "Bearer {}".format(self.api_key),
+                "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json"
             }
             
@@ -232,7 +232,7 @@ class EvaluationEngine:
                 "temperature": 0.3
             }
             
-            api_url = "{}/chat/completions".format(self.api_base_url)
+            api_url = f"{self.api_base_url}/chat/completions"
             response = requests.post(
                 api_url,
                 headers=headers,
@@ -244,14 +244,14 @@ class EvaluationEngine:
                 result = response.json()
                 return result["choices"][0]["message"]["content"].strip()
             else:
-                logger.error("API错误: {} - {}".format(response.status_code, response.text))
-                raise Exception("API调用失败: {}".format(response.status_code))
+                logger.error(f"API错误: {response.status_code} - {response.text}")
+                raise Exception(f"API调用失败: {response.status_code}")
                 
         except Exception as e:
-            logger.error("API调用失败: {}".format(e))
+            logger.error(f"API调用失败: {e}")
             raise
     
-    def _parse_evaluation_result(self, result_text: str) -> Dict[str, Any]:
+    def _parse_evaluation_result(self, result_text: str) -> dict[str, Any]:
         """解析评估结果（从文本中提取JSON）"""
         try:
             # 尝试提取JSON部分
@@ -290,23 +290,23 @@ class EvaluationEngine:
             return result
             
         except json.JSONDecodeError as e:
-            logger.error("JSON解析失败: {}".format(e))
-            logger.error("原始文本: {}".format(result_text[:500]))
+            logger.error(f"JSON解析失败: {e}")
+            logger.error(f"原始文本: {result_text[:500]}")
             # 返回默认结果
             return {
                 "empathy_score": 3,
                 "naturalness_score": 3,
                 "safety_score": 3,
                 "overall_comment": "评估解析失败，使用默认分数",
-                "error": "JSON解析失败: {}".format(str(e)),
+                "error": f"JSON解析失败: {e!s}",
                 "raw_response": result_text[:500]
             }
     
     def batch_evaluate(
         self,
-        conversations: List[Dict[str, Any]],
+        conversations: list[dict[str, Any]],
         max_workers: int = 3
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         批量评估多个对话
         
@@ -321,7 +321,7 @@ class EvaluationEngine:
         
         # 简单的顺序处理（可以后续优化为并发）
         for i, conv in enumerate(conversations):
-            logger.info("评估进度: {}/{}".format(i + 1, len(conversations)))
+            logger.info(f"评估进度: {i + 1}/{len(conversations)}")
             
             result = self.evaluate_response(
                 user_message=conv.get("user_message", ""),
@@ -342,10 +342,10 @@ class EvaluationEngine:
     def compare_prompts(
         self,
         user_message: str,
-        responses: Dict[str, str],
+        responses: dict[str, str],
         user_emotion: str = "neutral",
         emotion_intensity: float = 5.0
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         比较不同Prompt生成的回应
         
@@ -361,7 +361,7 @@ class EvaluationEngine:
         comparison_results = {}
         
         for prompt_name, bot_response in responses.items():
-            logger.info("评估 Prompt: {}".format(prompt_name))
+            logger.info(f"评估 Prompt: {prompt_name}")
             
             evaluation = self.evaluate_response(
                 user_message=user_message,
@@ -388,7 +388,7 @@ class EvaluationEngine:
         
         return summary
     
-    def _rank_prompts(self, evaluations: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _rank_prompts(self, evaluations: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
         """对Prompt评估结果进行排序"""
         rankings = []
         
@@ -409,8 +409,8 @@ class EvaluationEngine:
     
     def generate_evaluation_report(
         self,
-        evaluations: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        evaluations: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         """
         生成评估报告
         
@@ -464,7 +464,7 @@ class EvaluationEngine:
             "generated_at": datetime.now().isoformat()
         }
     
-    def _get_score_distribution(self, scores: List[float]) -> Dict[int, int]:
+    def _get_score_distribution(self, scores: list[float]) -> dict[int, int]:
         """获取分数分布"""
         distribution = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
         for score in scores:
@@ -486,7 +486,7 @@ class EvaluationEngine:
         else:
             return "较差 (Poor)"
     
-    def _get_top_items(self, items: List[str], top_n: int = 5) -> List[Dict[str, Any]]:
+    def _get_top_items(self, items: list[str], top_n: int = 5) -> list[dict[str, Any]]:
         """获取出现频率最高的项"""
         from collections import Counter
         counter = Counter(items)
@@ -500,7 +500,7 @@ def evaluate_single_response(
     bot_response: str,
     user_emotion: str = "neutral",
     emotion_intensity: float = 5.0
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     便捷函数：评估单个回应
     """
@@ -538,7 +538,7 @@ if __name__ == "__main__":
     print("="*80 + "\n")
     
     for i, test_case in enumerate(test_cases, 1):
-        print("测试案例 {}:".format(i))
+        print(f"测试案例 {i}:")
         print("-" * 80)
         result = engine.evaluate_response(**test_case)
         print(json.dumps(result, indent=2, ensure_ascii=False))

@@ -6,14 +6,13 @@ import hashlib
 import logging
 import math
 import os
-from typing import List
 
 logger = logging.getLogger(__name__)
 
 EMBED_DIM = 1536
 
 
-def _hash_embed(text: str, dim: int = EMBED_DIM) -> List[float]:
+def _hash_embed(text: str, dim: int = EMBED_DIM) -> list[float]:
     """无外部模型时的确定性伪 embedding（仅保证同文同向量，非语义质量）。"""
     vec = [0.0] * dim
     if not text:
@@ -23,14 +22,14 @@ def _hash_embed(text: str, dim: int = EMBED_DIM) -> List[float]:
         tokens = [text]
     for tok in tokens:
         digest = hashlib.sha256(tok.encode("utf-8")).digest()
-        for i in range(0, min(len(digest), 32)):
+        for i in range(min(len(digest), 32)):
             idx = (digest[i] + i * 17) % dim
             vec[idx] += 1.0
     norm = math.sqrt(sum(v * v for v in vec)) or 1.0
     return [v / norm for v in vec]
 
 
-def embed_text(text: str) -> List[float]:
+def embed_text(text: str) -> list[float]:
     """生成 embedding 向量。无 API 时回退哈希向量（仅开发/联通，非语义质量）。"""
     api_key = os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or ""
     base_url = os.getenv("LLM_BASE_URL", "").rstrip("/")

@@ -6,8 +6,9 @@
 
 import logging
 import traceback
-from typing import Callable, Dict, Any
-from fastapi import Request, Response, HTTPException
+from collections.abc import Callable
+
+from fastapi import HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -43,7 +44,7 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
             if handler:
                 status_code, error_data = handler(e)
             else:
-                status_code, error_data = 500, {"error": "系统错误", "details": str(e)}
+                status_code, _error_data = 500, {"error": "系统错误", "details": str(e)}
             
             return JSONResponse(
                 status_code=status_code,
@@ -74,7 +75,7 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
         
         except Exception as e:
             # 处理未预期的异常
-            logger.error(f"未预期异常: {type(e).__name__} - {str(e)}", extra={
+            logger.error(f"未预期异常: {type(e).__name__} - {e!s}", extra={
                 "exception_type": type(e).__name__,
                 "path": str(request.url),
                 "method": request.method,

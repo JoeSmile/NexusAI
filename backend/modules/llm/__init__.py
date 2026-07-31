@@ -4,15 +4,16 @@ LLM模块
 """
 
 from .core.llm_core import ChatEngine
-# from .services.llm_service import LLMService  # LLMService依赖LLMCore，暂时禁用
-from .models.llm_models import LLMRequest, LLMResponse, LLMProvider
-from .providers.openai_provider import OpenAIProvider
 from .harness import (
     LLMHarnessSettings,
     resolve_llm_settings,
     try_create_chat_openai,
     try_create_openai_sync_client,
 )
+
+# from .services.llm_service import LLMService  # LLMService依赖LLMCore，暂时禁用
+from .models.llm_models import LLMProvider, LLMRequest, LLMResponse
+from .providers.openai_provider import OpenAIProvider
 
 __all__ = [
     "ChatEngine",
@@ -29,7 +30,7 @@ __all__ = [
 
 # 可选的提供商
 try:
-    from .providers.anthropic_provider import AnthropicProvider
+    from .providers.anthropic_provider import AnthropicProvider  # noqa: F401
     __all__.append("AnthropicProvider")
 except ImportError:
     pass

@@ -7,7 +7,8 @@ LangGraph 兼容层。
 from __future__ import annotations
 
 import inspect
-from typing import Any, Callable, Hashable
+from collections.abc import Callable, Hashable
+from typing import Any
 
 END = "__end__"
 
@@ -16,8 +17,8 @@ class CompiledGraph:
     def __init__(
         self,
         nodes: dict[str, Callable],
-        edges: dict[str, list[str]],
-        conditionals: dict[str, tuple[Callable, dict[str, str]]],
+        edges: dict[str, list[Hashable]],
+        conditionals: dict[str, tuple[Callable, dict[str, Hashable]]],
         entry: str,
     ):
         self.nodes = nodes
@@ -26,14 +27,14 @@ class CompiledGraph:
         self._entry = entry
 
     async def ainvoke(self, state: dict) -> dict:
-        current = self._entry
+        current: Hashable = self._entry
         data = dict(state)
         visited = 0
         while current != END:
             visited += 1
             if visited > 100:
                 raise RuntimeError("pipeline cycle guard triggered")
-            fn = self.nodes[current]
+            fn = self.nodes[str(current)]
             result = fn(data)
             if inspect.isawaitable(result):
                 data = await result
@@ -44,7 +45,7 @@ class CompiledGraph:
                 key = router(data)
                 current = mapping[key]
             else:
-                nxt = self.edges.get(current, [END])
+                nxt = self.edges.get(str(current), [END])
                 current = nxt[0] if nxt else END
         return data
 
@@ -52,8 +53,8 @@ class CompiledGraph:
 class StateGraph:
     def __init__(self, _state_schema: Any = None):
         self._nodes: dict[str, Callable] = {}
-        self._edges: dict[str, list[str]] = {}
-        self._conditionals: dict[str, tuple[Callable, dict[str, str]]] = {}
+        self._edges: dict[str, list[Hashable]] = {}
+        self._conditionals: dict[str, tuple[Callable, dict[str, Hashable]]] = {}
         self._entry: str | None = None
 
     def add_node(self, name: str, fn: Callable) -> None:
@@ -63,7 +64,7 @@ class StateGraph:
         self._entry = name
 
     def add_edge(self, src: str, dst: Hashable) -> None:
-        self._edges.setdefault(src, []).append(dst if dst != END else END)
+        self._edges.setdefault(src, []).append(END if dst == END else dst)
 
     def add_conditional_edges(
         self,
@@ -71,7 +72,7 @@ class StateGraph:
         router: Callable,
         mapping: dict[str, Hashable],
     ) -> None:
-        norm = {k: (END if v == END else v) for k, v in mapping.items()}
+        norm: dict[str, Hashable] = {k: (END if v == END else v) for k, v in mapping.items()}
         self._conditionals[src] = (router, norm)
 
     def compile(self) -> CompiledGraph:

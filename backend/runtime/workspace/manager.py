@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 WorkspaceManager — 文件系统隔离管理
 
@@ -19,10 +18,9 @@ from __future__ import annotations
 import logging
 import os
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional, Set
 
 logger = logging.getLogger(__name__)
 
@@ -42,9 +40,9 @@ class WorkspaceInfo:
     workspace_id: str
     root: Path
     owner_id: str  # user_id or session_id
-    name: Optional[str] = None
+    name: str | None = None
     state: str = "idle"
-    created_at: Optional[str] = None
+    created_at: str | None = None
 
 
 class WorkspaceManager:
@@ -58,16 +56,16 @@ class WorkspaceManager:
         # ws.root = Path("/home/user/.emotional_chat/users/user_123")
     """
 
-    def __init__(self, base_dir: Optional[Path] = None):
+    def __init__(self, base_dir: Path | None = None):
         self._base = base_dir or _resolve_default_base()
-        self._workspaces: Dict[str, WorkspaceInfo] = {}
+        self._workspaces: dict[str, WorkspaceInfo] = {}
         self._lock = threading.Lock()
 
     def create_workspace(
         self,
         user_id: str,
-        workspace_id: Optional[str] = None,
-        name: Optional[str] = None,
+        workspace_id: str | None = None,
+        name: str | None = None,
     ) -> WorkspaceInfo:
         """创建隔离工作区"""
         import uuid
@@ -92,7 +90,7 @@ class WorkspaceManager:
         """解析工作区根路径"""
         return self._base / "users" / user_id
 
-    def get_workspace(self, workspace_id: str) -> Optional[WorkspaceInfo]:
+    def get_workspace(self, workspace_id: str) -> WorkspaceInfo | None:
         """获取工作区信息"""
         return self._workspaces.get(workspace_id)
 

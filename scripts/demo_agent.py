@@ -6,8 +6,8 @@ Agent演示脚本
 """
 
 import asyncio
-import sys
 import os
+import sys
 
 if os.name == "nt" and hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -16,7 +16,7 @@ if os.name == "nt" and hasattr(sys.stdout, "reconfigure"):
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend.agent import AgentCore, get_agent_core
+from backend.agent import get_agent_core
 
 
 async def main():
@@ -38,7 +38,7 @@ async def main():
         user_input="我最近心情很不好，感觉很焦虑",
         user_id=user_id
     )
-    print(f"用户：我最近心情很不好，感觉很焦虑")
+    print("用户：我最近心情很不好，感觉很焦虑")
     print(f"心语：{result1['response']}")
     print(f"情绪：{result1['emotion']} (强度: {result1['emotion_intensity']})")
     print(f"执行了 {len(result1['actions'])} 个行动")
@@ -52,7 +52,7 @@ async def main():
         user_input="我最近睡不好，怎么办？",
         user_id=user_id
     )
-    print(f"用户：我最近睡不好，怎么办？")
+    print("用户：我最近睡不好，怎么办？")
     print(f"心语：{result2['response']}")
     print(f"情绪：{result2['emotion']} (强度: {result2['emotion_intensity']})")
     print(f"执行了 {len(result2['actions'])} 个行动")
@@ -66,7 +66,7 @@ async def main():
         user_input="什么是正念冥想？",
         user_id=user_id
     )
-    print(f"用户：什么是正念冥想？")
+    print("用户：什么是正念冥想？")
     print(f"心语：{result3['response']}")
     print(f"情绪：{result3['emotion']} (强度: {result3['emotion_intensity']})")
     

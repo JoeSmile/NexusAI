@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Protocol 3: Permission Prompter — 权限提示抽象
 
@@ -15,7 +14,7 @@ Adapted for emotional chat:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Protocol
 
 

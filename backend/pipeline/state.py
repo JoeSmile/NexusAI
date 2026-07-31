@@ -8,7 +8,7 @@ PipelineState — LangGraph 管线状态定义。
 from __future__ import annotations
 
 import uuid
-from typing import Any, Optional, TypedDict
+from typing import Any, TypedDict
 
 
 class PipelineState(TypedDict):
@@ -27,16 +27,16 @@ class PipelineState(TypedDict):
     warm_memory: dict[str, str]
 
     # ── 分析结果 ──
-    emotion: Optional[str]
+    emotion: str | None
     emotion_intensity: float
-    intent: Optional[str]
+    intent: str | None
     intent_confidence: float
     entities: dict[str, str]
 
     # ── 缓存 ──
-    fingerprint: Optional[str]
+    fingerprint: str | None
     cache_hit: bool
-    cache_value: Optional[str]
+    cache_value: str | None
 
     # ── 护栏 ──
     pii_redacted: bool
@@ -51,21 +51,21 @@ class PipelineState(TypedDict):
     # ── 结果 ──
     response: str
     finish_reason: str  # skill_executed | llm_generated | cache_hit | blocked
-    approval_request_id: Optional[str]
+    approval_request_id: str | None
 
     # ── 观测 ──
     trace_id: str
     total_tokens: int
     total_cost: float
     pipeline_latency_ms: float
-    error_code: Optional[str]
-    langfuse_span: Optional[Any]
+    error_code: str | None
+    langfuse_span: Any | None
 
     # ── 扩展 (Task 18 LLM Key) ──
-    llm_api_key: Optional[str]
-    llm_base_url: Optional[str]
-    llm_key_id: Optional[str]
-    llm_key_version: Optional[int]
+    llm_api_key: str | None
+    llm_base_url: str | None
+    llm_key_id: str | None
+    llm_key_version: int | None
 
     # ── 流式（07.07e）──
     stream_mode: bool

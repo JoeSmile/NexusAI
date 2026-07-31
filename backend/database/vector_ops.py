@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import text
 
@@ -159,7 +159,7 @@ def store_user_memory(
     value: str,
     confidence: float = 1.0,
     source: str = "extracted",
-) -> Optional[int]:
+) -> int | None:
     """写入 UserMemory 并附 embedding"""
     emb = embed_text(f"{key} {value}")
     session_factory = get_pg_session()

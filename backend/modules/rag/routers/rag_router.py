@@ -4,16 +4,16 @@ RAG路由
 提供知识库管理和问答的API接口
 """
 
-from fastapi import APIRouter, HTTPException, UploadFile, File
-from pydantic import BaseModel, ConfigDict
-from typing import List, Dict, Any, Optional
 import os
 import tempfile
-from pathlib import Path
 
-from ..services.rag_service import RAGService, RAGIntegrationService
-from ..core.knowledge_base import KnowledgeBaseManager, PsychologyKnowledgeLoader
+from fastapi import APIRouter, File, HTTPException, UploadFile
+from pydantic import BaseModel, ConfigDict
+
 from backend.logging_config import get_logger
+
+from ..core.knowledge_base import KnowledgeBaseManager, PsychologyKnowledgeLoader
+from ..services.rag_service import RAGIntegrationService, RAGService
 
 logger = get_logger(__name__)
 
@@ -70,8 +70,8 @@ class AskRequest(BaseModel):
 class AskWithContextRequest(BaseModel):
     """带上下文的问答请求"""
     question: str
-    conversation_history: Optional[List[Dict[str, str]]] = None
-    user_emotion: Optional[str] = None
+    conversation_history: list[dict[str, str]] | None = None
+    user_emotion: str | None = None
     search_k: int = 3
 
     model_config = ConfigDict(
@@ -157,7 +157,7 @@ async def init_sample_knowledge(request: LoadSampleRequest = None):
             try:
                 kb_manager.delete_collection()
                 logger.info("已删除现有知识库")
-            except:
+            except Exception:
                 pass
         
         # 加载示例知识
@@ -197,7 +197,7 @@ async def init_knowledge_base_structure(request: LoadSampleRequest = None):
             try:
                 kb_manager.delete_collection()
                 logger.info("已删除现有知识库")
-            except:
+            except Exception:
                 pass
         
         # 从知识库结构加载知识
@@ -408,7 +408,7 @@ async def test_rag():
         logger.error(f"RAG测试失败: {e}")
         return {
             "success": False,
-            "message": f"RAG测试失败: {str(e)}",
+            "message": f"RAG测试失败: {e!s}",
             "suggestion": "请检查知识库是否正确初始化"
         }
 

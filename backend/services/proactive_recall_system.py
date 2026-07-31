@@ -4,11 +4,13 @@
 实现文档中提到的主动关怀和情感追踪功能
 """
 
-from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timedelta
-from backend.database import DatabaseManager, ChatMessage, MemoryItem
+from typing import Any
+
+from sqlalchemy import and_
+
+from backend.database import ChatMessage, DatabaseManager, MemoryItem
 from backend.services.enhanced_memory_manager import EnhancedMemoryManager
-from sqlalchemy import and_, func
 
 
 class EmotionTracker:
@@ -16,9 +18,8 @@ class EmotionTracker:
     
     def __init__(self):
         """初始化情感追踪器"""
-        pass
     
-    async def track_emotion_changes(self, user_id: str, days: int = 7) -> Dict[str, Any]:
+    async def track_emotion_changes(self, user_id: str, days: int = 7) -> dict[str, Any]:
         """
         追踪用户情绪变化
         
@@ -81,7 +82,7 @@ class EmotionTracker:
                 "changes": []
             }
     
-    def _detect_emotion_changes(self, timeline: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _detect_emotion_changes(self, timeline: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """
         检测显著的情绪变化点
         
@@ -129,7 +130,7 @@ class EmotionTracker:
         
         return changes[-5:]  # 返回最近5个变化点
     
-    def _calculate_trend(self, timeline: List[Dict[str, Any]]) -> str:
+    def _calculate_trend(self, timeline: list[dict[str, Any]]) -> str:
         """
         计算总体情绪趋势
         
@@ -170,7 +171,7 @@ class ProactiveRecallSystem:
     async def should_trigger_proactive_recall(self, 
                                              user_id: str,
                                              current_message: str,
-                                             emotion: Optional[str] = None) -> Tuple[bool, Optional[Dict[str, Any]]]:
+                                             emotion: str | None = None) -> tuple[bool, dict[str, Any] | None]:
         """
         判断是否应该触发主动回忆
         
@@ -218,7 +219,7 @@ class ProactiveRecallSystem:
         
         return False, None
     
-    async def _find_unfollow_memory(self, user_id: str) -> Optional[Dict[str, Any]]:
+    async def _find_unfollow_memory(self, user_id: str) -> dict[str, Any] | None:
         """
         查找未跟进的重要记忆
         
@@ -235,12 +236,12 @@ class ProactiveRecallSystem:
                 
                 memory = db.db.query(MemoryItem).filter(
                     MemoryItem.user_id == user_id,
-                    MemoryItem.is_active == True,
+                    MemoryItem.is_active,
                     MemoryItem.importance > 0.7,
                     MemoryItem.memory_type.in_(["commitment", "event", "concern"]),
                     and_(
                         MemoryItem.created_at < cutoff_date,
-                        (MemoryItem.last_accessed == None) | (MemoryItem.last_accessed < cutoff_date)
+                        (MemoryItem.last_accessed is None) | (MemoryItem.last_accessed < cutoff_date)
                     )
                 ).order_by(MemoryItem.importance.desc()).first()
                 
@@ -257,7 +258,7 @@ class ProactiveRecallSystem:
         
         return None
     
-    async def _check_emotion_change(self, user_id: str) -> Optional[Dict[str, Any]]:
+    async def _check_emotion_change(self, user_id: str) -> dict[str, Any] | None:
         """
         检查最近的情绪变化
         
@@ -323,7 +324,7 @@ class ProactiveRecallSystem:
         
         return 0
     
-    def _generate_followup_prompt(self, memory: Dict[str, Any]) -> str:
+    def _generate_followup_prompt(self, memory: dict[str, Any]) -> str:
         """
         生成跟进提示
         
@@ -346,7 +347,7 @@ class ProactiveRecallSystem:
         else:
             return f"还记得{days}天前我们聊到的：{content}。想和我分享最新的情况吗？"
     
-    def _generate_emotion_check_prompt(self, change: Dict[str, Any]) -> str:
+    def _generate_emotion_check_prompt(self, change: dict[str, Any]) -> str:
         """
         生成情绪关怀提示
         
@@ -364,7 +365,7 @@ class ProactiveRecallSystem:
     async def generate_proactive_response(self,
                                         user_id: str,
                                         current_message: str,
-                                        emotion: Optional[str] = None) -> Optional[str]:
+                                        emotion: str | None = None) -> str | None:
         """
         生成主动回应（在适当的时候）
         

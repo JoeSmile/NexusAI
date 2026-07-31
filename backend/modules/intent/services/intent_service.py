@@ -3,12 +3,12 @@
 Intent Recognition Service
 """
 
-from typing import Dict, Any, Optional
 import logging
+from typing import Any
 
-from ..core.intent_classifier import IntentClassifier
 from ..core.input_processor import InputProcessor
-from ..models.intent_models import IntentResult, IntentRequest
+from ..core.intent_classifier import IntentClassifier
+from ..models.intent_models import IntentResult
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ class IntentService:
     整合输入处理、意图识别等功能
     """
     
-    def __init__(self, model_path: Optional[str] = None):
+    def __init__(self, model_path: str | None = None):
         """
         初始化意图识别服务
         
@@ -30,7 +30,7 @@ class IntentService:
         self.intent_classifier = IntentClassifier(model_path)
         logger.info("意图识别服务初始化完成")
     
-    def analyze(self, text: str, user_id: Optional[str] = None) -> Dict[str, Any]:
+    def analyze(self, text: str, user_id: str | None = None) -> dict[str, Any]:
         """
         分析用户输入的意图
         
@@ -87,8 +87,8 @@ class IntentService:
     def _generate_suggestion(
         self, 
         intent_result: IntentResult, 
-        processed: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        processed: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         根据意图生成响应建议
         
@@ -182,7 +182,7 @@ class IntentService:
     def _check_action_required(
         self, 
         intent_result: IntentResult, 
-        processed: Dict[str, Any]
+        processed: dict[str, Any]
     ) -> bool:
         """
         判断是否需要特殊行动
@@ -206,7 +206,7 @@ class IntentService:
         
         return False
     
-    def build_prompt(self, user_context: Dict[str, Any]) -> str:
+    def build_prompt(self, user_context: dict[str, Any]) -> str:
         """
         构建大模型的prompt
         

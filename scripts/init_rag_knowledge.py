@@ -4,8 +4,8 @@ RAG知识库初始化脚本
 快速初始化心理健康知识库
 """
 
-import sys
 import os
+import sys
 
 if os.name == "nt" and hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")

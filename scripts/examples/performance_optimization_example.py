@@ -5,20 +5,18 @@
 """
 
 import asyncio
-import time
 import json
-import requests
-from typing import Dict, List, Any
-import sys
 import os
+import sys
+import time
 
 # 添加项目根目录到Python路径
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, project_root)
 
-from backend.services.performance_optimizer import performance_optimizer
-from backend.services.optimized_chat_service import optimized_chat_service
 from backend.config.performance_config import performance_config
+from backend.services.optimized_chat_service import optimized_chat_service
+from backend.services.performance_optimizer import performance_optimizer
 
 
 async def test_parallel_processing():
@@ -58,7 +56,7 @@ async def test_parallel_processing():
     )
     end_time = time.time()
     
-    print(f"✅ 并行处理完成")
+    print("✅ 并行处理完成")
     print(f"   处理时间: {result['processing_time']:.3f}s")
     print(f"   总时间: {end_time - start_time:.3f}s")
     print(f"   情感分析: {result['emotion']}")
@@ -94,7 +92,7 @@ async def test_caching():
     
     # 第一次计算（无缓存）
     start_time = time.time()
-    result1 = await performance_optimizer._get_or_compute(
+    await performance_optimizer._get_or_compute(
         cache_key,
         lambda: asyncio.sleep(0.1) or "计算结果"
     )
@@ -102,13 +100,13 @@ async def test_caching():
     
     # 第二次计算（有缓存）
     start_time = time.time()
-    result2 = await performance_optimizer._get_or_compute(
+    await performance_optimizer._get_or_compute(
         cache_key,
         lambda: asyncio.sleep(0.1) or "计算结果"
     )
     second_time = time.time() - start_time
     
-    print(f"✅ 缓存性能测试")
+    print("✅ 缓存性能测试")
     print(f"   首次计算时间: {first_time:.3f}s")
     print(f"   缓存命中时间: {second_time:.3f}s")
     print(f"   性能提升: {first_time/second_time:.1f}x")
@@ -201,7 +199,7 @@ async def test_optimized_chat_service():
         response = await optimized_chat_service.chat_optimized(chat_request)
         end_time = time.time()
         
-        print(f"✅ 优化聊天处理完成")
+        print("✅ 优化聊天处理完成")
         print(f"   处理时间: {end_time - start_time:.3f}s")
         print(f"   响应: {response.get('response', '无响应')[:100]}...")
         print(f"   优化启用: {response.get('optimization_enabled', False)}")

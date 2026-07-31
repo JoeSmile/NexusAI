@@ -2,31 +2,54 @@
 带插件支持的聊天引擎 - 扩展 ChatEngine 以支持 Function Calling
 """
 import json
-import uuid
 import re
-from typing import List, Dict, Any, Optional
-from datetime import datetime
+import uuid
+from typing import Any
+
 import requests
 
 # 导入 LangChain (Python 3.10+, langchain 0.2.x+)
 try:
-    from langchain_core.prompts import ChatPromptTemplate
     from langchain_core.output_parsers import StrOutputParser
+    from langchain_core.prompts import ChatPromptTemplate
     LANGCHAIN_AVAILABLE = True
 except ImportError:
     LANGCHAIN_AVAILABLE = False
     ChatPromptTemplate = None
     StrOutputParser = None
 
-from backend.modules.llm.harness import resolve_llm_settings, try_create_chat_openai
-from backend.database import DatabaseManager, create_tables, get_db
+from backend.database import DatabaseManager, create_tables
 from backend.models import ChatRequest, ChatResponse
-from backend.xinyu_prompt import get_system_prompt, build_full_prompt, validate_and_filter_input, XINYU_SYSTEM_PROMPT
-from backend.plugins.plugin_manager import PluginManager
-from backend.plugins.weather_plugin import WeatherPlugin
-from backend.plugins.news_plugin import NewsPlugin
-from backend.plugins.holiday_plugin import HolidayPlugin
+from backend.modules.llm.harness import resolve_llm_settings, try_create_chat_openai
 from backend.services.personalization_service import get_personalization_service
+from backend.xinyu_prompt import (
+    XINYU_SYSTEM_PROMPT,
+)
+
+
+class PluginManager:
+    """No-op stub — legacy weather/news/holiday plugins removed (Skill system)."""
+
+    def __init__(self) -> None:
+        self.plugins: dict[str, Any] = {}
+
+    def register_many(self, plugins: list) -> None:
+        return None
+
+    def get_function_schemas(self) -> list:
+        return []
+
+    def execute_plugin(self, name: str, **kwargs: Any) -> dict:
+        return {"error": f"plugin removed: {name}"}
+
+    def list_plugins(self) -> list:
+        return []
+
+    def get_usage_stats(self) -> dict:
+        return {}
+
+    def get_call_history(self, *args: Any, **kwargs: Any) -> list:
+        return []
 
 try:
     from backend.vector_store import VectorStore
@@ -66,18 +89,8 @@ class ChatEngineWithTools:
         else:
             self.vector_store = None
         
-        # 初始化插件管理器
+        # 旧 plugins 已移除；保留空 PluginManager 以兼容遗留 Function Calling 分支
         self.plugin_manager = PluginManager()
-        
-        # 注册插件
-        try:
-            weather_plugin = WeatherPlugin()
-            news_plugin = NewsPlugin()
-            holiday_plugin = HolidayPlugin()
-            self.plugin_manager.register_many([weather_plugin, news_plugin, holiday_plugin])
-            print("✓ 插件系统初始化成功（天气、新闻、节假日）")
-        except Exception as e:
-            print(f"警告: 插件初始化失败: {e}")
         
         # 初始化个性化服务
         try:
@@ -95,7 +108,7 @@ class ChatEngineWithTools:
                     print("警告: LangChain ChatOpenAI 不可用")
                     self.chain = None
                 else:
-                    self.template = """{system_prompt}
+                    self.template = f"""{XINYU_SYSTEM_PROMPT}
 
 {{long_term_memory}}
 
@@ -103,7 +116,7 @@ class ChatEngineWithTools:
 {{history}}
 
 用户：{{input}}
-ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
+ContextGate："""
 
                     self.prompt = ChatPromptTemplate.from_template(self.template)
                     self.output_parser = StrOutputParser()
@@ -179,7 +192,7 @@ ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
         try:
             db_manager = DatabaseManager()
             with db_manager as db:
-                assistant_message = db.save_message(
+                db.save_message(
                     session_id=session_id,
                     user_id=user_id,
                     role="assistant",
@@ -212,7 +225,7 @@ ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
             plugin_result=plugin_result
         )
     
-    def _detect_weather_intent(self, user_input: str) -> Optional[str]:
+    def _detect_weather_intent(self, user_input: str) -> str | None:
         """检测用户是否在询问天气，如果是则返回城市名称"""
         weather_keywords = ["天气", "温度", "下雨", "晴天", "阴天", "weather", "温度", "气温", "降雨", "下雪"]
         location_keywords = ["北京", "上海", "广州", "深圳", "杭州", "成都", "武汉", "西安", "南京", "重庆"]
@@ -244,7 +257,7 @@ ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
         # 如果没有找到具体城市，返回默认值（让API决定）
         return "当前城市" if "当前" in user_input or "这里" in user_input else None
     
-    def _detect_holiday_intent(self, user_input: str) -> Optional[Dict[str, str]]:
+    def _detect_holiday_intent(self, user_input: str) -> dict[str, str] | None:
         """检测用户是否在询问节假日信息，如果是则返回日期信息"""
         # 出游、旅行相关关键词
         travel_keywords = [
@@ -316,16 +329,16 @@ ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
     
     def _generate_response_with_plugins(self, user_input: str, session_id: str, 
                                        user_id: str = "anonymous",
-                                       emotion_state: Optional[Dict] = None,
-                                       plugin_used_ref: List = None, 
-                                       plugin_result_ref: List = None,
+                                       emotion_state: dict | None = None,
+                                       plugin_used_ref: list = None, 
+                                       plugin_result_ref: list = None,
                                        deep_thinking: bool = False):
         """
         使用 Function Calling 生成回应
         如果模型决定调用插件，则执行插件并基于结果生成最终回复
         """
         print(f"\n{'='*60}")
-        print(f"[DEBUG] _generate_response_with_plugins 被调用")
+        print("[DEBUG] _generate_response_with_plugins 被调用")
         print(f"[DEBUG] 用户输入: {user_input}")
         print(f"[DEBUG] session_id: {session_id}")
         print(f"{'='*60}\n")
@@ -407,7 +420,7 @@ ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
             
             # 让模型自己决定是否调用工具（不强制）
             tool_choice = "auto"
-            print(f"[DEBUG] 工具选择模式: auto（由模型决定是否调用工具）")
+            print("[DEBUG] 工具选择模式: auto（由模型决定是否调用工具）")
             
             # 优先尝试tools格式（通义千问）
             data = {
@@ -426,11 +439,11 @@ ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
             # 如果tools格式失败，尝试functions格式（OpenAI兼容）
             if response.status_code != 200:
                 print(f"[WARNING] 尝试tools格式失败 ({response.status_code}): {response.text[:200]}")
-                print(f"[DEBUG] 改用functions格式...")
+                print("[DEBUG] 改用functions格式...")
                 
                 # 对于functions格式，也让模型自己决定
                 function_call = "auto"
-                print(f"[DEBUG] 函数调用模式: auto（由模型决定是否调用函数）")
+                print("[DEBUG] 函数调用模式: auto（由模型决定是否调用函数）")
                 
                 data = {
                     "model": self.model,
@@ -464,7 +477,7 @@ ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
                 func_args_str = function_call.get("arguments", "{}")
                 try:
                     func_args = json.loads(func_args_str) if isinstance(func_args_str, str) else func_args_str
-                except:
+                except Exception:
                     func_args = {}
                 print(f"[DEBUG] 检测到tools格式调用: {func_name}, 参数: {func_args}")
             
@@ -476,7 +489,7 @@ ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
                 func_args_str = function_call.get("arguments", "{}")
                 try:
                     func_args = json.loads(func_args_str) if isinstance(func_args_str, str) else func_args_str
-                except:
+                except Exception:
                     func_args = {}
                 print(f"[DEBUG] 检测到functions格式调用: {func_name}, 参数: {func_args}")
             
@@ -489,7 +502,7 @@ ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
                     elif weather_location == "当前城市" or not weather_location:
                         # 如果无法提取，使用默认值或让API决定
                         func_args["location"] = "深圳"  # 默认值，可以根据需要修改
-                        print(f"[DEBUG] 使用默认location: 深圳")
+                        print("[DEBUG] 使用默认location: 深圳")
                 
                 # 辅助参数提取：节假日查询
                 if func_name == "get_holiday_info":
@@ -621,7 +634,7 @@ ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
                 # 如果用户明显在询问天气但模型没有调用工具，给出提示
                 weather_keywords = ["天气", "温度", "下雨", "晴天", "阴天", "weather"]
                 if any(keyword in user_input for keyword in weather_keywords):
-                    print(f"[WARNING] 用户询问天气但模型未调用工具，可能需要改进提示")
+                    print("[WARNING] 用户询问天气但模型未调用工具，可能需要改进提示")
                 
                 return content
         
@@ -631,7 +644,7 @@ ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
             traceback.print_exc()
             return self._get_fallback_response(user_input)
     
-    def _format_plugin_result(self, plugin_name: str, result: Dict[str, Any]) -> str:
+    def _format_plugin_result(self, plugin_name: str, result: dict[str, Any]) -> str:
         """格式化插件结果"""
         if plugin_name == "get_weather":
             if "error" in result:
@@ -712,7 +725,7 @@ ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
         
         return json.dumps(result, ensure_ascii=False)
     
-    def _generate_response_from_plugin_result(self, plugin_name: str, result: Dict[str, Any], user_input: str) -> str:
+    def _generate_response_from_plugin_result(self, plugin_name: str, result: dict[str, Any], user_input: str) -> str:
         """基于插件结果手动生成回复"""
         if "error" in result:
             error_msg = result['error']
@@ -780,7 +793,7 @@ ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
     
     def _call_llm_normal(self, user_input: str, session_id: str, 
                         user_id: str = "anonymous", 
-                        emotion_state: Optional[Dict] = None,
+                        emotion_state: dict | None = None,
                         deep_thinking: bool = False) -> str:
         """不使用插件的普通聊天"""
         # 获取历史
@@ -845,7 +858,7 @@ ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
             return self._get_fallback_response(user_input)
     
     def _get_personalized_system_prompt(self, user_id: str, user_input: str, 
-                                       emotion_state: Optional[Dict] = None) -> str:
+                                       emotion_state: dict | None = None) -> str:
         """
         获取个性化系统Prompt
         如果用户配置了个性化设置，使用个性化Prompt；否则使用默认Prompt
@@ -871,7 +884,7 @@ ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
             traceback.print_exc()
             return XINYU_SYSTEM_PROMPT
     
-    def analyze_emotion(self, message: str) -> Dict[str, Any]:
+    def analyze_emotion(self, message: str) -> dict[str, Any]:
         """
         分析用户消息的情感（公开接口，兼容 ChatEngine）
         
@@ -883,7 +896,7 @@ ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
         """
         return self._analyze_emotion_simple(message)
     
-    def _analyze_emotion_simple(self, message: str) -> Dict[str, Any]:
+    def _analyze_emotion_simple(self, message: str) -> dict[str, Any]:
         """简单的情感分析"""
         emotion_keywords = {
             "happy": ["开心", "高兴", "快乐", "兴奋", "满意", "幸福"],
@@ -921,7 +934,7 @@ ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
             "suggestions": suggestions
         }
     
-    def _get_emotion_suggestions(self, emotion: str) -> List[str]:
+    def _get_emotion_suggestions(self, emotion: str) -> list[str]:
         """获取情感建议"""
         suggestions_map = {
             "happy": ["很高兴看到你这么开心！", "你的快乐感染了我！", "太棒了！"],
@@ -937,7 +950,7 @@ ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
         suggestions = emotion_data.get("suggestions", [])
         return suggestions[0] if suggestions else "我在这里倾听你的心声。"
     
-    def get_session_summary(self, session_id: str) -> Dict[str, Any]:
+    def get_session_summary(self, session_id: str) -> dict[str, Any]:
         """获取会话摘要"""
         db_manager = DatabaseManager()
         with db_manager as db:
@@ -959,7 +972,7 @@ ContextGate：""".format(system_prompt=XINYU_SYSTEM_PROMPT)
                 "updated_at": messages[0].created_at.isoformat() if messages else None
             }
     
-    def get_user_emotion_trends(self, user_id: str) -> Dict[str, Any]:
+    def get_user_emotion_trends(self, user_id: str) -> dict[str, Any]:
         """获取用户情感趋势"""
         db_manager = DatabaseManager()
         with db_manager as db:

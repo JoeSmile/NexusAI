@@ -133,7 +133,7 @@ class LLMHarness(Harness):
                     stream=True,
                     max_tokens=int(kwargs.get("max_tokens", 1000)),
                 )
-                async for chunk in stream:
+                async for chunk in stream:  # type: ignore[union-attr]
                     delta = chunk.choices[0].delta.content if chunk.choices else None
                     if delta:
                         collected.append(delta)
@@ -179,9 +179,11 @@ class LLMHarness(Harness):
         from backend.pipeline.llm_helper import generate_text
 
         prompt = "\n".join(m.get("content", "") for m in messages)
+        key = api_key or os.getenv("LLM_API_KEY") or ""
+        url = base_url or os.getenv("LLM_BASE_URL") or ""
         return await generate_text(
             prompt,
             model=model,
-            api_key=api_key or os.getenv("LLM_API_KEY", ""),
-            base_url=base_url or os.getenv("LLM_BASE_URL", ""),
+            api_key=key,
+            base_url=url,
         )

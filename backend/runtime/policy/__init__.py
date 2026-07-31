@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Policy — 声明式策略引擎
 
@@ -11,13 +10,13 @@ Policy — 声明式策略引擎
 from backend.runtime.policy.policy_engine import (
     ActionType,
     PolicyAction,
-    PolicyRule,
     PolicyEngine,
+    PolicyRule,
 )
 
 __all__ = [
     "ActionType",
     "PolicyAction",
-    "PolicyRule",
     "PolicyEngine",
+    "PolicyRule",
 ]

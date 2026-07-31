@@ -4,16 +4,15 @@
 包含各种实用工具函数
 """
 
-import uuid
+import asyncio
 import hashlib
+import random
 import re
 import string
-import random
-from typing import Any, Dict, List, Optional, Union, Tuple
+import uuid
 from datetime import datetime, timedelta
-import json
-import asyncio
 from functools import wraps
+from typing import Any
 
 
 def generate_id(prefix: str = "", length: int = 8) -> str:
@@ -69,7 +68,7 @@ def sanitize_text(text: str, max_length: int = 2000) -> str:
     return text
 
 
-def extract_emotion_keywords(text: str) -> List[str]:
+def extract_emotion_keywords(text: str) -> list[str]:
     """从文本中提取情绪关键词"""
     emotion_keywords = {
         "positive": ["开心", "快乐", "兴奋", "满足", "幸福", "愉悦", "轻松", "平静", "好", "棒", "赞"],
@@ -80,7 +79,7 @@ def extract_emotion_keywords(text: str) -> List[str]:
     found_keywords = []
     text_lower = text.lower()
     
-    for category, keywords in emotion_keywords.items():
+    for _category, keywords in emotion_keywords.items():
         for keyword in keywords:
             if keyword in text_lower:
                 found_keywords.append(keyword)
@@ -110,7 +109,7 @@ def calculate_similarity(text1: str, text2: str) -> float:
     return intersection / union if union > 0 else 0.0
 
 
-def merge_dicts(*dicts: Dict[str, Any]) -> Dict[str, Any]:
+def merge_dicts(*dicts: dict[str, Any]) -> dict[str, Any]:
     """合并多个字典"""
     result = {}
     for d in dicts:
@@ -119,7 +118,7 @@ def merge_dicts(*dicts: Dict[str, Any]) -> Dict[str, Any]:
     return result
 
 
-def deep_merge_dicts(dict1: Dict[str, Any], dict2: Dict[str, Any]) -> Dict[str, Any]:
+def deep_merge_dicts(dict1: dict[str, Any], dict2: dict[str, Any]) -> dict[str, Any]:
     """深度合并字典"""
     result = dict1.copy()
     
@@ -132,7 +131,7 @@ def deep_merge_dicts(dict1: Dict[str, Any], dict2: Dict[str, Any]) -> Dict[str, 
     return result
 
 
-def flatten_dict(d: Dict[str, Any], parent_key: str = '', sep: str = '.') -> Dict[str, Any]:
+def flatten_dict(d: dict[str, Any], parent_key: str = '', sep: str = '.') -> dict[str, Any]:
     """扁平化嵌套字典"""
     items = []
     for k, v in d.items():
@@ -144,12 +143,12 @@ def flatten_dict(d: Dict[str, Any], parent_key: str = '', sep: str = '.') -> Dic
     return dict(items)
 
 
-def chunk_list(lst: List[Any], chunk_size: int) -> List[List[Any]]:
+def chunk_list(lst: list[Any], chunk_size: int) -> list[list[Any]]:
     """将列表分块"""
     return [lst[i:i + chunk_size] for i in range(0, len(lst), chunk_size)]
 
 
-def remove_duplicates(lst: List[Any], key_func: Optional[callable] = None) -> List[Any]:
+def remove_duplicates(lst: list[Any], key_func: callable | None = None) -> list[Any]:
     """移除列表中的重复项"""
     if key_func is None:
         return list(dict.fromkeys(lst))
@@ -165,7 +164,7 @@ def remove_duplicates(lst: List[Any], key_func: Optional[callable] = None) -> Li
     return result
 
 
-def safe_get(data: Dict[str, Any], keys: Union[str, List[str]], default: Any = None) -> Any:
+def safe_get(data: dict[str, Any], keys: str | list[str], default: Any = None) -> Any:
     """安全获取嵌套字典的值"""
     if isinstance(keys, str):
         keys = keys.split('.')
@@ -179,7 +178,7 @@ def safe_get(data: Dict[str, Any], keys: Union[str, List[str]], default: Any = N
         return default
 
 
-def safe_set(data: Dict[str, Any], keys: Union[str, List[str]], value: Any) -> bool:
+def safe_set(data: dict[str, Any], keys: str | list[str], value: Any) -> bool:
     """安全设置嵌套字典的值"""
     if isinstance(keys, str):
         keys = keys.split('.')
@@ -275,19 +274,19 @@ def normalize_text(text: str) -> str:
     return text
 
 
-def extract_urls(text: str) -> List[str]:
+def extract_urls(text: str) -> list[str]:
     """从文本中提取URL"""
     url_pattern = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
     return re.findall(url_pattern, text)
 
 
-def extract_emails(text: str) -> List[str]:
+def extract_emails(text: str) -> list[str]:
     """从文本中提取邮箱"""
     email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
     return re.findall(email_pattern, text)
 
 
-def extract_phone_numbers(text: str) -> List[str]:
+def extract_phone_numbers(text: str) -> list[str]:
     """从文本中提取手机号"""
     phone_pattern = r'(\+?86)?1[3-9]\d{9}'
     return re.findall(phone_pattern, text)
@@ -299,7 +298,7 @@ def create_timestamp(timezone_offset: int = 0) -> str:
     return dt.isoformat()
 
 
-def parse_timestamp(timestamp: str) -> Optional[datetime]:
+def parse_timestamp(timestamp: str) -> datetime | None:
     """解析时间戳"""
     try:
         return datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
@@ -310,7 +309,7 @@ def parse_timestamp(timestamp: str) -> Optional[datetime]:
 def is_within_timeframe(
     timestamp: str,
     timeframe: str,
-    reference_time: Optional[datetime] = None
+    reference_time: datetime | None = None
 ) -> bool:
     """检查时间戳是否在指定时间范围内"""
     if reference_time is None:
@@ -358,7 +357,7 @@ def timeout_async(seconds: float):
     return decorator
 
 
-def batch_process(items: List[Any], batch_size: int, processor: callable) -> List[Any]:
+def batch_process(items: list[Any], batch_size: int, processor: callable) -> list[Any]:
     """批量处理"""
     results = []
     for batch in chunk_list(items, batch_size):

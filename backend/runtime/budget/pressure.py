@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 BudgetPressure — 预算压力注入
 
@@ -13,7 +12,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +47,7 @@ class BudgetPressure:
     def __init__(self, max_iterations: int = 10):
         self._max_iterations = max_iterations
 
-    def check(self, iteration: int) -> Optional[BudgetWarning]:
+    def check(self, iteration: int) -> BudgetWarning | None:
         """检查是否需要注入预算压力"""
         if self._max_iterations <= 0:
             return None

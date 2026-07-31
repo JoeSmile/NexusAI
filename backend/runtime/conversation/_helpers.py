@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Helpers — 共享工具和数据结构
 """
@@ -7,7 +6,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -18,16 +17,16 @@ class TurnResult:
 
     success: bool
     response: str = ""
-    tool_calls: List[Dict[str, Any]] = field(default_factory=list)
-    skill_results: Dict[str, Any] = field(default_factory=dict)
-    emotion_tag: Optional[str] = None
-    usage: Dict[str, int] = field(default_factory=dict)
+    tool_calls: list[dict[str, Any]] = field(default_factory=list)
+    skill_results: dict[str, Any] = field(default_factory=dict)
+    emotion_tag: str | None = None
+    usage: dict[str, int] = field(default_factory=dict)
     iterations: int = 0
     stop_reason: str = ""  # "complete" | "budget_exceeded" | "error" | "cancelled"
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
-def _done_dict(result: TurnResult) -> Dict[str, Any]:
+def _done_dict(result: TurnResult) -> dict[str, Any]:
     """将 TurnResult 转换为 SSE 事件 dict"""
     return {
         "type": "done",
@@ -40,7 +39,7 @@ def _done_dict(result: TurnResult) -> Dict[str, Any]:
     }
 
 
-def _error_dict(error: str, **extra) -> Dict[str, Any]:
+def _error_dict(error: str, **extra) -> dict[str, Any]:
     """构造错误 SSE 事件 dict"""
     return {
         "type": "error",

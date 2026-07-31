@@ -4,13 +4,13 @@
 创建和配置FastAPI应用实例
 """
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from pathlib import Path
 import os
 import sys
 from datetime import datetime
+from pathlib import Path
+
+from fastapi import APIRouter, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 # 添加项目根目录到Python路径
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -25,20 +25,20 @@ except ImportError:
     pass
 
 # 导入路由
+from backend.pipeline.router import router as chat_pipeline_router
 from backend.routers import (
     admin_router,
     audit_router,
-    chat_router,
-    memory_router,
-    feedback_router,
     evaluation_router,
+    feedback_router,
+    memory_router,
     personalization_router,
-    rag_router
+    rag_router,
 )
 
-from backend.pipeline.router import router as chat_pipeline_router
-
 # 导入性能优化路由
+performance_router: APIRouter | None
+streaming_router: APIRouter | None
 try:
     from backend.routers.performance import router as performance_router
     from backend.routers.streaming_chat import router as streaming_router
@@ -49,6 +49,7 @@ except ImportError:
     streaming_router = None
 
 # 导入增强版聊天路由
+enhanced_chat_router: APIRouter | None
 try:
     from backend.routers.enhanced_chat import router as enhanced_chat_router
     ENHANCED_CHAT_ENABLED = True
@@ -57,6 +58,7 @@ except ImportError:
     enhanced_chat_router = None
 
 # 导入意图识别路由
+intent_router: APIRouter | None
 try:
     from backend.modules.intent.routers import intent_router
     INTENT_ENABLED = True
@@ -65,6 +67,7 @@ except ImportError:
     intent_router = None
 
 # 尝试导入Agent路由
+agent_router: APIRouter | None
 try:
     from backend.routers.agent import router as agent_router
     AGENT_ENABLED = True
@@ -100,7 +103,7 @@ def create_app() -> FastAPI:
         global_exception_handler,
     )
 
-    app.add_exception_handler(ContextGateException, contextgate_exception_handler)
+    app.add_exception_handler(ContextGateException, contextgate_exception_handler)  # type: ignore[arg-type]
     app.add_exception_handler(Exception, global_exception_handler)
     
     # CORS：浏览器不允许 allow_origins=["*"] 与 allow_credentials=True 同时使用

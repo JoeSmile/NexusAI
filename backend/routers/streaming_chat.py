@@ -4,17 +4,16 @@
 实现流式响应和实时交互功能
 """
 
-from fastapi import APIRouter, HTTPException, Depends
-from fastapi.responses import StreamingResponse
-from fastapi.requests import Request
-from typing import Dict, List, Optional, Any
 import asyncio
 import json
-import time
 from datetime import datetime
+from typing import Any
 
-from backend.services.optimized_chat_service import optimized_chat_service
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
+
 from backend.logging_config import get_logger
+from backend.services.optimized_chat_service import optimized_chat_service
 
 logger = get_logger(__name__)
 
@@ -23,7 +22,7 @@ router = APIRouter(prefix="/streaming", tags=["流式聊天"])
 
 
 @router.post("/chat")
-async def streaming_chat(request: Dict[str, Any]):
+async def streaming_chat(request: dict[str, Any]):
     """
     流式聊天接口
     
@@ -43,10 +42,11 @@ async def streaming_chat(request: Dict[str, Any]):
         
     except Exception as e:
         logger.error(f"流式聊天失败: {e}")
+        err_msg = str(e)
         
         # 返回错误流
         async def error_stream():
-            yield f"data: {json.dumps({'error': str(e), 'type': 'error'})}\n\n"
+            yield f"data: {json.dumps({'error': err_msg, 'type': 'error'})}\n\n"
             yield "data: [DONE]\n\n"
         
         return StreamingResponse(
@@ -61,7 +61,7 @@ async def streaming_chat(request: Dict[str, Any]):
 
 
 @router.post("/chat/with-metadata")
-async def streaming_chat_with_metadata(request: Dict[str, Any]):
+async def streaming_chat_with_metadata(request: dict[str, Any]):
     """
     带元数据的流式聊天
     
@@ -73,8 +73,8 @@ async def streaming_chat_with_metadata(request: Dict[str, Any]):
     """
     try:
         user_input = request.get("message", "")
-        session_id = request.get("session_id", "default")
-        user_id = request.get("user_id", "anonymous")
+        request.get("session_id", "default")
+        request.get("user_id", "anonymous")
         metadata = request.get("metadata", {})
         
         # 添加请求时间戳
@@ -125,9 +125,10 @@ async def streaming_chat_with_metadata(request: Dict[str, Any]):
         
     except Exception as e:
         logger.error(f"带元数据的流式聊天失败: {e}")
+        err_msg = str(e)
         
         async def error_stream():
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'message': err_msg})}\n\n"
             yield "data: [DONE]\n\n"
         
         return StreamingResponse(
@@ -258,7 +259,7 @@ async def websocket_chat(websocket):
         logger.error(f"WebSocket连接失败: {e}")
         try:
             await websocket.close()
-        except:
+        except Exception:
             pass
 
 

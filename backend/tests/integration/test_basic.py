@@ -3,8 +3,8 @@
 基础集成测试
 """
 
+
 import pytest
-from unittest.mock import Mock, patch
 
 
 class TestBasicIntegration:
@@ -33,11 +33,7 @@ class TestBasicIntegration:
     
     def test_exception_handling(self):
         """测试异常处理"""
-        from backend.core.exceptions import (
-            EmotionalChatException,
-            ValidationError,
-            DatabaseError
-        )
+        from backend.core.exceptions import DatabaseError, EmotionalChatException, ValidationError
         
         # 测试异常可以正常创建
         exc = EmotionalChatException("测试错误")

@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, TypeVar
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 F = TypeVar("F", bound=Callable[..., Any])
 
 try:
-    from langfuse.decorators import observe as _lf_observe
     from langfuse.decorators import langfuse_context as langfuse_context
+    from langfuse.decorators import observe as _lf_observe
 except ImportError:
 
     def _lf_observe(*args: Any, **kwargs: Any):  # type: ignore[misc]
@@ -31,4 +32,4 @@ def observe(*args: Any, **kwargs: Any):
     return _lf_observe(*args, **kwargs)
 
 
-__all__ = ["observe", "langfuse_context"]
+__all__ = ["langfuse_context", "observe"]

@@ -16,10 +16,22 @@ async def analyze_parallel(state: PipelineState) -> PipelineState:
     """并发分析情绪和意图"""
     message = state["message"]
 
-    emotion_result, intent_result = await asyncio.gather(
-        _analyze_emotion(message),
-        _analyze_intent(message),
-        return_exceptions=True,
+    from typing import Any, cast
+
+    gathered = cast(
+        tuple[Any, Any],
+        await asyncio.gather(
+            _analyze_emotion(message),
+            _analyze_intent(message),
+            return_exceptions=True,
+        ),
+    )
+    emotion_raw, intent_raw = gathered
+    emotion_result: dict | BaseException = (
+        emotion_raw if isinstance(emotion_raw, (dict, BaseException)) else {}
+    )
+    intent_result: dict | BaseException = (
+        intent_raw if isinstance(intent_raw, (dict, BaseException)) else {}
     )
 
     if isinstance(emotion_result, dict):
@@ -40,10 +52,9 @@ async def analyze_parallel(state: PipelineState) -> PipelineState:
 
     from backend.pipeline.cache.fingerprint_cache import make_fingerprint
 
-    if state.get("intent") and state.get("entities") is not None:
-        state["fingerprint"] = make_fingerprint(
-            state["intent"], state["entities"]
-        )
+    intent = state.get("intent") or "default"
+    entities = state.get("entities") or {}
+    state["fingerprint"] = make_fingerprint(intent, entities)
 
     return state
 

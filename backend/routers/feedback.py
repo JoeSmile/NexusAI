@@ -4,9 +4,15 @@
 """
 
 from fastapi import APIRouter, HTTPException
-from backend.models import FeedbackRequest, FeedbackResponse, FeedbackStatistics, FeedbackListResponse
+
 from backend.database import DatabaseManager
 from backend.logging_config import get_logger
+from backend.models import (
+    FeedbackListResponse,
+    FeedbackRequest,
+    FeedbackResponse,
+    FeedbackStatistics,
+)
 
 router = APIRouter(prefix="/feedback", tags=["feedback"])
 logger = get_logger(__name__)

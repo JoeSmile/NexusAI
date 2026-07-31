@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Session — 会话状态管理
 
@@ -7,20 +6,20 @@ Session — 会话状态管理
 """
 
 from backend.runtime.session.fsm import (
+    TERMINAL_STATES,
+    IllegalTransitionError,
     SessionFSM,
     SessionState,
-    IllegalTransitionError,
-    TERMINAL_STATES,
 )
 from backend.runtime.session.lineage import LineageTracker, SessionLineage
 from backend.runtime.session.resume import SessionResumer
 
 __all__ = [
-    "SessionFSM",
-    "SessionState",
-    "IllegalTransitionError",
     "TERMINAL_STATES",
+    "IllegalTransitionError",
     "LineageTracker",
+    "SessionFSM",
     "SessionLineage",
     "SessionResumer",
+    "SessionState",
 ]

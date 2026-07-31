@@ -8,13 +8,13 @@
 4. 记忆衰减机制
 """
 
-from typing import Dict, List, Optional, Any, Tuple
-from datetime import datetime, timedelta
 import json
-import math
-from backend.vector_store import VectorStore
-from backend.memory_extractor import MemoryExtractor
+from datetime import datetime
+from typing import Any
+
 from backend.database import DatabaseManager, MemoryItem
+from backend.memory_extractor import MemoryExtractor
+from backend.vector_store import VectorStore
 
 
 class MemoryDecayCalculator:
@@ -85,8 +85,8 @@ class ShortTermMemory:
         self.max_tokens = max_tokens
     
     def truncate_conversation(self, 
-                             history: List[Dict[str, Any]], 
-                             important_markers: Optional[List[int]] = None) -> List[Dict[str, Any]]:
+                             history: list[dict[str, Any]], 
+                             important_markers: list[int] | None = None) -> list[dict[str, Any]]:
         """
         裁剪对话历史
         
@@ -106,7 +106,7 @@ class ShortTermMemory:
             important_turns = [history[i] for i in important_markers if i < len(history)]
         
         # 2. 估算token数（简化：每个字符约0.5个token）
-        def estimate_tokens(messages: List[Dict[str, Any]]) -> int:
+        def estimate_tokens(messages: list[dict[str, Any]]) -> int:
             return sum(len(str(msg.get("content", ""))) // 2 for msg in messages)
         
         current_tokens = estimate_tokens(important_turns)
@@ -138,8 +138,8 @@ class ShortTermMemory:
         return all_turns
     
     def mark_important_turn(self, 
-                           message: Dict[str, Any], 
-                           criteria: Optional[Dict[str, Any]] = None) -> bool:
+                           message: dict[str, Any], 
+                           criteria: dict[str, Any] | None = None) -> bool:
         """
         判断对话轮次是否重要
         
@@ -194,8 +194,8 @@ class EnhancedMemoryManager:
                                    user_id: str,
                                    user_message: str, 
                                    bot_response: str,
-                                   emotion: Optional[str] = None,
-                                   emotion_intensity: Optional[float] = None) -> List[Dict[str, Any]]:
+                                   emotion: str | None = None,
+                                   emotion_intensity: float | None = None) -> list[dict[str, Any]]:
         """
         处理对话并提取记忆
         
@@ -248,7 +248,7 @@ class EnhancedMemoryManager:
     async def store_memory(self, 
                           user_id: str, 
                           session_id: str,
-                          memory: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+                          memory: dict[str, Any]) -> dict[str, Any] | None:
         """
         存储单条记忆到向量数据库和关系数据库
         
@@ -266,6 +266,7 @@ class EnhancedMemoryManager:
         
         try:
             import uuid
+
             from backend.database import vector_ops
 
             memory_key = f"{memory.get('type', 'other')}_{uuid.uuid4().hex[:12]}"
@@ -315,10 +316,10 @@ class EnhancedMemoryManager:
                                user_id: str, 
                                query: str,
                                n_results: int = 5,
-                               days_limit: Optional[int] = 30,
+                               days_limit: int | None = 30,
                                min_importance: float = 0.3,
-                               emotion_filter: Optional[str] = None,
-                               enable_decay: bool = True) -> List[Dict[str, Any]]:
+                               emotion_filter: str | None = None,
+                               enable_decay: bool = True) -> list[dict[str, Any]]:
         """
         检索相关记忆（支持时间衰减）
         
@@ -387,7 +388,7 @@ class EnhancedMemoryManager:
             print(f"检索记忆失败: {e}")
             return []
     
-    async def _update_access_stats(self, memory_ids: List[str]):
+    async def _update_access_stats(self, memory_ids: list[str]):
         """更新记忆的访问统计"""
         try:
             with DatabaseManager() as db:
@@ -407,7 +408,7 @@ class EnhancedMemoryManager:
     async def get_important_memories(self, 
                                     user_id: str, 
                                     limit: int = 10,
-                                    min_importance: float = 0.6) -> List[Dict[str, Any]]:
+                                    min_importance: float = 0.6) -> list[dict[str, Any]]:
         """
         获取用户最重要的记忆
         
@@ -423,7 +424,7 @@ class EnhancedMemoryManager:
             with DatabaseManager() as db:
                 memories = db.db.query(MemoryItem).filter(
                     MemoryItem.user_id == user_id,
-                    MemoryItem.is_active == True,
+                    MemoryItem.is_active,
                     MemoryItem.importance >= min_importance
                 ).order_by(
                     MemoryItem.importance.desc(),
@@ -450,8 +451,8 @@ class EnhancedMemoryManager:
             return []
     
     def get_short_term_context(self, 
-                              history: List[Dict[str, Any]],
-                              important_markers: Optional[List[int]] = None) -> List[Dict[str, Any]]:
+                              history: list[dict[str, Any]],
+                              important_markers: list[int] | None = None) -> list[dict[str, Any]]:
         """
         获取短期记忆上下文
         

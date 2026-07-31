@@ -74,7 +74,7 @@ lint:
 
 typecheck:
 	$(require_uv)
-	cd $(ROOT_DIR) && uv run --no-sync mypy backend/ --ignore-missing-imports
+	cd $(ROOT_DIR) && uv run --no-sync mypy --ignore-missing-imports
 
 fmt:
 	$(require_uv)

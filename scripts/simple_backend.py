@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 简化版后端服务
 适用于 Python 3.6 环境，不依赖 ChromaDB
 """
 
+import logging
 import os
 import sys
-import logging
 from pathlib import Path
 
 # 设置环境变量
@@ -29,10 +28,11 @@ logger = logging.getLogger(__name__)
 def create_simple_app():
     """创建简化的 FastAPI 应用"""
     try:
+        from typing import Any, Dict, Optional
+
         from fastapi import FastAPI, HTTPException
         from fastapi.middleware.cors import CORSMiddleware
         from pydantic import BaseModel
-        from typing import Optional, Dict, Any
         
         # 创建 FastAPI 应用
         app = FastAPI(
@@ -53,19 +53,19 @@ def create_simple_app():
         # 请求/响应模型
         class ChatRequest(BaseModel):
             message: str
-            user_id: Optional[str] = None
-            session_id: Optional[str] = None
+            user_id: str | None = None
+            session_id: str | None = None
         
         class ChatResponse(BaseModel):
             response: str
-            emotion: Optional[str] = None
-            confidence: Optional[float] = None
-            intensity: Optional[float] = None
-            suggestions: Optional[list] = None
+            emotion: str | None = None
+            confidence: float | None = None
+            intensity: float | None = None
+            suggestions: list | None = None
         
         class EmotionAnalysisRequest(BaseModel):
             text: str
-            user_id: Optional[str] = None
+            user_id: str | None = None
         
         class EmotionAnalysisResponse(BaseModel):
             emotion: str

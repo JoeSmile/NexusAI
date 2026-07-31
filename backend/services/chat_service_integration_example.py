@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 ChatService集成个性化配置示例
 展示如何将PersonalizationService集成到对话流程中
 """
 
-from typing import Dict, Optional
-from backend.services.personalization_service import get_personalization_service
-from backend.database import DatabaseManager
 import logging
+
+from backend.database import DatabaseManager
+from backend.services.personalization_service import get_personalization_service
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +27,9 @@ class PersonalizedChatService:
         self,
         user_id: str,
         user_message: str,
-        emotion_state: Optional[Dict] = None,
-        conversation_history: Optional[list] = None
-    ) -> Dict:
+        emotion_state: dict | None = None,
+        conversation_history: list | None = None
+    ) -> dict:
         """
         生成个性化回复
         
@@ -91,7 +90,7 @@ class PersonalizedChatService:
     def _build_context(
         self,
         current_message: str,
-        conversation_history: Optional[list] = None
+        conversation_history: list | None = None
     ) -> str:
         """构建对话上下文"""
         context_parts = []
@@ -111,8 +110,8 @@ class PersonalizedChatService:
     
     def _mock_llm_response(
         self,
-        user_config: Dict,
-        emotion_state: Optional[Dict] = None
+        user_config: dict,
+        emotion_state: dict | None = None
     ) -> str:
         """
         模拟LLM回复（用于测试）
@@ -205,7 +204,6 @@ async def _chat_with_memory(self, request: ChatRequest) -> ChatResponse:
 
 async def test_personalized_chat():
     """测试个性化聊天"""
-    import asyncio
     
     service = PersonalizedChatService()
     

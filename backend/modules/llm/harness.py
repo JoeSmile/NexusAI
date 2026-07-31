@@ -11,11 +11,10 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Any, Optional
-
-from config import Config
+from typing import Any
 
 from backend.logging_config import get_logger
+from config import Config
 
 logger = get_logger(__name__)
 
@@ -24,14 +23,14 @@ logger = get_logger(__name__)
 class LLMHarnessSettings:
     """当前解析得到的 LLM 连接参数。"""
 
-    api_key: Optional[str]
+    api_key: str | None
     base_url: str
     model: str
 
 
 def resolve_llm_settings(
     *,
-    model: Optional[str] = None,
+    model: str | None = None,
     prefer_evaluation_model: bool = False,
 ) -> LLMHarnessSettings:
     """
@@ -55,10 +54,10 @@ def resolve_llm_settings(
 def try_create_chat_openai(
     *,
     temperature: float = 0.7,
-    model: Optional[str] = None,
+    model: str | None = None,
     prefer_evaluation_model: bool = False,
     **extra: Any,
-) -> Optional[Any]:
+) -> Any | None:
     """
     创建 langchain_openai.ChatOpenAI；LangChain 不可用、无密钥或构造失败时返回 None。
     """
@@ -85,7 +84,7 @@ def try_create_chat_openai(
         return None
 
 
-def try_create_openai_sync_client() -> Optional[Any]:
+def try_create_openai_sync_client() -> Any | None:
     """
     创建 OpenAI SDK 同步客户端（记忆提取等）；无密钥或失败时返回 None。
     """

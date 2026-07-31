@@ -4,13 +4,14 @@
 定义基础的数据模型和验证器
 """
 
-from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
+from enum import StrEnum
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-from enum import Enum
 
 
-class ResponseStatus(str, Enum):
+class ResponseStatus(StrEnum):
     """响应状态枚举"""
     SUCCESS = "success"
     ERROR = "error"
@@ -28,7 +29,7 @@ class BaseResponse(BaseModel):
 class ErrorResponse(BaseResponse):
     """错误响应模型"""
     success: bool = Field(False, description="请求失败")
-    error: Dict[str, Any] = Field(..., description="错误详情")
+    error: dict[str, Any] = Field(..., description="错误详情")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -92,8 +93,8 @@ class HealthCheckResponse(BaseModel):
     """健康检查响应模型"""
     status: str = Field(..., description="服务状态")
     version: str = Field(..., description="服务版本")
-    uptime: Optional[str] = Field(None, description="运行时间")
-    services: Dict[str, str] = Field(..., description="各服务状态")
+    uptime: str | None = Field(None, description="运行时间")
+    services: dict[str, str] = Field(..., description="各服务状态")
     timestamp: datetime = Field(default_factory=datetime.now, description="检查时间")
 
     model_config = ConfigDict(
@@ -119,7 +120,7 @@ class SystemInfoResponse(BaseModel):
     name: str = Field(..., description="系统名称")
     version: str = Field(..., description="系统版本")
     environment: str = Field(..., description="运行环境")
-    features: List[str] = Field(..., description="功能特性列表")
+    features: list[str] = Field(..., description="功能特性列表")
     architecture: str = Field(..., description="系统架构")
     agent_enabled: bool = Field(..., description="Agent模块是否启用")
     timestamp: datetime = Field(default_factory=datetime.now, description="响应时间")
@@ -131,8 +132,8 @@ class StatisticsResponse(BaseModel):
     total_sessions: int = Field(..., description="总会话数")
     total_messages: int = Field(..., description="总消息数")
     active_sessions: int = Field(..., description="活跃会话数")
-    emotion_distribution: Optional[Dict[str, int]] = Field(None, description="情绪分布")
-    time_range: Optional[str] = Field(None, description="统计时间范围")
+    emotion_distribution: dict[str, int] | None = Field(None, description="情绪分布")
+    time_range: str | None = Field(None, description="统计时间范围")
     timestamp: datetime = Field(default_factory=datetime.now, description="统计时间")
 
 
@@ -142,15 +143,15 @@ class FileUploadResponse(BaseModel):
     file_size: int = Field(..., description="文件大小（字节）")
     file_type: str = Field(..., description="文件类型")
     upload_id: str = Field(..., description="上传ID")
-    url: Optional[str] = Field(None, description="文件访问URL")
+    url: str | None = Field(None, description="文件访问URL")
     timestamp: datetime = Field(default_factory=datetime.now, description="上传时间")
 
 
 class SearchRequest(BaseModel):
     """搜索请求模型"""
     query: str = Field(..., min_length=1, max_length=100, description="搜索关键词")
-    filters: Optional[Dict[str, Any]] = Field(None, description="搜索过滤器")
-    sort_by: Optional[str] = Field(None, description="排序字段")
+    filters: dict[str, Any] | None = Field(None, description="搜索过滤器")
+    sort_by: str | None = Field(None, description="排序字段")
     sort_order: str = Field("desc", pattern="^(asc|desc)$", description="排序顺序")
     pagination: PaginationRequest = Field(default_factory=PaginationRequest, description="分页参数")
 
@@ -165,18 +166,18 @@ class SearchRequest(BaseModel):
 class SearchResponse(BaseModel):
     """搜索响应模型"""
     query: str = Field(..., description="搜索关键词")
-    results: List[Dict[str, Any]] = Field(..., description="搜索结果")
+    results: list[dict[str, Any]] = Field(..., description="搜索结果")
     total: int = Field(..., description="结果总数")
     pagination: PaginationResponse = Field(..., description="分页信息")
     search_time: float = Field(..., description="搜索耗时（秒）")
-    suggestions: Optional[List[str]] = Field(None, description="搜索建议")
+    suggestions: list[str] | None = Field(None, description="搜索建议")
 
 
 class BatchRequest(BaseModel):
     """批量请求模型"""
-    items: List[Dict[str, Any]] = Field(..., description="批量操作项目")
+    items: list[dict[str, Any]] = Field(..., description="批量操作项目")
     operation: str = Field(..., description="操作类型")
-    options: Optional[Dict[str, Any]] = Field(None, description="操作选项")
+    options: dict[str, Any] | None = Field(None, description="操作选项")
 
     @field_validator('items')
     @classmethod
@@ -193,21 +194,21 @@ class BatchResponse(BaseModel):
     total: int = Field(..., description="总项目数")
     successful: int = Field(..., description="成功项目数")
     failed: int = Field(..., description="失败项目数")
-    results: List[Dict[str, Any]] = Field(..., description="操作结果")
-    errors: Optional[List[Dict[str, Any]]] = Field(None, description="错误信息")
+    results: list[dict[str, Any]] = Field(..., description="操作结果")
+    errors: list[dict[str, Any]] | None = Field(None, description="错误信息")
 
 
 class ValidationErrorDetail(BaseModel):
     """验证错误详情"""
     field: str = Field(..., description="错误字段")
     message: str = Field(..., description="错误消息")
-    value: Optional[Any] = Field(None, description="错误值")
+    value: Any | None = Field(None, description="错误值")
 
 
 class ValidationErrorResponse(BaseResponse):
     """验证错误响应"""
     success: bool = Field(False, description="验证失败")
-    errors: List[ValidationErrorDetail] = Field(..., description="验证错误列表")
+    errors: list[ValidationErrorDetail] = Field(..., description="验证错误列表")
 
     model_config = ConfigDict(
         json_schema_extra={

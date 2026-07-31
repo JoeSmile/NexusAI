@@ -9,10 +9,11 @@ External Tools - 外部工具模块
 - Agent核心工具函数
 """
 
-from .calendar_api import CalendarAPI
 from .audio_player import AudioPlayer
+from .calendar_api import CalendarAPI
 from .psychology_db import PsychologyDB
 from .scheduler_service import SchedulerService
+
 
 # 延迟导入Agent核心工具函数，避免循环依赖
 def __getattr__(name):

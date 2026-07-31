@@ -5,7 +5,6 @@ Intent Recognition Module Usage Examples
 """
 
 import sys
-import os
 from pathlib import Path
 
 # 添加项目根目录到Python路径
@@ -13,7 +12,6 @@ project_root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(project_root))
 
 from backend.modules.intent.services import IntentService
-from backend.modules.intent.models import IntentType
 
 
 def example_1_basic_usage():
@@ -141,7 +139,7 @@ def example_5_integration_with_chat():
     intent_analysis = intent_service.analyze(user_message, user_id="user_123")
     
     print(f"\n用户消息: {user_message}")
-    print(f"\n步骤1 - 意图识别:")
+    print("\n步骤1 - 意图识别:")
     print(f"  意图: {intent_analysis['intent']['intent']}")
     print(f"  置信度: {intent_analysis['intent']['confidence']:.2f}")
     
@@ -163,11 +161,11 @@ def example_5_integration_with_chat():
     # 4. 生成Prompt
     prompt = intent_service.build_prompt(user_context)
     
-    print(f"\n步骤3 - Prompt构建（前150字符）:")
+    print("\n步骤3 - Prompt构建（前150字符）:")
     print(f"  {prompt[:150]}...")
     
     # 5. 后续会调用大模型生成回复
-    print(f"\n步骤4 - 调用大模型生成回复 (模拟)")
+    print("\n步骤4 - 调用大模型生成回复 (模拟)")
     print(f"  响应建议: {intent_analysis['suggestion']['response_style']}")
 
 

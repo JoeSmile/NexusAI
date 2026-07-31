@@ -5,8 +5,8 @@
 """
 
 import os
-from typing import Dict, Any, Optional
-from pathlib import Path
+from typing import Any
+
 
 class PerformanceConfig:
     """性能优化配置类"""
@@ -65,7 +65,7 @@ class PerformanceConfig:
     SLOW_QUERY_THRESHOLD = float(os.getenv("SLOW_QUERY_THRESHOLD", "1.0"))  # 1秒
     
     @classmethod
-    def get_cache_config(cls) -> Dict[str, Any]:
+    def get_cache_config(cls) -> dict[str, Any]:
         """获取缓存配置"""
         return {
             "enabled": cls.CACHE_ENABLED,
@@ -78,7 +78,7 @@ class PerformanceConfig:
         }
     
     @classmethod
-    def get_concurrency_config(cls) -> Dict[str, Any]:
+    def get_concurrency_config(cls) -> dict[str, Any]:
         """获取并发配置"""
         return {
             "max_concurrent_requests": cls.MAX_CONCURRENT_REQUESTS,
@@ -87,7 +87,7 @@ class PerformanceConfig:
         }
     
     @classmethod
-    def get_timeout_config(cls) -> Dict[str, Any]:
+    def get_timeout_config(cls) -> dict[str, Any]:
         """获取超时配置"""
         return {
             "request_timeout": cls.REQUEST_TIMEOUT,
@@ -97,7 +97,7 @@ class PerformanceConfig:
         }
     
     @classmethod
-    def get_streaming_config(cls) -> Dict[str, Any]:
+    def get_streaming_config(cls) -> dict[str, Any]:
         """获取流式配置"""
         return {
             "enabled": cls.STREAMING_ENABLED,
@@ -106,7 +106,7 @@ class PerformanceConfig:
         }
     
     @classmethod
-    def get_monitoring_config(cls) -> Dict[str, Any]:
+    def get_monitoring_config(cls) -> dict[str, Any]:
         """获取监控配置"""
         return {
             "metrics_enabled": cls.METRICS_ENABLED,
@@ -117,7 +117,7 @@ class PerformanceConfig:
         }
     
     @classmethod
-    def get_database_config(cls) -> Dict[str, Any]:
+    def get_database_config(cls) -> dict[str, Any]:
         """获取数据库配置"""
         return {
             "pool_size": cls.DB_POOL_SIZE,
@@ -127,7 +127,7 @@ class PerformanceConfig:
         }
     
     @classmethod
-    def get_vector_config(cls) -> Dict[str, Any]:
+    def get_vector_config(cls) -> dict[str, Any]:
         """获取向量数据库配置"""
         return {
             "batch_size": cls.VECTOR_BATCH_SIZE,
@@ -136,7 +136,7 @@ class PerformanceConfig:
         }
     
     @classmethod
-    def get_all_config(cls) -> Dict[str, Any]:
+    def get_all_config(cls) -> dict[str, Any]:
         """获取所有配置"""
         return {
             "cache": cls.get_cache_config(),

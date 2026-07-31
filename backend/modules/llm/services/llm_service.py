@@ -5,29 +5,28 @@ LLM服务层
 """
 
 import time
-from typing import List, Dict, Any, Optional, AsyncGenerator
+from collections.abc import AsyncGenerator
 from datetime import datetime
+from typing import Any
+
+from backend.core.exceptions import ExternalServiceError
 
 from ..core.llm_core import LLMCore
 from ..models.llm_models import (
-    LLMRequest,
-    LLMResponse,
-    LLMProvider,
     ChatMessage,
     CompletionRequest,
     CompletionResponse,
-    LLMUsage,
-    LLMError,
-    LLMConfig
+    LLMConfig,
+    LLMProvider,
+    LLMRequest,
+    LLMResponse,
 )
-from backend.core.exceptions import ExternalServiceError
-from backend.core.utils.decorators import retry, timeout_async
 
 
 class LLMService:
     """LLM服务 - 统一的大语言模型调用接口"""
     
-    def __init__(self, config: Optional[LLMConfig] = None):
+    def __init__(self, config: LLMConfig | None = None):
         """
         初始化LLM服务
         
@@ -42,10 +41,10 @@ class LLMService:
         
     async def chat_completion(
         self,
-        messages: List[ChatMessage],
-        model: Optional[str] = None,
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        messages: list[ChatMessage],
+        model: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         **kwargs
     ) -> LLMResponse:
         """
@@ -85,7 +84,7 @@ class LLMService:
             
         except Exception as e:
             raise ExternalServiceError(
-                message=f"LLM聊天补全失败: {str(e)}",
+                message=f"LLM聊天补全失败: {e!s}",
                 service_name="LLM",
                 status_code=500
             )
@@ -93,9 +92,9 @@ class LLMService:
     async def text_completion(
         self,
         prompt: str,
-        model: Optional[str] = None,
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        model: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         **kwargs
     ) -> CompletionResponse:
         """
@@ -135,17 +134,17 @@ class LLMService:
             
         except Exception as e:
             raise ExternalServiceError(
-                message=f"LLM文本补全失败: {str(e)}",
+                message=f"LLM文本补全失败: {e!s}",
                 service_name="LLM",
                 status_code=500
             )
     
     async def stream_chat_completion(
         self,
-        messages: List[ChatMessage],
-        model: Optional[str] = None,
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        messages: list[ChatMessage],
+        model: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         **kwargs
     ) -> AsyncGenerator[str, None]:
         """
@@ -179,12 +178,12 @@ class LLMService:
                 
         except Exception as e:
             raise ExternalServiceError(
-                message=f"LLM流式聊天补全失败: {str(e)}",
+                message=f"LLM流式聊天补全失败: {e!s}",
                 service_name="LLM",
                 status_code=500
             )
     
-    async def analyze_emotion(self, text: str) -> Dict[str, Any]:
+    async def analyze_emotion(self, text: str) -> dict[str, Any]:
         """
         情绪分析
         
@@ -246,12 +245,12 @@ class LLMService:
                 
         except Exception as e:
             raise ExternalServiceError(
-                message=f"情绪分析失败: {str(e)}",
+                message=f"情绪分析失败: {e!s}",
                 service_name="LLM",
                 status_code=500
             )
     
-    async def extract_memories(self, text: str, emotion: str) -> List[Dict[str, Any]]:
+    async def extract_memories(self, text: str, emotion: str) -> list[dict[str, Any]]:
         """
         从文本中提取记忆
         
@@ -305,7 +304,7 @@ class LLMService:
                 
         except Exception as e:
             raise ExternalServiceError(
-                message=f"记忆提取失败: {str(e)}",
+                message=f"记忆提取失败: {e!s}",
                 service_name="LLM",
                 status_code=500
             )
@@ -313,7 +312,7 @@ class LLMService:
     async def generate_response(
         self,
         user_message: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         personality: str = "温暖、共情、专业",
         **kwargs
     ) -> str:
@@ -360,7 +359,7 @@ class LLMService:
                     context_info.append(f"用户画像：{context['user_profile']}")
                 
                 if context_info:
-                    system_prompt += f"\n\n当前上下文：\n" + "\n".join(context_info)
+                    system_prompt += "\n\n当前上下文：\n" + "\n".join(context_info)
 
             messages = [
                 ChatMessage(role="system", content=system_prompt),
@@ -378,12 +377,12 @@ class LLMService:
             
         except Exception as e:
             raise ExternalServiceError(
-                message=f"回复生成失败: {str(e)}",
+                message=f"回复生成失败: {e!s}",
                 service_name="LLM",
                 status_code=500
             )
     
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """
         健康检查
         
@@ -397,7 +396,7 @@ class LLMService:
             ]
             
             start_time = time.time()
-            response = await self.chat_completion(
+            await self.chat_completion(
                 messages=messages,
                 max_tokens=10,
                 temperature=0.1

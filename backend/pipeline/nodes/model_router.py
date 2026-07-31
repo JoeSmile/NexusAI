@@ -9,7 +9,7 @@ from backend.observability.decorators import observe
 from backend.pipeline.state import PipelineState
 from backend.skills.registry import registry
 
-ROUTING_RULES = {
+ROUTING_RULES: dict[str, dict[str, str | int]] = {
     "greeting": {
         "model": os.getenv("MODEL_CHEAP", "deepseek-chat"),
         "max_tokens": 100,
@@ -74,14 +74,16 @@ async def model_router(state: PipelineState) -> PipelineState:
                     state["error_code"] = result.error
                 return state
         except Exception as e:
-            state["response"] = f"Skill 执行错误: {str(e)}"
+            state["response"] = f"Skill 执行错误: {e!s}"
             state["finish_reason"] = "error"
             state["error_code"] = "SKILL_001"
             return state
 
     rule = ROUTING_RULES.get(intent, ROUTING_RULES["default"])
-    state["selected_model"] = rule["model"]
-    state["estimated_cost"] = estimate_cost(rule["model"], rule["max_tokens"])
+    model = str(rule["model"])
+    max_tokens = int(rule["max_tokens"])  # type: ignore[call-overload]
+    state["selected_model"] = model
+    state["estimated_cost"] = estimate_cost(model, max_tokens)
     state["finish_reason"] = "routed_to_llm"
     _ = _detect_provider  # Task 18 key injection 预留
     return state

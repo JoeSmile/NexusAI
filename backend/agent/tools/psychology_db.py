@@ -8,7 +8,7 @@ Psychology DB - 心理资源数据库
 - 专业咨询信息
 """
 
-from typing import List, Dict, Any, Optional
+from typing import Any
 
 
 class PsychologyDB:
@@ -18,7 +18,7 @@ class PsychologyDB:
         """初始化资源数据库"""
         self.resources = self._init_resources()
     
-    def _init_resources(self) -> Dict[str, List[Dict[str, Any]]]:
+    def _init_resources(self) -> dict[str, list[dict[str, Any]]]:
         """初始化资源库"""
         return {
             "articles": [
@@ -155,11 +155,11 @@ class PsychologyDB:
     
     def search_resources(
         self,
-        category: Optional[str] = None,
-        resource_type: Optional[str] = None,
-        tags: Optional[List[str]] = None,
-        difficulty: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+        category: str | None = None,
+        resource_type: str | None = None,
+        tags: list[str] | None = None,
+        difficulty: str | None = None
+    ) -> list[dict[str, Any]]:
         """
         搜索资源
         
@@ -208,8 +208,8 @@ class PsychologyDB:
         self,
         user_situation: str,
         emotion: str,
-        resource_type: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+        resource_type: str | None = None
+    ) -> list[dict[str, Any]]:
         """
         根据用户情况推荐资源
         
@@ -256,7 +256,7 @@ class PsychologyDB:
         self,
         goal: str,
         duration: int = 7
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         获取练习计划
         
@@ -296,9 +296,9 @@ class PsychologyDB:
     
     def _generate_schedule(
         self,
-        exercises: List[Dict[str, Any]],
+        exercises: list[dict[str, Any]],
         duration: int
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """生成练习时间表"""
         from datetime import datetime, timedelta
         
@@ -326,7 +326,7 @@ class PsychologyDB:
         
         return schedule
     
-    def get_crisis_resources(self) -> List[Dict[str, Any]]:
+    def get_crisis_resources(self) -> list[dict[str, Any]]:
         """获取危机干预资源"""
         return self.resources["crisis_resources"]
 

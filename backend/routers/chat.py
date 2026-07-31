@@ -3,25 +3,27 @@
 聊天相关路由
 """
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
-from fastapi.responses import StreamingResponse
-from typing import List, Optional
-from backend.models import ChatRequest, ChatResponse
-from backend.services.chat_service import ChatService
-from backend.logging_config import get_logger
 import json
-from pathlib import Path
-import uuid
 import os
 import sys
+import uuid
+from pathlib import Path
+
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
+
+from backend.logging_config import get_logger
+from backend.models import ChatRequest, ChatResponse
+from backend.services.chat_service import ChatService
+
 try:
     import PyPDF2
 except ImportError:  # pragma: no cover
     PyPDF2 = None
+from datetime import datetime
+
 import requests
 from bs4 import BeautifulSoup
-import asyncio
-from datetime import datetime
 
 # 添加项目根目录到Python路径
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -106,7 +108,7 @@ def parse_url_content(url):
         return {
             "url": url,
             "title": "解析失败",
-            "content": f"无法解析URL内容: {str(e)}",
+            "content": f"无法解析URL内容: {e!s}",
             "status": "error"
         }
 
@@ -191,7 +193,7 @@ async def search_user_sessions(user_id: str, keyword: str = "", limit: int = 50)
 
 
 @router.post("/sessions/batch-delete")
-async def delete_sessions_batch(session_ids: List[str]):
+async def delete_sessions_batch(session_ids: list[str]):
     """批量删除会话"""
     try:
         if not session_ids:
@@ -242,7 +244,7 @@ async def chat_with_attachments(
     user_id: str = Form(...),
     url_contents: str = Form(None),
     deep_thinking: str = Form("false"),
-    files: List[UploadFile] = File(default=[])
+    files: list[UploadFile] = File(default=[])
 ):
     """带附件的聊天接口（支持文件上传）"""
     try:
@@ -277,7 +279,7 @@ async def chat_with_attachments(
                 elif file_extension.lower() in ['.jpg', '.jpeg', '.png', '.gif']:
                     content = extract_text_from_image(file_path)
                 elif file_extension.lower() == '.txt':
-                    with open(file_path, 'r', encoding='utf-8') as f:
+                    with open(file_path, encoding='utf-8') as f:
                         content = f.read()
 
                 logger.info(f"附件解析完成: {file.filename}, 字符数={len(content) if content else 0}")
@@ -341,7 +343,7 @@ async def chat_stream(
     user_id: str = Form(...),
     url_contents: str = Form(None),
     deep_thinking: str = Form("false"),
-    files: List[UploadFile] = File(default=[])
+    files: list[UploadFile] = File(default=[])
 ):
     """
     流式聊天接口（SSE），支持文件附件。
@@ -371,7 +373,7 @@ async def chat_stream(
                 elif file_extension.lower() in ['.jpg', '.jpeg', '.png', '.gif']:
                     content = extract_text_from_image(file_path)
                 elif file_extension.lower() == '.txt':
-                    with open(file_path, 'r', encoding='utf-8') as f:
+                    with open(file_path, encoding='utf-8') as f:
                         content = f.read()
 
                 logger.info(f"附件解析完成: {file.filename}, 字符数={len(content) if content else 0}")
@@ -412,7 +414,7 @@ async def chat_stream(
             # 发送开始信号
             yield f"data: {json.dumps({'type':'start'})}\n\n"
 
-            from backend.database import DatabaseManager, ChatSession
+            from backend.database import ChatSession, DatabaseManager
             sid = session_id or str(uuid.uuid4())
 
             # 构建历史
@@ -439,7 +441,8 @@ async def chat_stream(
 
             # 使用 httpx 直接流式调用 API（解决 LangChain astream 兼容性问题）
             import httpx
-            from backend.xinyu_prompt import XINYU_SYSTEM_PROMPT, build_full_prompt
+
+            from backend.xinyu_prompt import build_full_prompt
 
             api_key = engine.api_key
             api_base_url = engine.api_base_url
@@ -474,39 +477,38 @@ async def chat_stream(
                 )
 
             full_response = ""
-            async with httpx.AsyncClient(timeout=120.0) as client:
-                async with client.stream(
-                    "POST",
-                    f"{api_base_url}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": model,
-                        "messages": messages_payload,
-                        "temperature": 0.7,
-                        "stream": True,
-                    },
-                ) as resp:
-                    if resp.status_code != 200:
-                        error_body = await resp.aread()
-                        raise Exception(f"API返回错误 ({resp.status_code}): {error_body.decode()}")
-                    async for line in resp.aiter_lines():
-                        if not line.startswith("data: "):
-                            continue
-                        data_str = line[6:].strip()
-                        if data_str == "[DONE]":
-                            break
-                        try:
-                            chunk_data = json.loads(data_str)
-                            delta = chunk_data.get("choices", [{}])[0].get("delta", {})
-                            token = delta.get("content", "")
-                            if token:
-                                full_response += token
-                                yield f"data: {json.dumps({'type':'token','content':token})}\n\n"
-                        except (json.JSONDecodeError, IndexError, KeyError):
-                            continue
+            async with httpx.AsyncClient(timeout=120.0) as client, client.stream(
+                "POST",
+                f"{api_base_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": model,
+                    "messages": messages_payload,
+                    "temperature": 0.7,
+                    "stream": True,
+                },
+            ) as resp:
+                if resp.status_code != 200:
+                    error_body = await resp.aread()
+                    raise Exception(f"API返回错误 ({resp.status_code}): {error_body.decode()}")
+                async for line in resp.aiter_lines():
+                    if not line.startswith("data: "):
+                        continue
+                    data_str = line[6:].strip()
+                    if data_str == "[DONE]":
+                        break
+                    try:
+                        chunk_data = json.loads(data_str)
+                        delta = chunk_data.get("choices", [{}])[0].get("delta", {})
+                        token = delta.get("content", "")
+                        if token:
+                            full_response += token
+                            yield f"data: {json.dumps({'type':'token','content':token})}\n\n"
+                    except (json.JSONDecodeError, IndexError, KeyError):
+                        continue
 
             # 分析情绪
             emotion = "neutral"
@@ -542,7 +544,7 @@ async def chat_stream(
 
         except Exception as e:
             logger.error(f"流式生成失败: {e}", exc_info=True)
-            yield f"data: {json.dumps({'type':'error','content':f'生成出错: {str(e)}'})}\n\n"
+            yield f"data: {json.dumps({'type':'error','content':f'生成出错: {e!s}'})}\n\n"
 
         yield "data: [DONE]\n\n"
 

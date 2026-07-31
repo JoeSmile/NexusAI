@@ -3,33 +3,30 @@
 核心模块单元测试
 """
 
-import pytest
-from unittest.mock import Mock, patch
 from datetime import datetime
+from unittest.mock import patch
 
-from backend.core.config import Config, get_config, Environment
+import pytest
+
+from backend.core.config import Config, Environment, get_config
 from backend.core.exceptions import (
+    ConfigurationError,
+    DatabaseError,
     EmotionalChatException,
     ValidationError,
-    ConfigurationError,
-    DatabaseError
+)
+from backend.core.utils.formatters import format_error, format_response, format_timestamp
+from backend.core.utils.helpers import (
+    calculate_similarity,
+    extract_emotion_keywords,
+    generate_id,
+    sanitize_text,
 )
 from backend.core.utils.validators import (
     validate_email,
     validate_phone,
+    validate_session_id,
     validate_text_length,
-    validate_session_id
-)
-from backend.core.utils.formatters import (
-    format_response,
-    format_error,
-    format_timestamp
-)
-from backend.core.utils.helpers import (
-    generate_id,
-    sanitize_text,
-    extract_emotion_keywords,
-    calculate_similarity
 )
 
 

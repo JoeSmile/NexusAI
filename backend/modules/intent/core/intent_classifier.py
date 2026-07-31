@@ -3,10 +3,9 @@
 Intent Classifier with hybrid approach (rule-based + ML)
 """
 
-from typing import Dict, Optional, List
 import logging
 
-from ..models.intent_models import IntentType, IntentResult
+from ..models.intent_models import IntentResult, IntentType
 from .rule_engine import RuleBasedIntentEngine
 
 logger = logging.getLogger(__name__)
@@ -20,7 +19,7 @@ class MLIntentClassifier:
     可以使用 transformers 库的 AutoModelForSequenceClassification
     """
     
-    def __init__(self, model_path: Optional[str] = None):
+    def __init__(self, model_path: str | None = None):
         """
         初始化ML分类器
         
@@ -92,7 +91,6 @@ class MLIntentClassifier:
         #     confidence=probs[pred].item(),
         #     source="model"
         # )
-        pass
     
     def _heuristic_classify(self, text: str) -> IntentResult:
         """
@@ -151,7 +149,7 @@ class IntentClassifier:
     整合规则引擎和机器学习模型
     """
     
-    def __init__(self, model_path: Optional[str] = None):
+    def __init__(self, model_path: str | None = None):
         """
         初始化意图分类器
         
@@ -213,7 +211,7 @@ class IntentClassifier:
         
         return ml_result
     
-    def batch_detect(self, texts: List[str]) -> List[IntentResult]:
+    def batch_detect(self, texts: list[str]) -> list[IntentResult]:
         """
         批量检测意图
         

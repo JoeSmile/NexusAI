@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 ActivityTracker — 活动追踪器
 
@@ -10,7 +9,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +24,7 @@ class ActivityRecord:
     name: str
     success: bool
     duration_ms: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class ActivityTracker:
@@ -40,7 +39,7 @@ class ActivityTracker:
 
     def __init__(self, session_id: str = "", max_records: int = 1000):
         self._session_id = session_id
-        self._records: List[ActivityRecord] = []
+        self._records: list[ActivityRecord] = []
         self._max_records = max_records
 
     def record_skill(
@@ -103,13 +102,13 @@ class ActivityTracker:
         if len(self._records) > self._max_records:
             self._records = self._records[-self._max_records:]
 
-    def get_recent(self, limit: int = 100) -> List[ActivityRecord]:
+    def get_recent(self, limit: int = 100) -> list[ActivityRecord]:
         """获取最近的活动记录"""
         return self._records[-limit:]
 
-    def get_skill_stats(self) -> Dict[str, Dict[str, Any]]:
+    def get_skill_stats(self) -> dict[str, dict[str, Any]]:
         """获取 Skill 执行统计"""
-        stats: Dict[str, Dict[str, Any]] = {}
+        stats: dict[str, dict[str, Any]] = {}
         for record in self._records:
             if record.activity_type != "skill":
                 continue

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module Guards — 统一的开关检查入口
 
@@ -24,12 +23,11 @@ Usage::
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 # 全局 toggles 实例 — 由应用启动时设置
-_toggles: Optional[object] = None
+_toggles: object | None = None
 
 
 class ModuleDisabledError(RuntimeError):

@@ -4,12 +4,11 @@
 包含各种数据格式化函数
 """
 
-from typing import Any, Dict, List, Optional, Union
-from datetime import datetime, timezone
 import json
 import uuid
+from datetime import UTC, datetime, timezone
+from typing import Any
 
-from ..exceptions import EmotionalChatException
 from ..interfaces import EmotionResult
 
 
@@ -18,11 +17,11 @@ def format_response(
     message: str = "success",
     status_code: int = 200,
     success: bool = True,
-    timestamp: Optional[str] = None
-) -> Dict[str, Any]:
+    timestamp: str | None = None
+) -> dict[str, Any]:
     """格式化API响应"""
     if timestamp is None:
-        timestamp = datetime.now(timezone.utc).isoformat()
+        timestamp = datetime.now(UTC).isoformat()
     
     response = {
         "success": success,
@@ -38,18 +37,18 @@ def format_response(
 
 
 def format_error(
-    error: Union[str, Exception],
-    error_code: Optional[str] = None,
+    error: str | Exception,
+    error_code: str | None = None,
     status_code: int = 500,
-    details: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+    details: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """格式化错误响应"""
     if isinstance(error, Exception):
         message = str(error)
         if hasattr(error, 'error_code'):
-            error_code = getattr(error, 'error_code')
+            error_code = error.error_code
         if hasattr(error, 'details'):
-            details = getattr(error, 'details')
+            details = error.details
     else:
         message = str(error)
     
@@ -60,19 +59,19 @@ def format_error(
             "message": message,
             "details": details or {}
         },
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "status_code": status_code
     }
 
 
 def format_timestamp(
-    dt: Optional[datetime] = None,
+    dt: datetime | None = None,
     format_type: str = "iso",
-    timezone_info: Optional[timezone] = None
+    timezone_info: timezone | None = None
 ) -> str:
     """格式化时间戳"""
     if dt is None:
-        dt = datetime.now(timezone_info or timezone.utc)
+        dt = datetime.now(timezone_info or UTC)
     
     if format_type == "iso":
         return dt.isoformat()
@@ -88,30 +87,30 @@ def format_timestamp(
         return dt.strftime(format_type)
 
 
-def format_emotion_result(emotion_result: EmotionResult) -> Dict[str, Any]:
+def format_emotion_result(emotion_result: EmotionResult) -> dict[str, Any]:
     """格式化情绪分析结果"""
     return {
         "emotion": emotion_result.emotion,
         "intensity": round(emotion_result.intensity, 2),
         "confidence": round(emotion_result.confidence, 3),
         "details": emotion_result.details,
-        "timestamp": datetime.now(timezone.utc).isoformat()
+        "timestamp": datetime.now(UTC).isoformat()
     }
 
 
 def format_chat_message(
     role: str,
     content: str,
-    emotion: Optional[str] = None,
-    emotion_intensity: Optional[float] = None,
-    metadata: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+    emotion: str | None = None,
+    emotion_intensity: float | None = None,
+    metadata: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """格式化聊天消息"""
-    message: Dict[str, Any] = {
+    message: dict[str, Any] = {
         "id": str(uuid.uuid4()),
         "role": role,
         "content": content,
-        "timestamp": datetime.now(timezone.utc).isoformat()
+        "timestamp": datetime.now(UTC).isoformat()
     }
     
     if emotion:
@@ -129,11 +128,11 @@ def format_chat_message(
 def format_session_info(
     session_id: str,
     user_id: str,
-    created_at: Optional[datetime] = None,
-    last_activity: Optional[datetime] = None,
+    created_at: datetime | None = None,
+    last_activity: datetime | None = None,
     message_count: int = 0,
-    metadata: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+    metadata: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """格式化会话信息"""
     session_info = {
         "session_id": session_id,
@@ -154,9 +153,9 @@ def format_memory_info(
     content: str,
     emotion: str,
     importance: float,
-    created_at: Optional[datetime] = None,
-    metadata: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+    created_at: datetime | None = None,
+    metadata: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """格式化记忆信息"""
     memory_info = {
         "id": memory_id,
@@ -174,13 +173,13 @@ def format_memory_info(
 
 def format_user_profile(
     user_id: str,
-    preferences: Optional[Dict[str, Any]] = None,
-    emotion_history: Optional[List[Dict[str, Any]]] = None,
+    preferences: dict[str, Any] | None = None,
+    emotion_history: list[dict[str, Any]] | None = None,
     session_count: int = 0,
     total_messages: int = 0,
-    created_at: Optional[datetime] = None,
-    last_active: Optional[datetime] = None
-) -> Dict[str, Any]:
+    created_at: datetime | None = None,
+    last_active: datetime | None = None
+) -> dict[str, Any]:
     """格式化用户档案"""
     profile = {
         "user_id": user_id,
@@ -201,12 +200,12 @@ def format_user_profile(
 
 def format_rag_result(
     answer: str,
-    sources: List[Dict[str, Any]],
+    sources: list[dict[str, Any]],
     confidence: float,
     knowledge_count: int,
     used_context: bool = False,
-    metadata: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+    metadata: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """格式化RAG结果"""
     result = {
         "answer": answer,
@@ -214,7 +213,7 @@ def format_rag_result(
         "confidence": round(confidence, 3),
         "knowledge_count": knowledge_count,
         "used_context": used_context,
-        "timestamp": datetime.now(timezone.utc).isoformat()
+        "timestamp": datetime.now(UTC).isoformat()
     }
     
     if metadata:
@@ -226,10 +225,10 @@ def format_rag_result(
 def format_evaluation_result(
     user_message: str,
     bot_response: str,
-    scores: Dict[str, float],
-    feedback: Optional[str] = None,
-    evaluator_id: Optional[str] = None
-) -> Dict[str, Any]:
+    scores: dict[str, float],
+    feedback: str | None = None,
+    evaluator_id: str | None = None
+) -> dict[str, Any]:
     """格式化评估结果"""
     return {
         "user_message": user_message,
@@ -238,7 +237,7 @@ def format_evaluation_result(
         "overall_score": round(sum(scores.values()) / len(scores), 3),
         "feedback": feedback,
         "evaluator_id": evaluator_id,
-        "timestamp": datetime.now(timezone.utc).isoformat()
+        "timestamp": datetime.now(UTC).isoformat()
     }
 
 
@@ -248,10 +247,10 @@ def format_feedback_info(
     session_id: str,
     feedback_type: str,
     content: str,
-    rating: Optional[int] = None,
-    created_at: Optional[datetime] = None,
+    rating: int | None = None,
+    created_at: datetime | None = None,
     analyzed: bool = False
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """格式化反馈信息"""
     feedback_info = {
         "id": feedback_id,
@@ -274,16 +273,16 @@ def format_statistics(
     total_sessions: int,
     total_messages: int,
     active_sessions: int,
-    emotion_distribution: Optional[Dict[str, int]] = None,
-    time_range: Optional[str] = None
-) -> Dict[str, Any]:
+    emotion_distribution: dict[str, int] | None = None,
+    time_range: str | None = None
+) -> dict[str, Any]:
     """格式化统计信息"""
     stats = {
         "total_users": total_users,
         "total_sessions": total_sessions,
         "total_messages": total_messages,
         "active_sessions": active_sessions,
-        "timestamp": datetime.now(timezone.utc).isoformat()
+        "timestamp": datetime.now(UTC).isoformat()
     }
     
     if emotion_distribution:
@@ -299,8 +298,8 @@ def format_pagination_info(
     page: int,
     page_size: int,
     total: int,
-    items: List[Any]
-) -> Dict[str, Any]:
+    items: list[Any]
+) -> dict[str, Any]:
     """格式化分页信息"""
     total_pages = (total + page_size - 1) // page_size
     
@@ -319,16 +318,16 @@ def format_pagination_info(
 
 def format_health_check(
     status: str,
-    services: Dict[str, str],
+    services: dict[str, str],
     version: str,
-    uptime: Optional[str] = None
-) -> Dict[str, Any]:
+    uptime: str | None = None
+) -> dict[str, Any]:
     """格式化健康检查结果"""
     health_info = {
         "status": status,
         "version": version,
         "services": services,
-        "timestamp": datetime.now(timezone.utc).isoformat()
+        "timestamp": datetime.now(UTC).isoformat()
     }
     
     if uptime:
@@ -337,7 +336,7 @@ def format_health_check(
     return health_info
 
 
-def format_config_info(config_dict: Dict[str, Any]) -> Dict[str, Any]:
+def format_config_info(config_dict: dict[str, Any]) -> dict[str, Any]:
     """格式化配置信息（隐藏敏感信息）"""
     sensitive_keys = {
         "password", "secret", "key", "token", "api_key", "private_key"
@@ -361,9 +360,9 @@ def format_log_entry(
     module: str,
     function: str,
     line_number: int,
-    exception: Optional[Exception] = None,
-    extra_data: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+    exception: Exception | None = None,
+    extra_data: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """格式化日志条目"""
     log_entry = {
         "level": level,
@@ -371,7 +370,7 @@ def format_log_entry(
         "module": module,
         "function": function,
         "line_number": line_number,
-        "timestamp": datetime.now(timezone.utc).isoformat()
+        "timestamp": datetime.now(UTC).isoformat()
     }
     
     if exception:

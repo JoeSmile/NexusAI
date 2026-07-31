@@ -6,17 +6,17 @@
 
 import asyncio
 import time
-from typing import Dict, List, Optional, Any, AsyncGenerator
-from fastapi import HTTPException
+from typing import Any
+
 from fastapi.responses import StreamingResponse
 
-from backend.services.performance_optimizer import (
-    performance_optimizer, 
-    stream_handler, 
-    cache_manager
-)
-from backend.services.chat_service import ChatService
 from backend.logging_config import get_logger
+from backend.services.chat_service import ChatService
+from backend.services.performance_optimizer import (
+    cache_manager,
+    performance_optimizer,
+    stream_handler,
+)
 
 logger = get_logger(__name__)
 
@@ -36,7 +36,7 @@ class OptimizedChatService(ChatService):
         self.cache_enabled = True
         
     @performance_optimizer.performance_monitor
-    async def chat_optimized(self, request: Dict[str, Any]) -> Dict[str, Any]:
+    async def chat_optimized(self, request: dict[str, Any]) -> dict[str, Any]:
         """
         优化的聊天处理
         
@@ -92,7 +92,7 @@ class OptimizedChatService(ChatService):
                 "fallback_used": True
             }
     
-    async def chat_streaming(self, request: Dict[str, Any]) -> StreamingResponse:
+    async def chat_streaming(self, request: dict[str, Any]) -> StreamingResponse:
         """
         流式聊天响应
         
@@ -103,7 +103,7 @@ class OptimizedChatService(ChatService):
             流式响应
         """
         user_input = request.get("message", "")
-        session_id = request.get("session_id", "default")
+        request.get("session_id", "default")
         
         async def generate_stream():
             try:
@@ -119,7 +119,7 @@ class OptimizedChatService(ChatService):
                     
             except Exception as e:
                 logger.error(f"流式响应失败: {e}")
-                yield f"data: 抱歉，生成过程中出现错误: {str(e)}\n\n"
+                yield f"data: 抱歉，生成过程中出现错误: {e!s}\n\n"
         
         return StreamingResponse(
             generate_stream(),
@@ -131,7 +131,7 @@ class OptimizedChatService(ChatService):
             }
         )
     
-    async def _parallel_process_input(self, user_input: str) -> Dict[str, Any]:
+    async def _parallel_process_input(self, user_input: str) -> dict[str, Any]:
         """并行处理用户输入"""
         try:
             # 使用性能优化器的并行处理
@@ -152,7 +152,7 @@ class OptimizedChatService(ChatService):
             }
     
     async def _build_optimized_prompt(self, user_input: str, 
-                                    processing_result: Dict[str, Any]) -> str:
+                                    processing_result: dict[str, Any]) -> str:
         """构建优化的Prompt"""
         try:
             # 使用缓存管理器
@@ -187,7 +187,7 @@ class OptimizedChatService(ChatService):
                 timeout=self.request_timeout
             )
             return response
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("LLM响应超时，使用降级策略")
             return self.performance_optimizer.fallback_strategy(
                 "llm_timeout", "用户输入"
@@ -219,8 +219,8 @@ class OptimizedChatService(ChatService):
         except Exception as e:
             logger.error(f"保存对话失败: {e}")
     
-    def _construct_prompt(self, user_input: str, emotion: Dict, 
-                         memory: Dict, safety: Dict) -> str:
+    def _construct_prompt(self, user_input: str, emotion: dict, 
+                         memory: dict, safety: dict) -> str:
         """构造Prompt"""
         prompt_parts = [
             "你是一个情感支持助手。",
@@ -239,7 +239,7 @@ class OptimizedChatService(ChatService):
         
         return "\n".join(prompt_parts)
     
-    async def get_performance_metrics(self) -> Dict[str, Any]:
+    async def get_performance_metrics(self) -> dict[str, Any]:
         """获取性能指标"""
         try:
             base_metrics = self.performance_optimizer.get_performance_metrics()
@@ -256,7 +256,7 @@ class OptimizedChatService(ChatService):
             logger.error(f"获取性能指标失败: {e}")
             return {"error": str(e)}
     
-    async def health_check_optimized(self) -> Dict[str, Any]:
+    async def health_check_optimized(self) -> dict[str, Any]:
         """优化的健康检查"""
         try:
             # 检查各个组件
@@ -287,7 +287,7 @@ class OptimizedChatService(ChatService):
         try:
             self.performance_optimizer.redis_client.ping()
             return True
-        except:
+        except Exception:
             return False
     
     async def _check_llm(self) -> bool:
@@ -299,7 +299,7 @@ class OptimizedChatService(ChatService):
                 timeout=5.0
             )
             return bool(test_response)
-        except:
+        except Exception:
             return False
     
     async def _check_database(self) -> bool:
@@ -307,7 +307,7 @@ class OptimizedChatService(ChatService):
         try:
             # 这里应该检查数据库连接
             return True
-        except:
+        except Exception:
             return False
     
     async def _check_cache(self) -> bool:
@@ -319,7 +319,7 @@ class OptimizedChatService(ChatService):
             self.performance_optimizer.redis_client.setex(test_key, 10, test_value)
             retrieved = self.performance_optimizer.redis_client.get(test_key)
             return retrieved == test_value
-        except:
+        except Exception:
             return False
 
 

@@ -3,25 +3,20 @@
 Anthropic提供商实现
 """
 
-from typing import List, Dict, Any, Optional, AsyncGenerator
+from collections.abc import AsyncGenerator
 from datetime import datetime
+from typing import Any
 
 import anthropic
 
+from ..models.llm_models import ChatMessage, CompletionResponse, LLMProvider, LLMResponse, LLMUsage
 from .base_provider import BaseLLMProvider
-from ..models.llm_models import (
-    LLMResponse,
-    CompletionResponse,
-    ChatMessage,
-    LLMUsage,
-    LLMProvider
-)
 
 
 class AnthropicProvider(BaseLLMProvider):
     """Anthropic提供商"""
     
-    def __init__(self, api_key: str, base_url: Optional[str] = None):
+    def __init__(self, api_key: str, base_url: str | None = None):
         """
         初始化Anthropic提供商
         
@@ -40,10 +35,10 @@ class AnthropicProvider(BaseLLMProvider):
     
     async def chat_completion(
         self,
-        messages: List[ChatMessage],
+        messages: list[ChatMessage],
         model: str,
         temperature: float = 0.7,
-        max_tokens: Optional[int] = None,
+        max_tokens: int | None = None,
         **kwargs
     ) -> LLMResponse:
         """
@@ -102,10 +97,10 @@ class AnthropicProvider(BaseLLMProvider):
     
     async def stream_chat_completion(
         self,
-        messages: List[ChatMessage],
+        messages: list[ChatMessage],
         model: str,
         temperature: float = 0.7,
-        max_tokens: Optional[int] = None,
+        max_tokens: int | None = None,
         **kwargs
     ) -> AsyncGenerator[str, None]:
         """
@@ -184,7 +179,7 @@ class AnthropicProvider(BaseLLMProvider):
         except Exception as e:
             raise self._create_error("anthropic_completion_error", str(e))
     
-    async def list_models(self) -> List[str]:
+    async def list_models(self) -> list[str]:
         """
         获取可用模型列表
         """
@@ -197,7 +192,7 @@ class AnthropicProvider(BaseLLMProvider):
             "claude-3-haiku-20240307"
         ]
     
-    async def get_model_info(self, model: str) -> Dict[str, Any]:
+    async def get_model_info(self, model: str) -> dict[str, Any]:
         """
         获取模型信息
         """

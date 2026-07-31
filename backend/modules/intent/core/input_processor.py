@@ -3,9 +3,8 @@
 Input Processor for text cleaning and safety filtering
 """
 
-import re
-from typing import Dict, List, Optional, Tuple
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +25,8 @@ class InputProcessor:
     
     def __init__(self):
         """初始化输入处理器"""
-        pass
     
-    def preprocess(self, text: str) -> Dict[str, any]:
+    def preprocess(self, text: str) -> dict[str, any]:
         """
         预处理输入文本
         
@@ -136,7 +134,7 @@ class InputProcessor:
         
         return text
     
-    def validate_input(self, text: str) -> Tuple[bool, Optional[str]]:
+    def validate_input(self, text: str) -> tuple[bool, str | None]:
         """
         验证输入是否合规
         

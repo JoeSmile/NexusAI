@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tool Call Dedup — 去除重复的工具调用
 
@@ -8,12 +7,12 @@ Tool Call Dedup — 去除重复的工具调用
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-def deduplicate_tool_calls(tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def deduplicate_tool_calls(tool_calls: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """
     去除重复的工具调用
 
@@ -30,7 +29,7 @@ def deduplicate_tool_calls(tool_calls: List[Dict[str, Any]]) -> List[Dict[str, A
         return []
 
     seen: set = set()
-    deduped: List[Dict[str, Any]] = []
+    deduped: list[dict[str, Any]] = []
 
     for call in tool_calls:
         name = call.get("name", "") or call.get("function", {}).get("name", "")

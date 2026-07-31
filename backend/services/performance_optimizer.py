@@ -8,11 +8,12 @@ import asyncio
 import hashlib
 import json
 import time
-from typing import Dict, List, Optional, Any, AsyncGenerator
+from collections.abc import AsyncGenerator
 from concurrent.futures import ThreadPoolExecutor
-import redis
 from functools import wraps
-import logging
+from typing import Any
+
+import redis
 
 from backend.logging_config import get_logger
 
@@ -41,7 +42,7 @@ class PerformanceOptimizer:
     async def parallel_processing(self, user_input: str, 
                                 emotion_analyzer, 
                                 safety_checker, 
-                                memory_retriever) -> Dict[str, Any]:
+                                memory_retriever) -> dict[str, Any]:
         """
         并行处理用户输入
         
@@ -136,7 +137,7 @@ class PerformanceOptimizer:
             
         except Exception as e:
             logger.error(f"流式响应失败: {e}")
-            yield f"data: 抱歉，生成过程中出现错误: {str(e)}\n\n"
+            yield f"data: 抱歉，生成过程中出现错误: {e!s}\n\n"
     
     def fallback_strategy(self, error_type: str, user_input: str) -> str:
         """
@@ -203,7 +204,7 @@ class PerformanceOptimizer:
         
         return wrapper
     
-    def get_performance_metrics(self) -> Dict[str, Any]:
+    def get_performance_metrics(self) -> dict[str, Any]:
         """获取性能指标"""
         try:
             # Redis性能指标
@@ -228,7 +229,7 @@ class PerformanceOptimizer:
             misses = info.get("keyspace_misses", 0)
             total = hits + misses
             return (hits / total * 100) if total > 0 else 0.0
-        except:
+        except Exception:
             return 0.0
 
 
@@ -253,7 +254,7 @@ class StreamingResponseHandler:
             if stream_id in self.active_streams:
                 del self.active_streams[stream_id]
     
-    def get_active_streams(self) -> Dict[str, Any]:
+    def get_active_streams(self) -> dict[str, Any]:
         """获取活跃流信息"""
         current_time = time.time()
         active_streams = {}
@@ -298,7 +299,7 @@ class CacheManager:
         if keys:
             self.redis.delete(*keys)
     
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """获取缓存统计"""
         info = self.redis.info()
         return {
@@ -307,7 +308,7 @@ class CacheManager:
             "hit_rate": self._calculate_hit_rate(info)
         }
     
-    def _calculate_hit_rate(self, info: Dict) -> float:
+    def _calculate_hit_rate(self, info: dict) -> float:
         """计算命中率"""
         hits = info.get("keyspace_hits", 0)
         misses = info.get("keyspace_misses", 0)

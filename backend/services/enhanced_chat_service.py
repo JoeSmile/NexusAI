@@ -8,20 +8,19 @@
 4. 主动回忆系统
 """
 
-from typing import Dict, Optional, Any, List
-from datetime import datetime
 import uuid
-import json
+from datetime import datetime
+from typing import Any
 
+from backend.database import ChatMessage, ChatSession, DatabaseManager
 from backend.models import ChatRequest, ChatResponse
-from backend.database import DatabaseManager, ChatSession, ChatMessage
 from backend.modules.llm.core.llm_core import ChatEngine
+from backend.services.enhanced_context_assembler import EnhancedContextAssembler
 
 # 导入增强版组件
 from backend.services.enhanced_memory_manager import EnhancedMemoryManager
-from backend.services.user_profile_builder import UserProfileBuilder
-from backend.services.enhanced_context_assembler import EnhancedContextAssembler
 from backend.services.proactive_recall_system import ProactiveRecallSystem
+from backend.services.user_profile_builder import UserProfileBuilder
 
 # 尝试导入可选功能
 try:
@@ -78,8 +77,8 @@ class EnhancedChatService:
         self._init_optional_features(use_rag, use_intent, use_enhanced_processor)
         
         print("✓ 增强版聊天服务已启动")
-        print(f"  - 记忆管理: 短期滑动窗口 + 长期向量检索 + 时间衰减")
-        print(f"  - 用户画像: 动态构建")
+        print("  - 记忆管理: 短期滑动窗口 + 长期向量检索 + 时间衰减")
+        print("  - 用户画像: 动态构建")
         print(f"  - 主动回忆: {'启用' if enable_proactive_recall else '禁用'}")
         print(f"  - RAG: {'启用' if self.rag_enabled else '禁用'}")
         print(f"  - 意图识别: {'启用' if self.intent_enabled else '禁用'}")
@@ -178,7 +177,7 @@ class EnhancedChatService:
         
         # ============ 第7步：构建增强Prompt ============
         system_prompt = self._build_system_prompt(context, proactive_prompt)
-        enhanced_prompt = self.context_assembler.build_prompt_context(
+        self.context_assembler.build_prompt_context(
             context, system_prompt
         )
         
@@ -231,7 +230,7 @@ class EnhancedChatService:
         
         return preprocessed, message
     
-    async def _analyze_intent(self, user_id: str, message: str) -> Optional[Dict]:
+    async def _analyze_intent(self, user_id: str, message: str) -> dict | None:
         """意图识别"""
         intent_result = None
         if self.intent_enabled and self.intent_service:
@@ -246,7 +245,7 @@ class EnhancedChatService:
         
         return intent_result
     
-    async def _get_conversation_history(self, session_id: str, limit: int = 15) -> List[Dict]:
+    async def _get_conversation_history(self, session_id: str, limit: int = 15) -> list[dict]:
         """获取对话历史"""
         try:
             with DatabaseManager() as db:
@@ -265,7 +264,7 @@ class EnhancedChatService:
             print(f"获取对话历史失败: {e}")
             return []
     
-    def _build_system_prompt(self, context: Dict[str, Any], proactive_prompt: Optional[str]) -> str:
+    def _build_system_prompt(self, context: dict[str, Any], proactive_prompt: str | None) -> str:
         """构建系统Prompt"""
         system_prompt = """你是"ContextGate"，一位温暖、耐心的心理陪伴者。"""
         
@@ -276,7 +275,7 @@ class EnhancedChatService:
         return system_prompt
     
     async def _try_rag_enhancement(self, message: str, emotion: str, 
-                                  chat_history: List[Dict]) -> Optional[Dict]:
+                                  chat_history: list[dict]) -> dict | None:
         """尝试RAG增强"""
         try:
             rag_result = self.rag_service.enhance_response(
@@ -289,7 +288,7 @@ class EnhancedChatService:
             print(f"RAG增强失败: {e}")
             return None
     
-    async def _generate_response(self, request: ChatRequest, rag_result: Optional[Dict],
+    async def _generate_response(self, request: ChatRequest, rag_result: dict | None,
                                 session_id: str, emotion: str, 
                                 emotion_intensity: float) -> ChatResponse:
         """生成回复"""
@@ -315,9 +314,9 @@ class EnhancedChatService:
                     timestamp=datetime.now()
                 )
     
-    def _enrich_response_context(self, response: ChatResponse, context: Dict[str, Any],
-                                 intent_result: Optional[Dict], preprocessed: Optional[Dict],
-                                 rag_result: Optional[Dict]):
+    def _enrich_response_context(self, response: ChatResponse, context: dict[str, Any],
+                                 intent_result: dict | None, preprocessed: dict | None,
+                                 rag_result: dict | None):
         """丰富响应上下文信息"""
         response.context = {
             # 记忆信息
@@ -386,7 +385,7 @@ class EnhancedChatService:
             import traceback
             traceback.print_exc()
     
-    def _create_blocked_response(self, session_id: str, preprocessed: Dict) -> ChatResponse:
+    def _create_blocked_response(self, session_id: str, preprocessed: dict) -> ChatResponse:
         """创建被阻止的响应"""
         return ChatResponse(
             response=preprocessed.get("friendly_message", "输入无效，请重新输入"),
@@ -402,7 +401,7 @@ class EnhancedChatService:
     
     # ============ 辅助接口方法 ============
     
-    async def get_session_history(self, session_id: str, limit: int = 20) -> Dict[str, Any]:
+    async def get_session_history(self, session_id: str, limit: int = 20) -> dict[str, Any]:
         """获取会话历史"""
         try:
             with DatabaseManager() as db:
@@ -439,7 +438,7 @@ class EnhancedChatService:
                 "error": str(e)
             }
     
-    async def get_user_sessions(self, user_id: str, limit: int = 50) -> Dict[str, Any]:
+    async def get_user_sessions(self, user_id: str, limit: int = 50) -> dict[str, Any]:
         """获取用户的所有会话"""
         try:
             with DatabaseManager() as db:
@@ -508,15 +507,15 @@ class EnhancedChatService:
             print(f"删除会话失败: {e}")
             return False
     
-    async def get_user_profile(self, user_id: str) -> Dict[str, Any]:
+    async def get_user_profile(self, user_id: str) -> dict[str, Any]:
         """获取用户画像"""
         return await self.profile_builder.build_profile(user_id)
     
-    async def get_user_memories(self, user_id: str, limit: int = 10) -> List[Dict[str, Any]]:
+    async def get_user_memories(self, user_id: str, limit: int = 10) -> list[dict[str, Any]]:
         """获取用户重要记忆"""
         return await self.memory_manager.get_important_memories(user_id, limit)
     
-    async def get_emotion_insights(self, user_id: str) -> Dict[str, Any]:
+    async def get_emotion_insights(self, user_id: str) -> dict[str, Any]:
         """获取用户情绪洞察"""
         if self.proactive_recall:
             trend_data = await self.proactive_recall.emotion_tracker.track_emotion_changes(

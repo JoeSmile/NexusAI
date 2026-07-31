@@ -4,15 +4,14 @@
 包含各种实用的装饰器
 """
 
-import time
 import asyncio
 import functools
-import logging
-from typing import Any, Callable, Dict, Optional, Union, List
-from collections import defaultdict
-from datetime import datetime, timedelta
 import hashlib
-import json
+import logging
+import time
+from collections.abc import Callable
+from datetime import datetime, timedelta
+from typing import Any
 
 from ..exceptions import RateLimitError, ValidationError
 
@@ -81,7 +80,7 @@ class RateLimiter:
     """速率限制器"""
     
     def __init__(self):
-        self._requests: Dict[str, List[datetime]] = {}
+        self._requests: dict[str, list[datetime]] = {}
         self._lock = asyncio.Lock()
     
     async def check_rate_limit(
@@ -119,7 +118,7 @@ _global_rate_limiter = RateLimiter()
 def rate_limit(
     max_requests: int = 60,
     time_window: int = 60,
-    key_func: Optional[Callable] = None
+    key_func: Callable | None = None
 ):
     """速率限制装饰器"""
     def decorator(func: Callable) -> Callable:
@@ -156,10 +155,10 @@ class CacheManager:
     """缓存管理器"""
     
     def __init__(self):
-        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._cache: dict[str, dict[str, Any]] = {}
         self._lock = asyncio.Lock()
     
-    async def get(self, key: str) -> Optional[Any]:
+    async def get(self, key: str) -> Any | None:
         """获取缓存"""
         async with self._lock:
             if key in self._cache:
@@ -189,7 +188,7 @@ class CacheManager:
 _global_cache = CacheManager()
 
 
-def cache(ttl: int = 300, key_func: Optional[Callable] = None):
+def cache(ttl: int = 300, key_func: Callable | None = None):
     """缓存装饰器"""
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
@@ -199,7 +198,7 @@ def cache(ttl: int = 300, key_func: Optional[Callable] = None):
                 cache_key = key_func(*args, **kwargs)
             else:
                 # 默认生成键
-                key_data = f"{func.__name__}:{str(args)}:{str(kwargs)}"
+                key_data = f"{func.__name__}:{args!s}:{kwargs!s}"
                 cache_key = hashlib.md5(key_data.encode()).hexdigest()
             
             # 尝试从缓存获取
@@ -218,10 +217,10 @@ def cache(ttl: int = 300, key_func: Optional[Callable] = None):
 
 
 def validate_input(
-    max_length: Optional[int] = None,
-    min_length: Optional[int] = None,
-    allowed_chars: Optional[str] = None,
-    forbidden_words: Optional[List[str]] = None
+    max_length: int | None = None,
+    min_length: int | None = None,
+    allowed_chars: str | None = None,
+    forbidden_words: list[str] | None = None
 ):
     """输入验证装饰器"""
     def decorator(func: Callable) -> Callable:
@@ -232,7 +231,7 @@ def validate_input(
                 if isinstance(arg, str):
                     _validate_string(arg, max_length, min_length, allowed_chars, forbidden_words)
             
-            for key, value in kwargs.items():
+            for _key, value in kwargs.items():
                 if isinstance(value, str):
                     _validate_string(value, max_length, min_length, allowed_chars, forbidden_words)
             
@@ -244,10 +243,10 @@ def validate_input(
 
 def _validate_string(
     text: str,
-    max_length: Optional[int],
-    min_length: Optional[int],
-    allowed_chars: Optional[str],
-    forbidden_words: Optional[List[str]]
+    max_length: int | None,
+    min_length: int | None,
+    allowed_chars: str | None,
+    forbidden_words: list[str] | None
 ):
     """验证字符串"""
     if min_length and len(text) < min_length:
@@ -271,7 +270,7 @@ def log_execution(
     log_level: int = logging.INFO,
     include_args: bool = True,
     include_result: bool = True,
-    logger: Optional[logging.Logger] = None
+    logger: logging.Logger | None = None
 ):
     """执行日志装饰器"""
     if logger is None:
@@ -381,7 +380,7 @@ def timeout(seconds: float):
             async def async_wrapper(*args, **kwargs):
                 try:
                     return await asyncio.wait_for(func(*args, **kwargs), timeout=seconds)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     raise TimeoutError(f"Function {func.__name__} timed out after {seconds} seconds")
             
             return async_wrapper

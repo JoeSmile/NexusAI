@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Triple Protocol — 基础契约层
 

@@ -3,20 +3,13 @@
 定义API请求/响应的数据模型
 """
 
-from .chat_schemas import (
-    ChatRequest,
-    ChatResponse,
-    ChatMessage,
-    SessionInfo,
-    UserProfile
-)
-
+from .chat_schemas import ChatMessage, ChatRequest, ChatResponse, SessionInfo, UserProfile
 from .common_schemas import (
     BaseResponse,
     ErrorResponse,
+    HealthCheckResponse,
     PaginationRequest,
     PaginationResponse,
-    HealthCheckResponse
 )
 
 __all__ = [
