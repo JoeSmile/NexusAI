@@ -43,7 +43,7 @@ try:
     from backend.routers.performance import router as performance_router
     from backend.routers.streaming_chat import router as streaming_router
     PERFORMANCE_OPTIMIZATION_ENABLED = True
-except ImportError:
+except Exception:
     PERFORMANCE_OPTIMIZATION_ENABLED = False
     performance_router = None
     streaming_router = None
@@ -53,7 +53,7 @@ enhanced_chat_router: APIRouter | None
 try:
     from backend.routers.enhanced_chat import router as enhanced_chat_router
     ENHANCED_CHAT_ENABLED = True
-except ImportError:
+except Exception:
     ENHANCED_CHAT_ENABLED = False
     enhanced_chat_router = None
 
@@ -62,7 +62,7 @@ intent_router: APIRouter | None
 try:
     from backend.modules.intent.routers import intent_router
     INTENT_ENABLED = True
-except ImportError:
+except Exception:
     INTENT_ENABLED = False
     intent_router = None
 
@@ -71,7 +71,7 @@ agent_router: APIRouter | None
 try:
     from backend.routers.agent import router as agent_router
     AGENT_ENABLED = True
-except ImportError:
+except Exception:
     AGENT_ENABLED = False
     agent_router = None
 

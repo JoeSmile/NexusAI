@@ -170,5 +170,12 @@ files = [
   "backend/core/tenant.py",
   "backend/core/health.py",
   "backend/core/circuit_breaker.py",
+  "backend/core/key_manager.py",
+  "backend/core/key_repository.py",
+  "backend/core/key_health.py",
+  "backend/app.py",
+  "backend/routers/admin.py",
+  "backend/routers/audit.py",
+  "backend/routers/files.py",
 ]
 

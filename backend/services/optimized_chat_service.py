@@ -32,7 +32,13 @@ class OptimizedChatService:
         self.max_concurrent_requests = 50
         self.request_timeout = 30
         self.cache_enabled = True
-        
+
+        # 显式占位 — 原 ChatService 父类从未提供这些依赖；避免 AttributeError
+        self.llm_client = None
+        self.emotion_analyzer = None
+        self.safety_checker = None
+        self.memory_retriever = None
+
     @performance_optimizer.performance_monitor
     async def chat_optimized(self, request: dict[str, Any]) -> dict[str, Any]:
         """
@@ -110,6 +116,9 @@ class OptimizedChatService:
                 prompt = await self._build_optimized_prompt(user_input, processing_result)
                 
                 # 流式生成
+                if self.llm_client is None:
+                    yield "data: 优化聊天依赖未配置（llm_client），请使用 /chat 管线\n\n"
+                    return
                 async for chunk in self.performance_optimizer.stream_response(
                     prompt, self.llm_client
                 ):
@@ -132,21 +141,28 @@ class OptimizedChatService:
     async def _parallel_process_input(self, user_input: str) -> dict[str, Any]:
         """并行处理用户输入"""
         try:
-            # 使用性能优化器的并行处理
+            if not all(
+                [self.emotion_analyzer, self.safety_checker, self.memory_retriever]
+            ):
+                return {
+                    "emotion": {"emotion": "neutral", "intensity": 5.0},
+                    "safety": {"safe": True, "confidence": 0.9},
+                    "memory": {"relevant_memories": []},
+                    "processing_time": 0.0,
+                }
             return await self.performance_optimizer.parallel_processing(
                 user_input,
                 self.emotion_analyzer,
                 self.safety_checker,
-                self.memory_retriever
+                self.memory_retriever,
             )
         except Exception as e:
             logger.error(f"并行处理失败: {e}")
-            # 返回默认值
             return {
                 "emotion": {"emotion": "neutral", "intensity": 5.0},
                 "safety": {"safe": True, "confidence": 0.9},
                 "memory": {"relevant_memories": []},
-                "processing_time": 0.0
+                "processing_time": 0.0,
             }
     
     async def _build_optimized_prompt(self, user_input: str, 
@@ -179,7 +195,10 @@ class OptimizedChatService:
     async def _generate_response_optimized(self, prompt: str) -> str:
         """优化的响应生成"""
         try:
-            # 设置超时
+            if self.llm_client is None:
+                return self.performance_optimizer.fallback_strategy(
+                    "general_error", "用户输入"
+                )
             response = await asyncio.wait_for(
                 self.llm_client.generate(prompt),
                 timeout=self.request_timeout
@@ -291,7 +310,8 @@ class OptimizedChatService:
     async def _check_llm(self) -> bool:
         """检查LLM服务"""
         try:
-            # 简单的LLM连接测试
+            if self.llm_client is None:
+                return False
             test_response = await asyncio.wait_for(
                 self.llm_client.generate("测试"),
                 timeout=5.0

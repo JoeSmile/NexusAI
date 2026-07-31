@@ -13,8 +13,58 @@ from datetime import datetime
 from typing import Any
 
 from backend.database import DatabaseManager, MemoryItem
-from backend.memory_extractor import MemoryExtractor
-from backend.vector_store import VectorStore
+from backend.database.vector_ops import add_chat_turn, search_user_memories
+
+
+class _ExtractorShim:
+    """替代已删除的 MemoryExtractor — 保守启发式"""
+
+    def should_extract_memory(self, user_message, emotion=None, emotion_intensity=None) -> bool:
+        return len(user_message or "") >= 8
+
+    def extract_memories(self, user_message, bot_response, emotion=None, emotion_intensity=None):
+        return [
+            {
+                "id": None,
+                "content": user_message,
+                "summary": (user_message or "")[:100],
+                "type": "conversation",
+                "importance": min(float(emotion_intensity or 5.0) / 10.0, 1.0),
+                "emotion": emotion or "neutral",
+                "intensity": emotion_intensity or 5.0,
+                "extraction_method": "heuristic",
+            }
+        ]
+
+
+class _VectorStoreShim:
+    """替代已删除的 VectorStore — 直接调 vector_ops"""
+
+    def __init__(self, tenant_id: str = "default"):
+        self.tenant_id = tenant_id
+
+    def add_conversation(
+        self,
+        session_id,
+        user_id,
+        user_message,
+        assistant_message,
+        emotion=None,
+        metadata=None,
+    ):
+        add_chat_turn(
+            self.tenant_id,
+            session_id,
+            user_id,
+            user_message,
+            assistant_message,
+            emotion,
+        )
+
+    def search(self, query, user_id=None, n_results=5, **kwargs):
+        if not user_id:
+            return []
+        return search_user_memories(self.tenant_id, user_id, query, limit=n_results)
 
 
 class MemoryDecayCalculator:
@@ -183,8 +233,8 @@ class EnhancedMemoryManager:
     def __init__(self):
         """初始化增强版记忆管理器"""
         self.tenant_id = "default"
-        self.vector_store = VectorStore(tenant_id=self.tenant_id)
-        self.extractor = MemoryExtractor()
+        self.vector_store = _VectorStoreShim(tenant_id=self.tenant_id)
+        self.extractor = _ExtractorShim()
         self.short_term = ShortTermMemory()
         self.decay_calculator = MemoryDecayCalculator()
         self.memory_collection = True  # pgvector 就绪标记

@@ -102,13 +102,14 @@ async def delete_api_key(
     with session_factory.Session() as session:
         if tenant.role == "super_admin":
             sql = text("UPDATE api_keys SET is_active=false WHERE id=:id")
-            params = {"id": key_id}
+            result = session.execute(sql, {"id": key_id})
         else:
             sql = text(
                 "UPDATE api_keys SET is_active=false WHERE id=:id AND tenant_id=:tid"
             )
-            params = {"id": key_id, "tid": tenant.tenant_id}
-        result = session.execute(sql, params)
+            result = session.execute(
+                sql, {"id": key_id, "tid": tenant.tenant_id}
+            )
         session.commit()
         if result.rowcount == 0:
             raise HTTPException(

@@ -1,342 +1,181 @@
 #!/usr/bin/env python3
-"""
-记忆服务层
-处理所有与记忆相关的业务逻辑
-"""
+"""记忆服务层 — pgvector UserMemory（替代旧 MemoryManager / MemoryExtractor）"""
 
-import json
-from datetime import datetime
+from __future__ import annotations
+
 from typing import Any
 
-from backend.database import DatabaseManager, MemoryItem
-from backend.memory_extractor import MemoryExtractor
-from backend.memory_manager import MemoryManager
+from sqlalchemy import text
+
+from backend.database.pgvector_session import UserMemory, get_pg_session
+from backend.database.vector_ops import search_user_memories, store_user_memory
 
 
 class MemoryService:
-    """记忆服务 - 统一的记忆管理接口"""
-    
-    def __init__(self):
-        """初始化记忆服务"""
-        self.memory_manager = MemoryManager()
-        self.extractor = MemoryExtractor()
-    
+    """记忆服务 — 统一走 pgvector"""
+
+    def __init__(self, tenant_id: str = "default"):
+        self.tenant_id = tenant_id
+
     async def process_and_store_memories(
-        self, 
-        session_id: str, 
+        self,
+        session_id: str,
         user_id: str,
         user_message: str,
         bot_response: str,
         emotion: str | None = None,
-        emotion_intensity: float | None = None
+        emotion_intensity: float | None = None,
     ) -> list[dict[str, Any]]:
-        """
-        处理对话并存储记忆
-        
-        Args:
-            session_id: 会话ID
-            user_id: 用户ID
-            user_message: 用户消息
-            bot_response: 机器人回复
-            emotion: 情绪
-            emotion_intensity: 情绪强度
-            
-        Returns:
-            存储的记忆列表
-        """
-        # 处理对话，提取并存储记忆
-        memories = self.memory_manager.process_conversation(
-            session_id=session_id,
+        key = f"turn:{session_id}"
+        value = f"user: {user_message}\nassistant: {bot_response}"
+        if emotion:
+            value += f"\nemotion: {emotion}:{emotion_intensity}"
+        mid = store_user_memory(
+            tenant_id=self.tenant_id,
             user_id=user_id,
-            user_message=user_message,
-            bot_response=bot_response,
-            emotion=emotion,
-            emotion_intensity=emotion_intensity
+            key=key,
+            value=value,
+            confidence=float(emotion_intensity or 5.0) / 10.0,
+            source="conversation",
         )
-        
-        # 同步到关系数据库
-        if memories:
-            synced_ids = self._sync_memories_to_db(memories)
-            # pgvector UserMemory must match relational sync. Drop rows whose
-            # relational write failed so they cannot leak into later retrievals.
-            for memory in memories:
-                memory_id = memory.get("id")
-                if memory_id and memory_id not in synced_ids:
-                    self.memory_manager.delete_memory(user_id, memory_id)
-            memories = [m for m in memories if m.get("id") in synced_ids]
-        
-        return memories
-    
-    def _sync_memories_to_db(self, memories: list[dict[str, Any]]) -> set[str]:
-        """将记忆同步到关系数据库，返回已确认持久化的 ID。"""
-        synced_ids: set[str] = set()
-        try:
-            with DatabaseManager() as db:
-                for memory in memories:
-                    # 检查是否已存在
-                    existing = db.db.query(MemoryItem).filter(
-                        MemoryItem.memory_id == memory.get("id")
-                    ).first()
-                    
-                    if not existing:
-                        # 创建新记忆条目
-                        memory_item = MemoryItem(
-                            memory_id=memory.get("id"),
-                            user_id=memory.get("user_id"),
-                            session_id=memory.get("session_id"),
-                            content=memory.get("content", ""),
-                            summary=memory.get("summary", ""),
-                            memory_type=memory.get("type", "other"),
-                            emotion=memory.get("emotion"),
-                            emotion_intensity=memory.get("intensity"),
-                            importance=memory.get("importance", 0.5),
-                            extraction_method=memory.get("extraction_method", "unknown"),
-                            keywords=json.dumps([], ensure_ascii=False)
-                        )
-                        db.db.add(memory_item)
-                    if memory.get("id"):
-                        synced_ids.add(memory["id"])
-                
-                db.db.commit()
-        except Exception as e:
-            print(f"同步记忆到数据库失败: {e}")
-            return set()
-        return synced_ids
-    
+        if mid is None:
+            return []
+        return [
+            {
+                "id": str(mid),
+                "user_id": user_id,
+                "session_id": session_id,
+                "content": value,
+                "type": "conversation",
+                "importance": float(emotion_intensity or 5.0) / 10.0,
+            }
+        ]
+
     async def retrieve_memories(
         self,
         user_id: str,
         query: str,
-        n_results: int = 3,
-        days_limit: int = 7
+        limit: int = 5,
+        memory_type: str | None = None,
     ) -> list[dict[str, Any]]:
-        """
-        检索相关记忆
-        
-        Args:
-            user_id: 用户ID
-            query: 查询文本
-            n_results: 返回数量
-            days_limit: 时间限制（天数）
-            
-        Returns:
-            相关记忆列表
-        """
-        memories = self.memory_manager.retrieve_memories(
+        results = search_user_memories(
+            tenant_id=self.tenant_id,
             user_id=user_id,
             query=query,
-            n_results=n_results,
-            days_limit=days_limit
+            limit=limit,
         )
-        
-        # 更新访问统计
-        if memories:
-            self._update_access_stats(memories)
-        
-        return memories
-    
-    def _update_access_stats(self, memories: list[dict[str, Any]]):
-        """更新记忆的访问统计"""
-        try:
-            with DatabaseManager() as db:
-                for memory in memories:
-                    memory_id = memory.get("id")
-                    memory_item = db.db.query(MemoryItem).filter(
-                        MemoryItem.memory_id == memory_id
-                    ).first()
-                    
-                    if memory_item:
-                        memory_item.access_count += 1
-                        memory_item.last_accessed = datetime.utcnow()
-                
-                db.db.commit()
-        except Exception as e:
-            print(f"更新访问统计失败: {e}")
-    
+        if memory_type:
+            results = [r for r in results if r.get("type") == memory_type]
+        return results
+
     async def get_emotion_trend(self, user_id: str, days: int = 7) -> dict[str, Any]:
-        """
-        获取用户情绪趋势
-        
-        Args:
-            user_id: 用户ID
-            days: 统计天数
-            
-        Returns:
-            情绪趋势数据
-        """
-        return self.memory_manager.get_user_emotion_trend(user_id, days)
-    
-    async def get_important_memories(self, user_id: str, limit: int = 5) -> list[dict[str, Any]]:
-        """
-        获取用户最重要的记忆
-        
-        Args:
-            user_id: 用户ID
-            limit: 返回数量
-            
-        Returns:
-            重要记忆列表
-        """
-        return self.memory_manager.get_important_memories(user_id, limit)
-    
+        # 业务域情绪趋势已退役；保留空结构兼容旧 API
+        return {"user_id": user_id, "days": days, "trend": [], "note": "emotion_trends_removed"}
+
+    async def get_important_memories(
+        self, user_id: str, limit: int = 5
+    ) -> list[dict[str, Any]]:
+        session_factory = get_pg_session()
+        with session_factory.Session() as session:
+            rows = (
+                session.query(UserMemory)
+                .filter_by(tenant_id=self.tenant_id, user_id=user_id)
+                .order_by(UserMemory.confidence.desc())
+                .limit(limit)
+                .all()
+            )
+        return [
+            {
+                "id": str(r.id),
+                "content": f"{r.key}: {r.value}",
+                "key": r.key,
+                "value": r.value,
+                "importance": float(r.confidence or 0.5),
+                "type": r.source or "other",
+            }
+            for r in rows
+        ]
+
     async def delete_memory(self, user_id: str, memory_id: str) -> bool:
-        """
-        删除指定记忆
-        
-        Args:
-            user_id: 用户ID
-            memory_id: 记忆ID
-            
-        Returns:
-            是否删除成功
-        """
-        # The relational row is authoritative and also proves ownership. Never
-        # delete from the vector index before this check succeeds.
-        try:
-            with DatabaseManager() as db:
-                memory_item = db.db.query(MemoryItem).filter(
-                    MemoryItem.memory_id == memory_id,
-                    MemoryItem.user_id == user_id,
-                    MemoryItem.is_active,
-                ).first()
-                if not memory_item:
-                    return False
-
-                if not self.memory_manager.delete_memory(user_id, memory_id):
-                    return False
-
-                memory_item.is_active = False
-                db.db.commit()
-                return True
-        except Exception as e:
-            print(f"删除记忆失败: {e}")
-            return False
+        session_factory = get_pg_session()
+        with session_factory.Session() as session:
+            row = (
+                session.query(UserMemory)
+                .filter_by(tenant_id=self.tenant_id, user_id=user_id, id=int(memory_id))
+                .first()
+            )
+            if not row:
+                return False
+            session.delete(row)
+            session.commit()
+            return True
 
     async def update_memory_importance(
         self, user_id: str, memory_id: str, new_importance: float
     ) -> bool:
-        """Update importance in both the authoritative row and vector index."""
         if not 0.0 <= new_importance <= 1.0:
             raise ValueError("new_importance must be between 0 and 1")
+        session_factory = get_pg_session()
+        with session_factory.Session() as session:
+            row = (
+                session.query(UserMemory)
+                .filter_by(tenant_id=self.tenant_id, user_id=user_id, id=int(memory_id))
+                .first()
+            )
+            if not row:
+                return False
+            row.confidence = new_importance
+            session.commit()
+            return True
 
-        try:
-            with DatabaseManager() as db:
-                memory_item = db.db.query(MemoryItem).filter(
-                    MemoryItem.memory_id == memory_id,
-                    MemoryItem.user_id == user_id,
-                    MemoryItem.is_active,
-                ).first()
-                if not memory_item:
-                    return False
-
-                old_importance = memory_item.importance
-                memory_item.importance = new_importance
-                db.db.flush()
-                if not self.memory_manager.update_memory_importance(memory_id, new_importance):
-                    memory_item.importance = old_importance
-                    db.db.rollback()
-                    return False
-                db.db.commit()
-                return True
-        except Exception as e:
-            print(f"更新记忆重要性失败: {e}")
-            return False
-    
     async def get_user_memories_list(
         self,
         user_id: str,
         memory_type: str | None = None,
-        limit: int = 50
+        limit: int = 50,
     ) -> list[dict[str, Any]]:
-        """
-        获取用户记忆列表（用于管理界面）
-        
-        Args:
-            user_id: 用户ID
-            memory_type: 记忆类型过滤
-            limit: 返回数量
-            
-        Returns:
-            记忆列表
-        """
-        try:
-            with DatabaseManager() as db:
-                query = db.db.query(MemoryItem).filter(
-                    MemoryItem.user_id == user_id,
-                    MemoryItem.is_active
-                )
-                
-                if memory_type:
-                    query = query.filter(MemoryItem.memory_type == memory_type)
-                
-                memories = query.order_by(
-                    MemoryItem.importance.desc(),
-                    MemoryItem.created_at.desc()
-                ).limit(limit).all()
-                
-                return [
-                    {
-                        "id": m.memory_id,
-                        "type": m.memory_type,
-                        "summary": m.summary,
-                        "content": m.content,
-                        "emotion": m.emotion,
-                        "intensity": m.emotion_intensity,
-                        "importance": m.importance,
-                        "access_count": m.access_count,
-                        "created_at": m.created_at.isoformat() if m.created_at else None,
-                        "last_accessed": m.last_accessed.isoformat() if m.last_accessed else None
-                    }
-                    for m in memories
-                ]
-        except Exception as e:
-            print(f"获取记忆列表失败: {e}")
-            return []
-    
-    async def get_memory_statistics(self, user_id: str) -> dict[str, Any]:
-        """
-        获取用户记忆统计信息
-        
-        Args:
-            user_id: 用户ID
-            
-        Returns:
-            统计数据
-        """
-        try:
-            with DatabaseManager() as db:
-                from sqlalchemy import func
-                
-                # 总记忆数
-                total_count = db.db.query(func.count(MemoryItem.id)).filter(
-                    MemoryItem.user_id == user_id,
-                    MemoryItem.is_active
-                ).scalar()
-                
-                # 按类型统计
-                type_stats = db.db.query(
-                    MemoryItem.memory_type,
-                    func.count(MemoryItem.id).label('count')
-                ).filter(
-                    MemoryItem.user_id == user_id,
-                    MemoryItem.is_active
-                ).group_by(MemoryItem.memory_type).all()
-                
-                # 平均重要性
-                avg_importance = db.db.query(func.avg(MemoryItem.importance)).filter(
-                    MemoryItem.user_id == user_id,
-                    MemoryItem.is_active
-                ).scalar()
-                
-                return {
-                    "total_count": total_count or 0,
-                    "avg_importance": float(avg_importance) if avg_importance else 0,
-                    "by_type": [
-                        {"type": t.memory_type, "count": t.count}
-                        for t in type_stats
-                    ]
-                }
-        except Exception as e:
-            print(f"获取记忆统计失败: {e}")
-            return {"total_count": 0, "avg_importance": 0, "by_type": []}
+        session_factory = get_pg_session()
+        with session_factory.Session() as session:
+            q = session.query(UserMemory).filter_by(
+                tenant_id=self.tenant_id, user_id=user_id
+            )
+            if memory_type:
+                q = q.filter(UserMemory.source == memory_type)
+            rows = q.order_by(UserMemory.updated_at.desc()).limit(limit).all()
+        return [
+            {
+                "id": str(r.id),
+                "content": f"{r.key}: {r.value}",
+                "key": r.key,
+                "value": r.value,
+                "importance": float(r.confidence or 0.5),
+                "type": r.source or "other",
+                "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+            }
+            for r in rows
+        ]
 
+    async def get_memory_statistics(self, user_id: str) -> dict[str, Any]:
+        session_factory = get_pg_session()
+        with session_factory.Session() as session:
+            total = (
+                session.query(UserMemory)
+                .filter_by(tenant_id=self.tenant_id, user_id=user_id)
+                .count()
+            )
+            by_source = session.execute(
+                text(
+                    """
+                    SELECT COALESCE(source, 'other') AS src, COUNT(*) AS n
+                    FROM user_memories
+                    WHERE tenant_id = :tid AND user_id = :uid
+                    GROUP BY src
+                    """
+                ),
+                {"tid": self.tenant_id, "uid": user_id},
+            ).fetchall()
+        return {
+            "user_id": user_id,
+            "total": total,
+            "by_type": {r.src: r.n for r in by_source},
+        }

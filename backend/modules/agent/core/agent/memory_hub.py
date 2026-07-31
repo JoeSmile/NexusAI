@@ -12,21 +12,29 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from backend.database import User, get_db
-from backend.memory_manager import MemoryManager
+
+try:
+    from backend.memory_manager import MemoryManager
+except ImportError:  # Batch 3.1.3 removed
+    MemoryManager = None  # type: ignore
 
 
 class MemoryHub:
     """记忆中枢 - Agent的记忆系统核心"""
     
-    def __init__(self, memory_manager: MemoryManager | None = None):
+    def __init__(self, memory_manager=None):
         """
         初始化记忆中枢
         
         Args:
             memory_manager: 现有的记忆管理器（可选，用于复用）
         """
-        # 复用现有记忆管理器
-        self.memory_manager = memory_manager or MemoryManager()
+        if memory_manager is not None:
+            self.memory_manager = memory_manager
+        elif MemoryManager is not None:
+            self.memory_manager = MemoryManager()
+        else:
+            self.memory_manager = None
         
         # 短期记忆（内存缓存）
         self.working_memory = {
@@ -77,6 +85,8 @@ class MemoryHub:
             是否成功巩固
         """
         try:
+            if self.memory_manager is None:
+                return False
             # 情景记忆：存储事件到向量数据库
             if memory["memory_type"] == "episodic":
                 self.memory_manager.save_memory(
@@ -133,13 +143,14 @@ class MemoryHub:
         
         # 1. 向量语义检索（相似度）
         try:
-            semantic_results = self.memory_manager.search_memories(
-                user_id=user_id,
-                query=query,
-                top_k=top_k,
-                min_importance=0.3
-            )
-            results.extend(semantic_results)
+            if self.memory_manager is not None:
+                semantic_results = self.memory_manager.search_memories(
+                    user_id=user_id,
+                    query=query,
+                    top_k=top_k,
+                    min_importance=0.3
+                )
+                results.extend(semantic_results)
         except Exception as e:
             print(f"语义检索失败: {e!s}")
         
