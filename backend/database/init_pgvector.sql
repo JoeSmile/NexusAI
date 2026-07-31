@@ -250,3 +250,24 @@ ALTER TABLE user_memories ADD COLUMN IF NOT EXISTS tenant_id VARCHAR(64) DEFAULT
 ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS tenant_id VARCHAR(64) DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_messages_tenant ON chat_messages(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_memories_tenant ON user_memories(tenant_id);
+
+-- ========== Task 18: LLM API Key 管理 ==========
+CREATE TABLE IF NOT EXISTS llm_api_keys (
+    id                SERIAL PRIMARY KEY,
+    tenant_id         VARCHAR(64) NOT NULL,
+    key_alias         VARCHAR(128) NOT NULL,
+    provider          VARCHAR(32) NOT NULL,
+    base_url          VARCHAR(256) NOT NULL DEFAULT '',
+    encrypted_key     TEXT NOT NULL,
+    key_version       INT NOT NULL DEFAULT 1,
+    is_active         BOOLEAN NOT NULL DEFAULT true,
+    expires_at        TIMESTAMPTZ,
+    last_verified     TIMESTAMPTZ,
+    last_verified_ok  BOOLEAN,
+    description       TEXT DEFAULT '',
+    created_by        VARCHAR(128) NOT NULL,
+    created_at        TIMESTAMPTZ DEFAULT now(),
+    rotated_at        TIMESTAMPTZ,
+    UNIQUE(tenant_id, key_alias)
+);
+CREATE INDEX IF NOT EXISTS idx_lak_tenant ON llm_api_keys(tenant_id, is_active);

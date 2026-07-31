@@ -279,3 +279,135 @@ async def request_permission(
         ).fetchone()
         session.commit()
     return {"status": "pending", "request_id": row.id}
+
+
+# ── LLM API Key 管理 ──
+
+
+class CreateLlmKeyRequest(BaseModel):
+    tenant_id: str | None = None
+    key_alias: str
+    provider: str = "deepseek"
+    base_url: str = ""
+    api_key_plaintext: str
+    expires_in_days: int | None = None
+    description: str = ""
+
+
+@router.post("/llm-keys")
+async def create_llm_key(
+    req: CreateLlmKeyRequest,
+    tenant: TenantContext = Depends(require_permission("admin:llm_key")),
+):
+    """创建 LLM API Key（明文传入，加密存储）"""
+    from backend.core.key_manager import KeyManager
+
+    km = KeyManager()
+    encrypted = km.encrypt(req.api_key_plaintext)
+    target_tenant = req.tenant_id or tenant.tenant_id
+
+    session_factory = get_pg_session()
+    with session_factory.Session() as session:
+        sql = text(
+            """
+            INSERT INTO llm_api_keys
+                (tenant_id, key_alias, provider, base_url, encrypted_key,
+                 description, created_by, expires_at)
+            VALUES
+                (:tid, :alias, :prov, :url, :enc,
+                 :desc, :by, now() + (:days * interval '1 day'))
+            RETURNING id, created_at
+            """
+        )
+        row = session.execute(
+            sql,
+            {
+                "tid": target_tenant,
+                "alias": req.key_alias,
+                "prov": req.provider,
+                "url": req.base_url,
+                "enc": encrypted,
+                "desc": req.description,
+                "by": tenant.user_id,
+                "days": req.expires_in_days or 365,
+            },
+        ).fetchone()
+        session.commit()
+
+    return {"id": row.id, "key_alias": req.key_alias, "status": "created"}
+
+
+@router.get("/llm-keys")
+async def list_llm_keys(
+    tenant: TenantContext = Depends(require_permission("admin:llm_key")),
+):
+    """列出租户 LLM Key（不返回明文）"""
+    session_factory = get_pg_session()
+    with session_factory.Session() as session:
+        if tenant.is_cross_tenant:
+            sql = text(
+                """
+                SELECT id, tenant_id, key_alias, provider, base_url,
+                       key_version, is_active, expires_at, last_verified_ok,
+                       description, created_at, rotated_at
+                FROM llm_api_keys
+                ORDER BY created_at DESC
+                """
+            )
+            rows = session.execute(sql).fetchall()
+        else:
+            sql = text(
+                """
+                SELECT id, tenant_id, key_alias, provider, base_url,
+                       key_version, is_active, expires_at, last_verified_ok,
+                       description, created_at, rotated_at
+                FROM llm_api_keys
+                WHERE tenant_id = :tid
+                ORDER BY created_at DESC
+                """
+            )
+            rows = session.execute(sql, {"tid": tenant.tenant_id}).fetchall()
+    return [
+        {
+            "id": r.id,
+            "tenant_id": r.tenant_id,
+            "key_alias": r.key_alias,
+            "provider": r.provider,
+            "key_version": r.key_version,
+            "is_active": r.is_active,
+            "last_verified_ok": r.last_verified_ok,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
+
+
+@router.delete("/llm-keys/{key_id}")
+async def delete_llm_key(
+    key_id: int,
+    tenant: TenantContext = Depends(require_permission("admin:llm_key")),
+):
+    """吊销 LLM Key"""
+    session_factory = get_pg_session()
+    with session_factory.Session() as session:
+        if tenant.is_cross_tenant:
+            sql = text("UPDATE llm_api_keys SET is_active=false WHERE id=:id")
+            session.execute(sql, {"id": key_id})
+        else:
+            sql = text(
+                "UPDATE llm_api_keys SET is_active=false WHERE id=:id AND tenant_id=:tid"
+            )
+            session.execute(sql, {"id": key_id, "tid": tenant.tenant_id})
+        session.commit()
+    return {"status": "deleted", "id": key_id}
+
+
+@router.post("/llm-keys/{key_id}/verify")
+async def verify_llm_key(
+    key_id: int,
+    tenant: TenantContext = Depends(require_permission("admin:llm_key")),
+):
+    """验证 Key 有效性"""
+    from backend.core.key_health import verify_key_by_id
+
+    return await verify_key_by_id(key_id)

@@ -10,21 +10,26 @@ load_dotenv(env_path)
 PROJECT_ROOT = os.getenv('PROJECT_ROOT', str(Path(__file__).parent))
 
 class Config:
-    # LLM API配置 - 支持通义千问(Qwen)、OpenAI等兼容接口
-    # 统一使用 LLM_API_KEY，兼容旧的环境变量名
-    LLM_API_KEY = (
+    # ── LLM API Key 安全治理 ──
+    # DB 加密存储 + KeyManager 运行时解密；保留 env fallback 过渡
+    LLM_KEY_MASTER_KEY = os.getenv("LLM_KEY_MASTER_KEY", "")
+    LLM_API_KEY_FALLBACK = (
         os.getenv("LLM_API_KEY")
         or os.getenv("DEEPSEEK_API_KEY")
         or os.getenv("DASHSCOPE_API_KEY")
         or os.getenv("OPENAI_API_KEY")
+        or ""
     )
-    # 默认使用智谱 OpenAI 兼容接口；可通过 LLM_BASE_URL 覆盖
-    LLM_BASE_URL = (
+    LLM_BASE_URL_FALLBACK = (
         os.getenv("LLM_BASE_URL")
         or os.getenv("DEEPSEEK_BASE_URL")
         or os.getenv("API_BASE_URL", "https://open.bigmodel.cn/api/paas/v4/")
     )
-    
+
+    # 兼容层：遗留代码仍读 LLM_API_KEY / LLM_BASE_URL
+    LLM_API_KEY = LLM_API_KEY_FALLBACK
+    LLM_BASE_URL = LLM_BASE_URL_FALLBACK
+
     # 为了兼容性，保留旧的属性名（指向统一的配置）
     OPENAI_API_KEY = LLM_API_KEY
     API_BASE_URL = LLM_BASE_URL

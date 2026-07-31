@@ -188,11 +188,56 @@ def seed_data() -> None:
         print(f"  ✅ 用户画像已写入 ({written} 条新增 / {len(profiles)} 条定义)")
 
 
+def seed_llm_keys() -> None:
+    """写入初始 LLM API Key（从 env 迁移到数据库）"""
+    import os
+
+    from sqlalchemy import text
+
+    from backend.core.key_manager import KeyManager
+    from backend.database.pgvector_session import get_pg_session
+
+    env_key = os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or ""
+    if not env_key:
+        print("  ⚠️  未找到 LLM_API_KEY 环境变量，跳过 seed LLM Key")
+        return
+    if not os.getenv("LLM_KEY_MASTER_KEY"):
+        print("  ⚠️  未设置 LLM_KEY_MASTER_KEY，跳过 seed LLM Key")
+        return
+
+    km = KeyManager()
+    encrypted = km.encrypt(env_key)
+    base_url = os.getenv("LLM_BASE_URL") or ""
+
+    session_factory = get_pg_session()
+    with session_factory.Session() as session:
+        sql = text(
+            """
+            INSERT INTO llm_api_keys
+                (tenant_id, key_alias, provider, base_url, encrypted_key,
+                 description, created_by)
+            VALUES
+                ('*', 'default-env', 'deepseek', :url, :enc,
+                 '从环境变量迁移的默认 Key', 'seed_script')
+            ON CONFLICT (tenant_id, key_alias) DO NOTHING
+            RETURNING id
+            """
+        )
+        row = session.execute(sql, {"enc": encrypted, "url": base_url}).fetchone()
+        session.commit()
+
+    if row:
+        print(f"  ✅ LLM API Key 已加密存储到数据库 (id={row.id})")
+    else:
+        print("  ℹ️  LLM API Key 已存在，跳过")
+
+
 def main() -> None:
     print("=" * 60)
     print("  ContextGate — Seed pgvector Data")
     print("=" * 60)
     seed_data()
+    seed_llm_keys()
     print("=" * 60)
     print("  ✅ 数据写入完成")
     print("=" * 60)

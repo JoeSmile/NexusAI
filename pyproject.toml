@@ -26,7 +26,6 @@ dependencies = [
     "pydantic>=2.7.0,<3.0.0",
     "python-dotenv>=0.20.0",
     "requests>=2.25.0",
-
     # LLM和LangChain
     "openai>=1.26.0,<2.0.0",
     "langchain>=0.2.0,<0.3.0",
@@ -35,25 +34,21 @@ dependencies = [
     "langgraph>=0.2.0,<0.3.0",
     "langfuse>=2.0.0,<3.0.0",
     "pandas>=2.0.0",
-
     # 数据库 (PostgreSQL + pgvector)
     "psycopg2-binary>=2.9.0",
     "pgvector>=0.3.0,<0.4.0",
     "sqlalchemy>=1.4.0,<2.0.0",
     "alembic>=1.8.0",
-
     # 文档处理
     "python-multipart>=0.0.9",
     "pypdf>=3.0.0",
     "PyPDF2>=2.0.0",
-
     # 依赖冲突修复
     "idna>=2.10",
     "anyio>=3.0.0",
     "sniffio>=1.3.0",
     "httpx>=0.27.0,<0.29.0",
     "protobuf>=4.25.0,<6.0.0",
-
     # 轻量工具
     "Pillow>=9.0.0",
     "jieba>=0.42.1",
@@ -63,6 +58,7 @@ dependencies = [
     "numpy>=1.21.0",
     "prometheus-client>=0.17.0",
     "pyyaml>=6.0",
+    "cryptography>=49.0.0",
 ]
 
 [project.optional-dependencies]

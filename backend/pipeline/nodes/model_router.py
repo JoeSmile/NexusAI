@@ -85,7 +85,21 @@ async def model_router(state: PipelineState) -> PipelineState:
     state["selected_model"] = model
     state["estimated_cost"] = estimate_cost(model, max_tokens)
     state["finish_reason"] = "routed_to_llm"
-    _ = _detect_provider  # Task 18 key injection 预留
+
+    # 注入租户级 LLM API Key（DB 加密 → 运行时解密；无则走 env fallback）
+    try:
+        from backend.core.key_repository import LLMKeyRepository
+
+        provider = _detect_provider(model)
+        key_data = await LLMKeyRepository().get_key(state["tenant_id"], provider)
+        if key_data:
+            state["llm_api_key"] = key_data.api_key
+            state["llm_base_url"] = key_data.base_url
+            state["llm_key_id"] = key_data.id
+            state["llm_key_version"] = key_data.key_version
+    except Exception:
+        pass
+
     return state
 
 
