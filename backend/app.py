@@ -333,6 +333,17 @@ def create_app() -> FastAPI:
     except Exception as e:
         logger.warning("Skill discovery failed: %s", e)
 
+    # Playground 静态页（保留 React frontend/src，仅挂载测试页）
+    from fastapi.staticfiles import StaticFiles
+
+    playground_dir = Path(__file__).parent.parent / "frontend"
+    if playground_dir.exists():
+        app.mount(
+            "/playground",
+            StaticFiles(directory=str(playground_dir), html=True),
+            name="playground",
+        )
+
     logger.info("应用初始化完成")
 
     return app

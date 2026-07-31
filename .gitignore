@@ -28,17 +28,23 @@ wheels/
 .installed.cfg
 *.egg
 
-# IDE
-.DS_Store
-.vscode/
+# IDE — track shared vscode recommendations
 .idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
 *.swp
 *.swo
 *~
 
-# Environment variables
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
 .env
 *.env.local
+*.local.env
 config.env
 
 # Logs
@@ -46,7 +52,7 @@ config.env
 log/
 !log/.gitkeep
 
-# Database
+# Database / local data
 *.db
 *.sqlite3
 data/
@@ -56,7 +62,7 @@ data/*
 !data/mock_data/
 !data/mock_data/**
 chroma_db/
+uploads/
 
 # Local assets
 assets/
-
