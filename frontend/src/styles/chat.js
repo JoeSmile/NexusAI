@@ -1,6 +1,7 @@
 import styled from 'styled-components';
 import { motion } from 'framer-motion';
-import { emotionColors } from '../constants/emotions';
+
+const emotionColors = { neutral: '#b2bec3' };
 
 // 顶部对话标题栏
 export const ChatHeader = styled.div`

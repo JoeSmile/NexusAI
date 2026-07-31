@@ -33,7 +33,6 @@ from backend.routers import (
     memory_router,
     feedback_router,
     evaluation_router,
-    emotion_router,
     personalization_router,
     rag_router
 )
@@ -73,13 +72,6 @@ try:
 except ImportError:
     AGENT_ENABLED = False
     agent_router = None
-
-try:
-    from backend.routers.hermes import router as hermes_router
-    HERMES_ROUTER_ENABLED = True
-except ImportError:
-    HERMES_ROUTER_ENABLED = False
-    hermes_router = None
 
 # 导入日志配置
 from backend.logging_config import get_logger
@@ -167,7 +159,6 @@ def create_app() -> FastAPI:
     app.include_router(memory_router)
     app.include_router(feedback_router)
     app.include_router(evaluation_router)
-    app.include_router(emotion_router)
     app.include_router(personalization_router)
     if rag_router is not None:
         app.include_router(rag_router)
@@ -181,10 +172,6 @@ def create_app() -> FastAPI:
     if AGENT_ENABLED and agent_router:
         app.include_router(agent_router)
         logger.info("Agent模块已启用")
-
-    if HERMES_ROUTER_ENABLED and hermes_router:
-        app.include_router(hermes_router)
-        logger.info("Hermes 工作区路由已注册 (/hermes)")
     
     # 注册意图识别路由（如果可用）
     if INTENT_ENABLED and intent_router:
@@ -206,14 +193,14 @@ def create_app() -> FastAPI:
     async def root():
         """API根路径"""
         features = [
-            "情感分析",
             "记忆系统",
             "上下文管理",
             "向量数据库",
             "LangChain集成",
             "自动评估",
             "RAG知识库",
-            "个性化配置"
+            "个性化配置",
+            "LangGraph管线",
         ]
         
         # 如果性能优化模块启用，添加到功能列表
@@ -232,8 +219,6 @@ def create_app() -> FastAPI:
         # 如果Agent模块启用，添加到功能列表
         if AGENT_ENABLED:
             features.append("Agent智能核心")
-        if HERMES_ROUTER_ENABLED:
-            features.append("Hermes工作区自动化")
         
         # 如果意图识别模块启用，添加到功能列表
         if INTENT_ENABLED:
@@ -279,11 +264,11 @@ def create_app() -> FastAPI:
                 "storage": ["向量数据库 (pgvector)", "关系数据库 (PostgreSQL)"]
             },
             "features": {
-                "emotion_analysis": "情绪分析与追踪",
                 "memory_extraction": "自动记忆提取",
                 "context_assembly": "上下文组装",
                 "user_profiling": "用户画像",
                 "evaluation": "自动评估系统",
+                "langgraph_pipeline": "LangGraph 管线",
                 "intent_recognition": "意图识别系统" if INTENT_ENABLED else None
             }
         }

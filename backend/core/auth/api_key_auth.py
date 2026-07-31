@@ -47,7 +47,7 @@ async def verify_api_key(
     with session_factory.Session() as session:
         sql = text("""
             SELECT ak.tenant_id, ak.user_id, ak.role,
-                   COALESCE(uap.permissions, '[]'::jsonb) AS extra_permissions
+                   COALESCE(uap.permissions, '[]'::json) AS extra_permissions
             FROM api_keys ak
             LEFT JOIN user_app_perms uap
                 ON ak.user_id = uap.user_id AND ak.tenant_id = uap.tenant_id

@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
 import { Brain, ChevronRight, HeartPulse, Lightbulb, Paperclip, Sparkles } from 'lucide-react';
 import ChatAPI from '../services/ChatAPI';
-import { emotionLabels } from '../constants/emotions';
+
+const emotionLabels = { neutral: '平静' };
 
 const Rail = styled.aside`
   width: 300px;

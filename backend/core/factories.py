@@ -89,15 +89,11 @@ class ContextServiceFactory(ServiceFactory):
 
 
 class EmotionAnalyzerFactory(ServiceFactory):
-    """情绪分析器工厂"""
+    """情绪分析器工厂 — Batch 3.1: emotion_analyzer 已删除"""
     
     def create_service(self, *args, **kwargs) -> IEmotionAnalyzer:
         """创建情绪分析器实例"""
-        try:
-            from ..emotion_analyzer import EmotionAnalyzer
-            return EmotionAnalyzer(*args, **kwargs)
-        except ImportError as e:
-            raise ConfigurationError(f"无法导入情绪分析器: {e}")
+        raise ConfigurationError("EmotionAnalyzer 已在 Batch 3.1 移除")
     
     def get_service_type(self) -> Type[IEmotionAnalyzer]:
         return IEmotionAnalyzer

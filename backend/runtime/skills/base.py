@@ -12,7 +12,7 @@ Skill Protocol — 技能系统的核心抽象
 从 Workflow 到 Skill 的映射：
   原 7 阶段 Workflow          →  Skill
   ─────────────────────────────────────────
-  阶段1: 感知层 (emotion)     →  EmotionSkill
+  阶段1: 感知层               →  (EmotionSkill 已移除)
   阶段2: 记忆检索 (memory)    →  MemorySkill
   阶段3: 任务规划 (planner)   →  PlanningSkill
   阶段4: 执行计划 (tool)      →  ToolSkill
@@ -155,14 +155,13 @@ class SkillRegistry:
     Usage::
 
         registry = SkillRegistry()
-        registry.register(EmotionSkill())
         registry.register(MemorySkill())
 
         # 获取适用的 Skill
         skills = registry.get_applicable_skills(context)
 
         # 按名称获取
-        skill = registry.get_skill("emotion_skill")
+        skill = registry.get_skill("memory_skill")
     """
 
     def __init__(self):

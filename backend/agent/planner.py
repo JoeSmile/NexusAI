@@ -25,7 +25,12 @@ from backend.modules.agent.protocol.mcp import (
     MCPMessage, MCPProtocol, MCPToolCall, MCPContext, 
     MCPMessageType, get_mcp_logger
 )
-from backend.hermes.intent import workspace_automation_intent
+
+try:
+    from backend.hermes.intent import workspace_automation_intent
+except ImportError:  # Batch 3.1: hermes 已删除
+    def workspace_automation_intent(_text: str) -> bool:
+        return False
 
 
 class GoalType(Enum):

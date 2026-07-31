@@ -39,8 +39,9 @@ import {
   URLButton,
   FeatureButton,
 } from '../styles/input';
-import { emotionLabels } from '../constants/emotions';
 import { formatTimestamp, formatFileSize } from '../utils/formatters';
+
+const emotionLabels = { neutral: '平静' };
 import MarkdownRenderer from './MarkdownRenderer';
 import { getFileIcon } from '../utils/fileUtils';
 import styled from 'styled-components';

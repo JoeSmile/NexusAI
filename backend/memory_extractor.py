@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 """
+# DEPRECATED (Batch 3.1): 旧记忆提取器；新管线不再依赖此模块。
+# 确认无引用后可删除；当前仍被 MemoryManager / enhanced_memory_manager 使用。
+
 记忆提取模块
 从对话中提取关键信息，包括情绪、事件、承诺等
 """

@@ -1,4 +1,8 @@
 """
+# DEPRECATED (Batch 3.1): 旧 VectorStore 门面。
+# 新代码请用 pipeline memory 节点 / backend.database.vector_ops。
+# 暂保留：MemoryManager / ChatEngine 仍依赖此 API。
+
 向量存储 — pgvector 实现（替代原 ChromaDB VectorStore）
 
 保持原有方法签名，供 MemoryManager / ChatEngine 兼容调用。

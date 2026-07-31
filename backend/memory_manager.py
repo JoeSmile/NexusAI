@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 """
+# DEPRECATED (Batch 3.1): 旧记忆管理器，将被 pipeline load_memory/write_memory 替代。
+# 确认无引用后可删除；当前仍被 memory_service / agent memory_hub 使用。
+
 记忆管理系统
 负责记忆的向量化存储、检索和更新（pgvector）
 """

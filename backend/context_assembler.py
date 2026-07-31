@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 """
+# DEPRECATED (Batch 3.1): 旧上下文组装；已被 pipeline/build_context 替代。
+# 确认无引用后可删除；当前仍被 context_service / agent_core 使用。
+
 上下文组装器
 整合用户画像、长期记忆、对话历史，生成完整的上下文
 """

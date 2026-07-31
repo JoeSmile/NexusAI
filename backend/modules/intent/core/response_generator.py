@@ -25,7 +25,11 @@ from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime
 
 from .dynamic_prompt_builder import DynamicPromptBuilder
-from backend.utils.sentiment_classifier import SentimentClassifier
+
+try:
+    from backend.utils.sentiment_classifier import SentimentClassifier
+except ImportError:  # Batch 3.1: sentiment_classifier 已删除
+    SentimentClassifier = None  # type: ignore[misc, assignment]
 
 logger = logging.getLogger(__name__)
 
@@ -63,9 +67,13 @@ class ResponseGenerator:
         # 初始化动态Prompt构建器
         self.prompt_builder = DynamicPromptBuilder(self.emotion_strategy)
         
-        # 初始化情感一致性分类器
-        if self.enable_consistency_check:
+        # 初始化情感一致性分类器（模块已删则关闭一致性检查）
+        self.sentiment_classifier = None
+        if self.enable_consistency_check and SentimentClassifier is not None:
             self.sentiment_classifier = SentimentClassifier()
+        elif self.enable_consistency_check:
+            self.enable_consistency_check = False
+            logger.warning("SentimentClassifier 不可用，已关闭情感一致性检查")
         
         # 缓存的固定回复（高频场景）
         self.cached_responses = self._load_cached_responses()
@@ -399,6 +407,8 @@ class ResponseGenerator:
         Returns:
             (is_valid, warnings): 是否有效，警告列表
         """
+        if self.sentiment_classifier is None:
+            return True, []
         result = self.sentiment_classifier.comprehensive_check(
             ai_response=response,
             user_emotion=user_emotion,

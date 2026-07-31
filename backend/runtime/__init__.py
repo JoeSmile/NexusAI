@@ -26,7 +26,6 @@ from backend.runtime.session.fsm import SessionFSM, SessionState, IllegalTransit
 from backend.runtime.config.toggles import ModuleToggles
 from backend.runtime.config.guards import is_module_enabled, require_module
 from backend.runtime.skills.base import Skill, SkillContext, SkillResult, SkillRegistry
-from backend.runtime.skills.emotion_skill import EmotionSkill
 from backend.runtime.skills.memory_skill import MemorySkill
 from backend.runtime.skills.planning_skill import PlanningSkill
 from backend.runtime.skills.reflect_skill import ReflectSkill
@@ -65,7 +64,6 @@ __all__ = [
     "SkillContext",
     "SkillResult",
     "SkillRegistry",
-    "EmotionSkill",
     "MemorySkill",
     "PlanningSkill",
     "ReflectSkill",
