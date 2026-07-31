@@ -1,0 +1,113 @@
+"""写回记忆 + 缓存 + 审计"""
+
+from __future__ import annotations
+
+import hashlib
+import os
+from datetime import datetime, timedelta
+
+from sqlalchemy import text
+
+from backend.database.pgvector_session import (
+    CacheEntry,
+    ChatMessage,
+    ChatSession,
+    get_pg_session,
+)
+from backend.pipeline.state import PipelineState
+
+
+async def write_memory(state: PipelineState) -> PipelineState:
+    """保存对话到 pgvector，写入缓存和审计日志。"""
+    tenant_id = state["tenant_id"]
+    user_id = state["user_id"]
+    session_id = state["session_id"]
+    message = state["message"]
+    response = state["response"]
+    trace_id = state["trace_id"]
+
+    session_factory = get_pg_session()
+    with session_factory.Session() as session:
+        existing = (
+            session.query(ChatSession).filter_by(session_id=session_id).first()
+        )
+        if not existing:
+            session.add(
+                ChatSession(
+                    session_id=session_id,
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    title=(message or "")[:80],
+                )
+            )
+            session.flush()
+        session.add(
+            ChatMessage(
+                tenant_id=tenant_id,
+                session_id=session_id,
+                user_id=user_id,
+                role="user",
+                content=message,
+                emotion=state.get("emotion"),
+                emotion_intensity=state.get("emotion_intensity", 5.0),
+            )
+        )
+        session.add(
+            ChatMessage(
+                tenant_id=tenant_id,
+                session_id=session_id,
+                user_id=user_id,
+                role="assistant",
+                content=response,
+            )
+        )
+
+        mock = os.getenv("LLM_MOCK", "true").lower() == "true"
+        if mock and response:
+            query_hash = hashlib.sha256(message.encode()).hexdigest()[:16]
+            exact_key = f"exact:{tenant_id}:{user_id}:{query_hash}"
+            session.execute(
+                text("DELETE FROM cache_entries WHERE cache_key = :k"),
+                {"k": exact_key},
+            )
+            session.add(
+                CacheEntry(
+                    cache_key=exact_key,
+                    cache_type="exact",
+                    tenant_id=tenant_id,
+                    value=response,
+                    ttl_seconds=300,
+                    expires_at=datetime.utcnow() + timedelta(seconds=300),
+                )
+            )
+
+        session.execute(
+            text("""
+                INSERT INTO audit_logs
+                    (tenant_id, user_id, action, trace_id,
+                     input_text, output_text, model,
+                     input_tokens, output_tokens, cost, latency_ms,
+                     error_code)
+                VALUES
+                    (:tid, :uid, 'chat', :trace_id,
+                     :input, :output, :model,
+                     :in_tok, :out_tok, :cost, :latency,
+                     :err)
+            """),
+            {
+                "tid": tenant_id,
+                "uid": user_id,
+                "trace_id": trace_id,
+                "input": message,
+                "output": response,
+                "model": state.get("selected_model", ""),
+                "in_tok": len(message),
+                "out_tok": len(response or ""),
+                "cost": state.get("total_cost", 0.0),
+                "latency": state.get("pipeline_latency_ms", 0.0),
+                "err": state.get("error_code"),
+            },
+        )
+        session.commit()
+
+    return state

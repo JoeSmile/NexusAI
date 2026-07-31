@@ -38,6 +38,8 @@ from backend.routers import (
     rag_router
 )
 
+from backend.pipeline.router import router as chat_pipeline_router
+
 # 导入性能优化路由
 try:
     from backend.routers.performance import router as performance_router
@@ -159,7 +161,9 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(admin_router, prefix="/api")
     app.include_router(audit_router, prefix="/api")
-    app.include_router(chat_router)
+    # LangGraph 管线接管 /chat（旧 chat_router 保留但不再挂载主路径）
+    app.include_router(chat_pipeline_router)
+    # app.include_router(chat_router)  # DEPRECATED: 使用 chat_pipeline_router
     app.include_router(memory_router)
     app.include_router(feedback_router)
     app.include_router(evaluation_router)

@@ -243,3 +243,10 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     created_at      TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_audit_tenant_time ON audit_logs(tenant_id, created_at);
+
+-- ========== Batch 4: 旧表补 tenant_id（幂等）==========
+ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS tenant_id VARCHAR(64) DEFAULT 'default';
+ALTER TABLE user_memories ADD COLUMN IF NOT EXISTS tenant_id VARCHAR(64) DEFAULT 'default';
+ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS tenant_id VARCHAR(64) DEFAULT 'default';
+CREATE INDEX IF NOT EXISTS idx_messages_tenant ON chat_messages(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_memories_tenant ON user_memories(tenant_id);

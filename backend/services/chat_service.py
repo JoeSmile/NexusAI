@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 """
+# DEPRECATED: 请使用 backend/pipeline/router.py
+# 新请求走 LangGraph 管线，此文件保留供参考
+
 聊天服务层
 处理所有与聊天相关的业务逻辑
 """

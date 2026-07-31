@@ -60,6 +60,8 @@ dependencies = [
     "typing-extensions>=4.0.0",
     "numpy>=1.21.0",
     "prometheus-client>=0.17.0",
+    # langgraph 官方包需 pydantic v2；Batch 4 使用 pipeline/langgraph_compat shim
+    # "langgraph>=0.2.0",  # 待 Batch 6/ pydantic v2 升级后启用
 ]
 
 [project.optional-dependencies]
