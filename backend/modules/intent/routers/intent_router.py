@@ -50,7 +50,7 @@ async def analyze_intent(
     Example:
         ```json
         {
-            "text": "我最近总是睡不着，该怎么办？",
+            "text": "如何查询公司的信息安全管理制度？",
             "user_id": "user_123"
         }
         ```
@@ -122,9 +122,9 @@ async def build_prompt(
         {
             "analysis": {
                 "intent": {
-                    "intent": "advice",
-                    "confidence": 0.85,
-                    "source": "model"
+                    "intent": "knowledge_query",
+                    "confidence": 0.90,
+                    "source": "rule"
                 }
             }
         }
@@ -157,31 +157,39 @@ async def get_intent_types():
         意图类型列表及说明
     """
     intent_types = {
+        "knowledge_query": {
+            "name": "知识查询",
+            "description": "查询企业制度、政策或知识库内容",
+            "examples": [
+                "如何查询公司的信息安全管理制度？",
+                "出差报销流程是什么？",
+            ],
+        },
         "advice": {
-            "name": "寻求建议",
-            "description": "用户寻求建议或解决方案",
-            "examples": ["怎么办？", "你有什么建议吗？", "该如何处理？"]
+            "name": "操作建议",
+            "description": "寻求可执行的操作建议或处理步骤",
+            "examples": ["这个故障怎么办？", "有什么处理建议吗？"],
         },
         "conversation": {
             "name": "普通对话",
             "description": "日常交流对话",
-            "examples": ["今天天气不错", "我在看书", "刚吃完饭"]
+            "examples": ["今天站会改到三点", "这份报告我看完了"],
         },
         "function": {
             "name": "功能请求",
             "description": "请求执行特定功能（提醒、记录等）",
-            "examples": ["提醒我吃药", "记录今天的心情", "设置闹钟"]
+            "examples": ["提醒我周五提交周报", "记录这次会议结论", "设置闹钟"],
         },
         "crisis": {
             "name": "安全预警",
             "description": "紧急情况，需要立即关注",
-            "examples": ["不想活了", "很想自杀", "撑不下去了"]
+            "examples": ["不想活了", "很想自杀", "撑不下去了"],
         },
         "chat": {
             "name": "闲聊",
             "description": "打招呼、寒暄等轻松对话",
-            "examples": ["你好", "在吗", "晚上好"]
-        }
+            "examples": ["你好", "在吗", "晚上好"],
+        },
     }
     
     return {

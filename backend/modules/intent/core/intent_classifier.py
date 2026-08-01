@@ -28,11 +28,12 @@ class MLIntentClassifier:
         """
         self.model_path = model_path or "intent_bert_model"
         self.labels = [
+            IntentType.KNOWLEDGE_QUERY,
             IntentType.ADVICE,
             IntentType.CHAT,
             IntentType.FUNCTION,
             IntentType.CRISIS,
-            IntentType.CONVERSATION
+            IntentType.CONVERSATION,
         ]
         
         # 模型加载（如果有训练好的模型）
@@ -102,37 +103,53 @@ class MLIntentClassifier:
             意图识别结果
         """
         text_lower = text.lower()
-        
-        # 简单的启发式规则
-        if any(word in text_lower for word in ["怎么办", "建议", "如何", "怎样"]):
+
+        knowledge_markers = [
+            "如何查询",
+            "怎么查询",
+            "查询公司",
+            "管理制度",
+            "信息安全",
+            "知识库",
+            "制度",
+            "政策",
+            "规定",
+            "合规",
+        ]
+        if any(word in text_lower for word in knowledge_markers):
+            return IntentResult(
+                intent=IntentType.KNOWLEDGE_QUERY,
+                confidence=0.85,
+                source="model",
+                metadata={"method": "heuristic"},
+            )
+        if any(word in text_lower for word in ["怎么办", "有什么建议", "怎么处理"]):
             return IntentResult(
                 intent=IntentType.ADVICE,
                 confidence=0.75,
                 source="model",
-                metadata={"method": "heuristic"}
+                metadata={"method": "heuristic"},
             )
-        elif any(word in text_lower for word in ["提醒", "记得", "别忘"]):
+        if any(word in text_lower for word in ["提醒", "记得", "别忘"]):
             return IntentResult(
                 intent=IntentType.FUNCTION,
                 confidence=0.70,
                 source="model",
-                metadata={"method": "heuristic"}
+                metadata={"method": "heuristic"},
             )
-        elif any(word in text_lower for word in ["你好", "早上好", "hi", "在吗"]):
+        if any(word in text_lower for word in ["你好", "早上好", "hi", "在吗"]):
             return IntentResult(
                 intent=IntentType.CHAT,
                 confidence=0.85,
                 source="model",
-                metadata={"method": "heuristic"}
+                metadata={"method": "heuristic"},
             )
-        else:
-            # 默认为普通对话
-            return IntentResult(
-                intent=IntentType.CONVERSATION,
-                confidence=0.60,
-                source="model",
-                metadata={"method": "heuristic"}
-            )
+        return IntentResult(
+            intent=IntentType.CONVERSATION,
+            confidence=0.60,
+            source="model",
+            metadata={"method": "heuristic"},
+        )
 
 
 class IntentClassifier:

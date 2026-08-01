@@ -115,17 +115,27 @@ class IntentService:
                 "avoid": ["说教", "轻视", "劝阻"],
                 "prompt_hint": "安全预警模式：需要提供明确的求助指引"
             },
+            IntentType.KNOWLEDGE_QUERY: {
+                "response_style": "专业、准确、可溯源",
+                "priority": "high",
+                "actions": [
+                    "检索企业知识库",
+                    "引用制度/政策原文要点",
+                    "标明出处",
+                ],
+                "avoid": ["编造制度", "情感化安慰"],
+                "prompt_hint": "知识查询模式：优先 RAG/知识库，给出可核对的制度信息",
+            },
             IntentType.ADVICE: {
-                "response_style": "建设性、实用、温和",
+                "response_style": "建设性、实用、简洁",
                 "priority": "medium",
                 "actions": [
                     "分析问题",
-                    "提供多个选择",
-                    "分享相关知识",
-                    "鼓励自主决策"
+                    "提供可操作步骤",
+                    "给出备选方案",
                 ],
                 "avoid": ["强制建议", "过于复杂"],
-                "prompt_hint": "建议提供模式：提供实用建议，但尊重用户选择"
+                "prompt_hint": "操作建议模式：给出中性可执行建议",
             },
             IntentType.FUNCTION: {
                 "response_style": "高效、明确、友好",
@@ -133,10 +143,10 @@ class IntentService:
                 "actions": [
                     "确认需求",
                     "执行功能",
-                    "反馈结果"
+                    "反馈结果",
                 ],
                 "avoid": ["冗长", "模糊"],
-                "prompt_hint": "功能执行模式：快速准确地完成用户请求"
+                "prompt_hint": "功能执行模式：快速准确地完成用户请求",
             },
             IntentType.CHAT: {
                 "response_style": "轻松、友好、自然",
@@ -144,22 +154,20 @@ class IntentService:
                 "actions": [
                     "保持对话",
                     "展现亲和力",
-                    "适当幽默"
                 ],
                 "avoid": ["过于正式", "冷漠"],
-                "prompt_hint": "闲聊模式：自然友好的日常交流"
+                "prompt_hint": "闲聊模式：自然友好的日常交流",
             },
             IntentType.CONVERSATION: {
-                "response_style": "平衡、自然、贴心",
+                "response_style": "平衡、自然、专业",
                 "priority": "medium",
                 "actions": [
                     "理解上下文",
                     "延续话题",
-                    "展现关心"
                 ],
                 "avoid": ["突兀", "生硬"],
-                "prompt_hint": "普通对话模式：保持自然流畅的对话"
-            }
+                "prompt_hint": "普通对话模式：保持自然流畅的对话",
+            },
         }
         
         return suggestions.get(
