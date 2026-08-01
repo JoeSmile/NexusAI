@@ -38,6 +38,11 @@ class ErrorCode(StrEnum):
     # ── 文件 (FILE_0xx) ──
     FILE_TOO_LARGE = "FILE_001"
     FILE_INVALID_TYPE = "FILE_002"
+    FILE_NOT_FOUND = "FILE_003"
+
+    # ── RAG / 多模态 (RAG_0xx) ──
+    RAG_DEP_MISSING = "RAG_001"
+    RAG_EMPTY_EXTRACT = "RAG_002"
 
     # ── 系统 (SYS_0xx) ──
     INTERNAL_ERROR = "SYS_001"
@@ -107,6 +112,8 @@ def _code_to_status(code: str) -> int:
         return 403
     if code.startswith("FILE_"):
         return 400
+    if code.startswith("RAG_"):
+        return 501 if code == "RAG_001" else 422
     if code.startswith("COST_"):
         return 402
     return 500

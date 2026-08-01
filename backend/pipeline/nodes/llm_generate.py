@@ -28,13 +28,23 @@ async def llm_generate(state: PipelineState) -> PipelineState:
         messages.append({"role": "system", "content": system_prompt})
     messages.append({"role": "user", "content": message})
 
+    max_tokens = 1000
+    try:
+        from backend.core.model_registry import get_model
+
+        spec = get_model(model)
+        if spec is not None:
+            max_tokens = int(spec.max_tokens)
+    except Exception:
+        pass
+
     result = await harness.generate(
         model=model,
         messages=messages,
         tenant_id=tenant_id,
         api_key=api_key,
         base_url=base_url,
-        max_tokens=1000,
+        max_tokens=max_tokens,
     )
 
     state["total_tokens"] = result.metadata.get("input_tokens", 0) + result.metadata.get(

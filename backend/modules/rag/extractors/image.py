@@ -10,14 +10,18 @@ from backend.modules.rag.extractors.audio import MultimodalDependencyError
 def extract_image_text(path: str | Path) -> str:
     """OCR 提取图片中的文本。"""
     path = Path(path)
+    from backend.core.errors import ErrorCode
+
     if not path.exists():
-        raise MultimodalDependencyError("FILE_003", f"文件不存在: {path}")
+        raise MultimodalDependencyError(
+            ErrorCode.FILE_NOT_FOUND.value, f"文件不存在: {path}"
+        )
 
     try:
         from paddleocr import PaddleOCR  # type: ignore
     except ImportError as e:
         raise MultimodalDependencyError(
-            "RAG_001",
+            ErrorCode.RAG_DEP_MISSING.value,
             "多模态图片依赖未安装: uv sync --extra multimodal",
         ) from e
 

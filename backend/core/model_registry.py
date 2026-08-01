@@ -71,6 +71,13 @@ def _default_models() -> dict[str, ModelSpec]:
     }
     # MODEL_REGISTRY_JSON='[{"name":"local-7b","provider":"vllm","base_url":"http://localhost:8001/v1",...}]'
     raw = os.getenv("MODEL_REGISTRY_JSON", "").strip()
+    if not raw:
+        try:
+            from config import get_settings
+
+            raw = (get_settings().model_registry_json or "").strip()
+        except Exception:
+            raw = ""
     if raw:
         try:
             for item in json.loads(raw):

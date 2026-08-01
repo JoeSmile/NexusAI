@@ -7,9 +7,12 @@ RAG路由
 import os
 import tempfile
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel, ConfigDict
 
+from backend.core.auth.models import TenantContext
+from backend.core.auth.permissions import require_permission
+from backend.core.errors import ContextGateException, ErrorCode
 from backend.logging_config import get_logger
 
 from ..core.knowledge_base import EnterpriseKnowledgeLoader, KnowledgeBaseManager
@@ -262,22 +265,25 @@ async def upload_pdf(file: UploadFile = File(...)):
 @router.post("/upload")
 async def upload_multimodal(
     file: UploadFile = File(...),
-    tenant_id: str = "default",
     category: str = "general",
+    tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
     """
     统一上传：pdf / text / audio(wav|mp3|m4a) / image(png|jpg)。
-    音频/图片需 `uv sync --extra multimodal`。
+    音频/图片需 `uv sync --extra multimodal`。租户取自认证上下文。
     """
     from backend.core.file_sanitizer import file_kind, sanitize_filename, validate_file
     from backend.database.vector_ops import add_knowledge
     from backend.modules.rag.extractors.audio import MultimodalDependencyError
 
+    tenant_id = tenant.tenant_id
     content = await file.read()
     filename = file.filename or "upload.bin"
     ok, err = validate_file(filename, content, file.content_type or "")
     if not ok:
-        raise HTTPException(status_code=400, detail=err)
+        raise ContextGateException(
+            ErrorCode.FILE_INVALID_TYPE.value, err or "invalid_file"
+        )
 
     kind = file_kind(filename) or "text"
     safe_name, ext = sanitize_filename(filename)
@@ -335,7 +341,9 @@ async def upload_multimodal(
 
             text = extract_image_text(tmp_path)
             if not text:
-                raise HTTPException(status_code=422, detail="RAG_002: OCR 未识别到文本")
+                raise ContextGateException(
+                    ErrorCode.RAG_EMPTY_EXTRACT.value, "OCR 未识别到文本"
+                )
             cid = add_knowledge(
                 text,
                 category=category,
@@ -346,7 +354,9 @@ async def upload_multimodal(
             )
             chunk_ids.append(cid)
         else:
-            raise HTTPException(status_code=400, detail=f"FILE_002: 不支持的类型 {kind}")
+            raise ContextGateException(
+                ErrorCode.FILE_INVALID_TYPE.value, f"不支持的类型 {kind}"
+            )
 
         return {
             "success": True,
@@ -356,7 +366,12 @@ async def upload_multimodal(
             "chunk_ids": chunk_ids,
         }
     except MultimodalDependencyError as e:
-        raise HTTPException(status_code=501, detail=f"{e.code}: {e}") from e
+        raise ContextGateException(
+            e.code if e.code.startswith("RAG_") else ErrorCode.RAG_DEP_MISSING.value,
+            str(e),
+        ) from e
+    except ContextGateException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
