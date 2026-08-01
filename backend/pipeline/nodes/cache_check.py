@@ -17,16 +17,13 @@ def make_query_hash(message: str) -> str:
 
 
 def _cheap_fingerprint(message: str) -> str | None:
-    """廉价意图指纹预检 — 仅通用意图"""
+    """廉价意图指纹预检 — 仅通用意图启发式（greeting）；不做业务域模板匹配。"""
     from backend.pipeline.cache.fingerprint_cache import make_fingerprint
 
     greetings = ["你好", "嗨", "hello", "hi", "早上好", "晚上好"]
-    advices = ["怎么办", "建议", "帮帮我", "有什么办法", "我该"]
 
     if any(g in message for g in greetings):
         return make_fingerprint("greeting", {})
-    if any(a in message for a in advices):
-        return make_fingerprint("advice", {"topic": message})
     return None
 
 
