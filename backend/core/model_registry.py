@@ -1,4 +1,4 @@
-"""模型注册表 — 统一多模型路由（Task 21.01）"""
+"""模型注册表 — 统一多模型路由（Task 21.01 / 22.01）"""
 
 from __future__ import annotations
 
@@ -23,12 +23,13 @@ class ModelSpec:
 
 
 _REGISTRY: dict[str, ModelSpec] | None = None
+_DEFAULT_MODEL = "deepseek-v4-flash"
 
 
 def _default_models() -> dict[str, ModelSpec]:
-    cheap = os.getenv("MODEL_CHEAP", "deepseek-chat")
-    good = os.getenv("MODEL_GOOD", "deepseek-chat")
-    best = os.getenv("MODEL_BEST", "deepseek-chat")
+    cheap = os.getenv("MODEL_CHEAP", _DEFAULT_MODEL)
+    good = os.getenv("MODEL_GOOD", _DEFAULT_MODEL)
+    best = os.getenv("MODEL_BEST", _DEFAULT_MODEL)
     base = os.getenv("LLM_BASE_URL", "") or os.getenv("API_BASE_URL", "")
     models = {
         cheap: ModelSpec(
@@ -63,7 +64,8 @@ def _default_models() -> dict[str, ModelSpec]:
             provider="mock",
             base_url="http://localhost:8001/v1",
             api_key_ref="",
-            cost_per_1k=0.0,
+            # 高成本，避免 cheapest-in-tier 误选 mock；显式 MODEL_*=mock-local 仍可用
+            cost_per_1k=999.0,
             max_tokens=500,
             tier="cheap",
             capability="chat",
@@ -120,7 +122,7 @@ def get_model(name: str) -> ModelSpec | None:
 
 
 def select_model_for_intent(intent: str) -> ModelSpec:
-    """按意图档位选择模型：greeting→cheap, knowledge_query/advice→good, else→best。"""
+    """按意图档位选择模型；同 tier 取 cost_per_1k 最低者。"""
     reg = get_registry()
     tier_map = {
         "greeting": "cheap",
@@ -130,14 +132,20 @@ def select_model_for_intent(intent: str) -> ModelSpec:
         "function": "good",
     }
     tier = tier_map.get(intent or "default", "best")
-    for spec in reg.values():
-        if spec.enabled and spec.capability == "chat" and spec.tier == tier:
-            return spec
+    tier_candidates = [
+        spec
+        for spec in reg.values()
+        if spec.enabled and spec.capability == "chat" and spec.tier == tier
+    ]
+    if tier_candidates:
+        return min(tier_candidates, key=lambda s: (float(s.cost_per_1k), s.name))
     # fallback: any enabled chat model
     for spec in reg.values():
         if spec.enabled and spec.capability == "chat":
             return spec
-    return ModelSpec(name=os.getenv("MODEL_BEST", "deepseek-chat"), provider="default")
+    return ModelSpec(
+        name=os.getenv("MODEL_BEST", _DEFAULT_MODEL), provider="default"
+    )
 
 
 def list_models() -> list[ModelSpec]:

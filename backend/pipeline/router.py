@@ -246,7 +246,7 @@ async def chat_streaming(
     from backend.pipeline.nodes.write_memory import write_memory
 
     harness = LLMHarness()
-    model = final.get("selected_model") or "deepseek-chat"
+    model = final.get("selected_model") or "deepseek-v4-flash"
     prompt = final.get("raw_input") or final.get("message") or ""
 
     async def event_stream() -> AsyncIterator[str]:

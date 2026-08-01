@@ -15,7 +15,7 @@ harness = LLMHarness()
 @observe(name="pipeline.llm_generate", as_type="generation")
 async def llm_generate(state: PipelineState) -> PipelineState:
     """通过 LLMHarness 生成回复"""
-    model = state.get("selected_model", "deepseek-chat")
+    model = state.get("selected_model", "deepseek-v4-flash")
     tenant_id = state["tenant_id"]
     api_key = state.get("llm_api_key") or os.getenv("LLM_API_KEY", "")
     base_url = state.get("llm_base_url") or os.getenv("LLM_BASE_URL", "")

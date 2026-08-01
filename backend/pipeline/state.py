@@ -107,7 +107,7 @@ def make_initial_state(
         "pii_redacted": False,
         "prompt_injection_detected": False,
         "guardrails_passed": True,
-        "selected_model": "deepseek-chat",
+        "selected_model": "deepseek-v4-flash",
         "estimated_cost": 0.0,
         "llm_tools": [],
         "response": "",

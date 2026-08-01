@@ -10,7 +10,8 @@ from backend.core.metrics import cost_total, tokens_total
 from backend.database.pgvector_session import get_pg_session
 
 COST_TABLE: dict[str, float] = {
-    "deepseek-chat": 0.00014,
+    "deepseek-v4-flash": 0.00014,
+    "deepseek-v4-pro": 0.00055,
     "deepseek-reasoner": 0.00055,
     "gpt-4o": 0.0025,
     "gpt-4o-mini": 0.00015,
