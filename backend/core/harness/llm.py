@@ -15,6 +15,12 @@ from backend.core.cost_manager import (
     record_consumption,
 )
 from backend.core.harness.base import Harness, HarnessResult
+from backend.core.harness.provider import (
+    get_llm_provider,
+    load_fixture,
+    mock_response,
+    save_fixture,
+)
 
 
 class LLMHarness(Harness):
@@ -45,6 +51,16 @@ class LLMHarness(Harness):
         input_tokens = sum(count_tokens(m.get("content", "")) for m in messages)
 
         async def _call():
+            provider = get_llm_provider()
+            prompt = "\n".join(m.get("content", "") for m in messages)
+            if provider == "mock":
+                return mock_response(model, prompt)
+            if provider == "replay":
+                hit = load_fixture(model, messages)
+                if hit is not None:
+                    return hit
+                return mock_response(model, prompt)
+            # record / openai:真实调用(record 由 generate_text 落盘)
             return await self._call_api(model, messages, api_key, base_url)
 
         result = await self.wrap(
@@ -105,21 +121,25 @@ class LLMHarness(Harness):
             return
 
         key = api_key or os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or ""
-        mock = os.getenv("LLM_MOCK", "true").lower() == "true"
+        provider = get_llm_provider()
         input_tokens = sum(count_tokens(m.get("content", "")) for m in messages)
         collected: list[str] = []
+        prompt = "\n".join(m.get("content", "") for m in messages)
 
-        if mock or not key:
-            from backend.pipeline.llm_helper import generate_text
-
-            prompt = "\n".join(m.get("content", "") for m in messages)
-            text = await generate_text(
-                prompt, model=model, api_key=key, base_url=base_url or ""
+        if provider in ("mock", "replay"):
+            text = (
+                load_fixture(model, messages)
+                if provider == "replay"
+                else None
             )
+            if text is None:
+                text = mock_response(model, prompt)
             for ch in text:
                 collected.append(ch)
                 yield ch
         else:
+            # record / openai:真流式(OpenAI-compatible astream,失败降级非流式)
+            recorded = ""
             try:
                 from openai import AsyncOpenAI
 
@@ -137,6 +157,7 @@ class LLMHarness(Harness):
                     delta = chunk.choices[0].delta.content if chunk.choices else None
                     if delta:
                         collected.append(delta)
+                        recorded += delta
                         yield delta
             except Exception:
                 # 失败时降级为非流式 generate
@@ -150,8 +171,11 @@ class LLMHarness(Harness):
                 )
                 text = str(result.output or "")
                 for ch in text:
+                    collected.append(ch)
                     yield ch
                 return
+            if provider == "record" and recorded:
+                save_fixture(model, messages, recorded)
 
         output_text = "".join(collected)
         output_tokens = count_tokens(output_text)

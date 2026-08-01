@@ -60,15 +60,24 @@ db-init:
 run:
 	$(require_uv)
 	cd $(ROOT_DIR) && \
+		APP_ENV=$${APP_ENV:-dev} \
 		DATABASE_URL=$${DATABASE_URL:-postgresql://contextgate:contextgate_local@localhost:5432/contextgate} \
 		uv run --no-sync uvicorn backend.app:app --reload --host 0.0.0.0 --port 8000
+
+demo:
+	$(require_uv)
+	cd $(ROOT_DIR) && \
+		APP_ENV=demo \
+		uv run --no-sync uvicorn backend.app:app --host 0.0.0.0 --port 8000
 
 seed:
 	$(require_uv)
 	cd $(ROOT_DIR) && \
+		APP_ENV=$${APP_ENV:-dev} \
 		DATABASE_URL=$${DATABASE_URL:-postgresql://contextgate:contextgate_local@localhost:5432/contextgate} \
 		uv run --no-sync python scripts/seed_api_keys.py
 	cd $(ROOT_DIR) && \
+		APP_ENV=$${APP_ENV:-dev} \
 		DATABASE_URL=$${DATABASE_URL:-postgresql://contextgate:contextgate_local@localhost:5432/contextgate} \
 		uv run --no-sync python scripts/seed_pgvector.py
 
@@ -87,7 +96,8 @@ fmt:
 test:
 	$(require_uv)
 	cd $(ROOT_DIR) && \
-		LLM_MOCK=true \
+		APP_ENV=test \
+		LLM_PROVIDER=replay \
 		DATABASE_URL=$${DATABASE_URL:-postgresql://contextgate:contextgate_local@localhost:5432/contextgate} \
 		uv run --no-sync pytest tests/ -v
 

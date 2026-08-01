@@ -17,12 +17,32 @@ cp config.env.example config.env    # config.env 已 gitignore
 
 | env 键 | 作用 | 默认 |
 |--------|------|------|
-| `LLM_MOCK` | `true` 时 LLM 返回 mock 切片(不消耗额度,适合先跑通链路) | true |
+| `APP_ENV` | 环境分层:dev / test / demo,加载 `config/{APP_ENV}.env` | dev |
+| `LLM_PROVIDER` | mock(确定性伪响应)/ record(真实调用+落盘)/ replay(回放 fixture,未命中降级 mock)/ openai(始终真实) | replay |
 | `LLM_API_KEY` | 主 LLM key(运行时优先 KeyManager 加密库) | 空 |
 | `LLM_BASE_URL` / `DEFAULT_MODEL` | 模型端点与默认模型 | deepseek |
 | `MODEL_CHEAP/GOOD/BEST` | model_router 三档模型 | deepseek-chat |
 | `LANGFUSE_ENABLED` | LangFuse trace 开关(UI: http://localhost:3001) | true |
 | `LLM_KEY_MASTER_KEY` | Task 18 加密主密钥(`secrets.token_hex(32)` 生成;不设则走 env 明文) | 空 |
+
+### 环境分层与 Mock 策略
+
+优先级:**shell 环境变量 > config.env(本地覆盖)> config/{APP_ENV}.env > 默认值**。
+
+```bash
+make run    # APP_ENV=dev  → LLM_PROVIDER=replay(离线回放,未命中降级 mock)
+make test   # APP_ENV=test → LLM_PROVIDER=replay(CI 零成本确定性)
+make demo   # APP_ENV=demo → LLM_PROVIDER=openai(演示用真实模型,先填 key)
+```
+
+**采集真实响应作为 fixture(一次,之后永久免费):**
+
+```bash
+LLM_PROVIDER=record make run   # 真实调用 LLM,响应落盘 data/mock_data/llm/
+make run                       # 回 replay,同样的请求直接回放,零调用零波动
+```
+
+fixture 按 (model + messages) 哈希命名,随仓库提交,团队共享。
 
 ### 2. 获取 API Key(认证 X-API-Key)
 
@@ -89,7 +109,7 @@ make run         # uvicorn :8000
    ```json
    {"intent": "knowledge_query", "confidence": 0.92, ...}
    ```
-   若 `LLM_MOCK=true`,返回 mock 意图;关掉 mock 走真实模型。
+   开发默认 `LLM_PROVIDER=replay`(fixture 回放,未命中降级 mock);要采真实意图数据:`LLM_PROVIDER=record make run` 跑一次,之后 replay 永久回放。
 
 ## 常见问题
 

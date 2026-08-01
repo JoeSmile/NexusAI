@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+import os
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -10,12 +11,23 @@ from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _ENV_PATH = Path(__file__).parent / "config.env"
-load_dotenv(_ENV_PATH)
+_PROFILE = (os.getenv("APP_ENV") or "dev").strip().lower() or "dev"
+_PROFILE_PATH = Path(__file__).parent / "config" / f"{_PROFILE}.env"
+
+# 优先级: shell 环境变量 > config.env(本地覆盖)> config/{APP_ENV}.env > 默认值
+# override=False: 已存在的环境变量不被文件覆盖
+load_dotenv(_ENV_PATH, override=False)
+if _PROFILE_PATH.exists():
+    load_dotenv(_PROFILE_PATH, override=False)
+
+_env_files = [str(_ENV_PATH)]
+if _PROFILE_PATH.exists():
+    _env_files.append(str(_PROFILE_PATH))
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=str(_ENV_PATH),
+        env_file=tuple(_env_files),
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,

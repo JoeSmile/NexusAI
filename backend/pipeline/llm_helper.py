@@ -6,12 +6,26 @@ import os
 
 
 async def generate_text(prompt: str, model: str = "", api_key: str = "", base_url: str = "") -> str:
-    mock = os.getenv("LLM_MOCK", "true").lower() == "true"
-    key = api_key or os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or ""
-    if mock or not key:
-        snippet = prompt.strip().replace("\n", " ")[-180:]
-        return f"[mock:{model or 'default'}] 已收到：{snippet}"
+    from backend.core.harness.provider import (
+        get_llm_provider,
+        load_fixture,
+        mock_response,
+        save_fixture,
+    )
 
+    provider = get_llm_provider()
+    key = api_key or os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or ""
+
+    if provider == "mock" or (provider in ("replay", "openai", "record") and not key):
+        return mock_response(model, prompt)
+    if provider == "replay":
+        hit = load_fixture(model, [{"role": "user", "content": prompt}])
+        if hit is not None:
+            return hit
+        return mock_response(model, prompt)
+
+    # record / openai:真实调用(record 落盘 fixture)
+    result = "系统暂时繁忙，请稍后再试。"
     try:
         from backend.modules.llm.core.llm_core import ChatEngine
 
@@ -22,8 +36,10 @@ async def generate_text(prompt: str, model: str = "", api_key: str = "", base_ur
 
             resp = engine.chat(ChatRequest(message=prompt, session_id="pipeline", user_id="pipeline"))
             content = getattr(resp, "response", None) or getattr(resp, "message", None) or str(resp)
-            return str(content)
+            result = str(content)
     except Exception as exc:
-        return f"系统暂时繁忙，请稍后再试。({exc})"
+        result = f"系统暂时繁忙，请稍后再试。({exc})"
 
-    return "系统暂时繁忙，请稍后再试。"
+    if provider == "record":
+        save_fixture(model, [{"role": "user", "content": prompt}], result)
+    return result
