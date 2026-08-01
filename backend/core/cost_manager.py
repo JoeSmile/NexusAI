@@ -74,3 +74,110 @@ async def check_budget(tenant_id: str, estimated_cost: float) -> bool:
     if estimated_cost > daily_limit:
         return False
     return True
+
+
+def cost_summary(
+    *,
+    tenant_id: str | None = None,
+    from_ts: str | None = None,
+    to_ts: str | None = None,
+    granularity: str = "day",
+) -> dict:
+    """按租户/模型/时间窗口聚合 audit_logs 成本。
+
+    granularity: day | hour
+    """
+    trunc = "hour" if granularity == "hour" else "day"
+    clauses = ["1=1"]
+    params: dict[str, object] = {}
+    if tenant_id:
+        clauses.append("tenant_id = :tid")
+        params["tid"] = tenant_id
+    if from_ts:
+        clauses.append("created_at >= CAST(:from_ts AS timestamptz)")
+        params["from_ts"] = from_ts
+    if to_ts:
+        clauses.append("created_at <= CAST(:to_ts AS timestamptz)")
+        params["to_ts"] = to_ts
+    where = " AND ".join(clauses)
+
+    session_factory = get_pg_session()
+    with session_factory.Session() as session:
+        by_model = session.execute(
+            text(
+                f"""
+                SELECT COALESCE(NULLIF(model, ''), 'unknown') AS model,
+                       COUNT(*) AS calls,
+                       COALESCE(SUM(input_tokens), 0) AS input_tokens,
+                       COALESCE(SUM(output_tokens), 0) AS output_tokens,
+                       COALESCE(SUM(cost), 0) AS cost
+                FROM audit_logs
+                WHERE {where}
+                GROUP BY 1
+                ORDER BY cost DESC
+                """
+            ),
+            params,
+        ).fetchall()
+        by_bucket = session.execute(
+            text(
+                f"""
+                SELECT date_trunc(:trunc, created_at) AS bucket,
+                       tenant_id,
+                       COUNT(*) AS calls,
+                       COALESCE(SUM(input_tokens + output_tokens), 0) AS tokens,
+                       COALESCE(SUM(cost), 0) AS cost
+                FROM audit_logs
+                WHERE {where}
+                GROUP BY 1, 2
+                ORDER BY 1 ASC
+                """
+            ),
+            {**params, "trunc": trunc},
+        ).fetchall()
+        totals = session.execute(
+            text(
+                f"""
+                SELECT COUNT(*) AS calls,
+                       COALESCE(SUM(input_tokens), 0) AS input_tokens,
+                       COALESCE(SUM(output_tokens), 0) AS output_tokens,
+                       COALESCE(SUM(cost), 0) AS cost
+                FROM audit_logs
+                WHERE {where}
+                """
+            ),
+            params,
+        ).fetchone()
+
+    return {
+        "tenant_id": tenant_id,
+        "from": from_ts,
+        "to": to_ts,
+        "granularity": trunc,
+        "totals": {
+            "calls": int(totals.calls or 0) if totals else 0,
+            "input_tokens": int(totals.input_tokens or 0) if totals else 0,
+            "output_tokens": int(totals.output_tokens or 0) if totals else 0,
+            "cost": float(totals.cost or 0.0) if totals else 0.0,
+        },
+        "by_model": [
+            {
+                "model": r.model,
+                "calls": int(r.calls),
+                "input_tokens": int(r.input_tokens),
+                "output_tokens": int(r.output_tokens),
+                "cost": float(r.cost),
+            }
+            for r in by_model
+        ],
+        "series": [
+            {
+                "bucket": r.bucket.isoformat() if r.bucket else None,
+                "tenant_id": r.tenant_id,
+                "calls": int(r.calls),
+                "tokens": int(r.tokens),
+                "cost": float(r.cost),
+            }
+            for r in by_bucket
+        ],
+    }

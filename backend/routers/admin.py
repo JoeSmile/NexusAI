@@ -412,3 +412,30 @@ async def verify_llm_key(
     from backend.core.key_health import verify_key_by_id
 
     return await verify_key_by_id(key_id)
+
+
+@router.get("/cost-summary")
+async def get_cost_summary(
+    tenant_id: str | None = None,
+    from_ts: str | None = None,
+    to_ts: str | None = None,
+    granularity: str = "day",
+    tenant: TenantContext = Depends(require_permission("admin:*")),
+):
+    """成本聚合看板数据（来自 audit_logs）。"""
+    from backend.core.cost_manager import cost_summary
+
+    target = tenant_id
+    if not tenant.is_cross_tenant:
+        target = tenant.tenant_id
+    if granularity not in ("day", "hour"):
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "ADMIN_001", "message": "granularity_must_be_day_or_hour"},
+        )
+    return cost_summary(
+        tenant_id=target,
+        from_ts=from_ts,
+        to_ts=to_ts,
+        granularity=granularity,
+    )
