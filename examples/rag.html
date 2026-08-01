@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAG 知识库 — RAG 用例</title>
+<style>
+  body { font-family: -apple-system, "PingFang SC", sans-serif; background: #0f172a; color: #e2e8f0; max-width: 800px; margin: 0 auto; padding: 24px; }
+  h1 { font-size: 20px; color: #38bdf8; }
+  .desc { background: #1e293b; border-left: 3px solid #38bdf8; padding: 12px 16px; border-radius: 4px; font-size: 13px; line-height: 1.7; }
+  label { display: block; margin: 16px 0 6px; font-size: 13px; color: #94a3b8; }
+  input, textarea { width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid #334155; color: #e2e8f0; border-radius: 6px; padding: 10px; font-size: 14px; }
+  textarea { min-height: 70px; }
+  button { background: #0284c7; border: none; color: #fff; padding: 10px 24px; border-radius: 6px; font-size: 14px; cursor: pointer; margin-top: 14px; }
+  pre { background: #0b1220; border: 1px solid #334155; border-radius: 6px; padding: 12px; white-space: pre-wrap; word-break: break-all; font-size: 13px; max-height: 360px; overflow: auto; }
+</style>
+</head>
+<body>
+<h1>RAG 知识库 — /api/rag/*</h1>
+<div class="desc">
+  <b>测什么:</b>知识库全链路:初始化示例知识 → 文档入库 → 向量检索 → 问答引用。<br>
+  <b>前置:</b>X-API-Key(需 kb:*);首次使用先 <code>POST /api/rag/init/sample</code> 载入示例知识(或 scripts/init_rag_knowledge.py 导入真实企业文档)。<br>
+  <b>预期:</b>ask 返回带来源引用的回答;search 返回相似 chunks;status 显示文档数。
+</div>
+
+<label for="apiKey">X-API-Key</label>
+<input id="apiKey" placeholder="cg_...">
+
+<label for="question">问题</label>
+<textarea id="question">ContextGate 的 API Key 是怎么加密管理的？</textarea>
+
+<div style="display:flex; gap:12px; flex-wrap:wrap;">
+  <button onclick="call('ask')">POST /api/rag/ask</button>
+  <button onclick="call('search')" style="background:#334155;">POST /api/rag/search</button>
+  <button onclick="call('status')" style="background:#334155;">GET /api/rag/status</button>
+  <button onclick="call('init')" style="background:#334155;">POST /api/rag/init/sample</button>
+  <button onclick="call('examples')" style="background:#334155;">GET /api/rag/examples</button>
+</div>
+
+<label for="file">上传 PDF(可选,验证文档入库)</label>
+<input type="file" id="file" accept=".pdf">
+<button onclick="upload()" style="background:#334155; margin-top:8px;">POST /api/rag/upload/pdf</button>
+
+<pre id="out">// 结果将显示在这里</pre>
+
+<script>
+const BASE = 'http://localhost:8000';
+function hdrs() {
+  const k = document.getElementById('apiKey').value.trim();
+  return { 'Content-Type': 'application/json', ...(k ? { 'X-API-Key': k } : {}) };
+}
+async function call(mode) {
+  const out = document.getElementById('out');
+  const q = document.getElementById('question').value;
+  out.textContent = '// 请求中...';
+  try {
+    let url = BASE + '/api/rag/' + mode, opts = { headers: hdrs() };
+    if (mode === 'ask' || mode === 'search') {
+      opts.method = 'POST';
+      opts.body = JSON.stringify({ question: q, ...(mode === 'search' ? { top_k: 5 } : {}) });
+    } else if (mode === 'init') {
+      opts.method = 'POST';
+    }
+    const r = await fetch(url, opts);
+    out.textContent = r.status + ' ' + r.statusText + '\n' + (await r.text());
+  } catch (e) { out.textContent = '// 请求失败: ' + e.message; }
+}
+async function upload() {
+  const out = document.getElementById('out');
+  const f = document.getElementById('file').files[0];
+  if (!f) { out.textContent = '// 请先选择 PDF 文件'; return; }
+  const fd = new FormData();
+  fd.append('file', f);
+  const k = document.getElementById('apiKey').value.trim();
+  try {
+    const r = await fetch(BASE + '/api/rag/upload/pdf', {
+      method: 'POST',
+      headers: k ? { 'X-API-Key': k } : {},
+      body: fd,
+    });
+    out.textContent = r.status + ' ' + r.statusText + '\n' + (await r.text());
+  } catch (e) { out.textContent = '// 上传失败: ' + e.message; }
+}
+</script>
+</body>
+</html>
