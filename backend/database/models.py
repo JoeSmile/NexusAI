@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
 数据库配置和模型定义
+
+- 引擎 / Session 惰性引导 + 次级 ORM 模型(users / knowledge / feedback /
+  response_evaluations / memory_items / ab_test / personalizations 等)
+- 会话与消息模型在 pgvector_session.py(chat_sessions / chat_messages 唯一权威)
 """
 import json
 import os
@@ -22,7 +26,7 @@ from sqlalchemy.orm import sessionmaker
 
 
 def _project_root() -> str:
-    # backend/database/legacy.py → repo root
+    # backend/database/models.py → repo root
     return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
@@ -109,7 +113,7 @@ def get_session():
 
 
 def __getattr__(name: str):
-    """兼容 `from backend.database.legacy import engine/SessionLocal/DATABASE_URL`。"""
+    """兼容 `from backend.database.models import engine/SessionLocal/DATABASE_URL`。"""
     if name == "engine":
         init_database()
         return _engine
@@ -133,29 +137,6 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     is_active = Column(Boolean, default=True)
-
-class ChatSession(Base):
-    """聊天会话表"""
-    __tablename__ = "chat_sessions"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    session_id = Column(String(100), unique=True, index=True)
-    user_id = Column(String(100), index=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    is_active = Column(Boolean, default=True)
-
-class ChatMessage(Base):
-    """聊天消息表"""
-    __tablename__ = "chat_messages"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    session_id = Column(String(100), index=True)
-    user_id = Column(String(100), index=True)
-    role = Column(String(20))  # user, assistant
-    content = Column(Text)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
 
 class Knowledge(Base):
     """知识库表"""
@@ -460,12 +441,13 @@ class DatabaseManager:
 
     def save_message(self, session_id, user_id, role, content):
         """保存聊天消息"""
+        from backend.database.pgvector_session import ChatMessage
+
         message = ChatMessage(
             session_id=session_id,
             user_id=user_id,
             role=role,
             content=content,
-            # emotion 相关字段已移除
         )
         self.db.add(message)
         self.db.commit()
@@ -474,6 +456,8 @@ class DatabaseManager:
     
     def get_session_messages(self, session_id, limit=50):
         """获取会话消息"""
+        from backend.database.pgvector_session import ChatMessage
+
         return self.db.query(ChatMessage)\
             .filter(ChatMessage.session_id == session_id)\
             .order_by(ChatMessage.created_at.desc())\
@@ -517,6 +501,8 @@ class DatabaseManager:
     
     def get_user_sessions(self, user_id, limit=50):
         """获取用户的所有会话"""
+        from backend.database.pgvector_session import ChatSession
+
         return self.db.query(ChatSession)\
             .filter(ChatSession.user_id == user_id)\
             .order_by(ChatSession.updated_at.desc())\
@@ -525,6 +511,8 @@ class DatabaseManager:
     
     def create_session(self, session_id, user_id):
         """创建新会话"""
+        from backend.database.pgvector_session import ChatSession
+
         session = ChatSession(
             session_id=session_id,
             user_id=user_id
@@ -536,6 +524,8 @@ class DatabaseManager:
     
     def delete_session(self, session_id):
         """删除会话及其相关数据"""
+        from backend.database.pgvector_session import ChatMessage, ChatSession
+
         try:
             # 删除会话相关的所有消息
             self.db.query(ChatMessage).filter(ChatMessage.session_id == session_id).delete()

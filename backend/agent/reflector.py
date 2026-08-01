@@ -35,7 +35,6 @@ class InteractionResult(Enum):
 
 class FollowupType(Enum):
     """回访类型"""
-    ROUTINE_CHECK = "routine_check"           # 常规检查
     GOAL_TRACKING = "goal_tracking"           # 目标跟踪
 
 
@@ -213,18 +212,6 @@ class Reflector:
             followup = self._assess_followup_need(memory, user_id)
             if followup:
                 return followup
-        
-        # 3. 检查用户活跃度
-        days_since_last = self._get_days_since_last_interaction(user_id)
-        if days_since_last >= 7:
-            return {
-                "type": FollowupType.ROUTINE_CHECK.value,
-                "user_id": user_id,
-                "reason": "长时间未联系",
-                "message": "好久不见！最近过得怎么样？",
-                "schedule_time": (datetime.now() + timedelta(days=1)).isoformat(),
-                "priority": "low"
-            }
         
         return None
     
@@ -418,74 +405,21 @@ class Reflector:
         
         days_since = (datetime.now() - timestamp).days
         
-        # 规则1：睡眠问题 -> 7天后回访
-        if "睡眠" in content and days_since >= 7 and importance > 0.6:
-            return {
-                "type": FollowupType.GOAL_TRACKING.value,
-                "user_id": user_id,
-                "memory_id": memory.get("id"),
-                "reason": "睡眠改善跟踪",
-                "message": "你最近睡眠有改善吗？之前建议的方法有帮助吗？",
-                "schedule_time": (datetime.now() + timedelta(hours=24)).isoformat(),
-                "priority": "medium"
-            }
-        
-        # 规则2：考试/面试 -> 事件后3天回访
-        if any(kw in content for kw in ["考试", "面试", "答辩"]) and days_since >= 3 and days_since <= 7:
-            return {
-                "type": FollowupType.GOAL_TRACKING.value,
-                "user_id": user_id,
-                "memory_id": memory.get("id"),
-                "reason": "重要事件结果跟踪",
-                "message": "你的考试/面试怎么样了？结果还顺利吗？",
-                "schedule_time": (datetime.now() + timedelta(hours=12)).isoformat(),
-                "priority": "high"
-            }
-        
-        # 规则3：行为改变计划 -> 1周后回访
+        # 规则1：重要计划/决定 -> 1周后回访跟踪
         if any(kw in content for kw in ["计划", "打算", "决定", "改变"]) and days_since >= 7 and importance > 0.7:
             return {
                 "type": FollowupType.GOAL_TRACKING.value,
                 "user_id": user_id,
                 "memory_id": memory.get("id"),
-                "reason": "行为改变跟踪",
+                "reason": "计划进展跟踪",
                 "message": "你的计划进展如何？有遇到什么困难吗？",
                 "schedule_time": (datetime.now() + timedelta(days=1)).isoformat(),
                 "priority": "medium"
             }
         
         return None
-    
 
-    def _get_days_since_last_interaction(self, user_id: str) -> int:
-        """
-        获取距离上次交互的天数
-        
-        Args:
-            user_id: 用户ID
-            
-        Returns:
-            天数
-        """
-        try:
-            from backend.database import Conversation, Message, get_db
-            
-            db = next(get_db())
-            
-            last_message = db.query(Message).join(Conversation).filter(
-                Conversation.user_id == user_id
-            ).order_by(Message.created_at.desc()).first()
-            
-            if last_message and last_message.created_at:
-                days = (datetime.now() - last_message.created_at).days
-                return days
-            
-            return 999  # 如果没有记录，返回很大的值
-            
-        except Exception as e:
-            print(f"获取最后交互时间失败: {e!s}")
-            return 0
-    
+
     def _init_evaluation_rules(self) -> dict[str, Any]:
         """
         初始化评估规则
@@ -497,10 +431,7 @@ class Reflector:
             "failure_threshold": 0.3,
             "response_time_target": 2.0,  # 秒
             "followup_rules": {
-                "sleep_issue": {"days": 7, "priority": "medium"},
-                "exam_interview": {"days": 3, "priority": "high"},
-                "behavior_change": {"days": 7, "priority": "medium"},
-                "routine_check": {"days": 7, "priority": "low"}
+                "planning_tracking": {"days": 7, "priority": "medium"}
             }
         }
     

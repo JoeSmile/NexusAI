@@ -227,7 +227,7 @@ class PGVectorSession:
 
     def __init__(self, db_url: str | None = None):
         if db_url is None:
-            from backend.database.legacy import _resolve_database_url
+            from backend.database.models import _resolve_database_url
 
             db_url = _resolve_database_url()
         self.engine = create_engine(db_url, pool_pre_ping=True)

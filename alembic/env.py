@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Alembic环境配置文件
 
-两套 ORM Base(legacy + pgvector)合并为单一 target_metadata:
-- 共享表(chat_sessions / chat_messages)以 pgvector 版为准
+两套 ORM Base(models + pgvector)合并为单一 target_metadata:
+- 会话/消息表(chat_sessions / chat_messages)仅存在于 pgvector Base
 - 其余表取并集,保证 autogenerate / upgrade 覆盖完整 schema
 """
 
@@ -17,11 +17,10 @@ from alembic import context
 
 # 添加项目根目录到Python路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
-
 # 导入配置和数据库模型
-from backend.database.legacy import Base as LegacyBase
-from backend.database.pgvector_session import Base as VectorBase
 from config import Config
+from backend.database.models import Base as ModelsBase
+from backend.database.pgvector_session import Base as VectorBase
 
 # 这是Alembic配置对象，提供了alembic.ini文件的访问
 config = context.config
@@ -41,13 +40,11 @@ config.set_main_option("sqlalchemy.url", database_url)
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# 合并两套 Base 的 metadata（pgvector 优先，避免 chat_sessions/chat_messages 重复定义）
+# 合并两套 Base 的 metadata(表名无交集,直接并集)
 _merged_metadata = MetaData()
 for table in VectorBase.metadata.sorted_tables:
     table.to_metadata(_merged_metadata)
-for table in LegacyBase.metadata.sorted_tables:
-    if table.name in _merged_metadata.tables:
-        continue
+for table in ModelsBase.metadata.sorted_tables:
     table.to_metadata(_merged_metadata)
 target_metadata = _merged_metadata
 
