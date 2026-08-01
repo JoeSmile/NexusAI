@@ -7,6 +7,7 @@ from backend.pipeline.nodes.analyze_parallel import analyze_parallel
 from backend.pipeline.nodes.auth_check import auth_check
 from backend.pipeline.nodes.build_context import build_context
 from backend.pipeline.nodes.cache_check import cache_check, should_skip_to_end
+from backend.pipeline.nodes.conversion_hook import conversion_hook
 from backend.pipeline.nodes.experiment_hook import experiment_hook
 from backend.pipeline.nodes.guardrails_input import (
     guardrails_input,
@@ -37,6 +38,7 @@ def build_pipeline():
     builder.add_node("llm_generate", llm_generate)
     builder.add_node("guardrails_output", guardrails_output)
     builder.add_node("write_memory", write_memory)
+    builder.add_node("conversion_hook", conversion_hook)
 
     builder.set_entry_point("auth_check")
 
@@ -69,14 +71,15 @@ def build_pipeline():
         "model_router",
         route_short_or_long,
         {
-            "end": END,
+            "conversion_hook": "conversion_hook",
             "llm_generate": "llm_generate",
         },
     )
 
     builder.add_edge("llm_generate", "guardrails_output")
     builder.add_edge("guardrails_output", "write_memory")
-    builder.add_edge("write_memory", END)
+    builder.add_edge("write_memory", "conversion_hook")
+    builder.add_edge("conversion_hook", END)
 
     return builder.compile()
 

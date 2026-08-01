@@ -97,10 +97,10 @@ async def model_router(state: PipelineState) -> PipelineState:
 
 
 def route_short_or_long(state: PipelineState) -> str:
-    """条件边: 短路径结束 → END，否则 → llm_generate（stream_mode 则交由路由层 stream）"""
+    """条件边: 短路径 → conversion_hook，否则 → llm_generate（stream_mode 交由路由层 stream）"""
     fr = state.get("finish_reason", "")
     if fr in ("skill_executed", "PENDING_APPROVAL", "AUTH_002"):
-        return "end"
+        return "conversion_hook"
     if state.get("stream_mode"):
-        return "end"
+        return "conversion_hook"
     return "llm_generate"
