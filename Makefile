@@ -55,7 +55,7 @@ db-init:
 	$(require_uv)
 	cd $(ROOT_DIR) && \
 		DATABASE_URL=$${DATABASE_URL:-postgresql://contextgate:contextgate_local@localhost:5432/contextgate} \
-		uv run --no-sync python -c "from backend.database.pgvector_session import PGVectorSession; PGVectorSession().init_db(); print('✅ db initialized')"
+		uv run --no-sync alembic upgrade head
 
 run:
 	$(require_uv)
