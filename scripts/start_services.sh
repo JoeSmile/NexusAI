@@ -13,7 +13,7 @@ echo "=========================================="
 
 cd "$PROJECT_ROOT"
 echo "启动后端服务..."
-nohup /usr/local/bin/python3.10 run_backend.py > "$LOG_DIR/backend.log" 2>&1 &
+nohup uv run --no-sync uvicorn backend.app:app --host 0.0.0.0 --port 8000 > "$LOG_DIR/backend.log" 2>&1 &
 BACKEND_PID=$!
 echo "$BACKEND_PID" > "$LOG_DIR/backend.pid"
 echo "后端启动中，PID: $BACKEND_PID"

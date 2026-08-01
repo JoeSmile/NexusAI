@@ -100,7 +100,7 @@ clean:
 verify:
 	$(require_uv)
 	@echo "== brand =="
-	@grep -rE "心语|情感陪伴|xinyu|emotional_chat|emotional-chat|温暖耐心|我理解你的感受|倾听你的感受|Psychology|EMOTIONAL_CHAT" $(ROOT_DIR)/backend/ $(ROOT_DIR)/scripts/ $(ROOT_DIR)/frontend/ --include="*.py" --include="*.sh" --include="*.html" --include="*.js" --include="*.ps1" && echo "❌ brand" && exit 1 || echo "✅ 无情感化字眼"
+	@cd $(ROOT_DIR) && grep -rE "心语|情感陪伴|xinyu|emotional_chat|emotional-chat|温暖耐心|我理解你的感受|倾听你的感受|Psychology|EMOTIONAL_CHAT" --include="*.py" --include="*.sh" --include="*.html" --include="*.js" --include="*.ps1" . 2>/dev/null | grep -v "^\./\.venv/\|^\./\.git/\|^\./tasks/" && echo "❌ brand" && exit 1 || echo "✅ 无情感化字眼"
 	@echo "== project name =="
 	@grep "name.*=.*emotional-chat" $(ROOT_DIR)/pyproject.toml && echo "❌ name" && exit 1 || echo "✅ 项目名已改"
 	@echo "== imports =="

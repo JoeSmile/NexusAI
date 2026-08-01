@@ -4,16 +4,15 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 # 停止旧进程
-pkill -f "python3.*run_backend.py" 2>/dev/null
-pkill -f "python3.10.*run_backend.py" 2>/dev/null
+pkill -f "uvicorn backend.app" 2>/dev/null
 
 # 等待进程完全停止
 sleep 3
 
-# 启动后端（使用 Python 3.10）
+# 启动后端
 cd "$PROJECT_ROOT"
 mkdir -p log
-nohup python3.10 run_backend.py > log/backend.log 2>&1 &
+nohup uv run --no-sync uvicorn backend.app:app --host 0.0.0.0 --port 8000 > log/backend.log 2>&1 &
 echo "后端启动中..."
 
 # 等待后端启动
@@ -22,7 +21,7 @@ sleep 5
 # 检查服务状态
 echo ""
 echo "===== 服务状态 ====="
-ps aux | grep -E "run_backend" | grep -v grep
+ps aux | grep -E "uvicorn backend.app" | grep -v grep
 echo ""
 echo "===== 端口监听 ====="
 ss -tlnp | grep -E ":8000" 2>/dev/null || netstat -tlnp | grep -E ":8000" 2>/dev/null

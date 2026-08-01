@@ -6,7 +6,7 @@ Create Date: 2026-08-01
 
 说明:
 - 由两套 ORM Base(legacy + pgvector)合并生成,覆盖全部 24 张表
-- 已移除 emotional_chat 遗留:emotion_analysis / feedbacks / system_events /
+- 已移除旧版遗留:emotion_analysis / feedbacks / system_events /
   user_languages 等孤儿表,以及 chat_messages.emotion、memory_items.emotion、
   response_evaluations.user_emotion 等情绪字段
 - roles 表种子数据与 backend/core/auth/models.py ROLES 保持一致(增删需同步)

@@ -73,7 +73,7 @@ def main():
         print("=" * 70 + "\n")
         
         print("📝 后续步骤:")
-        print("  1. 启动API服务: python run_backend.py")
+        print("  1. 启动API服务: make run")
         print("  2. 访问API文档: http://localhost:8000/docs")
         print("  3. 测试RAG端点: http://localhost:8000/api/rag/test")
         print()
