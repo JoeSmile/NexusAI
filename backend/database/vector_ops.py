@@ -240,6 +240,8 @@ def add_knowledge(
     category: str = "general",
     tenant_id: str = "default",
     metadata: dict | None = None,
+    source: str = "",
+    source_type: str = "text",
 ) -> int:
     emb = embed_text(text)
     session_factory = get_pg_session()
@@ -248,6 +250,8 @@ def add_knowledge(
             tenant_id=tenant_id,
             category=category,
             content=text,
+            source=source,
+            source_type=source_type,
             meta=metadata or {},
             embedding=emb,
         )

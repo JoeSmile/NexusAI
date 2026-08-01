@@ -74,21 +74,14 @@ dev = [
     "ruff>=0.1.0",
     "mypy>=1.0.0",
 ]
-# 旧多模态能力（会拉 tensorflow，macOS/arm64 常装不上；需要时: uv sync --extra multimodal）
+# 多模态提取（Task 21.02）— 未安装时 /api/rag/upload 返回 RAG_001
+# 安装: uv sync --extra multimodal
 multimodal = [
+    "faster-whisper>=1.0.0",
     "openai-whisper>=20230314",
-    "pydub>=0.25.1",
-    "noisereduce>=2.0.0",
-    "librosa>=0.9.0",
+    "paddleocr>=2.7.0",
+    "paddlepaddle>=2.5.0",
     "soundfile>=0.12.0",
-    "opencv-python>=4.5.0",
-    "deepface>=0.0.79",
-    "face-recognition>=1.3.0",
-    "pytesseract>=0.3.10",
-    "gTTS>=2.5.0",
-    "aliyun-python-sdk-core>=2.15.0",
-    "aliyun-python-sdk-imageprocess>=2.0.0",
-    "aliyun-python-sdk-ocr>=1.0.0",
 ]
 
 [project.urls]

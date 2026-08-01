@@ -217,6 +217,7 @@ class KnowledgeChunk(Base):
     category = Column(String(100), default="general", index=True)
     content = Column(Text, nullable=False)
     source = Column(String(256), default="")
+    source_type = Column(String(32), default="text", index=True)  # text|pdf|audio|image
     meta = Column(JSON, default=dict)
     embedding = Column(Vector(1536), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)

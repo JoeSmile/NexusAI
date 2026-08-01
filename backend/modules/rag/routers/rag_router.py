@@ -259,6 +259,114 @@ async def upload_pdf(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/upload")
+async def upload_multimodal(
+    file: UploadFile = File(...),
+    tenant_id: str = "default",
+    category: str = "general",
+):
+    """
+    统一上传：pdf / text / audio(wav|mp3|m4a) / image(png|jpg)。
+    音频/图片需 `uv sync --extra multimodal`。
+    """
+    from backend.core.file_sanitizer import file_kind, sanitize_filename, validate_file
+    from backend.database.vector_ops import add_knowledge
+    from backend.modules.rag.extractors.audio import MultimodalDependencyError
+
+    content = await file.read()
+    filename = file.filename or "upload.bin"
+    ok, err = validate_file(filename, content, file.content_type or "")
+    if not ok:
+        raise HTTPException(status_code=400, detail=err)
+
+    kind = file_kind(filename) or "text"
+    safe_name, ext = sanitize_filename(filename)
+    tmp_path = None
+    chunk_ids: list[int] = []
+
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=ext or "") as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        if kind == "pdf":
+            kb_manager = get_kb_manager()
+            loader = EnterpriseKnowledgeLoader(kb_manager)
+            loader.load_from_pdf(tmp_path)
+            return {
+                "success": True,
+                "source_type": "pdf",
+                "message": f"PDF {filename} 已入库",
+                "chunks": 0,
+            }
+
+        if kind == "text":
+            text = content.decode("utf-8", errors="ignore").strip()
+            if text:
+                cid = add_knowledge(
+                    text,
+                    category=category,
+                    tenant_id=tenant_id,
+                    source=safe_name,
+                    source_type="text",
+                    metadata={"filename": filename},
+                )
+                chunk_ids.append(cid)
+        elif kind == "audio":
+            from backend.modules.rag.extractors.audio import extract_audio_text
+
+            segments = extract_audio_text(tmp_path)
+            for seg in segments:
+                cid = add_knowledge(
+                    seg["text"],
+                    category=category,
+                    tenant_id=tenant_id,
+                    source=safe_name,
+                    source_type="audio",
+                    metadata={
+                        "filename": filename,
+                        "start": seg.get("start"),
+                        "end": seg.get("end"),
+                    },
+                )
+                chunk_ids.append(cid)
+        elif kind == "image":
+            from backend.modules.rag.extractors.image import extract_image_text
+
+            text = extract_image_text(tmp_path)
+            if not text:
+                raise HTTPException(status_code=422, detail="RAG_002: OCR 未识别到文本")
+            cid = add_knowledge(
+                text,
+                category=category,
+                tenant_id=tenant_id,
+                source=safe_name,
+                source_type="image",
+                metadata={"filename": filename},
+            )
+            chunk_ids.append(cid)
+        else:
+            raise HTTPException(status_code=400, detail=f"FILE_002: 不支持的类型 {kind}")
+
+        return {
+            "success": True,
+            "source_type": kind,
+            "message": f"{filename} 已提取并写入知识库",
+            "chunks": len(chunk_ids),
+            "chunk_ids": chunk_ids,
+        }
+    except MultimodalDependencyError as e:
+        raise HTTPException(status_code=501, detail=f"{e.code}: {e}") from e
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"多模态上传失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+
 @router.post("/ask")
 async def ask_question(request: AskRequest):
     """
