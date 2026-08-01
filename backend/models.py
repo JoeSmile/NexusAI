@@ -142,7 +142,7 @@ class PersonalizationConfig(BaseModel):
     role: str = "专业助手"
     role_name: str = "ContextGate"
     role_background: str | None = None
-    personality: str = "温暖耐心"
+    personality: str = "专业严谨"
     core_principles: list[str] | None = None
     forbidden_behaviors: list[str] | None = None
     

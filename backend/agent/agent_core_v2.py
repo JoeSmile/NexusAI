@@ -86,7 +86,7 @@ class _LLMClientAdapter:
             text = self._llm.generate(messages, system=system_prompt)
         else:
             # 降级: 使用模板回复
-            text = "我在这里倾听你的感受。能多告诉我一些吗？"
+            text = "我暂时无法调用模型服务，请稍后再试。"
 
         return TurnSummary(text=text, usage={"input_tokens": 0, "output_tokens": 0})
 
@@ -568,7 +568,7 @@ class AgentCore:
 
     async def _call_llm(self, context: str, user_input: str) -> str:
         """调用 LLM"""
-        return "我理解你的感受。让我们一起面对这个问题。"
+        return "我暂时无法调用模型服务，请稍后再试。"
 
     def _template_response(self, perception: dict, tool_outputs: list) -> str:
         """模板回复"""

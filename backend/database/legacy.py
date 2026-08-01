@@ -349,7 +349,7 @@ class UserPersonalization(Base):
     role = Column(String(100), default="专业助手")  # 角色类型
     role_name = Column(String(100), default="ContextGate")  # 角色名称
     role_background = Column(Text)  # 角色背景故事
-    personality = Column(String(100), default="温暖耐心")  # 性格特征
+    personality = Column(String(100), default="专业严谨")  # 性格特征
     core_principles = Column(Text)  # 核心原则 (JSON数组)
     forbidden_behaviors = Column(Text)  # 禁忌行为 (JSON数组)
     

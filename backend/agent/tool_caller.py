@@ -549,7 +549,7 @@ if __name__ == "__main__":
         result = await tool_caller.call(
             "search_memory",
             {
-                "query": "睡眠",
+                "query": "API网关",
                 "user_id": "user_123",
                 "time_range": 7
             }
@@ -558,12 +558,14 @@ if __name__ == "__main__":
         
         print("\n" + "="*50 + "\n")
         
-        # 调用工具示例2：推荐冥想
-        print("2. 推荐冥想：")
+        # 调用工具示例2：查询项目知识
+        print("2. 查询项目知识：")
         result = await tool_caller.call(
-                    {
-                "theme": "sleep",
-                "duration": 15
+            "search_memory",
+            {
+                "query": "项目部署",
+                "user_id": "user_123",
+                "time_range": 30
             }
         )
         print(json.dumps(result, ensure_ascii=False, indent=2))
@@ -575,10 +577,10 @@ if __name__ == "__main__":
         result = await tool_caller.call(
             "set_reminder",
             {
-                "content": "记得做睡前冥想",
+                "content": "下午三点项目评审会议",
                 "user_id": "user_123",
-                "schedule_time": "2025-10-15T21:30:00",
-                "repeat": True
+                "schedule_time": "2025-10-15T15:00:00",
+                "repeat": False
             }
         )
         print(json.dumps(result, ensure_ascii=False, indent=2))

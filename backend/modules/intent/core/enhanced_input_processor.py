@@ -44,18 +44,10 @@ class EnhancedInputProcessor:
         "绝绝子": "非常好",
         "栓Q": "谢谢你",
         
-        # 常见错别字
+        # 常见口语化表达
         "在吗": "在吗",
         "你好呀": "你好",
         "怎么办呀": "怎么办",
-        "好难受啊": "好难受",
-        "睡不着觉": "睡不着",
-        "太糟糕了": "太糟糕",
-        "我很焦虑": "我很焦虑",
-        
-        "难过ing": "正在难过",
-        "开心ing": "正在开心",
-        "焦虑ing": "正在焦虑",
         
         # 可根据实际使用情况继续添加
     }
@@ -94,10 +86,10 @@ class EnhancedInputProcessor:
                 # 预加载jieba词典（提升首次分词速度）
                 jieba.initialize()
                 # 添加自定义词汇
-                jieba.add_word('焦虑', freq=1000, tag='n')
-                jieba.add_word('抑郁', freq=1000, tag='n')
-                jieba.add_word('失眠', freq=1000, tag='n')
-                jieba.add_word('压力大', freq=1000, tag='a')
+                jieba.add_word('API网关', freq=1000, tag='nz')
+                jieba.add_word('向量检索', freq=1000, tag='n')
+                jieba.add_word('数据脱敏', freq=1000, tag='n')
+                jieba.add_word('多租户', freq=1000, tag='n')
                 logger.info("✓ jieba分词引擎已初始化并加载自定义词典")
             except Exception as e:
                 logger.warning(f"jieba初始化失败: {e}，将禁用分词功能")

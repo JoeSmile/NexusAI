@@ -10,10 +10,7 @@ Agent Core - Agent核心控制器
 支持MCP协议：所有模块间通信使用标准化的MCP协议
 """
 
-import json
 import os
-
-# 导入MCP协议
 import sys
 import uuid
 from datetime import datetime
@@ -445,8 +442,7 @@ class AgentCore:
         
         except Exception as e:
             print(f"生成回复失败: {e!s}")
-            return "我理解你的感受。能多告诉我一些吗？"
-    
+            return "抱歉，我暂时无法生成回复，请稍后再试。"
 
     async def _perceive(
         self, 
@@ -566,8 +562,8 @@ class AgentCore:
         
         except Exception as e:
             print(f"生成回复失败: {e!s}")
-            return "我理解你的感受。能多告诉我一些吗？"
-    
+            return "抱歉，我暂时无法生成回复，请稍后再试。"
+
     def _simple_context_assembly(
         self,
         context: dict[str, Any],
@@ -601,12 +597,12 @@ class AgentCore:
         """调用LLM生成回复"""
         # 这里应该调用实际的LLM服务
         # 简化实现
-        
+
         # 如果有LLM客户端，调用它
         # response = await self.llm.generate(prompt)
-        
+
         # 简化：返回模板
-        return "我理解你的感受。让我们一起面对这个问题。"
+        return "我暂时无法调用模型服务，请稍后再试。"
     
 
     def _identify_intent(self, text: str) -> str:
@@ -692,55 +688,4 @@ def get_agent_core() -> AgentCore:
     if _agent_core_instance is None:
         _agent_core_instance = AgentCore()
     return _agent_core_instance
-
-
-# 使用示例
-if __name__ == "__main__":
-    import asyncio
-    
-    async def main():
-        # 创建Agent Core
-        agent = AgentCore()
-        
-        # 模拟用户交互
-        user_id = "user_test_123"
-        
-        print("=" * 60)
-        print("ContextGateAgent测试")
-        print("=" * 60)
-        
-        # 测试1: 关怀支持场景
-        print("\n【场景1：关怀支持】")
-        result1 = await agent.process(
-            user_input="我最近心情很不好，感觉很焦虑",
-            user_id=user_id
-        )
-        print("用户：我最近心情很不好，感觉很焦虑")
-        print(f"ContextGate：{result1['response']}")
-        print(f"回复：{result1['response'][:60]}")
-        print(f"执行了 {len(result1['actions'])} 个行动")
-        
-        print("\n" + "-" * 60 + "\n")
-        
-        # 测试2: 问题解决场景
-        print("【场景2：问题解决】")
-        result2 = await agent.process(
-            user_input="我最近睡不好，怎么办？",
-            user_id=user_id
-        )
-        print("用户：我最近睡不好，怎么办？")
-        print(f"ContextGate：{result2['response']}")
-        print(f"回复：{result2['response'][:60]}")
-        print(f"执行了 {len(result2['actions'])} 个行动")
-        if result2.get('followup_scheduled'):
-            print("✓ 已安排回访")
-        
-        print("\n" + "-" * 60 + "\n")
-        
-        # 获取Agent状态
-        print("【Agent状态】")
-        status = agent.get_agent_status()
-        print(json.dumps(status, ensure_ascii=False, indent=2))
-    
-    asyncio.run(main())
 

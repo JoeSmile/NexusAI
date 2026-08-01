@@ -34,7 +34,7 @@ class SystemPromptBuilder:
     Usage::
 
         builder = SystemPromptBuilder(
-            base_identity="你是一个温暖的LLM GatewayAI。"
+            base_identity="你是一个专业的LLM GatewayAI。"
         )
         builder.add_layer(PromptLayer(name="skills", content=skill_summary, priority=10))
         builder.add_layer(PromptLayer(name="memory", content=memory_block, priority=20))
@@ -43,7 +43,7 @@ class SystemPromptBuilder:
 
     def __init__(
         self,
-        base_identity: str = "你是一个温暖的LLM GatewayAI，致力于倾听和理解用户的感受。",
+        base_identity: str = "你是一个专业的LLM GatewayAI，为企业场景提供准确、可靠的信息服务。",
         language_hint: str | None = None,
         memory_block: str | None = None,
         skill_summaries: list[dict] | None = None,

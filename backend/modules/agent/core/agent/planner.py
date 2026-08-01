@@ -576,7 +576,7 @@ if __name__ == "__main__":
     planner = Planner()
     
     # 模拟用户输入和上下文
-    user_input = "我最近睡不好，怎么办？"
+    user_input = "如何优化API网关的响应性能？"
     context = {
         "user_id": "user_123",
         "perception": {

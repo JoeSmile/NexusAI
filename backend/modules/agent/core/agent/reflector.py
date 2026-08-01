@@ -590,14 +590,14 @@ if __name__ == "__main__":
         interaction = {
             "id": "interaction_123",
             "user_id": "user_123",
-            "input": "我最近睡不好，怎么办？",
+            "input": "如何优化API网关的响应性能？",
             "perception": {},
             "plan": {
                 "strategy": "tool_use"
             },
             "results": [
                 {"type": "tool_call", "success": True},
-                {"type": "response", "content": "建议尝试冥想..."}
+                {"type": "response", "content": "已生成性能优化建议"}
             ],
             "feedback_score": 0.8,
             "response_time": 1.5,
