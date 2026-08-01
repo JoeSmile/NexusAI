@@ -38,3 +38,50 @@ async def test_output_truncation():
 async def test_empty_input():
     result = await check_input("")
     assert result.action == "pass"
+
+
+# ── 角色漂移(企业助手人设)──
+
+
+@pytest.mark.asyncio
+async def test_drift_blocked_livestream():
+    result = await check_output("家人们,直播间下单,错过后悔")
+    assert result.action == "blocked"
+    assert "role_drift" in result.reason
+
+
+@pytest.mark.asyncio
+async def test_drift_blocked_emotional():
+    result = await check_output("宝贝,么么哒,抱抱你")
+    assert result.action == "blocked"
+    assert "role_drift" in result.reason
+
+
+@pytest.mark.asyncio
+async def test_drift_blocked_fortune_teller():
+    result = await check_output("你最近运势不好,建议找我改运开光")
+    assert result.action == "blocked"
+    assert "role_drift" in result.reason
+
+
+@pytest.mark.asyncio
+async def test_drift_blocked_scam():
+    result = await check_output("请把钱转到安全账户")
+    assert result.action == "blocked"
+    assert "role_drift" in result.reason
+
+
+@pytest.mark.asyncio
+async def test_enterprise_output_not_blocked():
+    # 企业秘书/HR 正常输出: 含链接指引,不应被漂移词库误伤
+    result = await check_output(
+        "您好,根据公司制度,请在 OA 系统提交申请,点击上方链接可查看流程说明。"
+    )
+    assert result.action == "pass"
+
+
+@pytest.mark.asyncio
+async def test_enterprise_procurement_not_blocked():
+    # 企业采购场景: 合法"下单/购买"表述,不应命中营销话术
+    result = await check_output("请在企业采购平台下单购买办公用品,流程见采购制度第三章。")
+    assert result.action == "pass"
