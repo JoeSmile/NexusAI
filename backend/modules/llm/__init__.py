@@ -10,14 +10,11 @@ from .harness import (
     try_create_chat_openai,
     try_create_openai_sync_client,
 )
-
-# from .services.llm_service import LLMService  # LLMService依赖LLMCore，暂时禁用
 from .models.llm_models import LLMProvider, LLMRequest, LLMResponse
 from .providers.openai_provider import OpenAIProvider
 
 __all__ = [
     "ChatEngine",
-    # "LLMService",  # 暂时禁用
     "LLMRequest",
     "LLMResponse",
     "LLMProvider",
@@ -27,10 +24,3 @@ __all__ = [
     "try_create_chat_openai",
     "try_create_openai_sync_client",
 ]
-
-# 可选的提供商
-try:
-    from .providers.anthropic_provider import AnthropicProvider  # noqa: F401
-    __all__.append("AnthropicProvider")
-except ImportError:
-    pass

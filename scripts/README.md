@@ -7,6 +7,7 @@
 - `init_rag_knowledge.py`：初始化 RAG 知识库（企业文档入库）。
 - `seed_api_keys.py` / `seed_pgvector.py`：写入开发用 API Key 与示例数据（`make seed`）。
 - `verify_schema.py`：校验数据库 schema 与 ORM 模型完全一致（防漂移）。
+- `audit_consistency.py`：全仓一致性审计（残留引用 / 断链 / make target / env 键 / import 冒烟）。
 - `start_services.sh` / `restart_services.sh`：Linux 运维脚本。
 
 ## 数据库迁移
