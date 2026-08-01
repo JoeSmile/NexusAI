@@ -127,7 +127,7 @@ class PsychologyDB:
                         "闭上眼睛或半闭",
                         "将注意力放在呼吸上",
                         "观察呼吸的自然节奏",
-                        "当思绪飘走时，温柔地带回"
+                        "当思绪飘走时，轻轻地带回"
                     ],
                     "frequency": "daily",
                     "duration": 10
@@ -137,18 +137,18 @@ class PsychologyDB:
                 {
                     "id": "crisis_001",
                     "type": "hotline",
-                    "name": "心理危机热线",
+                    "name": "安全求助通道",
                     "phone": "400-161-9995",
                     "available": "24/7",
-                    "description": "提供24小时心理危机干预服务"
+                    "description": "提供安全求助指引"
                 },
                 {
                     "id": "crisis_002",
                     "type": "online_counseling",
-                    "name": "在线心理咨询",
+                    "name": "专业咨询入口",
                     "url": "https://example.com/online-counseling",
                     "available": "9:00-21:00",
-                    "description": "专业心理咨询师在线服务"
+                    "description": "专业咨询服务入口（预留）"
                 }
             ]
         }
@@ -327,7 +327,7 @@ class PsychologyDB:
         return schedule
     
     def get_crisis_resources(self) -> list[dict[str, Any]]:
-        """获取危机干预资源"""
+        """获取安全求助资源"""
         return self.resources["crisis_resources"]
 
 

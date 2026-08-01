@@ -37,8 +37,8 @@ class FollowupType(Enum):
     """回访类型"""
     ROUTINE_CHECK = "routine_check"           # 常规检查
     GOAL_TRACKING = "goal_tracking"           # 目标跟踪
-    EMOTIONAL_SUPPORT = "emotional_support"   # 情感支持
-    CRISIS_INTERVENTION = "crisis_intervention"  # 危机干预
+    EMOTIONAL_SUPPORT = "emotional_support"   # 关怀支持（遗留）
+    CRISIS_INTERVENTION = "crisis_intervention"  # 安全预警（遗留）
 
 
 class Reflector:
@@ -430,7 +430,7 @@ class Reflector:
         # 针对弱点提出改进
         for weakness in analysis.get("weaknesses", []):
             if "用户满意度低" in weakness:
-                improvements.append("增强共情表达，使用更温暖的语气")
+                improvements.append("增强表达的清晰度与专业性")
             
             elif "响应速度慢" in weakness:
                 improvements.append("优化工具调用流程，减少不必要的检索")

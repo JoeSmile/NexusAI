@@ -7,7 +7,7 @@ Response Generator Core Module
 - 基于情感意图动态生成AI回复
 - 融合规则引擎、缓存匹配和LLM生成的混合架构
 - 实现情感一致性校验和反馈闭环
-- 支持危机干预和个性化定制
+- 支持安全预警和个性化定制
 
 架构：
 1. 情感匹配决策引擎
@@ -134,14 +134,14 @@ class ResponseGenerator:
             }
         }
         
-        # 1. 检查是否为高风险情况（危机干预）
+        # 1. 检查是否为高风险情况
         if self._is_crisis_situation(user_emotion, metadata):
             response = self._handle_crisis(user_input, user_emotion, metadata)
             result["response"] = response
             result["generation_method"] = "rule_based_crisis"
             result["metadata"]["is_crisis"] = True
             self.stats["rule_based"] += 1
-            logger.warning(f"危机干预触发 [user={user_id}]: {user_emotion}")
+            logger.warning(f"安全预警触发 [user={user_id}]: {user_emotion}")
             return result
         
         # 2. 缓存匹配（高频固定场景）
@@ -217,9 +217,9 @@ class ResponseGenerator:
                             user_emotion: str, 
                             metadata: dict | None) -> bool:
         """
-        判断是否为危机情况（核心逻辑）
+        判断是否为高风险情况（核心逻辑）
         
-        注意：完整版本包含多级风险评估、关键词动态检测、情绪强度阈值等，
+        注意：完整版本包含多级风险评估、关键词动态检测等，
         详见：backend/modules/intent/core/crisis_intervention.py
         
         Args:
@@ -227,7 +227,7 @@ class ResponseGenerator:
             metadata: 元数据
             
         Returns:
-            是否为危机情况
+            是否为高风险情况
         """
         # 核心判断逻辑（精简版）
         if user_emotion == "high_risk_depression":
@@ -243,7 +243,7 @@ class ResponseGenerator:
                       user_emotion: str,
                       metadata: dict | None) -> str:
         """
-        处理危机情况，返回预设的危机干预回复（核心逻辑）
+        处理高风险情况，返回预设的安全提示回复（核心逻辑）
         
         注意：完整版本包含动态话术生成、多级干预策略、日志记录等，
         详见：backend/modules/intent/core/crisis_intervention.py
@@ -254,7 +254,7 @@ class ResponseGenerator:
             metadata: 元数据
             
         Returns:
-            危机干预回复
+            安全提示回复
         """
         # 核心处理逻辑（精简版）
         crisis_strategy = self.emotion_strategy.get("high_risk_depression", {})
@@ -263,12 +263,10 @@ class ResponseGenerator:
         if crisis_response:
             return crisis_response
         
-        # 默认危机回复（核心模板）
-        return """我非常关心你现在的情绪状态。你不是一个人，有很多人愿意帮助你。
-建议你立即联系心理援助热线：
-- 希望24热线：400-161-9995
-- 北京心理危机干预中心：010-82951332
-我会一直在这里陪你。"""
+        # 默认安全提示（核心模板）
+        return """我们非常关心你的安全。你现在的感受很重要，但我是企业信息平台助手，无法提供此类专业支持。
+建议你尽快联系身边可信赖的人，或通过公司 EAP、当地专业支持渠道寻求帮助。
+紧急情况下请及时拨打 120 或 110。"""
     
     def _match_cached_response(self, 
                                user_input: str, 
@@ -381,9 +379,9 @@ class ResponseGenerator:
         identity_replacements = {
             "我是AI": "我是ContextGate",
             "我是一个AI": "我是ContextGate",
-            "作为AI": "作为陪伴者",
-            "AI助手": "陪伴者",
-            "人工智能": "陪伴者"
+            "作为AI": "作为AI",
+            "AI助手": "AI助手",
+            "人工智能": "AI助手"
         }
         for old, new in identity_replacements.items():
             if old in processed:

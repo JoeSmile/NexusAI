@@ -177,13 +177,13 @@ class PlanningSkill(Skill):
         emotion_data.get("emotion", "") if emotion_data else ""
         intensity = emotion_data.get("emotion_intensity", 5.0) if emotion_data else 5.0
 
-        # 规则1：高情绪强度 → 情感支持
+        # 规则1：高强度信号 → 关怀支持
         if intensity >= 7.0:
             return {
                 "goal_type": GoalType.EMOTIONAL_SUPPORT.value,
                 "complexity": Complexity.MEDIUM.value,
                 "urgency": "high",
-                "description": "用户情绪强烈，需要情感支持",
+                "description": "用户表达强烈困扰，需要关怀支持",
             }
 
         # 规则2：问题关键词 → 问题解决

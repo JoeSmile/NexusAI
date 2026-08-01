@@ -88,7 +88,7 @@ def format_timestamp(
 
 
 def format_emotion_result(emotion_result: EmotionResult) -> dict[str, Any]:
-    """格式化情绪分析结果"""
+    """格式化分析结果"""
     return {
         "emotion": emotion_result.emotion,
         "intensity": round(emotion_result.intensity, 2),

@@ -40,7 +40,7 @@ except ImportError:  # Batch 3.1: hermes 已删除
 class GoalType(Enum):
     """目标类型"""
     INFORMATION_QUERY = "information_query"     # 信息查询
-    EMOTIONAL_SUPPORT = "emotional_support"     # 情感支持
+    EMOTIONAL_SUPPORT = "emotional_support"     # 关怀支持（遗留）
     PROBLEM_SOLVING = "problem_solving"         # 问题解决
     BEHAVIOR_CHANGE = "behavior_change"         # 行为改变
     CASUAL_CHAT = "casual_chat"                 # 闲聊
@@ -57,7 +57,7 @@ class Complexity(Enum):
 class Strategy(Enum):
     """执行策略"""
     DIRECT_RESPONSE = "direct_response"           # 直接回复
-    EMPATHY_FIRST = "empathy_first"               # 情感优先
+    EMPATHY_FIRST = "empathy_first"               # 关怀优先（遗留）
     TOOL_USE = "tool_use"                         # 工具调用
     SCHEDULED_FOLLOWUP = "scheduled_followup"     # 定时回访
     CONVERSATIONAL = "conversational"             # 对话引导
@@ -172,7 +172,7 @@ class Planner:
         perception.get("emotion", "")
         emotion_intensity = perception.get("emotion_intensity", 0)
 
-        # Hermes 工作区 / 出书 / 图表 / 联网：优先于纯情绪路由（避免改稿需求被当成闲聊）
+        # Hermes 工作区 / 出书 / 图表 / 联网：优先于纯状态路由（避免改稿需求被当成闲聊）
         if workspace_automation_intent(user_input):
             return {
                 "goal_type": GoalType.WORKSPACE_AUTOMATION,
@@ -181,13 +181,13 @@ class Planner:
                 "description": "本地工作区与文档/联网自动化",
             }
         
-        # 规则1：高情绪强度 -> 情感支持
+        # 规则1：高强度信号 -> 关怀支持
         if emotion_intensity >= 7.0:
             return {
                 "goal_type": GoalType.EMOTIONAL_SUPPORT,
                 "complexity": Complexity.MEDIUM,
                 "urgency": "high",
-                "description": "用户情绪强烈，需要情感支持"
+                "description": "用户表达强烈困扰，需要关怀支持"
             }
         
         # 规则2：包含问题关键词 -> 问题解决
@@ -242,11 +242,11 @@ class Planner:
         sub_goals = []
         
         if goal_type == GoalType.EMOTIONAL_SUPPORT:
-            # 情感支持流程
+            # 关怀支持流程
             sub_goals = [
                 {
                     "task_id": "empathy",
-                    "description": "提供共情回应",
+                    "description": "提供理解与回应",
                     "depends_on": [],
                     "priority": "high",
                     "tools_needed": []
@@ -260,7 +260,7 @@ class Planner:
                 },
                 {
                     "task_id": "emotional_support",
-                    "description": "提供情感支持和建议",
+                    "description": "提供关怀支持和建议",
                     "depends_on": ["empathy", "retrieve_memory"],
                     "priority": "high",
                     "tools_needed": []
@@ -417,7 +417,7 @@ class Planner:
         perception = context.get("perception", {})
         emotion_intensity = perception.get("emotion_intensity", 0)
         
-        # 规则1：如果用户情绪强度高，优先情感支持
+        # 规则1：如果用户状态信号强，优先关怀支持
         if emotion_intensity > 7.0:
             return Strategy.EMPATHY_FIRST
         
@@ -648,8 +648,8 @@ class Planner:
         if "睡眠" in task_description:
             followup_time = datetime.now() + timedelta(days=7)
         
-        # 情绪问题：3天后
-        elif "情绪" in task_description or "心情" in task_description:
+        # 情绪相关（遗留）任务：3天后
+        elif "情绪" in task_description or "心情" in task_description:  # 遗留关键词匹配
             followup_time = datetime.now() + timedelta(days=3)
         
         # 行为改变：1周后

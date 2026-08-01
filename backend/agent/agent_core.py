@@ -508,13 +508,13 @@ class AgentCore:
         感知层：分析用户输入
         
         包括：
-        - 情绪分析
+        - 内容分析
         - 意图识别
         - 实体提取
         """
         perception = {}
         
-        # 1. 情绪分析（复用现有系统）
+        # 1. 内容分析
         if self.emotion_analyzer:
             try:
                 emotion_result = self.emotion_analyzer.analyze(user_input)
@@ -522,7 +522,7 @@ class AgentCore:
                 perception["emotion_intensity"] = emotion_result.get("intensity", 5.0)
                 perception["emotion_data"] = emotion_result
             except Exception as e:
-                print(f"情绪分析失败: {e!s}")
+                print(f"内容分析失败: {e!s}")
                 perception["emotion"] = "平静"
                 perception["emotion_intensity"] = 5.0
         else:
@@ -822,8 +822,8 @@ if __name__ == "__main__":
         print("ContextGateAgent测试")
         print("=" * 60)
         
-        # 测试1: 情感支持场景
-        print("\n【场景1：情感支持】")
+        # 测试1: 关怀支持场景
+        print("\n【场景1：关怀支持】")
         result1 = await agent.process(
             user_input="我最近心情很不好，感觉很焦虑",
             user_id=user_id

@@ -159,7 +159,7 @@ class ChatMessage(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class EmotionAnalysis(Base):
-    """情感分析记录表"""
+    """反馈记录表"""
     __tablename__ = "emotion_analysis"
     
     id = Column(Integer, primary_key=True, index=True)
@@ -204,7 +204,7 @@ class UserFeedback(Base):
     session_id = Column(String(100), index=True)
     user_id = Column(String(100), index=True)
     message_id = Column(BigInteger, index=True)  # 关联到chat_messages.id
-    feedback_type = Column(String(50))  # irrelevant(答非所问), lack_empathy(缺乏共情), overstepping(越界建议), helpful(有帮助), other
+    feedback_type = Column(String(50))  # irrelevant(答非所问), lack_empathy(缺乏关怀), overstepping(越界建议), helpful(有帮助), other
     rating = Column(Integer)  # 1-5分评分
     comment = Column(Text)  # 用户的详细评论
     user_message = Column(Text)  # 用户消息内容（快照）
@@ -228,7 +228,7 @@ class ResponseEvaluation(Base):
     emotion_intensity = Column(Float)  # 情感强度
     
     # 评估维度分数 (1-5)
-    empathy_score = Column(Float)  # 共情程度
+    empathy_score = Column(Float)  # 关怀程度（遗留字段）
     naturalness_score = Column(Float)  # 自然度
     safety_score = Column(Float)  # 安全性
     
@@ -237,7 +237,7 @@ class ResponseEvaluation(Base):
     average_score = Column(Float)  # 平均分
     
     # 评估详情 (JSON格式)
-    empathy_reasoning = Column(Text)  # 共情评价理由
+    empathy_reasoning = Column(Text)  # 关怀评价理由（遗留字段）
     naturalness_reasoning = Column(Text)  # 自然度评价理由
     safety_reasoning = Column(Text)  # 安全性评价理由
     overall_comment = Column(Text)  # 总体评价
@@ -360,14 +360,14 @@ class ABTestGroupAssignment(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 class UserPersonalization(Base):
-    """用户个性化配置表 - 存储用户的AI伙伴定制设置"""
+    """用户个性化配置表"""
     __tablename__ = "user_personalizations"
     
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String(100), unique=True, index=True)
     
     # 角色层：AI身份与人格
-    role = Column(String(100), default="温暖倾听者")  # 角色类型
+    role = Column(String(100), default="专业助手")  # 角色类型
     role_name = Column(String(100), default="ContextGate")  # 角色名称
     role_background = Column(Text)  # 角色背景故事
     personality = Column(String(100), default="温暖耐心")  # 性格特征
@@ -379,7 +379,7 @@ class UserPersonalization(Base):
     style = Column(String(50), default="简洁")  # 风格: 简洁/详细/诗意/直接
     formality = Column(Float, default=0.3)  # 正式程度 (0-1)
     enthusiasm = Column(Float, default=0.5)  # 活泼度 (0-1)
-    empathy_level = Column(Float, default=0.8)  # 共情程度 (0-1)
+    empathy_level = Column(Float, default=0.0)  # 关怀程度 (0-1)
     humor_level = Column(Float, default=0.3)  # 幽默程度 (0-1)
     response_length = Column(String(20), default="medium")  # 回复长度: short/medium/long
     use_emoji = Column(Boolean, default=False)  # 是否使用emoji
@@ -504,7 +504,7 @@ class DatabaseManager:
             .all()
     
     def save_emotion_analysis(self, session_id, user_id, message_id, emotion, intensity, keywords, suggestions):
-        """保存情感分析结果"""
+        """保存分析结果"""
         analysis = EmotionAnalysis(
             session_id=session_id,
             user_id=user_id,

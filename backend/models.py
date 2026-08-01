@@ -156,7 +156,7 @@ class PersonalizationConfig(BaseModel):
     user_id: str
     
     # 角色层
-    role: str = "温暖倾听者"
+    role: str = "专业助手"
     role_name: str = "ContextGate"
     role_background: str | None = None
     personality: str = "温暖耐心"

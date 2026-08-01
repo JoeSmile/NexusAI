@@ -39,7 +39,7 @@ class TurnSummary:
     tool_calls: list[dict] = field(default_factory=list)
     usage: dict = field(default_factory=dict)  # {input_tokens, output_tokens, total_tokens}
     iterations: int = 0
-    emotion_analysis: dict | None = None  # 情感分析结果（可选）
+    emotion_analysis: dict | None = None  # 分析结果（可选，遗留字段）
 
 
 class LLMClient(Protocol):

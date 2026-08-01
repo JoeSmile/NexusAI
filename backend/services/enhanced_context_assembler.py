@@ -172,7 +172,7 @@ class EnhancedContextAssembler:
         prompt_parts.append("- 回应要体现对过往经历的记忆")
         prompt_parts.append("- 语气要符合用户偏好")
         prompt_parts.append("- 避免重复已讨论过的建议")
-        prompt_parts.append("- 保持温暖、共情的态度")
+        prompt_parts.append("- 保持专业、准确的态度")
         
         return "\n".join(prompt_parts)
     

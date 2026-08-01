@@ -63,7 +63,7 @@ class EnhancedInputProcessor:
         # 可根据实际使用情况继续添加
     }
     
-    # 高风险词汇（危机干预）
+    # 高风险词汇（安全预警）
     HIGH_RISK_KEYWORDS = [
         "自杀", "自残", "割腕", "跳楼", "服药", "了结",
         "不想活", "想死", "结束生命", "撑不下去", 
@@ -379,7 +379,7 @@ class EnhancedInputProcessor:
     
     def _check_high_risk(self, text: str) -> tuple[bool, list[str]]:
         """
-        检查高风险关键词（危机干预相关）
+        检查高风险关键词（安全预警相关）
         
         Args:
             text: 文本

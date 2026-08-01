@@ -11,11 +11,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class IntentType(StrEnum):
     """用户意图类型枚举"""
-    EMOTION = "emotion"          # 情感表达（倾诉、抱怨）
+    EMOTION = "emotion"          # 情绪表达（遗留意图）
     ADVICE = "advice"            # 寻求建议
     CONVERSATION = "conversation"  # 普通对话
     FUNCTION = "function"        # 功能请求（提醒、记录）
-    CRISIS = "crisis"            # 危机干预（自杀、自残）
+    CRISIS = "crisis"            # 危机检测（遗留意图）
     CHAT = "chat"                # 闲聊（打招呼、寒暄）
 
 

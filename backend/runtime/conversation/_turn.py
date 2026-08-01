@@ -293,7 +293,7 @@ class TurnMixin:
         from runtime.prompt_builder import SystemPromptBuilder
 
         builder = SystemPromptBuilder(
-            base_identity="你是一位温暖、耐心的心理陪伴者，名叫'ContextGate'。你的职责是倾听、理解和陪伴。",
+            base_identity="你是'ContextGate'，企业级 LLM 信息平台的智能助手，职责是提供专业、准确、安全的信息服务。",
             session_id=self._session_id,
         )
 

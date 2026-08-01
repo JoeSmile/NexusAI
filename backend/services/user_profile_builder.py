@@ -262,7 +262,7 @@ class UserProfileBuilder:
         if question_ratio > 0.5:
             interaction_style = "主动求助型"
         elif emotion_ratio > 0.6:
-            interaction_style = "情感倾诉型"
+            interaction_style = "任务导向型"
         else:
             interaction_style = "理性交流型"
         

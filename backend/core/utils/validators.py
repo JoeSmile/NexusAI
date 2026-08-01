@@ -24,18 +24,6 @@ USER_ID_PATTERN = re.compile(r'^[a-zA-Z0-9_-]{3,50}$')
 
 SESSION_ID_PATTERN = re.compile(r'^[a-f0-9-]{36}$')
 
-# 敏感词列表（示例）
-FORBIDDEN_WORDS = [
-    "自杀", "自残", "伤害", "暴力", "仇恨", "歧视"
-]
-
-# 情绪关键词
-EMOTION_KEYWORDS = {
-    "positive": ["开心", "快乐", "兴奋", "满足", "幸福", "愉悦", "轻松", "平静"],
-    "negative": ["难过", "悲伤", "愤怒", "焦虑", "恐惧", "失望", "沮丧", "紧张"],
-    "neutral": ["正常", "一般", "平淡", "无聊", "困惑", "思考"]
-}
-
 
 def validate_email(email: str) -> tuple[bool, str]:
     """验证邮箱格式"""
@@ -112,12 +100,6 @@ def validate_message_content(message: str) -> tuple[bool, str]:
     if not valid:
         return valid, error
     
-    # 检查敏感词
-    message_lower = message.lower()
-    for word in FORBIDDEN_WORDS:
-        if word in message_lower:
-            return False, f"消息包含敏感词：{word}"
-    
     # 检查是否为纯符号或数字
     if re.match(r'^[\s\d\W]+$', message):
         return False, "消息内容不能只包含符号或数字"
@@ -125,32 +107,6 @@ def validate_message_content(message: str) -> tuple[bool, str]:
     return True, "消息内容验证通过"
 
 
-def validate_emotion_value(emotion: str) -> tuple[bool, str]:
-    """验证情绪值"""
-    valid_emotions = [
-        "开心", "快乐", "兴奋", "满足", "幸福", "愉悦", "轻松", "平静",
-        "难过", "悲伤", "愤怒", "焦虑", "恐惧", "失望", "沮丧", "紧张",
-        "neutral", "正常", "一般", "平淡", "无聊", "困惑", "思考"
-    ]
-    
-    if not emotion or not isinstance(emotion, str):
-        return False, "情绪值不能为空"
-    
-    if emotion not in valid_emotions:
-        return False, f"无效的情绪值：{emotion}"
-    
-    return True, "情绪值验证通过"
-
-
-def validate_emotion_intensity(intensity: float) -> tuple[bool, str]:
-    """验证情绪强度"""
-    if not isinstance(intensity, (int, float)):
-        return False, "情绪强度必须是数字"
-    
-    if not (0 <= intensity <= 10):
-        return False, "情绪强度必须在0-10之间"
-    
-    return True, "情绪强度验证通过"
 
 
 def validate_rating(rating: int) -> tuple[bool, str]:
@@ -317,21 +273,6 @@ def sanitize_input(text: str) -> str:
     return text
 
 
-def extract_emotion_keywords(text: str) -> list[str]:
-    """从文本中提取情绪关键词"""
-    if not isinstance(text, str):
-        return []
-    
-    text_lower = text.lower()
-    found_keywords = []
-    
-    for _category, keywords in EMOTION_KEYWORDS.items():
-        for keyword in keywords:
-            if keyword in text_lower:
-                found_keywords.append(keyword)
-    
-    return found_keywords
-
 
 # 验证装饰器
 def validate_request_data(schema: dict[str, Any]):
@@ -364,4 +305,3 @@ if __name__ == "__main__":
     print("测试文本长度验证:", validate_text_length("Hello World"))
     print("测试会话ID验证:", validate_session_id(str(uuid.uuid4())))
     print("测试消息内容验证:", validate_message_content("你好，今天天气不错"))
-    print("测试情绪关键词提取:", extract_emotion_keywords("我今天很开心，但有点焦虑"))

@@ -113,10 +113,10 @@ class IntentService:
                     "不做价值判断"
                 ],
                 "avoid": ["说教", "轻视", "劝阻"],
-                "prompt_hint": "危机干预模式：需要表现出深切关心，提供实际帮助资源"
+                "prompt_hint": "安全预警模式：需要提供明确的求助指引"
             },
             IntentType.EMOTION: {
-                "response_style": "共情、温暖、理解",
+                "response_style": "专业、清晰、务实",
                 "priority": "high",
                 "actions": [
                     "积极倾听",
@@ -125,7 +125,7 @@ class IntentService:
                     "适当的安慰"
                 ],
                 "avoid": ["立即给建议", "否定感受"],
-                "prompt_hint": "LLM Gateway模式：重点在于理解和共情，而非解决问题"
+                "prompt_hint": "LLM Gateway模式：重点在于准确理解和解决问题"
             },
             IntentType.ADVICE: {
                 "response_style": "建设性、实用、温和",
@@ -243,7 +243,7 @@ class IntentService:
         
         # 构建prompt
         base_prompt = f"""
-你是一位温暖、耐心的心理陪伴助手"ContextGate"。请根据用户的情绪和意图，给予恰当的回应。
+你是"ContextGate"企业信息平台助手。请根据用户的意图，给予专业、准确的回应。
 
 【用户状态分析】
 - 当前情绪：{emotion}

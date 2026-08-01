@@ -13,7 +13,7 @@ Module Toggles — per-module enable/disable switches
 3. 隔离测试：开发期间可以只开某个模块
 
 LLM Gateway模块列表：
-  emotion_skill        — 情感分析 Skill
+  emotion_skill        — 分析 Skill（遗留）
   memory_skill         — 记忆检索 Skill
   planning_skill       — 任务规划 Skill
   reflect_skill        — 反思评估 Skill

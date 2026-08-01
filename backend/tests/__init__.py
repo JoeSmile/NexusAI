@@ -213,7 +213,7 @@ def create_mock_openai_response(content: str = "测试回复"):
 
 
 def create_mock_emotion_analysis(emotion: str = "neutral", intensity: float = 5.0):
-    """创建模拟情绪分析结果"""
+    """创建模拟分析结果"""
     return {
         "emotion": emotion,
         "intensity": intensity,

@@ -185,16 +185,16 @@ class LLMService:
     
     async def analyze_emotion(self, text: str) -> dict[str, Any]:
         """
-        情绪分析
+        内容分析
         
         Args:
             text: 要分析的文本
             
         Returns:
-            情绪分析结果
+            分析结果
         """
         try:
-            # 构建情绪分析提示
+            # 构建分析提示
             prompt = f"""
 请分析以下文本的情绪状态，返回JSON格式的结果：
 
@@ -245,7 +245,7 @@ class LLMService:
                 
         except Exception as e:
             raise ExternalServiceError(
-                message=f"情绪分析失败: {e!s}",
+                message=f"内容分析失败: {e!s}",
                 service_name="LLM",
                 status_code=500
             )
@@ -313,7 +313,7 @@ class LLMService:
         self,
         user_message: str,
         context: dict[str, Any] | None = None,
-        personality: str = "温暖、共情、专业",
+        personality: str = "专业、严谨、清晰",
         **kwargs
     ) -> str:
         """
@@ -341,7 +341,7 @@ class LLMService:
 4. 鼓励用户积极面对生活
 
 回复要求：
-- 用温暖、共情的语气
+- 用专业、清晰的语气
 - 提供具体可操作的建议
 - 避免给出医疗诊断
 - 鼓励用户寻求专业帮助（如需要）

@@ -240,7 +240,7 @@ class OptimizedChatService:
                          memory: dict, safety: dict) -> str:
         """构造Prompt"""
         prompt_parts = [
-            "你是一个情感支持助手。",
+            "你是ContextGate企业信息平台助手。",
             f"用户情感: {emotion.get('emotion', 'neutral')}",
             f"情感强度: {emotion.get('intensity', 5.0)}",
         ]
@@ -252,7 +252,7 @@ class OptimizedChatService:
             prompt_parts.append("注意: 用户输入可能包含敏感内容")
         
         prompt_parts.append(f"用户说: {user_input}")
-        prompt_parts.append("请给出共情、自然的回复。")
+        prompt_parts.append("请给出专业、清晰的回复。")
         
         return "\n".join(prompt_parts)
     

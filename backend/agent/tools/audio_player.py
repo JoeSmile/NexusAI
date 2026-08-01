@@ -76,7 +76,7 @@ class AudioPlayer:
                     "title": "雨声",
                     "duration": 30,
                     "url": "https://example.com/audio/whitenoise/rain.mp3",
-                    "description": "温柔的雨声，营造宁静氛围",
+                    "description": "细雨声，营造安静氛围",
                     "tags": ["自然", "雨", "宁静"]
                 },
                 {

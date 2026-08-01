@@ -82,7 +82,7 @@ def get_user_mood_trend(user_id: str, days: int = 7) -> dict[str, Any]:
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days)
         
-        # 查询情绪分析记录
+        # 查询交互分析记录
         emotion_records = db.query(EmotionAnalysis).filter(
             EmotionAnalysis.user_id == user_id,
             EmotionAnalysis.created_at >= start_date,
@@ -180,9 +180,9 @@ def get_user_mood_trend(user_id: str, days: int = 7) -> dict[str, Any]:
         
         # 生成摘要
         if needs_intervention:
-            summary = f"近{days}天情绪分析：平均强度{average_intensity:.1f}/10，趋势{trend_direction}，建议主动关怀"
+            summary = f"近{days}天交互分析：平均强度{average_intensity:.1f}/10，趋势{trend_direction}，建议主动跟进"
         else:
-            summary = f"近{days}天情绪分析：平均强度{average_intensity:.1f}/10，趋势{trend_direction}，状态稳定"
+            summary = f"近{days}天交互分析：平均强度{average_intensity:.1f}/10，趋势{trend_direction}，状态稳定"
         
         return {
             "trend": trend,

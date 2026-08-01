@@ -45,12 +45,12 @@ async def get_role_templates():
     ```json
     [
         {
-            "id": "warm_listener",
-            "name": "温暖倾听者",
-            "role": "温暖倾听者",
-            "personality": "温暖、耐心、善于倾听",
-            "description": "一个温暖的陪伴者，善于倾听，给予理解和支持",
-            "icon": "❤️"
+            "id": "analyst",
+            "name": "严谨分析师",
+            "role": "严谨分析师",
+            "personality": "逻辑严谨、数据驱动、客观",
+            "description": "以数据和逻辑为核心的分析助手",
+            "icon": "📊"
         }
     ]
     ```
@@ -113,7 +113,7 @@ async def get_user_config(user_id: str, db: Session = Depends(get_db)):
                 "user_id": user_id,
                 "config": {
                     "user_id": user_id,
-                    "role": "温暖倾听者",
+                    "role": "专业助手",
                     "role_name": "ContextGate",
                     "personality": "温暖耐心",
                     "tone": "温和",
@@ -232,7 +232,7 @@ async def create_or_update_config(
             # 创建新配置
             config_data = {
                 "user_id": user_id,
-                "role": update_data.role or "温暖倾听者",
+                "role": update_data.role or "专业助手",
                 "role_name": update_data.role_name or "ContextGate",
                 "role_background": update_data.role_background,
                 "personality": update_data.personality or "温暖耐心",

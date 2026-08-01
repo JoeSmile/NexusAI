@@ -122,7 +122,7 @@ class MemoryError(EmotionalChatException):
 
 
 class EmotionAnalysisError(EmotionalChatException):
-    """情绪分析错误"""
+    """分析错误"""
 
 
 class ContextError(EmotionalChatException):
@@ -156,7 +156,7 @@ EXCEPTION_HANDLERS = {
     ExternalServiceError: lambda e: (503, {"error": "外部服务不可用", "details": e.to_dict()}),
     RAGError: lambda e: (500, {"error": "知识库错误", "details": e.message}),
     MemoryError: lambda e: (500, {"error": "记忆系统错误", "details": e.message}),
-    EmotionAnalysisError: lambda e: (500, {"error": "情绪分析错误", "details": e.message}),
+    EmotionAnalysisError: lambda e: (500, {"error": "分析错误", "details": e.message}),
     ContextError: lambda e: (500, {"error": "上下文错误", "details": e.message}),
     ChatError: lambda e: (500, {"error": "聊天服务错误", "details": e.message}),
     EvaluationError: lambda e: (500, {"error": "评估系统错误", "details": e.message}),

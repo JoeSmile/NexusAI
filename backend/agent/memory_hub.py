@@ -4,7 +4,7 @@ Memory Hub — 六层记忆中枢
 参考 ai-buddy Phase 6.3 六层记忆架构设计，适配 emotional_chat 情感聊天场景。
 
 六层作用域：
-  L1 组织级  (organization)  — 全局知识库（如共情话术库），系统 prompt 注入，只读
+  L1 组织级  (organization)  — 全局知识库，系统 prompt 注入，只读
   L2 工作区级 (workspace)     — 跨用户活动日志，不暴露为工具，蒸馏管道消费
   L3 用户级  (user)          — 长期用户偏好（兴趣、情绪基线），memory_* 工具可读写
   L4 Agent实例级(agent_instance)— Agent 学习模式（情绪响应策略），memory_* 工具可读写
@@ -103,7 +103,7 @@ class MemoryHub:
         self,
         user_id: str = "",
         session_id: str = "",
-        agent_type: str = "xinyu",
+        agent_type: str = "contextgate",
         memory_manager: MemoryManager | None = None,
         toggles: ModuleToggles | None = None,
     ):
@@ -138,7 +138,7 @@ class MemoryHub:
             store_id=f"org_{self._agent_type}",
             scope="organization",
             target_id=self._agent_type,
-            description="组织级知识库：共情话术库、安全规范等",
+            description="组织级知识库：业务知识、安全规范等",
         )
 
         # L2 工作区级 — 活动日志，不暴露
@@ -471,7 +471,7 @@ class MemoryHub:
             query: 用户消息
             emotion: 情绪标签
             emotion_intensity: 情绪强度 (0-10)
-            bot_empathy_score: 共情评分 (0-1)
+            bot_empathy_score: 关怀评分 (0-1, 遗留字段)
             tool_calls: 本轮工具调用记录
             final_status: 本轮状态
 
@@ -817,7 +817,7 @@ _memory_hub_registry_lock = threading.RLock()
 def get_memory_hub(
     user_id: str = "",
     session_id: str = "",
-    agent_type: str = "xinyu",
+    agent_type: str = "contextgate",
 ) -> MemoryHub:
     """Return a MemoryHub isolated by user, session, and agent type.
 
@@ -825,7 +825,7 @@ def get_memory_hub(
     Call ``await hub.initialize()`` where persistent state must be loaded before
     the first turn.
     """
-    key = (user_id or "", session_id or "", agent_type or "xinyu")
+    key = (user_id or "", session_id or "", agent_type or "contextgate")
     with _memory_hub_registry_lock:
         hub = _memory_hub_registry.get(key)
         if hub is None:
@@ -841,7 +841,7 @@ def get_memory_hub(
 async def get_memory_hub_async(
     user_id: str = "",
     session_id: str = "",
-    agent_type: str = "xinyu",
+    agent_type: str = "contextgate",
 ) -> MemoryHub:
     """Return an isolated hub after loading its persistent state."""
     hub = get_memory_hub(user_id, session_id, agent_type)

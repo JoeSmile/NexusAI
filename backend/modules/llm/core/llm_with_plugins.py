@@ -22,8 +22,8 @@ from backend.database import DatabaseManager, create_tables
 from backend.models import ChatRequest, ChatResponse
 from backend.modules.llm.harness import resolve_llm_settings, try_create_chat_openai
 from backend.services.personalization_service import get_personalization_service
-from backend.xinyu_prompt import (
-    XINYU_SYSTEM_PROMPT,
+from backend.system_prompt import (
+    SYSTEM_PROMPT,
 )
 
 
@@ -108,7 +108,7 @@ class ChatEngineWithTools:
                     print("警告: LangChain ChatOpenAI 不可用")
                     self.chain = None
                 else:
-                    self.template = f"""{XINYU_SYSTEM_PROMPT}
+                    self.template = f"""{SYSTEM_PROMPT}
 
 {{long_term_memory}}
 
@@ -359,7 +359,7 @@ ContextGate："""
 1. 仔细分析用户问题的核心和潜在意图
 2. 考虑多个角度和可能性
 3. 提供更全面、更有深度的回答
-4. 如果涉及情感问题，请进行更深入的情感理解和共情
+4. 如果涉及复杂问题，请给出更深入、准确的分析
 5. 考虑回答的长远影响和不同场景下的适用性
 
 请给出经过深入思考的回应。"""
@@ -562,7 +562,7 @@ ContextGate："""
 1. 必须包含具体的天气信息（温度、天气状况等）
 2. 用温暖、关心的语气
 3. 可以结合天气给出贴心的建议
-4. 保持"ContextGate"的陪伴者角色，不要只是冷冰冰地报数据"""
+4. 保持"ContextGate"专业助手的定位，在准确的基础上给出友好表达"""
                 elif func_name == "get_latest_news":
                     user_message_content = f"""用户询问了新闻信息，我已经查询到了以下新闻数据：
 
@@ -573,7 +573,7 @@ ContextGate："""
 2. 每条新闻都要有明确的标题和简要描述
 3. 用温暖、关心的语气介绍这些新闻
 4. 可以询问用户对哪条新闻感兴趣，想了解更多
-5. 保持"ContextGate"的陪伴者角色，让用户感受到你在分享有用的信息"""
+5. 保持"ContextGate"专业助手的定位，让用户感受到信息的价值"""
                 elif func_name == "get_holiday_info":
                     user_message_content = f"""用户询问了节假日信息，我已经查询到了以下数据：
 
@@ -584,7 +584,7 @@ ContextGate："""
 2. 如果是节假日，说明是什么节日
 3. 结合用户提到的出游、旅行等需求，给出贴心的建议
 4. 用温暖、关心的语气，帮助用户规划行程
-5. 保持"ContextGate"的陪伴者角色，让用户感受到你在关心他们的出行安排"""
+5. 保持"ContextGate"专业助手的定位，让用户感受到出行信息的价值"""
                 else:
                     user_message_content = f"""用户询问了相关信息，我已经查询到了以下数据：
 
@@ -816,7 +816,7 @@ ContextGate："""
 1. 仔细分析用户问题的核心和潜在意图
 2. 考虑多个角度和可能性
 3. 提供更全面、更有深度的回答
-4. 如果涉及情感问题，请进行更深入的情感理解和共情
+4. 如果涉及复杂问题，请给出更深入、准确的分析
 5. 考虑回答的长远影响和不同场景下的适用性
 
 请给出经过深入思考的回应。"""
@@ -864,7 +864,7 @@ ContextGate："""
         如果用户配置了个性化设置，使用个性化Prompt；否则使用默认Prompt
         """
         if not self.personalization_service:
-            return XINYU_SYSTEM_PROMPT
+            return SYSTEM_PROMPT
         
         try:
             # 获取数据库会话
@@ -882,7 +882,7 @@ ContextGate："""
             print(f"获取个性化Prompt失败，使用默认Prompt: {e}")
             import traceback
             traceback.print_exc()
-            return XINYU_SYSTEM_PROMPT
+            return SYSTEM_PROMPT
     
     def analyze_emotion(self, message: str) -> dict[str, Any]:
         """
@@ -892,12 +892,12 @@ ContextGate："""
             message: 用户消息
             
         Returns:
-            情感分析结果字典，包含 emotion, intensity, keywords, suggestions
+            分析结果字典，包含 emotion, intensity, keywords, suggestions
         """
         return self._analyze_emotion_simple(message)
     
     def _analyze_emotion_simple(self, message: str) -> dict[str, Any]:
-        """简单的情感分析"""
+        """简单的分析"""
         emotion_keywords = {
             "happy": ["开心", "高兴", "快乐", "兴奋", "满意", "幸福"],
             "sad": ["难过", "伤心", "沮丧", "失落", "痛苦", "抑郁"],

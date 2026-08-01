@@ -75,7 +75,7 @@ class PolicyEngine:
             PolicyRule(
                 rule_id="crisis_intervention",
                 priority=100,
-                description="危机干预策略",
+                description="安全预警策略",
                 condition="emotion.is_crisis == true",
                 action_chain=[
                     PolicyAction(type=ActionType.ESCALATE_TO_HUMAN, reason="检测到危机信号"),
@@ -93,7 +93,7 @@ class PolicyEngine:
         PolicyRule(
             rule_id="crisis_intervention",
             priority=100,
-            description="危机干预 — 检测到自杀/自残信号时升级到人工",
+            description="安全预警 — 检测到高风险信号时升级到人工",
             condition="emotion.is_crisis == true",
             action_chain=[
                 PolicyAction(
@@ -104,7 +104,7 @@ class PolicyEngine:
                 PolicyAction(
                     type=ActionType.ALERT,
                     params={"channel": "crisis_team"},
-                    reason="通知危机干预团队",
+                    reason="通知安全预警团队",
                 ),
             ],
         ),

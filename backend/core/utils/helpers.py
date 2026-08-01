@@ -10,6 +10,7 @@ import random
 import re
 import string
 import uuid
+from collections.abc import Callable
 from datetime import datetime, timedelta
 from functools import wraps
 from typing import Any
@@ -148,7 +149,7 @@ def chunk_list(lst: list[Any], chunk_size: int) -> list[list[Any]]:
     return [lst[i:i + chunk_size] for i in range(0, len(lst), chunk_size)]
 
 
-def remove_duplicates(lst: list[Any], key_func: callable | None = None) -> list[Any]:
+def remove_duplicates(lst: list[Any], key_func: Callable | None = None) -> list[Any]:
     """移除列表中的重复项"""
     if key_func is None:
         return list(dict.fromkeys(lst))

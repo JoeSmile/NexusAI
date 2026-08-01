@@ -739,7 +739,7 @@ if __name__ == "__main__":
         parameters={"query": "焦虑", "user_id": "user_123"}
     )
     planner_msg = protocol.create_planner_output(
-        content="识别到情感支持需求，需要检索相关记忆",
+        content="识别到相关需求，需要检索相关记忆",
         task_goal={"goal_type": "emotional_support", "complexity": "medium"},
         tool_calls=[tool_call]
     )

@@ -160,7 +160,7 @@ async def get_intent_types():
     intent_types = {
         "emotion": {
             "name": "情感表达",
-            "description": "用户表达情绪，需要倾听和共情",
+            "description": "用户表达需求或困扰，需要理解与回应",
             "examples": ["我好难过", "今天心情不好", "感到很焦虑"]
         },
         "advice": {
@@ -179,7 +179,7 @@ async def get_intent_types():
             "examples": ["提醒我吃药", "记录今天的心情", "设置闹钟"]
         },
         "crisis": {
-            "name": "危机干预",
+            "name": "安全预警",
             "description": "紧急情况，需要立即关注",
             "examples": ["不想活了", "很想自杀", "撑不下去了"]
         },

@@ -13,7 +13,7 @@ from ..models import ChatRequest, ChatResponse
 
 @dataclass
 class EmotionResult:
-    """情绪分析结果"""
+    """分析结果"""
     emotion: str
     intensity: float
     confidence: float
@@ -69,7 +69,7 @@ class IChatEngine(ABC):
 
 
 class IEmotionAnalyzer(ABC):
-    """情绪分析器接口"""
+    """分析器接口"""
     
     @abstractmethod
     async def analyze_emotion(self, text: str) -> EmotionResult:

@@ -32,7 +32,7 @@ evaluation_engine = EvaluationEngine()
 async def evaluate_response(request: EvaluationRequest):
     """
     评估单个回应
-    使用LLM作为裁判，从共情程度、自然度、安全性三个维度评分
+    使用LLM作为裁判，从准确性、完整性、安全性三个维度评分
     """
     try:
         # 调用评估引擎

@@ -23,8 +23,8 @@ from backend.models import ChatResponse
 from backend.modules.llm.harness import resolve_llm_settings, try_create_chat_openai
 
 # 导入ContextGatePrompt配置
-from backend.xinyu_prompt import (
-    XINYU_SYSTEM_PROMPT,
+from backend.system_prompt import (
+    SYSTEM_PROMPT,
     build_full_prompt,
     validate_and_filter_input,
 )
@@ -75,7 +75,7 @@ class ChatEngine:
                     self.chain = None
                 else:
                     # 2. 定义 AI 人格与行为准则（使用完整的ContextGatePrompt）
-                    self.template = f"""{XINYU_SYSTEM_PROMPT}
+                    self.template = f"""{SYSTEM_PROMPT}
 
 {{long_term_memory}}
 
@@ -348,7 +348,7 @@ ContextGate："""
             ],
             "lonely": [
                 "听起来你感到孤独。这种感觉确实很难受。我在这里陪着你。你想聊聊吗？",
-                "我能理解你的孤独感。这种时候确实让人难过。你并不孤单，我在这里倾听。",
+                "我理解你的困扰。如果需要，我可以帮你分析问题或查找相关资料。",
                 "你现在一定很孤单。这种感觉很沉重。想说说你的想法吗？"
             ],
             "grateful": [
@@ -402,7 +402,7 @@ ContextGate："""
                     emotion_intensity=emotion_data["intensity"]
                 )
                 
-                # 保存情感分析结果
+                # 保存分析结果
                 db.save_emotion_analysis(
                     session_id=session_id,
                     user_id=user_id,

@@ -549,7 +549,7 @@ class AgentCore:
     # ── 旧版辅助方法（向后兼容）────────────────────────────────
 
     async def _perceive(self, user_input: str, user_id: str) -> dict[str, Any]:
-        """感知层 — 情绪分析 + 意图识别"""
+        """感知层 — 内容分析 + 意图识别"""
         perception = {}
         if self.emotion_analyzer:
             try:

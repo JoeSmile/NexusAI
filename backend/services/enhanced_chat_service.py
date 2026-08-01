@@ -137,7 +137,7 @@ class EnhancedChatService:
         if preprocessed and preprocessed.get("blocked"):
             return self._create_blocked_response(session_id, preprocessed)
         
-        # ============ 第2步：情绪分析 ============
+        # ============ 第2步：内容分析 ============
         emotion_result = self.chat_engine.analyze_emotion(message)
         emotion = emotion_result.get("emotion", "neutral")
         emotion_intensity = emotion_result.get("intensity", 5.0)
@@ -256,7 +256,7 @@ class EnhancedChatService:
     
     def _build_system_prompt(self, context: dict[str, Any], proactive_prompt: str | None) -> str:
         """构建系统Prompt"""
-        system_prompt = """你是"ContextGate"，一位温暖、耐心的心理陪伴者。"""
+        system_prompt = """你是"ContextGate"，企业级 LLM 信息平台的智能助手，专业、准确、安全。"""
         
         # 如果有主动回忆提示，添加到系统Prompt
         if proactive_prompt:

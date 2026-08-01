@@ -51,7 +51,7 @@ class TurnDigest:
     timestamp: float               # Unix timestamp
     emotion: str = "neutral"       # 用户情绪标签
     emotion_intensity: float = 5.0 # 情绪强度 (0-10)
-    bot_empathy_score: float = 0.0 # 共情评分 (0-1, 可选)
+    bot_empathy_score: float = 0.0 # 关怀评分 (0-1, 可选, 遗留字段)
     tool_calls: list[dict[str, Any]] = ()  # [{name, success}]
     final_status: str = "success"  # success / failed / timeout
 

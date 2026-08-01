@@ -9,7 +9,7 @@ ConversationRuntime to be reused by:
 
 Adapted for emotional chat:
 - 增加内容安全相关的权限类型
-- 危机干预策略需要高等级权限
+- 危机检测策略需要高等级权限
 """
 
 from __future__ import annotations
