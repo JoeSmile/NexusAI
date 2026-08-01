@@ -38,17 +38,14 @@ class TurnDigest:
     query: str
     timestamp: float
     tool_calls: list[dict[str, Any]] = field(default_factory=list)  # [{name, success}]
-    emotion_tag: str = ""
     final_status: str = "success"  # "success" | "failed" | "timeout"
 
 
 # ── Constants ──
 
 _RECENT_TOPICS_LIMIT = 20
-_EMOTION_TRENDS_LIMIT = 10
 _TOOL_PATTERNS_LIMIT = 30
 _PREFS_PATH = "preferences/recent_topics"
-_EMOTION_PATH = "patterns/emotion_trends"
 _PATTERNS_PATH = "patterns/tool_usage"
 
 
@@ -82,12 +79,12 @@ class ActivityDistiller:
             agent_instance_store: L4 Agent 模式存储
 
         Returns:
-            {"topics_updated": bool, "emotions_updated": bool, "patterns_updated": bool}
+            {"topics_updated": bool, "patterns_updated": bool}
         """
         if not is_module_enabled("activity_distillation"):
-            return {"topics_updated": False, "emotions_updated": False, "patterns_updated": False}
+            return {"topics_updated": False, "patterns_updated": False}
 
-        result = {"topics_updated": False, "emotions_updated": False, "patterns_updated": False}
+        result = {"topics_updated": False, "patterns_updated": False}
 
         try:
             # L3: 更新最近话题
@@ -97,14 +94,6 @@ class ActivityDistiller:
                 if updated != prior:
                     await self._write_store(user_store, _PREFS_PATH, updated)
                     result["topics_updated"] = True
-
-            # L3: 更新情感趋势
-            if user_store:
-                prior = await self._read_store(user_store, _EMOTION_PATH)
-                updated = self._merge_emotion_trends(prior, digest)
-                if updated != prior:
-                    await self._write_store(user_store, _EMOTION_PATH, updated)
-                    result["emotions_updated"] = True
 
             # L4: 更新工具使用模式
             if agent_instance_store:
@@ -149,26 +138,6 @@ class ActivityDistiller:
 
         return json.dumps(items, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
-    def _merge_emotion_trends(self, prior_json: str | None, digest: TurnDigest) -> str:
-        """合并情感趋势"""
-        items: list[dict[str, Any]] = []
-        if prior_json:
-            try:
-                parsed = json.loads(prior_json)
-                if isinstance(parsed, list):
-                    items = [x for x in parsed if isinstance(x, dict)]
-            except (json.JSONDecodeError, TypeError):
-                items = []
-
-        if digest.emotion_tag:
-            items.insert(0, {
-                "emotion": digest.emotion_tag,
-                "timestamp": digest.timestamp,
-                "session_id": digest.session_id,
-            })
-
-        items = items[:_EMOTION_TRENDS_LIMIT]
-        return json.dumps(items, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
     def _merge_tool_patterns(self, prior_json: str | None, digest: TurnDigest) -> str:
         """合并工具使用统计"""

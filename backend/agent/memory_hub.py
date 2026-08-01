@@ -1,13 +1,13 @@
 """
 Memory Hub — 六层记忆中枢
 
-参考 ai-buddy Phase 6.3 六层记忆架构设计，适配 emotional_chat 情感聊天场景。
+参考 ai-buddy Phase 6.3 六层记忆架构设计，适配 ContextGate 场景。
 
 六层作用域：
   L1 组织级  (organization)  — 全局知识库，系统 prompt 注入，只读
   L2 工作区级 (workspace)     — 跨用户活动日志，不暴露为工具，蒸馏管道消费
-  L3 用户级  (user)          — 长期用户偏好（兴趣、情绪基线），memory_* 工具可读写
-  L4 Agent实例级(agent_instance)— Agent 学习模式（情绪响应策略），memory_* 工具可读写
+  L3 用户级  (user)          — 长期用户偏好（兴趣、话题），memory_* 工具可读写
+  L4 Agent实例级(agent_instance)— Agent 学习模式（交互模式），memory_* 工具可读写
   L5 会话级  (session)       — 当次对话工作记忆（当前话题、用户状态），memory_* 工具可读写
   L6 当轮级  (turn)          — 对话上下文 window，不存储，虚拟层
 
@@ -29,7 +29,6 @@ from datetime import datetime
 from typing import Any
 
 from backend.agent.activity_distiller import (
-    PREFS_EMOTION_PATH,
     PREFS_TOPICS_PATH,
     TurnDigest,
     distill_turn,
@@ -88,10 +87,10 @@ class MemoryHub:
       await hub.initialize()
 
       # 每轮对话前
-      memory_prompt = hub.build_memory_prompt("今天心情不太好")
+      memory_prompt = hub.build_memory_prompt("请帮我分析季度数据")
 
       # 每轮对话后
-      await hub.on_turn_end(query="今天心情不太好", emotion="sad", intensity=7.0)
+      await hub.on_turn_end(query="请帮我分析季度数据")
     """
 
     # 稳定路径常量
@@ -155,7 +154,7 @@ class MemoryHub:
                 store_id=f"user_{self._user_id}",
                 scope="user",
                 target_id=self._user_id,
-                description="用户级记忆：偏好、兴趣、情绪基线",
+                description="用户级记忆：偏好、兴趣、话题",
             )
 
         # L4 Agent 实例级 — Agent 学习模式
@@ -163,7 +162,7 @@ class MemoryHub:
             store_id=f"agent_{self._agent_type}_{self._user_id}",
             scope="agent_instance",
             target_id=self._agent_type,
-            description="Agent 实例级记忆：情绪响应策略、交互模式",
+            description="Agent 实例级记忆：交互模式",
         )
 
         # L5 会话级 — 当次对话工作记忆
@@ -459,9 +458,6 @@ class MemoryHub:
     async def on_turn_end(
         self,
         query: str,
-        emotion: str = "neutral",
-        emotion_intensity: float = 5.0,
-        bot_empathy_score: float = 0.0,
         tool_calls: list[dict[str, Any]] | None = None,
         final_status: str = "success",
     ) -> dict[str, bool]:
@@ -469,9 +465,6 @@ class MemoryHub:
 
         Args:
             query: 用户消息
-            emotion: 情绪标签
-            emotion_intensity: 情绪强度 (0-10)
-            bot_empathy_score: 关怀评分 (0-1, 遗留字段)
             tool_calls: 本轮工具调用记录
             final_status: 本轮状态
 
@@ -479,16 +472,13 @@ class MemoryHub:
             蒸馏更新结果
         """
         if not self._toggles.is_enabled("activity_distillation"):
-            return {"topics_updated": False, "emotion_baseline_updated": False, "patterns_updated": False}
+            return {"topics_updated": False, "patterns_updated": False}
 
         digest = TurnDigest(
             session_id=self._session_id,
             user_id=self._user_id,
             query=query,
             timestamp=time.time(),
-            emotion=emotion,
-            emotion_intensity=emotion_intensity,
-            bot_empathy_score=bot_empathy_score,
             tool_calls=tool_calls or [],
             final_status=final_status,
         )
@@ -496,8 +486,6 @@ class MemoryHub:
         # 记录到 L2 活动日志
         self._activity_log.append({
             "query": query,
-            "emotion": emotion,
-            "intensity": emotion_intensity,
             "timestamp": digest.timestamp,
         })
 
@@ -518,8 +506,8 @@ class MemoryHub:
         """构建注入到 system prompt 的记忆摘要。
 
         优先级：
-          1. L3 用户偏好（recent_topics + emotion_baseline）
-          2. L4 Agent 模式（emotion_response）
+          1. L3 用户偏好（recent_topics）
+          2. L4 Agent 模式（tool_usage）
           3. L5 会话上下文（current_task + user_state）
           4. 向量语义检索结果（对 query 最相关的记忆）
 
@@ -575,15 +563,6 @@ class MemoryHub:
                 except json.JSONDecodeError:
                     pass
 
-            # 情绪基线
-            emotion_entry = await user_store.read(PREFS_EMOTION_PATH)
-            if emotion_entry and emotion_entry.content:
-                try:
-                    import json
-                    profile["emotion_baseline"] = json.loads(emotion_entry.content)
-                except json.JSONDecodeError:
-                    pass
-
         # 从数据库补充基本信息
         try:
             if get_db is not None and User is not None:
@@ -628,7 +607,6 @@ class MemoryHub:
                     "action": "message",
                     "content": msg.content[:100] if msg.content else "",
                     "role": msg.role,
-                    "emotion": msg.emotion,
                     "timestamp": msg.created_at.isoformat() if msg.created_at else None,
                 }
                 for msg in messages
@@ -645,21 +623,14 @@ class MemoryHub:
         旧代码调用 memory_hub.encode({...})，现在映射到语义检索 + L3 写入。
         """
         content = data.get("content", "")
-        emotion = data.get("emotion", {})
         user_id = data.get("user_id", self._user_id)
         role = data.get("role", "user")
 
         # 简化处理：直接返回结构化记忆
-        emotion.get("emotion", "neutral") if isinstance(emotion, dict) else str(emotion)
-        intensity = emotion.get("intensity", 5.0) if isinstance(emotion, dict) else 5.0
-
-        importance = min(1.0, intensity / 10.0)
-
         return {
             "memory_type": "episodic",
             "content": content,
-            "emotion": emotion,
-            "importance": importance,
+            "importance": 0.5,
             "user_id": user_id,
             "role": role,
         }
@@ -699,7 +670,6 @@ class MemoryHub:
                         if entry.content and query.lower() in entry.content.lower():
                             results.append({
                                 "content": entry.content,
-                                "emotion": {},
                                 "timestamp": entry.updated_at,
                                 "importance": 0.5,
                                 "path": entry.path,
@@ -762,23 +732,6 @@ class MemoryHub:
                     await self.user_store.write(
                         PREFS_TOPICS_PATH,
                         json.dumps(topics[:20], ensure_ascii=False, sort_keys=True, separators=(",", ":")),
-                    )
-
-                # 重建情绪基线
-                emotion_counts = {}
-                for msg in messages:
-                    if msg.emotion:
-                        emotion_counts[msg.emotion] = emotion_counts.get(msg.emotion, 0) + 1
-                if emotion_counts:
-                    dominant = max(emotion_counts.items(), key=lambda x: x[1])[0]
-                    baseline = {
-                        "dominant_emotion": dominant,
-                        "avg_intensity": 5.0,
-                        "distribution": emotion_counts,
-                    }
-                    await self.user_store.write(
-                        PREFS_EMOTION_PATH,
-                        json.dumps(baseline, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
                     )
 
         except Exception as e:

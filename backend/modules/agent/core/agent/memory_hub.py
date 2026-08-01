@@ -56,14 +56,13 @@ class MemoryHub:
         编码：将新经验转换为记忆
         
         Args:
-            experience: 经验数据，包含content, emotion, context等
+            experience: 经验数据，包含content, context等
             
         Returns:
             编码后的记忆对象
         """
         memory = {
             "content": experience.get("content", ""),
-            "emotion": experience.get("emotion", {}),
             "context": self.working_memory["conversation"][-5:],  # 最近5轮对话
             "timestamp": datetime.now(),
             "importance": self._calculate_importance(experience),
@@ -92,7 +91,6 @@ class MemoryHub:
                 self.memory_manager.save_memory(
                     user_id=memory["user_id"],
                     content=memory["content"],
-                    emotion=memory["emotion"],
                     importance=memory["importance"],
                     metadata=memory.get("metadata", {})
                 )
@@ -108,7 +106,6 @@ class MemoryHub:
                     self.memory_manager.save_memory(
                         user_id=memory["user_id"],
                         content=knowledge,
-                        emotion=memory["emotion"],
                         importance=memory["importance"],
                         metadata={"type": "knowledge", **memory.get("metadata", {})}
                     )
@@ -132,7 +129,7 @@ class MemoryHub:
         Args:
             query: 搜索查询
             user_id: 用户ID
-            context: 上下文信息（情绪、时间等）
+            context: 上下文信息（时间等）
             top_k: 返回Top-K记忆
             
         Returns:
@@ -165,18 +162,6 @@ class MemoryHub:
                 results.extend(temporal_results)
             except Exception as e:
                 print(f"时间检索失败: {e!s}")
-        
-        # 3. 情绪关联检索（情绪一致性）
-        if context.get("emotion"):
-            try:
-                emotion_results = self._search_by_emotion(
-                    user_id=user_id,
-                    emotion=context["emotion"],
-                    limit=2
-                )
-                results.extend(emotion_results)
-            except Exception as e:
-                print(f"情绪检索失败: {e!s}")
         
         # 合并去重，按重要性和相似度排序
         unique_results = self._merge_and_rank(results, top_k)
@@ -241,9 +226,7 @@ class MemoryHub:
                 "username": user.username,
                 "created_at": user.created_at.isoformat() if user.created_at else None,
                 "total_conversations": self._get_conversation_count(user_id),
-                "emotion_baseline": self._get_emotion_baseline(user_id),
-                "interests": self._extract_interests(user_id),
-                "personality_traits": self._extract_personality_traits(user_id)
+                "interests": self._extract_interests(user_id)
             }
             
             return profile
@@ -284,7 +267,6 @@ class MemoryHub:
                     "action": "message",
                     "content": msg.content[:100],  # 截断内容
                     "role": msg.role,
-                    "emotion": msg.emotion_label,
                     "timestamp": msg.created_at.isoformat() if msg.created_at else None
                 })
             
@@ -301,21 +283,14 @@ class MemoryHub:
         计算记忆重要性
         
         规则：
-        1. 情绪强度越高，重要性越高
-        2. 包含特定关键词（考试、面试等）提高重要性
-        3. 内容长度影响重要性
+        1. 包含特定关键词（考试、面试等）提高重要性
+        2. 内容长度影响重要性
         """
         importance = 0.5  # 基础重要性
         
-        # 情绪强度影响（0-1）
-        emotion = experience.get("emotion", {})
-        if isinstance(emotion, dict) and "intensity" in emotion:
-            intensity = emotion.get("intensity", 0)
-            importance += intensity * 0.3
-        
         # 关键词影响
         content = experience.get("content", "")
-        important_keywords = ["考试", "面试", "分手", "生病", "家人", "工作", "健康", "抑郁", "焦虑"]
+        important_keywords = ["考试", "面试", "生病", "家人", "工作", "健康"]
         if any(kw in content for kw in important_keywords):
             importance += 0.2
         
@@ -367,9 +342,7 @@ class MemoryHub:
                 message = Message(
                     conversation_id=conversation.id,
                     role=memory.get("role", "user"),
-                    content=memory["content"],
-                    emotion_label=memory.get("emotion", {}).get("emotion"),
-                    emotion_intensity=memory.get("emotion", {}).get("intensity")
+                    content=memory["content"]
                 )
                 db.add(message)
                 db.commit()
@@ -398,10 +371,6 @@ class MemoryHub:
             for msg in messages:
                 results.append({
                     "content": msg.content,
-                    "emotion": {
-                        "emotion": msg.emotion_label,
-                        "intensity": msg.emotion_intensity
-                    },
                     "timestamp": msg.created_at,
                     "importance": 0.7  # 近期记忆默认较重要
                 })
@@ -412,40 +381,7 @@ class MemoryHub:
             print(f"近期记忆搜索失败: {e!s}")
             return []
     
-    def _search_by_emotion(
-        self, 
-        user_id: str, 
-        emotion: str, 
-        limit: int = 3
-    ) -> list[dict[str, Any]]:
-        """根据情绪搜索记忆"""
-        try:
-            db = next(get_db())
-            
-            messages = db.query(Message).join(Conversation).filter(
-                Conversation.user_id == user_id,
-                Message.emotion_label == emotion,
-                Message.role == "user"
-            ).order_by(Message.created_at.desc()).limit(limit).all()
-            
-            results = []
-            for msg in messages:
-                results.append({
-                    "content": msg.content,
-                    "emotion": {
-                        "emotion": msg.emotion_label,
-                        "intensity": msg.emotion_intensity
-                    },
-                    "timestamp": msg.created_at,
-                    "importance": 0.6
-                })
-            
-            return results
-            
-        except Exception as e:
-            print(f"情绪记忆搜索失败: {e!s}")
-            return []
-    
+
     def _merge_and_rank(
         self, 
         results: list[dict[str, Any]], 
@@ -484,46 +420,7 @@ class MemoryHub:
         except:
             return 0
     
-    def _get_emotion_baseline(self, user_id: str) -> dict[str, Any]:
-        """获取用户情绪基线"""
-        try:
-            db = next(get_db())
-            
-            # 统计最近30天的情绪分布
-            since_date = datetime.now() - timedelta(days=30)
-            messages = db.query(Message).join(Conversation).filter(
-                Conversation.user_id == user_id,
-                Message.created_at >= since_date,
-                Message.emotion_label.isnot(None)
-            ).all()
-            
-            if not messages:
-                return {}
-            
-            emotions = {}
-            total_intensity = 0
-            
-            for msg in messages:
-                emotion = msg.emotion_label
-                intensity = msg.emotion_intensity or 0
-                
-                if emotion:
-                    emotions[emotion] = emotions.get(emotion, 0) + 1
-                    total_intensity += intensity
-            
-            dominant_emotion = max(emotions.items(), key=lambda x: x[1])[0] if emotions else "平静"
-            avg_intensity = total_intensity / len(messages) if messages else 0
-            
-            return {
-                "dominant_emotion": dominant_emotion,
-                "avg_intensity": round(avg_intensity, 2),
-                "emotion_distribution": emotions
-            }
-            
-        except Exception as e:
-            print(f"获取情绪基线失败: {e!s}")
-            return {}
-    
+
     def _extract_interests(self, user_id: str) -> list[str]:
         """提取用户兴趣"""
         # 简化实现：基于关键词统计
@@ -559,38 +456,6 @@ class MemoryHub:
             print(f"提取兴趣失败: {e!s}")
             return []
     
-    def _extract_personality_traits(self, user_id: str) -> list[str]:
-        """提取用户性格特征"""
-        # 简化实现：基于情绪和表达分析
-        try:
-            emotion_baseline = self._get_emotion_baseline(user_id)
-            
-            traits = []
-            
-            # 基于主导情绪推断性格
-            dominant_emotion = emotion_baseline.get("dominant_emotion", "")
-            emotion_map = {
-                "焦虑": "敏感型",
-                "开心": "乐观型",
-                "难过": "情绪化",
-                "平静": "稳重型"
-            }
-            
-            if dominant_emotion in emotion_map:
-                traits.append(emotion_map[dominant_emotion])
-            
-            # 基于情绪强度推断
-            avg_intensity = emotion_baseline.get("avg_intensity", 0)
-            if avg_intensity > 7:
-                traits.append("感性")
-            elif avg_intensity < 4:
-                traits.append("理性")
-            
-            return traits
-            
-        except Exception as e:
-            print(f"提取性格特征失败: {e!s}")
-            return []
 
 
 # 单例模式
