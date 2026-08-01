@@ -59,7 +59,7 @@ async def get_feedback_statistics():
 
 
 @router.get("/list", response_model=FeedbackListResponse)
-async def get_feedback_list(feedback_type: str = None, limit: int = 100):
+async def get_feedback_list(feedback_type: str | None = None, limit: int = 100):
     """获取反馈列表"""
     try:
         with DatabaseManager() as db:

@@ -97,8 +97,7 @@ async def search_memories(
         memories = await memory_service.retrieve_memories(
             user_id=user_id,
             query=query,
-            n_results=n_results,
-            days_limit=days_limit
+            limit=n_results,
         )
         
         return {

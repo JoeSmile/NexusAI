@@ -189,7 +189,7 @@ async def compare_prompts(request: ComparePromptsRequest):
 
 
 @router.get("/list", response_model=EvaluationListResponse)
-async def get_evaluations(session_id: str = None, limit: int = 100):
+async def get_evaluations(session_id: str | None = None, limit: int = 100):
     """获取评估列表"""
     try:
         with DatabaseManager() as db:

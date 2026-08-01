@@ -181,5 +181,26 @@ files = [
   "backend/routers/admin.py",
   "backend/routers/audit.py",
   "backend/routers/files.py",
+  "backend/routers/agent.py",
+  "backend/routers/enhanced_chat.py",
+  "backend/routers/evaluation.py",
+  "backend/routers/personalization.py",
+  "backend/routers/performance.py",
+  "backend/routers/streaming_chat.py",
+  "backend/routers/memory.py",
+  "backend/routers/feedback.py",
+  "backend/modules/intent",
+  "backend/modules/rag",
+  "backend/modules/llm",
 ]
+
+# 遗留模块类型债巨大 — 纳入 files 扫描范围，但对这些包忽略错误，避免放宽全局策略
+[[tool.mypy.overrides]]
+module = [
+  "backend.modules.rag.*",
+  "backend.modules.llm.*",
+  "backend.modules.intent.core.enhanced_input_processor",
+  "backend.modules.intent.core.input_processor",
+]
+ignore_errors = true
 

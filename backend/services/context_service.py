@@ -15,6 +15,9 @@ class UserProfile(dict):
     def user_id(self) -> str:
         return str(self.get("user_id", ""))
 
+    def to_dict(self) -> dict[str, Any]:
+        return dict(self)
+
 
 class ContextService:
     """上下文服务 — 管理对话上下文（遗留 API 兼容）"""

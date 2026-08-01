@@ -79,18 +79,9 @@ class MLIntentClassifier:
         Returns:
             意图识别结果
         """
-        # TODO: 实现真实的模型推理
-        # inputs = self.tokenizer(text, return_tensors="pt", truncation=True, max_length=128)
-        # with torch.no_grad():
-        #     logits = self.model(**inputs).logits
-        # probs = torch.softmax(logits, dim=1)[0]
-        # pred = torch.argmax(probs).item()
-        # 
-        # return IntentResult(
-        #     intent=self.labels[pred],
-        #     confidence=probs[pred].item(),
-        #     source="model"
-        # )
+        # TODO: 实现真实的模型推理；当前回退启发式
+        return self._heuristic_classify(text)
+
     
     def _heuristic_classify(self, text: str) -> IntentResult:
         """
