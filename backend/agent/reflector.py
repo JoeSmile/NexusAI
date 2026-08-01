@@ -37,8 +37,6 @@ class FollowupType(Enum):
     """回访类型"""
     ROUTINE_CHECK = "routine_check"           # 常规检查
     GOAL_TRACKING = "goal_tracking"           # 目标跟踪
-    EMOTIONAL_SUPPORT = "emotional_support"   # 关怀支持（遗留）
-    CRISIS_INTERVENTION = "crisis_intervention"  # 安全预警（遗留）
 
 
 class Reflector:
@@ -126,10 +124,6 @@ class Reflector:
             "id": mcp_message.metadata.get("interaction_id") if mcp_message.metadata else mcp_message.message_id,
             "user_id": mcp_message.context.user_profile.get("user_id") if mcp_message.context.user_profile else None,
             "input": mcp_message.content,
-            "perception": {
-                "emotion": mcp_message.context.emotion_state.get("emotion") if mcp_message.context.emotion_state else "平静",
-                "emotion_intensity": mcp_message.context.emotion_state.get("intensity", 5.0) if mcp_message.context.emotion_state else 5.0
-            },
             "plan": mcp_message.context.task_goal or {},
             "results": [
                 {
@@ -161,7 +155,6 @@ class Reflector:
         
         output_context = MCPContext(
             user_profile=mcp_message.context.user_profile,
-            emotion_state=mcp_message.context.emotion_state,
             task_goal=mcp_message.context.task_goal,
             memory_summary=mcp_message.context.memory_summary,
             conversation_history=mcp_message.context.conversation_history,
@@ -221,19 +214,7 @@ class Reflector:
             if followup:
                 return followup
         
-        # 3. 检查情绪异常
-        emotion_log = memory_hub.get_action_log(user_id, days=7)
-        if self._detect_emotional_crisis(emotion_log):
-            return {
-                "type": FollowupType.EMOTIONAL_SUPPORT.value,
-                "user_id": user_id,
-                "reason": "检测到情绪异常",
-                "message": "我注意到你最近情绪波动比较大，还好吗？需要聊聊吗？",
-                "schedule_time": (datetime.now() + timedelta(hours=2)).isoformat(),
-                "priority": "high"
-            }
-        
-        # 4. 检查用户活跃度
+        # 3. 检查用户活跃度
         days_since_last = self._get_days_since_last_interaction(user_id)
         if days_since_last >= 7:
             return {
@@ -273,7 +254,6 @@ class Reflector:
         - 用户满意度
         - 响应时间
         - 目标达成度
-        - 情绪变化
         """
         metrics = {}
         
@@ -289,11 +269,7 @@ class Reflector:
         goal_achieved = interaction.get("goal_achieved", False)
         metrics["goal_achieved"] = 1.0 if goal_achieved else 0.3
         
-        # 4. 情绪变化
-        emotion_change = self._calculate_emotion_change(interaction)
-        metrics["emotion_change"] = emotion_change
-        
-        # 5. 工具使用效果
+        # 4. 工具使用效果
         tool_results = interaction.get("results", [])
         successful_tools = sum(1 for r in tool_results if r.get("success", False))
         total_tools = len([r for r in tool_results if r.get("type") == "tool_call"])
@@ -301,27 +277,7 @@ class Reflector:
         
         return metrics
     
-    def _calculate_emotion_change(self, interaction: dict[str, Any]) -> float:
-        """
-        计算情绪变化
-        
-        正值表示情绪改善，负值表示情绪恶化
-        """
-        perception = interaction.get("perception", {})
-        initial_emotion = perception.get("emotion", "")
-        perception.get("emotion_intensity", 5.0)
-        
-        # 简化实现：假设负面情绪强度降低是好的
-        negative_emotions = ["焦虑", "抑郁", "愤怒", "恐惧", "难过"]
-        
-        if initial_emotion in negative_emotions:
-            # 如果初始是负面情绪，强度降低是改善
-            # 这里简化为假设降低了1-2分
-            return 0.5  # 改善
-        else:
-            # 正面或中性情绪，保持稳定
-            return 0.0
-    
+
     def _determine_result(self, metrics: dict[str, float]) -> InteractionResult:
         """
         判断交互结果
@@ -349,9 +305,8 @@ class Reflector:
         weights = {
             "user_satisfaction": 0.3,
             "goal_achieved": 0.3,
-            "emotion_change": 0.2,
-            "response_speed_score": 0.1,
-            "tool_success_rate": 0.1
+            "response_speed_score": 0.2,
+            "tool_success_rate": 0.2
         }
         
         score = 0.0
@@ -392,9 +347,6 @@ class Reflector:
         if metrics.get("goal_achieved", 0) >= 0.8:
             analysis["strengths"].append("目标达成")
         
-        if metrics.get("emotion_change", 0) > 0:
-            analysis["strengths"].append("情绪得到改善")
-        
         # 分析弱点
         if metrics.get("user_satisfaction", 0) < 0.5:
             analysis["weaknesses"].append("用户满意度低")
@@ -409,10 +361,6 @@ class Reflector:
             analysis["weaknesses"].append("工具调用失败率高")
         
         # 关键因素
-        perception = interaction.get("perception", {})
-        if perception.get("emotion_intensity", 0) > 7:
-            analysis["key_factors"].append("高情绪强度场景")
-        
         plan = interaction.get("plan", {})
         if plan and plan.get("strategy") == "tool_use":
             analysis["key_factors"].append("工具密集型交互")
@@ -494,22 +442,7 @@ class Reflector:
                 "priority": "high"
             }
         
-        # 规则3：情绪危机 -> 2天后回访
-        emotion = memory.get("emotion", {})
-        if isinstance(emotion, dict):
-            emotion_intensity = emotion.get("intensity", 0)
-            if emotion_intensity >= 8.0 and days_since >= 2 and days_since <= 5:
-                return {
-                    "type": FollowupType.EMOTIONAL_SUPPORT.value,
-                    "user_id": user_id,
-                    "memory_id": memory.get("id"),
-                    "reason": "情绪关怀",
-                    "message": "最近心情有好转吗？我一直在关心你。",
-                    "schedule_time": (datetime.now() + timedelta(hours=6)).isoformat(),
-                    "priority": "high"
-                }
-        
-        # 规则4：行为改变计划 -> 1周后回访
+        # 规则3：行为改变计划 -> 1周后回访
         if any(kw in content for kw in ["计划", "打算", "决定", "改变"]) and days_since >= 7 and importance > 0.7:
             return {
                 "type": FollowupType.GOAL_TRACKING.value,
@@ -523,36 +456,7 @@ class Reflector:
         
         return None
     
-    def _detect_emotional_crisis(self, emotion_log: list[dict[str, Any]]) -> bool:
-        """
-        检测情绪危机
-        
-        识别需要紧急关注的情绪模式
-        """
-        if not emotion_log:
-            return False
-        
-        negative_emotions = ["焦虑", "抑郁", "愤怒", "恐惧", "难过"]
-        
-        # 规则1：连续3天高强度负面情绪
-        high_intensity_days = 0
-        for log in emotion_log[-7:]:  # 最近7天
-            emotion = log.get("emotion", "")
-            if emotion in negative_emotions:
-                high_intensity_days += 1
-        
-        if high_intensity_days >= 3:
-            return True
-        
-        # 规则2：情绪急剧恶化
-        if len(emotion_log) >= 2:
-            # 简化判断：最近2次的情绪都是负面的
-            recent_emotions = [log.get("emotion", "") for log in emotion_log[:2]]
-            if all(e in negative_emotions for e in recent_emotions):
-                return True
-        
-        return False
-    
+
     def _get_days_since_last_interaction(self, user_id: str) -> int:
         """
         获取距离上次交互的天数
@@ -591,12 +495,10 @@ class Reflector:
         return {
             "success_threshold": 0.8,
             "failure_threshold": 0.3,
-            "emotion_improvement_threshold": 0.5,
             "response_time_target": 2.0,  # 秒
             "followup_rules": {
                 "sleep_issue": {"days": 7, "priority": "medium"},
                 "exam_interview": {"days": 3, "priority": "high"},
-                "emotional_crisis": {"days": 2, "priority": "high"},
                 "behavior_change": {"days": 7, "priority": "medium"},
                 "routine_check": {"days": 7, "priority": "low"}
             }
@@ -689,10 +591,7 @@ if __name__ == "__main__":
             "id": "interaction_123",
             "user_id": "user_123",
             "input": "我最近睡不好，怎么办？",
-            "perception": {
-                "emotion": "焦虑",
-                "emotion_intensity": 7.5
-            },
+            "perception": {},
             "plan": {
                 "strategy": "tool_use"
             },

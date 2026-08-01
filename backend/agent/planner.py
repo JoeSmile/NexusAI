@@ -40,7 +40,6 @@ except ImportError:  # Batch 3.1: hermes 已删除
 class GoalType(Enum):
     """目标类型"""
     INFORMATION_QUERY = "information_query"     # 信息查询
-    EMOTIONAL_SUPPORT = "emotional_support"     # 关怀支持（遗留）
     PROBLEM_SOLVING = "problem_solving"         # 问题解决
     BEHAVIOR_CHANGE = "behavior_change"         # 行为改变
     CASUAL_CHAT = "casual_chat"                 # 闲聊
@@ -57,7 +56,6 @@ class Complexity(Enum):
 class Strategy(Enum):
     """执行策略"""
     DIRECT_RESPONSE = "direct_response"           # 直接回复
-    EMPATHY_FIRST = "empathy_first"               # 关怀优先（遗留）
     TOOL_USE = "tool_use"                         # 工具调用
     SCHEDULED_FOLLOWUP = "scheduled_followup"     # 定时回访
     CONVERSATIONAL = "conversational"             # 对话引导
@@ -168,10 +166,6 @@ class Planner:
         
         使用规则匹配，避免每次都调用LLM
         """
-        perception = context.get("perception", {})
-        perception.get("emotion", "")
-        emotion_intensity = perception.get("emotion_intensity", 0)
-
         # Hermes 工作区 / 出书 / 图表 / 联网：优先于纯状态路由（避免改稿需求被当成闲聊）
         if workspace_automation_intent(user_input):
             return {
@@ -181,16 +175,7 @@ class Planner:
                 "description": "本地工作区与文档/联网自动化",
             }
         
-        # 规则1：高强度信号 -> 关怀支持
-        if emotion_intensity >= 7.0:
-            return {
-                "goal_type": GoalType.EMOTIONAL_SUPPORT,
-                "complexity": Complexity.MEDIUM,
-                "urgency": "high",
-                "description": "用户表达强烈困扰，需要关怀支持"
-            }
-        
-        # 规则2：包含问题关键词 -> 问题解决
+        # 规则1：包含问题关键词 -> 问题解决
         problem_keywords = ["怎么办", "怎么做", "如何", "帮我", "建议"]
         if any(kw in user_input for kw in problem_keywords):
             return {
@@ -200,7 +185,7 @@ class Planner:
                 "description": "用户寻求解决方案"
             }
         
-        # 规则3：包含查询关键词 -> 信息查询
+        # 规则2：包含查询关键词 -> 信息查询
         query_keywords = ["是什么", "为什么", "什么时候", "在哪里"]
         if any(kw in user_input for kw in query_keywords):
             return {
@@ -210,7 +195,7 @@ class Planner:
                 "description": "用户查询信息"
             }
         
-        # 规则4：包含计划关键词 -> 行为改变
+        # 规则3：包含计划关键词 -> 行为改变
         change_keywords = ["打算", "计划", "决定", "想要", "改变"]
         if any(kw in user_input for kw in change_keywords):
             return {
@@ -241,33 +226,7 @@ class Planner:
         goal_type = goal["goal_type"]
         sub_goals = []
         
-        if goal_type == GoalType.EMOTIONAL_SUPPORT:
-            # 关怀支持流程
-            sub_goals = [
-                {
-                    "task_id": "empathy",
-                    "description": "提供理解与回应",
-                    "depends_on": [],
-                    "priority": "high",
-                    "tools_needed": []
-                },
-                {
-                    "task_id": "retrieve_memory",
-                    "description": "检索相关记忆",
-                    "depends_on": [],
-                    "priority": "medium",
-                    "tools_needed": ["search_memory"]
-                },
-                {
-                    "task_id": "emotional_support",
-                    "description": "提供关怀支持和建议",
-                    "depends_on": ["empathy", "retrieve_memory"],
-                    "priority": "high",
-                    "tools_needed": []
-                }
-            ]
-        
-        elif goal_type == GoalType.WORKSPACE_AUTOMATION:
+        if goal_type == GoalType.WORKSPACE_AUTOMATION:
             sub_goals = [
                 {
                     "task_id": "hermes_workspace",
@@ -414,22 +373,16 @@ class Planner:
         根据任务特征和上下文选择执行策略
         """
         tasks = task_graph["tasks"]
-        perception = context.get("perception", {})
-        emotion_intensity = perception.get("emotion_intensity", 0)
         
-        # 规则1：如果用户状态信号强，优先关怀支持
-        if emotion_intensity > 7.0:
-            return Strategy.EMPATHY_FIRST
-        
-        # 规则2：如果任务需要外部工具，使用Tool-Use策略
+        # 规则1：如果任务需要外部工具，使用Tool-Use策略
         if any(task.get("tools_needed") for task in tasks):
             return Strategy.TOOL_USE
         
-        # 规则3：如果需要长期跟踪，使用Follow-up策略
+        # 规则2：如果需要长期跟踪，使用Follow-up策略
         if any(task.get("requires_followup") for task in tasks):
             return Strategy.SCHEDULED_FOLLOWUP
         
-        # 规则4：如果任务简单，直接回复
+        # 规则3：如果任务简单，直接回复
         if len(tasks) == 1:
             return Strategy.DIRECT_RESPONSE
         
@@ -506,10 +459,6 @@ class Planner:
         context = {
             "user_input": user_input,
             "user_id": mcp_context.user_profile.get("user_id") if mcp_context.user_profile else None,
-            "perception": {
-                "emotion": mcp_context.emotion_state.get("emotion") if mcp_context.emotion_state else "平静",
-                "emotion_intensity": mcp_context.emotion_state.get("intensity", 5.0) if mcp_context.emotion_state else 5.0
-            },
             "memories": mcp_context.memory_summary.get("memories", []) if mcp_context.memory_summary else [],
             "user_profile": mcp_context.user_profile or {}
         }
@@ -553,7 +502,6 @@ class Planner:
         # 创建MCP上下文（合并原有上下文）
         output_context = MCPContext(
             user_profile=mcp_context.user_profile,
-            emotion_state=mcp_context.emotion_state,
             task_goal=task_goal,
             memory_summary=mcp_context.memory_summary,
             conversation_history=mcp_context.conversation_history,
@@ -597,14 +545,12 @@ class Planner:
         根据工具类型和上下文生成合适的参数
         """
         user_id = context.get("user_id", "")
-        perception = context.get("perception", {})
         
         if tool_name == "search_memory":
             return {
                 "query": context.get("user_input", ""),
                 "user_id": user_id,
-                "time_range": 30,
-                "emotion_filter": perception.get("emotion")
+                "time_range": 30
             }
         
         elif tool_name == "set_reminder":
@@ -615,19 +561,6 @@ class Planner:
                 "repeat": task.get("requires_followup", False)
             }
         
-        elif tool_name == "recommend_resource":
-            return {
-                "theme": perception.get("emotion", "relaxation"),
-                "user_id": user_id
-            }
-        
-        elif tool_name == "get_emotion_log":
-            return {
-                "user_id": user_id,
-                "days": 7,
-                "emotion_type": perception.get("emotion")
-            }
-
         elif tool_name == "hermes_dispatch":
             return {"instruction": context.get("user_input", "") or ""}
         
@@ -644,16 +577,8 @@ class Planner:
         
         task_description = task.get("description", "")
         
-        # 睡眠问题：7天后
-        if "睡眠" in task_description:
-            followup_time = datetime.now() + timedelta(days=7)
-        
-        # 情绪相关（遗留）任务：3天后
-        elif "情绪" in task_description or "心情" in task_description:  # 遗留关键词匹配
-            followup_time = datetime.now() + timedelta(days=3)
-        
         # 行为改变：1周后
-        elif "改变" in task_description or "计划" in task_description:
+        if "改变" in task_description or "计划" in task_description:
             followup_time = datetime.now() + timedelta(days=7)
         
         # 默认：2天后
@@ -669,11 +594,6 @@ class Planner:
         定义各种决策规则
         """
         return {
-            "emotion_threshold": {
-                "high": 7.0,
-                "medium": 5.0,
-                "low": 3.0
-            },
             "complexity_rules": {
                 "simple": ["查询", "是什么", "定义"],
                 "medium": ["怎么办", "建议"],
@@ -697,8 +617,6 @@ if __name__ == "__main__":
     context = {
         "user_id": "user_123",
         "perception": {
-            "emotion": "焦虑",
-            "emotion_intensity": 7.5,
             "intent": "problem_solving"
         },
         "memories": []

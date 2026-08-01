@@ -6,7 +6,7 @@ Agent Core — Runtime + Skills 适配层
 
 迁移映射：
   AgentCore.process()       → ConversationRuntime.process_turn()
-  AgentCore._perceive()     → EmotionSkill.execute(mode="analyze")
+  AgentCore._perceive()     → 已移除（感知层并入 runtime skills）
   AgentCore.memory_hub      → MemorySkill + MemoryHub (注入)
   AgentCore.planner         → PlanningSkill.execute(mode="plan")
   AgentCore.tool_caller     → ToolSkill + ToolExecutor Protocol
@@ -40,10 +40,9 @@ class _LLMClientAdapter:
         stream_turn(messages, tools=None, *, system_prompt=None, max_tokens=4096) → AsyncIterator[AssistantEvent]
     """
 
-    def __init__(self, legacy_llm=None, context_assembler=None, emotion_analyzer=None):
+    def __init__(self, legacy_llm=None, context_assembler=None):
         self._llm = legacy_llm
         self._context_assembler = context_assembler
-        self._emotion_analyzer = emotion_analyzer
 
     async def stream_turn(
         self,
@@ -61,12 +60,11 @@ class _LLMClientAdapter:
                 yield AssistantEvent(
                     type="text_delta",
                     text=chunk,
-                    emotion_tag="",
                 )
         else:
             # 降级: 同步生成后一次性输出
             summary = await self.complete(messages, tools, system_prompt=system_prompt, max_tokens=max_tokens)
-            yield AssistantEvent(type="text_delta", text=summary.text, emotion_tag="")
+            yield AssistantEvent(type="text_delta", text=summary.text)
             yield AssistantEvent(type="stop", text=None, usage=summary.usage)
 
     async def complete(
@@ -147,7 +145,7 @@ class AgentCore:
       - get_execution_history(user_id, limit) → list
 
     内部使用 ConversationRuntime + Skill 系统：
-      - EmotionSkill 替代 _perceive()
+      - 感知层并入 runtime Skill 链
       - MemorySkill 替代 memory_hub 阶段
       - PlanningSkill 替代 planner
       - ToolSkill 替代 tool_caller
@@ -222,11 +220,8 @@ class AgentCore:
         # 旧系统组件
         try:
             from backend.context_assembler import ContextAssembler
-            from backend.emotion_analyzer import EmotionAnalyzer
-            self.emotion_analyzer = EmotionAnalyzer()
             self.context_assembler = ContextAssembler()
         except ImportError:
-            self.emotion_analyzer = None
             self.context_assembler = None
 
     def _build_runtime(self, user_id: str, session_id: str | None = None):
@@ -241,7 +236,6 @@ class AgentCore:
         llm_adapter = _LLMClientAdapter(
             legacy_llm=self.llm,
             context_assembler=self.context_assembler,
-            emotion_analyzer=self.emotion_analyzer,
         )
         tool_adapter = _ToolExecutorAdapter(legacy_tool_caller=self.tool_caller)
         permission_adapter = _PermissionPrompterAdapter()
@@ -253,7 +247,6 @@ class AgentCore:
             llm_client=llm_adapter,
             tool_executor=tool_adapter,
             memory_hub=self.memory_hub,
-            emotion_analyzer=self.emotion_analyzer,
         )
 
         # 注入 permission prompter（通过属性注入）
@@ -329,9 +322,6 @@ class AgentCore:
             response_time = (datetime.now() - start_time).total_seconds()
 
             # 从 TurnResult 提取数据
-            emotion_data = result.skill_results.get("emotion_skill", {})
-            emotion = emotion_data.get("output", {}).get("emotion", "") if isinstance(emotion_data, dict) else ""
-            emotion_intensity = emotion_data.get("output", {}).get("emotion_intensity", 0) if isinstance(emotion_data, dict) else 0
             evaluation_data = result.skill_results.get("reflect_skill", {})
 
             execution_record = {
@@ -339,8 +329,6 @@ class AgentCore:
                 "user_id": user_id,
                 "timestamp": datetime.now(),
                 "response": result.response,
-                "emotion": emotion,
-                "emotion_intensity": emotion_intensity,
                 "skill_results": result.skill_results,
                 "evaluation": evaluation_data,
                 "response_time": response_time,
@@ -355,13 +343,10 @@ class AgentCore:
                 "interaction_id": interaction_id,
                 "response": result.response,
                 "actions": [],  # Skill results 已在 skill_results 中
-                "emotion": emotion,
-                "emotion_intensity": emotion_intensity,
                 "evaluation": evaluation_data,
                 "followup_scheduled": False,
                 "response_time": response_time,
                 "iterations": result.iterations,
-                "emotion_tag": result.emotion_tag,
             }
 
         except Exception as e:
@@ -381,14 +366,6 @@ class AgentCore:
         """将旧系统组件注入到 Skill 中"""
         if self._runtime is None:
             return
-
-        # 注入 EmotionAnalyzer 到 EmotionSkill
-        try:
-            emotion_skill = self._runtime._skill_registry.get_skill("emotion_skill")
-            if emotion_skill and hasattr(emotion_skill, "_emotion_analyzer"):
-                emotion_skill._emotion_analyzer = self.emotion_analyzer
-        except Exception:
-            pass
 
         # 注入 MemoryHub 到 MemorySkill
         try:
@@ -427,13 +404,12 @@ class AgentCore:
             if self.memory_hub:
                 current_memory = self.memory_hub.encode({
                     "content": user_input,
-                    "emotion": perception.get("emotion_data", {}),
                     "user_id": user_id,
                     "role": "user",
                 })
                 relevant_memories = self.memory_hub.retrieve(
                     query=user_input, user_id=user_id,
-                    context={"emotion": perception.get("emotion", ""), "time_range": 30},
+                    context={"time_range": 30},
                     top_k=5,
                 )
                 user_profile = await self.memory_hub.get_user_profile(user_id) or {}
@@ -501,8 +477,6 @@ class AgentCore:
                 "interaction_id": interaction_id,
                 "response": execution_results.get("response", ""),
                 "actions": execution_results.get("actions", []),
-                "emotion": perception.get("emotion", ""),
-                "emotion_intensity": perception.get("emotion_intensity", 0),
                 "evaluation": evaluation,
                 "followup_scheduled": followup is not None,
                 "response_time": response_time,
@@ -551,18 +525,6 @@ class AgentCore:
     async def _perceive(self, user_input: str, user_id: str) -> dict[str, Any]:
         """感知层 — 内容分析 + 意图识别"""
         perception = {}
-        if self.emotion_analyzer:
-            try:
-                emotion_result = self.emotion_analyzer.analyze(user_input)
-                perception["emotion"] = emotion_result.get("emotion", "平静")
-                perception["emotion_intensity"] = emotion_result.get("intensity", 5.0)
-                perception["emotion_data"] = emotion_result
-            except Exception:
-                perception["emotion"] = "平静"
-                perception["emotion_intensity"] = 5.0
-        else:
-            perception["emotion"] = self._simple_emotion_detect(user_input)
-            perception["emotion_intensity"] = 5.0
         perception["intent"] = self._identify_intent(user_input)
         perception["entities"] = self._extract_entities(user_input)
         return perception
@@ -610,28 +572,8 @@ class AgentCore:
 
     def _template_response(self, perception: dict, tool_outputs: list) -> str:
         """模板回复"""
-        emotion = perception.get("emotion", "")
-        templates = {
-            "焦虑": "我能感受到你的焦虑。深呼吸，我们一起来面对。",
-            "难过": "我能理解你现在的难过。想聊聊吗？",
-            "愤怒": "我听到了你的愤怒。能告诉我发生了什么吗？",
-            "开心": "真为你感到开心！",
-        }
-        return templates.get(emotion, "我在这里倾听。想跟我聊聊吗？")
+        return "我暂时无法调用模型服务，请稍后再试。"
 
-    def _simple_emotion_detect(self, text: str) -> str:
-        """简单情绪检测"""
-        emotion_keywords = {
-            "焦虑": ["焦虑", "担心", "紧张", "不安"],
-            "难过": ["难过", "伤心", "失落", "沮丧"],
-            "愤怒": ["生气", "愤怒", "气愤"],
-            "开心": ["开心", "高兴", "快乐"],
-            "恐惧": ["害怕", "恐惧"],
-        }
-        for emotion, keywords in emotion_keywords.items():
-            if any(kw in text for kw in keywords):
-                return emotion
-        return "平静"
 
     def _identify_intent(self, text: str) -> str:
         """意图识别"""
@@ -641,7 +583,7 @@ class AgentCore:
             return "information_query"
         elif any(kw in text for kw in ["计划", "打算", "决定"]):
             return "behavior_change"
-        return "emotional_support"
+        return "general_chat"
 
     def _extract_entities(self, text: str) -> list[str]:
         """实体提取"""
