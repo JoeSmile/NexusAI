@@ -20,7 +20,7 @@ Agent模块 - 智能Agent核心 (Runtime + Skills 版)
 """
 
 # V2 (Runtime + Skills) 作为默认
-from .agent_core_v2 import AgentCore, get_agent_core
+from .agent_core import AgentCore, get_agent_core
 
 # 旧版组件（仍可单独使用）
 from .memory_hub import MemoryHub, get_memory_hub

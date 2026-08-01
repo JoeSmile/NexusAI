@@ -17,7 +17,7 @@ def make_query_hash(message: str) -> str:
 
 
 def _cheap_fingerprint(message: str) -> str | None:
-    """廉价意图指纹预检 — 仅通用意图（无业务域情绪词表）"""
+    """廉价意图指纹预检 — 仅通用意图"""
     from backend.pipeline.cache.fingerprint_cache import make_fingerprint
 
     greetings = ["你好", "嗨", "hello", "hi", "早上好", "晚上好"]
