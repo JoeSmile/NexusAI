@@ -1,22 +1,25 @@
 #!/usr/bin/env python3
 """
 应用工厂
-创建和配置FastAPI应用实例
+创建和配置 FastAPI 应用实例（Task 19.08 / 19.09: lazy include + lifespan）
 """
 
+from __future__ import annotations
+
+import importlib
 import os
 import sys
+from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, FastAPI
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# 添加项目根目录到Python路径
+# 添加项目根目录到 Python 路径
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
-# 尽早加载 config.env，保证 os.getenv 在路由/服务导入前可用（含 uvicorn 直接启动）
 try:
     from dotenv import load_dotenv
 
@@ -24,77 +27,109 @@ try:
 except ImportError:
     pass
 
-# 导入路由
-from backend.pipeline.router import router as chat_pipeline_router
-from backend.routers import (
-    admin_router,
-    audit_router,
-    evaluation_router,
-    feedback_router,
-    memory_router,
-    personalization_router,
-    rag_router,
-)
-
-# 导入性能优化路由
-performance_router: APIRouter | None
-streaming_router: APIRouter | None
-try:
-    from backend.routers.performance import router as performance_router
-    from backend.routers.streaming_chat import router as streaming_router
-    PERFORMANCE_OPTIMIZATION_ENABLED = True
-except Exception:
-    PERFORMANCE_OPTIMIZATION_ENABLED = False
-    performance_router = None
-    streaming_router = None
-
-# 导入增强版聊天路由
-enhanced_chat_router: APIRouter | None
-try:
-    from backend.routers.enhanced_chat import router as enhanced_chat_router
-    ENHANCED_CHAT_ENABLED = True
-except Exception:
-    ENHANCED_CHAT_ENABLED = False
-    enhanced_chat_router = None
-
-# 导入意图识别路由
-intent_router: APIRouter | None
-try:
-    from backend.modules.intent.routers import intent_router
-    INTENT_ENABLED = True
-except Exception:
-    INTENT_ENABLED = False
-    intent_router = None
-
-# 尝试导入Agent路由
-agent_router: APIRouter | None
-try:
-    from backend.routers.agent import router as agent_router
-    AGENT_ENABLED = True
-except Exception:
-    AGENT_ENABLED = False
-    agent_router = None
-
-# 导入日志配置
 from backend.logging_config import get_logger
 
 logger = get_logger(__name__)
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """启动预热 / 关闭清理。"""
+    logger.info("═" * 40)
+    logger.info("ContextGate 启动中...")
+    logger.info("═" * 40)
+
+    try:
+        from backend.database import init_database
+
+        init_database()
+        logger.info("✓ 数据库连接池就绪")
+    except Exception as e:
+        logger.warning("数据库初始化失败: %s", e)
+
+    try:
+        from backend.core.key_manager import KeyManager
+
+        KeyManager()
+        logger.info("✓ KeyManager 就绪")
+    except Exception as e:
+        logger.warning("KeyManager 未就绪: %s", e)
+
+    try:
+        from backend.services.performance_optimizer import performance_optimizer
+
+        r = await performance_optimizer._ensure_redis()
+        if r is not None and await performance_optimizer.ping():
+            logger.info("✓ Redis 连接池就绪")
+        else:
+            logger.info("Redis 不可用（缓存降级）")
+    except Exception as e:
+        logger.info("Redis 不可用（缓存降级）: %s", e)
+
+    try:
+        from backend.skills.registry import registry
+
+        registry.discover()
+        logger.info("Skill registry: %s skills loaded", len(registry._skills))
+    except Exception as e:
+        logger.warning("Skill discovery failed: %s", e)
+
+    logger.info("═" * 40)
+    logger.info("ContextGate 就绪")
+    logger.info("═" * 40)
+
+    yield
+
+    logger.info("ContextGate 关闭中...")
+    try:
+        from backend.services.performance_optimizer import performance_optimizer
+
+        await performance_optimizer.close()
+    except Exception:
+        pass
+
+
+def _lazy_include(
+    app: FastAPI,
+    module_path: str,
+    attr: str,
+    *,
+    prefix: str | None = None,
+    required: bool = False,
+    label: str | None = None,
+) -> bool:
+    """惰性 import 并注册路由。"""
+    try:
+        mod = importlib.import_module(module_path)
+        router = getattr(mod, attr, None)
+        if router is None:
+            if required:
+                logger.error("必选路由缺失: %s.%s", module_path, attr)
+            return False
+        if prefix:
+            app.include_router(router, prefix=prefix)
+        else:
+            app.include_router(router)
+        if label:
+            logger.info("%s 已启用", label)
+        return True
+    except Exception as e:
+        if required:
+            logger.error("必选路由加载失败 %s: %s", module_path, e)
+            raise
+        logger.debug("可选路由跳过 %s: %s", module_path, e)
+        return False
+
+
 def create_app() -> FastAPI:
-    """
-    创建FastAPI应用实例
-    
-    Returns:
-        配置好的FastAPI应用
-    """
-    # 创建应用
+    """创建并配置 FastAPI 应用实例。"""
     app = FastAPI(
         title="ContextGate API",
         description="The Intelligent Gateway for LLM Context Management",
         version="1.0.0",
         docs_url="/docs",
-        redoc_url="/redoc"
+        redoc_url="/redoc",
+        lifespan=lifespan,
     )
 
     from backend.core.errors import (
@@ -105,8 +140,7 @@ def create_app() -> FastAPI:
 
     app.add_exception_handler(ContextGateException, contextgate_exception_handler)  # type: ignore[arg-type]
     app.add_exception_handler(Exception, global_exception_handler)
-    
-    # CORS：浏览器不允许 allow_origins=["*"] 与 allow_credentials=True 同时使用
+
     _cors_all = os.getenv("CORS_ALLOW_ALL", "").strip().lower() in ("1", "true", "yes")
     if _cors_all:
         _origins = ["*"]
@@ -135,131 +169,123 @@ def create_app() -> FastAPI:
     from backend.core.metrics import MetricsMiddleware
     from backend.core.tenant import TenantMiddleware
 
-    # LIFO: 后添加的先执行 → Tenant → Metrics → Signature → CORS
     app.add_middleware(SignatureMiddleware)
     app.add_middleware(MetricsMiddleware)
     app.add_middleware(TenantMiddleware)
-    
+
     from prometheus_client import make_asgi_app
 
     app.mount("/metrics", make_asgi_app())
 
-    from backend.core.health import router as health_router
-    from backend.routers.files import router as files_router
+    # 必选路由
+    _lazy_include(app, "backend.core.health", "router", required=True)
+    _lazy_include(app, "backend.routers", "admin_router", prefix="/api", required=True)
+    _lazy_include(app, "backend.routers", "audit_router", prefix="/api", required=True)
+    _lazy_include(app, "backend.routers.files", "router", required=True)
+    _lazy_include(
+        app, "backend.pipeline.router", "router", required=True, label="LangGraph 管线"
+    )
+    _lazy_include(app, "backend.routers", "memory_router", required=True)
+    _lazy_include(app, "backend.routers", "feedback_router", required=True)
+    _lazy_include(app, "backend.routers", "evaluation_router", required=True)
+    _lazy_include(app, "backend.routers", "personalization_router", required=True)
 
-    # 注册路由
-    app.include_router(health_router)
-    app.include_router(admin_router, prefix="/api")
-    app.include_router(audit_router, prefix="/api")
-    app.include_router(files_router)
-    # LangGraph 管线接管 /chat（旧 chat_router 已删除，Batch 8）
-    app.include_router(chat_pipeline_router)
-    app.include_router(memory_router)
-    app.include_router(feedback_router)
-    app.include_router(evaluation_router)
-    app.include_router(personalization_router)
-    if rag_router is not None:
-        app.include_router(rag_router)
-    
-    # 注册增强版聊天路由（如果可用）
-    if ENHANCED_CHAT_ENABLED and enhanced_chat_router:
-        app.include_router(enhanced_chat_router)
-        logger.info("增强版多轮对话系统已启用")
-    
-    # 注册Agent路由（如果可用）
-    if AGENT_ENABLED and agent_router:
-        app.include_router(agent_router)
-        logger.info("Agent模块已启用")
-    
-    # 注册意图识别路由（如果可用）
-    if INTENT_ENABLED and intent_router:
-        app.include_router(intent_router)
-        logger.info("意图识别模块已启用")
-    
-    # 注册性能优化路由（如果可用）
-    if PERFORMANCE_OPTIMIZATION_ENABLED and performance_router:
-        app.include_router(performance_router)
-        logger.info("性能优化模块已启用")
-    
-    # 注册流式聊天路由（如果可用）
-    if PERFORMANCE_OPTIMIZATION_ENABLED and streaming_router:
-        app.include_router(streaming_router)
-        logger.info("流式聊天模块已启用")
-    
-    # 根路由
+    # 可选路由
+    features = {
+        "rag": _lazy_include(app, "backend.routers", "rag_router", label="RAG"),
+        "enhanced_chat": _lazy_include(
+            app,
+            "backend.routers.enhanced_chat",
+            "router",
+            label="增强版多轮对话",
+        ),
+        "agent": _lazy_include(
+            app, "backend.routers.agent", "router", label="Agent 模块"
+        ),
+        "intent": _lazy_include(
+            app, "backend.modules.intent.routers", "intent_router", label="意图识别"
+        ),
+        "performance": _lazy_include(
+            app,
+            "backend.routers.performance",
+            "router",
+            label="性能优化",
+        ),
+        "streaming": _lazy_include(
+            app,
+            "backend.routers.streaming_chat",
+            "router",
+            label="流式聊天",
+        ),
+    }
+    app.state.feature_flags = features
+
     @app.get("/")
     async def root():
-        """API根路径"""
-        features = [
+        feature_list = [
             "记忆系统",
             "上下文管理",
             "向量数据库",
             "LangChain集成",
             "自动评估",
-            "RAG知识库",
             "个性化配置",
             "LangGraph管线",
         ]
-        
-        # 如果性能优化模块启用，添加到功能列表
-        if PERFORMANCE_OPTIMIZATION_ENABLED:
-            features.extend([
-                "性能优化",
-                "流式响应",
-                "缓存机制",
-                "并行处理"
-            ])
-        
-        # 如果增强版聊天模块启用，添加到功能列表
-        if ENHANCED_CHAT_ENABLED:
-            features.append("增强版多轮对话")
-        
-        # 如果Agent模块启用，添加到功能列表
-        if AGENT_ENABLED:
-            features.append("Agent智能核心")
-        
-        # 如果意图识别模块启用，添加到功能列表
-        if INTENT_ENABLED:
-            features.append("意图识别系统")
-        
+        if features.get("rag"):
+            feature_list.append("RAG知识库")
+        if features.get("performance"):
+            feature_list.extend(["性能优化", "流式响应", "缓存机制", "并行处理"])
+        if features.get("enhanced_chat"):
+            feature_list.append("增强版多轮对话")
+        if features.get("agent"):
+            feature_list.append("Agent智能核心")
+        if features.get("intent"):
+            feature_list.append("意图识别系统")
+
         return {
             "name": "ContextGate",
             "version": "1.0.0",
             "status": "running",
-            "features": features,
-            "architecture": "分层服务架构 + Agent核心" if AGENT_ENABLED else "分层服务架构",
-            "agent_enabled": AGENT_ENABLED,
-            "timestamp": datetime.now().isoformat()
+            "features": feature_list,
+            "architecture": (
+                "分层服务架构 + Agent核心"
+                if features.get("agent")
+                else "分层服务架构"
+            ),
+            "agent_enabled": bool(features.get("agent")),
+            "timestamp": datetime.now().isoformat(),
         }
-    
-    # 系统信息
+
     @app.get("/system/info")
     async def system_info():
-        """系统信息"""
         routers_list = ["chat", "memory", "feedback", "evaluation"]
         services_list = ["MemoryService", "ContextService"]
-        
-        # 如果Agent模块启用，添加Agent相关信息
-        if AGENT_ENABLED:
+        if features.get("agent"):
             routers_list.append("agent")
             services_list.append("AgentService")
-        
-        # 如果意图识别模块启用，添加相关信息
-        if INTENT_ENABLED:
+        if features.get("intent"):
             routers_list.append("intent")
             services_list.append("IntentService")
-        
-        info = {
+
+        return {
             "architecture": {
-                "pattern": "分层服务架构 + Agent核心" if AGENT_ENABLED else "分层服务架构",
-                "layers": ["路由层", "服务层", "核心层", "数据层"] if AGENT_ENABLED else ["路由层", "服务层", "数据层"],
+                "pattern": (
+                    "分层服务架构 + Agent核心"
+                    if features.get("agent")
+                    else "分层服务架构"
+                ),
+                "layers": (
+                    ["路由层", "服务层", "核心层", "数据层"]
+                    if features.get("agent")
+                    else ["路由层", "服务层", "数据层"]
+                ),
                 "services": services_list,
-                "routers": routers_list
+                "routers": routers_list,
             },
             "memory_system": {
                 "enabled": True,
                 "components": ["记忆提取器", "记忆管理器", "上下文组装器"],
-                "storage": ["向量数据库 (pgvector)", "关系数据库 (PostgreSQL)"]
+                "storage": ["向量数据库 (pgvector)", "关系数据库 (PostgreSQL)"],
             },
             "features": {
                 "memory_extraction": "自动记忆提取",
@@ -267,73 +293,12 @@ def create_app() -> FastAPI:
                 "user_profiling": "用户画像",
                 "evaluation": "自动评估系统",
                 "langgraph_pipeline": "LangGraph 管线",
-                "intent_recognition": "意图识别系统" if INTENT_ENABLED else None
-            }
+                "intent_recognition": (
+                    "意图识别系统" if features.get("intent") else None
+                ),
+            },
         }
-        
-        # 添加Agent信息
-        if AGENT_ENABLED:
-            info["agent_system"] = {
-                "enabled": True,
-                "components": [
-                    "Agent Core - 核心控制器",
-                    "Memory Hub - 记忆中枢",
-                    "Planner - 任务规划器",
-                    "Tool Caller - 工具调用器",
-                    "Reflector - 反思优化器"
-                ],
-                "capabilities": [
-                    "智能任务规划",
-                    "工具自动调用",
-                    "主动回访",
-                    "策略优化"
-                ],
-                "external_tools": [
-                    "日历API",
-                    "音频播放服务",
-                    "心理资源数据库",
-                    "定时提醒服务"
-                ]
-            }
-        
-        # 添加意图识别信息
-        if INTENT_ENABLED:
-            info["intent_system"] = {
-                "enabled": True,
-                "mode": "hybrid",
-                "components": [
-                    "Rule Engine - 规则引擎",
-                    "ML Classifier - 机器学习分类器",
-                    "Input Processor - 输入预处理器"
-                ],
-                "supported_intents": [
-                    "emotion - 情感表达",
-                    "advice - 寻求建议",
-                    "conversation - 普通对话",
-                    "function - 功能请求",
-                    "crisis - 危机干预",
-                    "chat - 闲聊"
-                ],
-                "capabilities": [
-                    "关键词快速匹配",
-                    "语义意图识别",
-                    "危机情况检测",
-                    "智能Prompt构建"
-                ]
-            }
-        
-        return info
 
-    # 启动时自动发现 Skill
-    try:
-        from backend.skills.registry import registry
-
-        registry.discover()
-        logger.info("Skill registry: %s skills loaded", len(registry._skills))
-    except Exception as e:
-        logger.warning("Skill discovery failed: %s", e)
-
-    # Playground 静态页（保留 React frontend/src，仅挂载测试页）
     from fastapi.staticfiles import StaticFiles
 
     playground_dir = Path(__file__).parent.parent / "frontend"
@@ -345,10 +310,7 @@ def create_app() -> FastAPI:
         )
 
     logger.info("应用初始化完成")
-
     return app
 
 
-# 创建应用实例
 app = create_app()
-

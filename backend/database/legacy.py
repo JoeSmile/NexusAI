@@ -70,23 +70,58 @@ def _resolve_database_url() -> str:
     )
 
 
-# 数据库配置 — 单一入口，避免与 _resolve_database_url 重复
-DATABASE_URL = _resolve_database_url()
-if DATABASE_URL.startswith("sqlite"):
-    print(f"✓ 使用 SQLite 数据库: {DATABASE_URL}")
-else:
-    print("✓ 使用 PostgreSQL + pgvector 数据库")
-
-_engine_kwargs = {"echo": False}
-if DATABASE_URL.startswith("sqlite"):
-    _engine_kwargs["connect_args"] = {"check_same_thread": False}
-else:
-    _engine_kwargs["pool_pre_ping"] = True
-
-engine = create_engine(DATABASE_URL, **_engine_kwargs)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# ── Task 19.01: 惰性初始化 — 模块顶层不做 create_engine / 连接探测 ──
+_engine = None
+_session_factory = None
+_database_url: str | None = None
 
 Base = declarative_base()
+
+
+def init_database(url: str | None = None) -> None:
+    """首次调用时创建 engine / SessionLocal（可在 lifespan 中预热）。"""
+    global _engine, _session_factory, _database_url
+    if _engine is not None:
+        return
+
+    resolved = url or _resolve_database_url()
+    _database_url = resolved
+    kwargs: dict = {"echo": False}
+    if resolved.startswith("sqlite"):
+        kwargs["connect_args"] = {"check_same_thread": False}
+        print(f"✓ 使用 SQLite 数据库: {resolved}")
+    else:
+        kwargs["pool_pre_ping"] = True
+        kwargs["pool_size"] = int(os.getenv("DB_POOL_SIZE", "10"))
+        kwargs["max_overflow"] = int(os.getenv("DB_MAX_OVERFLOW", "20"))
+        kwargs["pool_recycle"] = int(os.getenv("DB_POOL_RECYCLE", "3600"))
+        print("✓ 使用 PostgreSQL + pgvector 数据库")
+
+    _engine = create_engine(resolved, **kwargs)
+    _session_factory = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
+
+
+def get_session():
+    """惰性获取 session。"""
+    init_database()
+    assert _session_factory is not None
+    return _session_factory()
+
+
+def __getattr__(name: str):
+    """兼容 `from backend.database.legacy import engine/SessionLocal/DATABASE_URL`。"""
+    if name == "engine":
+        init_database()
+        return _engine
+    if name == "SessionLocal":
+        init_database()
+        return _session_factory
+    if name == "DATABASE_URL":
+        global _database_url
+        if _database_url is None:
+            _database_url = _resolve_database_url()
+        return _database_url
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 class User(Base):
     """用户表"""
@@ -375,21 +410,19 @@ class UserPersonalization(Base):
 def create_tables():
     """
     创建数据库表（不推荐直接使用）
-    
+
     警告：请使用 Alembic 迁移系统来管理数据库结构变更
     使用命令：python scripts/db_manager.py init
-    
-    仅在特殊情况下（如测试环境快速建表）才直接调用此函数
-    
-    当 MySQL 未启动导致连接被拒绝时，若 USE_SQLITE_FALLBACK 为真（默认开启），
-    会自动切换到项目 data/ 目录下的 contextgate_local.db（SQLite）。
-    生产环境请设置 USE_SQLITE_FALLBACK=0 并保证 MySQL 可用。
+
+    当 PostgreSQL 不可达且 USE_SQLITE_FALLBACK=1 时，回退到本地 SQLite。
     """
-    global engine, SessionLocal, DATABASE_URL
+    global _engine, _session_factory, _database_url
     from sqlalchemy.exc import OperationalError
 
+    init_database()
+    assert _engine is not None
     try:
-        Base.metadata.create_all(bind=engine)
+        Base.metadata.create_all(bind=_engine)
         return
     except OperationalError as e:
         err = str(e).lower()
@@ -400,9 +433,10 @@ def create_tables():
             or "10061" in str(e)
             or "connection refused" in err
         )
+        current_url = _database_url or ""
         if (
             not is_unreachable
-            or DATABASE_URL.startswith("sqlite")
+            or current_url.startswith("sqlite")
             or not _truthy_env("USE_SQLITE_FALLBACK", default="1")
         ):
             raise
@@ -414,37 +448,38 @@ def create_tables():
             "  请先 `make up` 并核对 DATABASE_URL；\n"
             "  若不希望自动回退，请设置环境变量 USE_SQLITE_FALLBACK=0。"
         )
-        DATABASE_URL = sqlite_url
         try:
-            engine.dispose(close=True)
+            _engine.dispose(close=True)
         except Exception:
             pass
-        engine = create_engine(
-            sqlite_url, echo=True, connect_args={"check_same_thread": False}
-        )
-        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-        Base.metadata.create_all(bind=engine)
+        _engine = None
+        _session_factory = None
+        _database_url = None
+        init_database(sqlite_url)
+        assert _engine is not None
+        Base.metadata.create_all(bind=_engine)
 
-# 获取数据库会话
+
 def get_db():
-    db = SessionLocal()
+    db = get_session()
     try:
         yield db
     finally:
         db.close()
 
+
 # 数据库操作类
 # DEPRECATED: 请使用 backend.database.pgvector_session.PGVectorSession
 class DatabaseManager:
     def __init__(self):
-        self.db = SessionLocal()
-    
+        self.db = get_session()
+
     def __enter__(self):
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.db.close()
-    
+
     def save_message(self, session_id, user_id, role, content, emotion=None, emotion_intensity=None):
         """保存聊天消息"""
         message = ChatMessage(

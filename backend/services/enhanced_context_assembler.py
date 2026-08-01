@@ -4,6 +4,7 @@
 实现文档中提到的智能上下文管理功能
 """
 
+import asyncio
 from datetime import datetime
 from typing import Any
 
@@ -13,86 +14,83 @@ from backend.services.user_profile_builder import UserProfileBuilder
 
 class EnhancedContextAssembler:
     """增强版上下文组装器 - 智能管理对话上下文"""
-    
+
     def __init__(self):
         """初始化上下文组装器"""
         self.memory_manager = EnhancedMemoryManager()
         self.profile_builder = UserProfileBuilder()
-    
-    async def assemble_context(self,
-                              user_id: str,
-                              session_id: str,
-                              current_message: str,
-                              chat_history: list[dict[str, Any]],
-                              emotion: str | None = None,
-                              emotion_intensity: float | None = None) -> dict[str, Any]:
-        """
-        组装完整的对话上下文
-        
-        Args:
-            user_id: 用户ID
-            session_id: 会话ID
-            current_message: 当前消息
-            chat_history: 对话历史
-            emotion: 当前情绪
-            emotion_intensity: 情绪强度
-            
-        Returns:
-            完整的上下文数据
-        """
-        # 1. 识别重要对话轮次
+
+    async def assemble_context(
+        self,
+        user_id: str,
+        session_id: str,
+        current_message: str,
+        chat_history: list[dict[str, Any]],
+        emotion: str | None = None,
+        emotion_intensity: float | None = None,
+    ) -> dict[str, Any]:
+        """组装完整的对话上下文（独立 IO 步骤并行）。"""
         important_markers = self._identify_important_turns(chat_history)
-        
-        # 2. 获取短期记忆（裁剪后的对话历史）
-        short_term_context = self.memory_manager.get_short_term_context(
-            chat_history, 
-            important_markers
+
+        (
+            short_term_context,
+            long_term_memories,
+            user_profile,
+            conversation_graph,
+        ) = await asyncio.gather(
+            self._get_short_term(chat_history, important_markers),
+            self._get_long_term(user_id, current_message),
+            self._get_profile(user_id),
+            self._get_graph(user_id),
         )
-        
-        # 3. 检索长期记忆（向量检索）
-        long_term_memories = await self.memory_manager.retrieve_memories(
-            user_id=user_id,
-            query=current_message,
-            n_results=5,
-            days_limit=30,
-            enable_decay=True
-        )
-        
-        # 4. 获取用户画像
-        user_profile = await self.profile_builder.build_profile(user_id)
+
         profile_summary = await self.profile_builder.generate_profile_summary(user_id)
-        
-        # 5. 获取对话脉络图谱
-        conversation_graph = await self.profile_builder.build_conversation_graph(user_id)
-        
-        # 6. 组装上下文
-        context = {
+
+        return {
             "user_id": user_id,
             "session_id": session_id,
             "current_message": current_message,
             "current_emotion": {
                 "emotion": emotion,
-                "intensity": emotion_intensity
+                "intensity": emotion_intensity,
             },
             "short_term_memory": {
                 "messages": short_term_context,
-                "count": len(short_term_context),
-                "important_turns": important_markers
+                "count": len(short_term_context) if short_term_context else 0,
+                "important_turns": important_markers,
             },
             "long_term_memory": {
                 "memories": long_term_memories,
-                "count": len(long_term_memories)
+                "count": len(long_term_memories) if long_term_memories else 0,
             },
             "user_profile": {
                 "summary": profile_summary,
-                "details": user_profile
+                "details": user_profile,
             },
             "conversation_graph": conversation_graph,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
-        
-        return context
-    
+
+    async def _get_short_term(self, history, markers):
+        return await asyncio.to_thread(
+            self.memory_manager.get_short_term_context, history, markers
+        )
+
+    async def _get_long_term(self, user_id, query):
+        return await self.memory_manager.retrieve_memories(
+            user_id=user_id,
+            query=query,
+            n_results=5,
+            days_limit=30,
+            enable_decay=True,
+        )
+
+    async def _get_profile(self, user_id):
+        return await self.profile_builder.build_profile(user_id)
+
+    async def _get_graph(self, user_id):
+        return await self.profile_builder.build_conversation_graph(user_id)
+
     def _identify_important_turns(self, chat_history: list[dict[str, Any]]) -> list[int]:
         """
         识别重要的对话轮次

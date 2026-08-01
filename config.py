@@ -1,67 +1,124 @@
-import os
+"""应用配置 — pydantic-settings + Config 兼容代理（Task 19.03）"""
+
+from __future__ import annotations
+
+from functools import lru_cache
 from pathlib import Path
+
 from dotenv import load_dotenv
+from pydantic import Field, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# 加载.env配置文件
-env_path = Path(__file__).parent / 'config.env'
-load_dotenv(env_path)
+_ENV_PATH = Path(__file__).parent / "config.env"
+load_dotenv(_ENV_PATH)
 
-# 获取项目根目录
-PROJECT_ROOT = os.getenv('PROJECT_ROOT', str(Path(__file__).parent))
 
-class Config:
-    # ── LLM API Key 安全治理 ──
-    # DB 加密存储 + KeyManager 运行时解密；保留 env fallback 过渡
-    LLM_KEY_MASTER_KEY = os.getenv("LLM_KEY_MASTER_KEY", "")
-    LLM_API_KEY_FALLBACK = (
-        os.getenv("LLM_API_KEY")
-        or os.getenv("DEEPSEEK_API_KEY")
-        or os.getenv("DASHSCOPE_API_KEY")
-        or os.getenv("OPENAI_API_KEY")
-        or ""
-    )
-    LLM_BASE_URL_FALLBACK = (
-        os.getenv("LLM_BASE_URL")
-        or os.getenv("DEEPSEEK_BASE_URL")
-        or os.getenv("API_BASE_URL", "https://open.bigmodel.cn/api/paas/v4/")
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=str(_ENV_PATH),
+        env_file_encoding="utf-8",
+        extra="ignore",
+        case_sensitive=False,
     )
 
-    # 兼容层：遗留代码仍读 LLM_API_KEY / LLM_BASE_URL
-    LLM_API_KEY = LLM_API_KEY_FALLBACK
-    LLM_BASE_URL = LLM_BASE_URL_FALLBACK
+    project_root: str = Field(default_factory=lambda: str(Path(__file__).parent))
 
-    # 为了兼容性，保留旧的属性名（指向统一的配置）
-    OPENAI_API_KEY = LLM_API_KEY
-    API_BASE_URL = LLM_BASE_URL
-    DASHSCOPE_API_KEY = LLM_API_KEY
-    
-    # LangChain配置
-    LANGCHAIN_TRACING_V2 = os.getenv("LANGCHAIN_TRACING_V2", "false").lower() == "true"
-    LANGCHAIN_API_KEY = os.getenv("LANGCHAIN_API_KEY")
-    # 禁用LangSmith以避免403错误
-    LANGCHAIN_ENDPOINT = os.getenv("LANGCHAIN_ENDPOINT", "")
-    
-    # 数据库配置（PostgreSQL + pgvector）
-    DATABASE_URL = os.getenv(
-        "DATABASE_URL",
-        "postgresql://contextgate:contextgate_local@localhost:5432/contextgate",
+    # LLM（env fallback；运行时优先 KeyManager）
+    llm_api_key: str = ""
+    llm_base_url: str = "https://open.bigmodel.cn/api/paas/v4/"
+    deepseek_api_key: str = ""
+    dashscope_api_key: str = ""
+    openai_api_key: str = ""
+    deepseek_base_url: str = ""
+    api_base_url: str = ""
+
+    # LangChain / LangSmith（SDK 也可直接读 env）
+    langchain_tracing_v2: bool = False
+    langchain_api_key: str = ""
+    langchain_endpoint: str = ""
+
+    database_url: str = (
+        "postgresql://contextgate:contextgate_local@localhost:5432/contextgate"
     )
-    
-    # 模型配置
-    DEFAULT_MODEL = os.getenv("DEFAULT_MODEL") or os.getenv("DEEPSEEK_MODEL", "glm-5.1")
-    TEMPERATURE = float(os.getenv("TEMPERATURE", "0.7"))
-    MAX_TOKENS = int(os.getenv("MAX_TOKENS", "1000"))
-    
-    # 服务器配置
-    HOST = os.getenv("HOST", "0.0.0.0")
-    PORT = int(os.getenv("PORT", "8000"))
-    DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 
-    # Hermes 风格工作区自动化（参考 Nous Hermes Agent 工具与 MCP 文档）
-    HERMES_TOOLS_ENABLED = os.getenv("HERMES_TOOLS_ENABLED", "0").lower() in ("1", "true", "yes")
-    HERMES_WORKSPACE_ROOT = os.getenv("HERMES_WORKSPACE_ROOT", "").strip()
-    HERMES_WEB_FETCH_ENABLED = os.getenv("HERMES_WEB_FETCH_ENABLED", "0").lower() in ("1", "true", "yes")
-    HERMES_WEB_ALLOWLIST = os.getenv("HERMES_WEB_ALLOWLIST", "").strip()
-    HERMES_WEB_MAX_BYTES = int(os.getenv("HERMES_WEB_MAX_BYTES", "524288"))
-    HERMES_SHELL_ENABLED = os.getenv("HERMES_SHELL_ENABLED", "0").lower() in ("1", "true", "yes")
-    HERMES_SHELL_TIMEOUT_SEC = int(os.getenv("HERMES_SHELL_TIMEOUT_SEC", "60"))
+    default_model: str = ""
+    deepseek_model: str = "glm-5.1"
+    temperature: float = 0.7
+    max_tokens: int = 1000
+
+    host: str = "0.0.0.0"
+    port: int = 8000
+    debug: bool = False
+
+    llm_key_master_key: str = ""
+
+    redis_url: str = "redis://localhost:6379"
+    cache_ttl: int = 3600
+
+    cors_allow_all: bool = False
+    frontend_origins: str = ""
+
+    hermes_tools_enabled: bool = False
+    hermes_workspace_root: str = ""
+    hermes_web_fetch_enabled: bool = False
+    hermes_web_allowlist: str = ""
+    hermes_web_max_bytes: int = 524288
+    hermes_shell_enabled: bool = False
+    hermes_shell_timeout_sec: int = 60
+
+    @model_validator(mode="after")
+    def _resolve_fallbacks(self) -> Settings:
+        if not self.llm_api_key:
+            self.llm_api_key = (
+                self.deepseek_api_key
+                or self.dashscope_api_key
+                or self.openai_api_key
+                or ""
+            )
+        if not self.llm_base_url or self.llm_base_url == "https://open.bigmodel.cn/api/paas/v4/":
+            alt = self.deepseek_base_url or self.api_base_url
+            if alt:
+                self.llm_base_url = alt
+        if not self.default_model:
+            self.default_model = self.deepseek_model or "glm-5.1"
+        return self
+
+
+@lru_cache
+def get_settings() -> Settings:
+    """惰性创建 + 缓存 — 首次调用时读取 env。"""
+    return Settings()
+
+
+class ConfigProxy:
+    """旧 `Config.LLM_API_KEY` 接口兼容层。"""
+
+    _COMPAT = {
+        "OPENAI_API_KEY": "llm_api_key",
+        "API_BASE_URL": "llm_base_url",
+        "DASHSCOPE_API_KEY": "llm_api_key",
+        "LLM_API_KEY_FALLBACK": "llm_api_key",
+        "LLM_BASE_URL_FALLBACK": "llm_base_url",
+        "CHROMA_PERSIST_DIRECTORY": None,
+    }
+
+    def __getattr__(self, name: str):
+        s = get_settings()
+        mapped = self._COMPAT.get(name)
+        if name in self._COMPAT:
+            if mapped is None:
+                return None
+            return getattr(s, mapped)
+
+        key = name.lower()
+        if hasattr(s, key):
+            return getattr(s, key)
+
+        for field in type(s).model_fields:
+            if field.upper() == name:
+                return getattr(s, field)
+
+        raise AttributeError(f"Config has no attribute {name}")
+
+
+Config = ConfigProxy()

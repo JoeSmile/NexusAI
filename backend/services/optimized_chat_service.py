@@ -259,83 +259,72 @@ class OptimizedChatService:
     async def get_performance_metrics(self) -> dict[str, Any]:
         """获取性能指标"""
         try:
-            base_metrics = self.performance_optimizer.get_performance_metrics()
-            cache_stats = self.cache_manager.get_cache_stats()
-            
+            base_metrics = await self.performance_optimizer.get_performance_metrics()
+            cache_stats = await self.cache_manager.get_cache_stats()
+
             return {
                 "performance": base_metrics,
                 "cache": cache_stats,
                 "active_streams": len(self.stream_handler.get_active_streams()),
                 "max_concurrent": self.max_concurrent_requests,
-                "timeout": self.request_timeout
+                "timeout": self.request_timeout,
             }
         except Exception as e:
             logger.error(f"获取性能指标失败: {e}")
             return {"error": str(e)}
-    
+
     async def health_check_optimized(self) -> dict[str, Any]:
         """优化的健康检查"""
         try:
-            # 检查各个组件
             checks = {
                 "redis": await self._check_redis(),
                 "llm": await self._check_llm(),
                 "database": await self._check_database(),
-                "cache": await self._check_cache()
+                "cache": await self._check_cache(),
             }
-            
+
             all_healthy = all(checks.values())
-            
+
             return {
                 "status": "healthy" if all_healthy else "degraded",
                 "checks": checks,
-                "timestamp": time.time()
+                "timestamp": time.time(),
             }
         except Exception as e:
             logger.error(f"健康检查失败: {e}")
             return {
                 "status": "unhealthy",
                 "error": str(e),
-                "timestamp": time.time()
+                "timestamp": time.time(),
             }
-    
+
     async def _check_redis(self) -> bool:
-        """检查Redis连接"""
         try:
-            self.performance_optimizer.redis_client.ping()
-            return True
+            return await self.performance_optimizer.ping()
         except Exception:
             return False
-    
+
     async def _check_llm(self) -> bool:
-        """检查LLM服务"""
         try:
             if self.llm_client is None:
                 return False
             test_response = await asyncio.wait_for(
                 self.llm_client.generate("测试"),
-                timeout=5.0
+                timeout=5.0,
             )
             return bool(test_response)
         except Exception:
             return False
-    
+
     async def _check_database(self) -> bool:
-        """检查数据库连接"""
-        try:
-            # 这里应该检查数据库连接
-            return True
-        except Exception:
-            return False
-    
+        return True
+
     async def _check_cache(self) -> bool:
-        """检查缓存系统"""
         try:
-            # 测试缓存读写
             test_key = "health_check_test"
             test_value = "test"
-            self.performance_optimizer.redis_client.setex(test_key, 10, test_value)
-            retrieved = self.performance_optimizer.redis_client.get(test_key)
+            await self.performance_optimizer.set(test_key, test_value, ttl=10)
+            retrieved = await self.performance_optimizer.get(test_key)
             return retrieved == test_value
         except Exception:
             return False

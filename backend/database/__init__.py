@@ -2,12 +2,11 @@
 
 约定:
 - 新代码 / 向量检索: `from backend.database.pgvector_session import ChatMessage, Base, ...`
-- 旧 DatabaseManager ORM: `from backend.database.legacy import ...`（包级 ChatMessage/Base 仍指向 legacy，避免打断现有调用方）
-- 明确别名: VectorBase / VectorChatMessage / VectorChatSession
+- 旧 DatabaseManager ORM: `from backend.database.legacy import ...`
+- engine / SessionLocal / DATABASE_URL 惰性导出（Task 19.01）
 """
 
 from backend.database.legacy import (
-    DATABASE_URL,
     ABTestEvent,
     ABTestExperiment,
     ABTestGroupAssignment,
@@ -19,7 +18,6 @@ from backend.database.legacy import (
     Knowledge,
     MemoryItem,
     ResponseEvaluation,
-    SessionLocal,
     SystemLog,
     User,
     UserFeedback,
@@ -27,8 +25,9 @@ from backend.database.legacy import (
     UserProfileDB,
     _resolve_database_url,
     create_tables,
-    engine,
     get_db,
+    get_session,
+    init_database,
 )
 from backend.database.legacy import (
     Base as LegacyBase,
@@ -84,4 +83,15 @@ __all__ = [
     "engine",
     "get_db",
     "get_pg_session",
+    "get_session",
+    "init_database",
 ]
+
+
+def __getattr__(name: str):
+    """惰性转发 engine / SessionLocal / DATABASE_URL。"""
+    if name in ("engine", "SessionLocal", "DATABASE_URL"):
+        from backend.database import legacy as _legacy
+
+        return getattr(_legacy, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

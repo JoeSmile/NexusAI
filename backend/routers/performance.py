@@ -70,7 +70,7 @@ async def get_cache_stats():
         缓存统计数据
     """
     try:
-        stats = cache_manager.get_cache_stats()
+        stats = await cache_manager.get_cache_stats()
         return {
             "status": "success",
             "timestamp": datetime.now().isoformat(),
@@ -94,10 +94,10 @@ async def clear_cache(pattern: str | None = None):
     """
     try:
         if pattern:
-            cache_manager.invalidate_pattern(pattern)
+            await cache_manager.invalidate_pattern(pattern)
             message = f"已清除匹配模式 '{pattern}' 的缓存"
         else:
-            cache_manager.invalidate_pattern("*")
+            await cache_manager.invalidate_pattern("*")
             message = "已清除所有缓存"
         
         return {

@@ -10,120 +10,110 @@
 
 import uuid
 from datetime import datetime
+from functools import cached_property
 from typing import Any
 
 from backend.database import ChatMessage, ChatSession, DatabaseManager
 from backend.models import ChatRequest, ChatResponse
-from backend.modules.llm.core.llm_core import ChatEngine
 from backend.services.enhanced_context_assembler import EnhancedContextAssembler
-
-# 导入增强版组件
 from backend.services.enhanced_memory_manager import EnhancedMemoryManager
 from backend.services.proactive_recall_system import ProactiveRecallSystem
 from backend.services.user_profile_builder import UserProfileBuilder
 
-# 尝试导入可选功能
-try:
-    from backend.modules.rag.services.rag_service import RAGIntegrationService
-    RAG_AVAILABLE = True
-except ImportError:
-    RAG_AVAILABLE = False
-    RAGIntegrationService = None
-
-try:
-    from backend.modules.intent.services import IntentService
-    INTENT_AVAILABLE = True
-except ImportError:
-    INTENT_AVAILABLE = False
-    IntentService = None
-
-try:
-    from backend.modules.intent.core.enhanced_input_processor import EnhancedInputProcessor
-    ENHANCED_PROCESSOR_AVAILABLE = True
-except ImportError:
-    ENHANCED_PROCESSOR_AVAILABLE = False
-    EnhancedInputProcessor = None
-
 
 class EnhancedChatService:
-    """增强版聊天服务 - 实现文档中所有的高级功能"""
-    
+    """增强版聊天服务 — 组件按需惰性初始化（Task 19.07）"""
+
     def __init__(
         self,
         use_rag: bool = True,
         use_intent: bool = True,
         use_enhanced_processor: bool = True,
-        enable_proactive_recall: bool = True
+        enable_proactive_recall: bool = True,
     ):
-        """
-        初始化增强版聊天服务
-        
-        Args:
-            use_rag: 是否启用RAG知识库
-            use_intent: 是否启用意图识别
-            use_enhanced_processor: 是否启用增强输入处理
-            enable_proactive_recall: 是否启用主动回忆
-        """
-        # 核心引擎
-        self.chat_engine = ChatEngine()
-        
-        # 增强版组件
-        self.memory_manager = EnhancedMemoryManager()
-        self.profile_builder = UserProfileBuilder()
-        self.context_assembler = EnhancedContextAssembler()
-        self.proactive_recall = ProactiveRecallSystem() if enable_proactive_recall else None
-        
-        # 可选功能初始化
-        self._init_optional_features(use_rag, use_intent, use_enhanced_processor)
-        
-        print("✓ 增强版聊天服务已启动")
-        print("  - 记忆管理: 短期滑动窗口 + 长期向量检索 + 时间衰减")
-        print("  - 用户画像: 动态构建")
-        print(f"  - 主动回忆: {'启用' if enable_proactive_recall else '禁用'}")
-        print(f"  - RAG: {'启用' if self.rag_enabled else '禁用'}")
-        print(f"  - 意图识别: {'启用' if self.intent_enabled else '禁用'}")
-    
-    def _init_optional_features(self, use_rag: bool, use_intent: bool, use_enhanced_processor: bool):
-        """初始化可选功能"""
-        # 增强版输入处理器
-        self.enhanced_processor_enabled = False
-        self.enhanced_processor = None
-        if use_enhanced_processor and ENHANCED_PROCESSOR_AVAILABLE:
-            try:
-                self.enhanced_processor = EnhancedInputProcessor(
-                    enable_jieba=True,
-                    enable_duplicate_check=True
-                )
-                self.enhanced_processor_enabled = True
-                print("  ✓ 增强版输入处理器已启用")
-            except Exception as e:
-                print(f"  ⚠ 增强版输入处理器初始化失败: {e}")
-        
-        # RAG服务
-        self.rag_enabled = False
-        self.rag_service = None
-        if use_rag and RAG_AVAILABLE:
-            try:
-                self.rag_service = RAGIntegrationService()
-                if self.rag_service.rag_service.is_knowledge_available():
-                    self.rag_enabled = True
-                    print("  ✓ RAG知识库已启用")
-                else:
-                    print("  ⚠ RAG服务已加载，但知识库未初始化")
-            except Exception as e:
-                print(f"  ⚠ RAG服务初始化失败: {e}")
-        
-        # 意图识别服务
-        self.intent_enabled = False
-        self.intent_service = None
-        if use_intent and INTENT_AVAILABLE:
-            try:
-                self.intent_service = IntentService()
-                self.intent_enabled = True
-                print("  ✓ 意图识别系统已启用")
-            except Exception as e:
-                print(f"  ⚠ 意图识别服务初始化失败: {e}")
-    
+        self._cfg = {
+            "use_rag": use_rag,
+            "use_intent": use_intent,
+            "use_enhanced_processor": use_enhanced_processor,
+            "enable_proactive_recall": enable_proactive_recall,
+        }
+
+    @cached_property
+    def chat_engine(self):
+        from backend.modules.llm.core.llm_core import ChatEngine
+
+        return ChatEngine()
+
+    @cached_property
+    def memory_manager(self):
+        return EnhancedMemoryManager()
+
+    @cached_property
+    def profile_builder(self):
+        return UserProfileBuilder()
+
+    @cached_property
+    def context_assembler(self):
+        return EnhancedContextAssembler()
+
+    @cached_property
+    def proactive_recall(self):
+        if self._cfg.get("enable_proactive_recall"):
+            return ProactiveRecallSystem()
+        return None
+
+    @cached_property
+    def enhanced_processor(self):
+        if not self._cfg.get("use_enhanced_processor"):
+            return None
+        try:
+            from backend.modules.intent.core.enhanced_input_processor import (
+                EnhancedInputProcessor,
+            )
+
+            return EnhancedInputProcessor(
+                enable_jieba=True, enable_duplicate_check=True
+            )
+        except Exception:
+            return None
+
+    @property
+    def enhanced_processor_enabled(self) -> bool:
+        return self.enhanced_processor is not None
+
+    @cached_property
+    def rag_service(self):
+        if not self._cfg.get("use_rag"):
+            return None
+        try:
+            from backend.modules.rag.services.rag_service import RAGIntegrationService
+
+            svc = RAGIntegrationService()
+            if svc.rag_service.is_knowledge_available():
+                return svc
+        except Exception:
+            return None
+        return None
+
+    @property
+    def rag_enabled(self) -> bool:
+        return self.rag_service is not None
+
+    @cached_property
+    def intent_service(self):
+        if not self._cfg.get("use_intent"):
+            return None
+        try:
+            from backend.modules.intent.services import IntentService
+
+            return IntentService()
+        except Exception:
+            return None
+
+    @property
+    def intent_enabled(self) -> bool:
+        return self.intent_service is not None
+
     async def chat(self, request: ChatRequest) -> ChatResponse:
         """
         处理聊天请求（增强版流程）
