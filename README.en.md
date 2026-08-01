@@ -8,6 +8,8 @@ Enterprise LLM pre-processing pipeline with auth, multi-tenancy, guardrails, obs
 
 ## Quick Start
 
+> Prerequisites: Docker (postgres + pgvector), uv (manages Python 3.11+). Same commands on macOS / Windows / Linux.
+
 ```bash
 # 1. Start infrastructure (postgres + pgvector)
 make up

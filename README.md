@@ -30,6 +30,14 @@ auth_check → load_memory → rate_limiter → cache_check
                             → write_memory + audit → END (1-5s)
 ```
 
+## 前置要求
+
+- **Docker** — PostgreSQL + pgvector 基础设施（`make up`）
+- **uv** — Python 包管理（自动管理 Python 3.11+，无需单独装 Python）
+- **git**
+
+macOS / Windows / Linux 均可，命令完全一致。
+
 ## Quick Start
 
 ```bash
