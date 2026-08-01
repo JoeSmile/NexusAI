@@ -36,7 +36,7 @@ class ModuleDisabledError(RuntimeError):
     def __init__(self, module: str) -> None:
         super().__init__(
             f"Module '{module}' is disabled via ModuleToggles. "
-            f"Enable it with EMOTIONAL_CHAT__MODULES__{module.upper()}__ENABLED=true"
+            f"Enable it with CONTEXTGATE__MODULES__{module.upper()}__ENABLED=true"
         )
         self.module = module
 

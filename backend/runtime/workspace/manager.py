@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 def _resolve_default_base() -> Path:
     """解析默认基础目录"""
-    val = os.environ.get("EMOTIONAL_CHAT_WORKSPACE_BASE")
+    val = os.environ.get("CONTEXTGATE_WORKSPACE_BASE")
     if val:
         return Path(val)
     return Path.home() / ".contextgate"

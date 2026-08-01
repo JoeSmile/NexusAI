@@ -145,7 +145,7 @@ idle → running → (requires_approval → running) → compacted/forked → te
 
 ### 4. ModuleToggles 特性开关
 
-环境变量覆盖：`EMOTIONAL_CHAT__MODULES__<MODULE>__ENABLED=true/false`
+环境变量覆盖：`CONTEXTGATE__MODULES__<MODULE>__ENABLED=true/false`
 
 ### 5. PolicyEngine 声明式策略
 

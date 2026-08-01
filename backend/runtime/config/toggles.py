@@ -5,7 +5,7 @@ Module Toggles — per-module enable/disable switches
   runtime.modules.<module>.enabled = true | false
 
 支持环境变量覆盖：
-  EMOTIONAL_CHAT__MODULES__<MODULE>__ENABLED=true|false
+  CONTEXTGATE__MODULES__<MODULE>__ENABLED=true|false
 
 这使得：
 1. 渐进式发布：新功能背后有开关
@@ -55,7 +55,7 @@ class ModuleToggles:
 
     环境变量覆盖（优先级最高）::
 
-        EMOTIONAL_CHAT__MODULES__MEMORY_SKILL__ENABLED=true
+        CONTEXTGATE__MODULES__MEMORY_SKILL__ENABLED=true
     """
 
     # 所有模块的默认状态
@@ -79,7 +79,7 @@ class ModuleToggles:
         "skill_review": False,
     }
 
-    ENV_PREFIX = "EMOTIONAL_CHAT__MODULES__"
+    ENV_PREFIX = "CONTEXTGATE__MODULES__"
 
     def __init__(self, overrides: dict[str, bool] | None = None):
         # 初始化为默认值
