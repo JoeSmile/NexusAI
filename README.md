@@ -61,8 +61,9 @@ curl -X POST http://localhost:8000/chat \
   -d '{"message": "你好", "session_id": "test", "user_id": "alice"}'
 ```
 
-开发期轻量测试页: http://localhost:8000/playground/playground.html  
-SSE 流式: `POST /chat/streaming`（见 `examples/streaming.html`）。空闲约 15s 发 `: ping` 心跳；客户端断开即中止生成。**暂不支持 `Last-Event-ID` 断点续传**，断线后需重新请求。
+开发期轻量测试页: http://localhost:8000/playground/（`examples/` 静态挂载）  
+- Admin: `/playground/admin.html`  
+- SSE: `/playground/streaming.html` → `POST /chat/streaming`（空闲约 15s `: ping`；断开即中止；**暂不支持 `Last-Event-ID` 断点续传**）
 
 ## Features
 

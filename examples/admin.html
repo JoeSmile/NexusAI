@@ -5,42 +5,65 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>管理 API — Admin 用例</title>
 <style>
-  body { font-family: -apple-system, "PingFang SC", sans-serif; background: #0f172a; color: #e2e8f0; max-width: 800px; margin: 0 auto; padding: 24px; }
+  body { font-family: -apple-system, "PingFang SC", sans-serif; background: #0f172a; color: #e2e8f0; max-width: 880px; margin: 0 auto; padding: 24px; }
   h1 { font-size: 20px; color: #38bdf8; }
   .desc { background: #1e293b; border-left: 3px solid #38bdf8; padding: 12px 16px; border-radius: 4px; font-size: 13px; line-height: 1.7; }
   label { display: block; margin: 16px 0 6px; font-size: 13px; color: #94a3b8; }
   input, textarea { width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid #334155; color: #e2e8f0; border-radius: 6px; padding: 10px; font-size: 14px; }
-  button { background: #0284c7; border: none; color: #fff; padding: 10px 24px; border-radius: 6px; font-size: 14px; cursor: pointer; margin-top: 14px; }
+  button { background: #0284c7; border: none; color: #fff; padding: 10px 18px; border-radius: 6px; font-size: 13px; cursor: pointer; margin-top: 10px; }
+  button.secondary { background: #334155; }
+  button.danger { background: #b91c1c; }
   pre { background: #0b1220; border: 1px solid #334155; border-radius: 6px; padding: 12px; white-space: pre-wrap; word-break: break-all; font-size: 13px; max-height: 360px; overflow: auto; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  .hint { font-size: 12px; color: #64748b; margin-top: 4px; }
 </style>
 </head>
 <body>
 <h1>管理 API — /api/admin/*</h1>
 <div class="desc">
-  <b>测什么:</b>API Key 生命周期(创建/列出/删除)、LLM Key 加密管理(KeyManager)、权限审批流、审计日志导出。<br>
-  <b>前置:</b>X-API-Key 需 admin 权限(make seed 的 super_admin key;若只有 user 权限会 403)。<br>
-  <b>预期:</b>创建 key 返回明文(仅一次);llm-keys 加密入库不落明文;审批流 pending → approve;audit 可导出 CSV。
+  <b>测什么:</b>API Key 生命周期(创建/列出/删除)、LLM Key 加密管理、权限审批流、审计日志导出。<br>
+  <b>前置:</b>X-API-Key 需 admin 权限(<code>make seed</code> 的 super_admin key)。<br>
+  <b>访问:</b><code>http://localhost:8000/playground/admin.html</code>
 </div>
 
 <label for="apiKey">X-API-Key(管理权限)</label>
 <input id="apiKey" placeholder="cg_...">
 
-<label for="tenantId">租户</label>
+<label>租户 / 用户</label>
 <div class="grid">
-  <input id="tenantId" value="acme">
-  <label style="margin:0; align-self:center; font-size:12px; color:#64748b;">用户: <input id="userId" value="bob" style="width:120px; display:inline-block;"></label>
+  <input id="tenantId" value="acme" placeholder="tenant_id">
+  <input id="userId" value="bob" placeholder="user_id">
 </div>
 
-<div style="display:flex; gap:12px; flex-wrap:wrap;">
+<label>资源 ID（删除 / 审批用）</label>
+<div class="grid">
+  <div>
+    <input id="apiKeyId" placeholder="API Key id (数字)">
+    <div class="hint">DELETE /api/admin/api-keys/{id}</div>
+  </div>
+  <div>
+    <input id="llmKeyId" placeholder="LLM Key id (数字)">
+    <div class="hint">DELETE /api/admin/llm-keys/{id}</div>
+  </div>
+</div>
+<div style="margin-top:10px">
+  <input id="requestId" placeholder="审批 request_id (数字)" value="1">
+  <div class="hint">POST /api/admin/approve</div>
+</div>
+
+<div class="row">
   <button onclick="call('api-keys', 'POST')">创建 API Key</button>
-  <button onclick="call('api-keys', 'GET')" style="background:#334155;">列出 API Keys</button>
-  <button onclick="call('llm-keys', 'POST')" style="background:#334155;">登记 LLM Key</button>
-  <button onclick="call('llm-keys', 'GET')" style="background:#334155;">列出 LLM Keys</button>
-  <button onclick="call('pending-requests', 'GET')" style="background:#334155;">待审批列表</button>
-  <button onclick="call('approve', 'POST')" style="background:#334155;">审批通过</button>
-  <button onclick="call('logs', 'GET', '/api/audit/logs')" style="background:#334155;">审计日志</button>
-  <button onclick="call('export', 'GET', '/api/audit/export')" style="background:#334155;">导出审计 CSV</button>
+  <button class="secondary" onclick="call('api-keys', 'GET')">列出 API Keys</button>
+  <button class="danger" onclick="delApiKey()">删除 API Key</button>
+  <button class="secondary" onclick="call('llm-keys', 'POST')">登记 LLM Key</button>
+  <button class="secondary" onclick="call('llm-keys', 'GET')">列出 LLM Keys</button>
+  <button class="danger" onclick="delLlmKey()">删除 LLM Key</button>
+  <button class="secondary" onclick="call('pending-requests', 'GET')">待审批列表</button>
+  <button class="secondary" onclick="approve(true)">审批通过</button>
+  <button class="danger" onclick="approve(false)">审批拒绝</button>
+  <button class="secondary" onclick="call('logs', 'GET', '/api/audit/logs')">审计日志</button>
+  <button class="secondary" onclick="call('export', 'GET', '/api/audit/export')">导出审计 CSV</button>
 </div>
 
 <pre id="out">// 结果将显示在这里</pre>
@@ -51,25 +74,47 @@ function hdrs() {
   const k = document.getElementById('apiKey').value.trim();
   return { 'Content-Type': 'application/json', ...(k ? { 'X-API-Key': k } : {}) };
 }
-async function call(path, method, fullPath) {
+async function call(path, method, fullPath, body) {
   const out = document.getElementById('out');
   out.textContent = '// 请求中...';
   try {
-    let url = fullPath ? BASE + fullPath : BASE + '/api/admin/' + path, opts = { method, headers: hdrs() };
-    if (path === 'api-keys' && method === 'POST') {
+    let url = fullPath ? BASE + fullPath : BASE + '/api/admin/' + path;
+    const opts = { method, headers: hdrs() };
+    if (body !== undefined) {
+      opts.body = JSON.stringify(body);
+    } else if (path === 'api-keys' && method === 'POST') {
       opts.body = JSON.stringify({
         tenant_id: document.getElementById('tenantId').value,
         user_id: document.getElementById('userId').value,
         role: 'user', description: 'admin.html 用例创建',
       });
     } else if (path === 'llm-keys' && method === 'POST') {
-      opts.body = JSON.stringify({ provider: 'deepseek', api_key: 'sk-placeholder', model: 'deepseek-chat' });
-    } else if (path === 'approve') {
-      opts.body = JSON.stringify({ request_id: 1, approved: true });
+      opts.body = JSON.stringify({
+        provider: 'deepseek',
+        api_key: 'sk-placeholder',
+        model: 'deepseek-chat',
+        tenant_id: document.getElementById('tenantId').value,
+      });
     }
     const r = await fetch(url, opts);
-    out.textContent = r.status + ' ' + r.statusText + '\n' + (await r.text());
+    const text = await r.text();
+    out.textContent = r.status + ' ' + r.statusText + '\n' + text;
   } catch (e) { out.textContent = '// 请求失败: ' + e.message; }
+}
+function delApiKey() {
+  const id = document.getElementById('apiKeyId').value.trim();
+  if (!id) { document.getElementById('out').textContent = '// 请填写 API Key id'; return; }
+  return call('api-keys/' + id, 'DELETE', '/api/admin/api-keys/' + id);
+}
+function delLlmKey() {
+  const id = document.getElementById('llmKeyId').value.trim();
+  if (!id) { document.getElementById('out').textContent = '// 请填写 LLM Key id'; return; }
+  return call('llm-keys/' + id, 'DELETE', '/api/admin/llm-keys/' + id);
+}
+function approve(approved) {
+  const request_id = Number(document.getElementById('requestId').value.trim());
+  if (!request_id) { document.getElementById('out').textContent = '// 请填写 request_id'; return; }
+  return call('approve', 'POST', '/api/admin/approve', { request_id, approved });
 }
 </script>
 </body>
