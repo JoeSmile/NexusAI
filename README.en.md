@@ -22,7 +22,7 @@ make db-init
 make run
 ```
 
-Dev test client (frontend): http://localhost:3000 (to be replaced by Playground in v1.0)
+- Dev test client (Playground): http://localhost:8000/playground/playground.html
 
 API key seeding lands in Batch 6 (`scripts/seed_api_keys.py`).
 

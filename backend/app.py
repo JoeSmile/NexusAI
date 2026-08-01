@@ -146,16 +146,9 @@ def create_app() -> FastAPI:
         _origins = ["*"]
         _creds = False
     else:
+        # React/Vite 前端已移除,允许来源由 FRONTEND_ORIGINS 环境变量配置
         _extra = os.getenv("FRONTEND_ORIGINS", "")
-        _origins = [
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-        ]
-        if _extra:
-            _origins.extend([o.strip() for o in _extra.split(",") if o.strip()])
-        _origins = list(dict.fromkeys(_origins))
+        _origins = [o.strip() for o in _extra.split(",") if o.strip()]
         _creds = True
     app.add_middleware(
         CORSMiddleware,
