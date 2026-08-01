@@ -294,7 +294,7 @@ def create_app() -> FastAPI:
 
     from fastapi.staticfiles import StaticFiles
 
-    playground_dir = Path(__file__).parent.parent / "frontend"
+    playground_dir = Path(__file__).parent.parent / "examples"
     if playground_dir.exists():
         app.mount(
             "/playground",
