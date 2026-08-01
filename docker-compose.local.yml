@@ -32,15 +32,18 @@ services:
       DEBUG: "true"
       DATABASE_URL: postgresql://contextgate:contextgate_local@postgres:5432/contextgate
       LLM_MOCK: "true"
+      LANGFUSE_ENABLED: "true"
       LANGFUSE_HOST: http://langfuse:3000
-      LANGFUSE_PUBLIC_KEY: pk-local-dev
-      LANGFUSE_SECRET_KEY: sk-local-dev
+      LANGFUSE_PUBLIC_KEY: pk-lf-local-contextgate
+      LANGFUSE_SECRET_KEY: sk-lf-local-contextgate
     volumes:
       - .:/app
       - /app/.venv
     depends_on:
       postgres:
         condition: service_healthy
+      langfuse:
+        condition: service_started
     command:
       [
         "uvicorn",
@@ -55,18 +58,50 @@ services:
     networks:
       - contextgate_local
 
-  langfuse:
-    image: ghcr.io/langfuse/langfuse:latest
-    ports:
-      - "3001:3000"
+  # 独立库，避免与 contextgate 业务表混在同一 schema
+  langfuse-db-init:
+    image: pgvector/pgvector:pg16
+    volumes:
+      - ./backend/database/ensure_langfuse_db.sh:/ensure_langfuse_db.sh:ro
     environment:
-      DATABASE_URL: postgresql://contextgate:contextgate_local@postgres:5432/contextgate
-      NEXTAUTH_SECRET: dev-secret-change-in-production
-      SALT: dev-salt-change-in-production
-      NEXTAUTH_URL: http://localhost:3001
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: contextgate
+      POSTGRES_PASSWORD: contextgate_local
+      POSTGRES_DB: contextgate
+    entrypoint: ["/bin/sh", "/ensure_langfuse_db.sh"]
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - contextgate_local
+    restart: "no"
+
+  # v2 = 单 Postgres 即可；:latest(v3) 需要 ClickHouse/Redis/MinIO
+  langfuse:
+    image: ghcr.io/langfuse/langfuse:2
+    ports:
+      - "3001:3000"
+    environment:
+      DATABASE_URL: postgresql://contextgate:contextgate_local@postgres:5432/langfuse
+      NEXTAUTH_SECRET: contextgate-langfuse-dev-secret
+      SALT: contextgate-langfuse-dev-salt
+      ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      NEXTAUTH_URL: http://localhost:3001
+      TELEMETRY_ENABLED: "false"
+      LANGFUSE_INIT_ORG_ID: contextgate-org
+      LANGFUSE_INIT_ORG_NAME: ContextGate
+      LANGFUSE_INIT_PROJECT_ID: contextgate-project
+      LANGFUSE_INIT_PROJECT_NAME: ContextGate Local
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: pk-lf-local-contextgate
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: sk-lf-local-contextgate
+      LANGFUSE_INIT_USER_EMAIL: admin@contextgate.local
+      LANGFUSE_INIT_USER_NAME: admin
+      LANGFUSE_INIT_USER_PASSWORD: contextgate
+    depends_on:
+      postgres:
+        condition: service_healthy
+      langfuse-db-init:
+        condition: service_completed_successfully
     restart: unless-stopped
     networks:
       - contextgate_local

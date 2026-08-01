@@ -1,4 +1,4 @@
-.PHONY: help sync lock install up up-all down db-init run lint typecheck test check verify seed fmt docker-up docker-down clean
+.PHONY: help sync lock install up up-langfuse up-all down db-init run lint typecheck test check verify seed fmt docker-up docker-down clean
 
 ROOT_DIR := $(patsubst %/,%,$(dir $(abspath $(firstword $(MAKEFILE_LIST)))))
 UV := $(shell command -v uv 2> /dev/null)
@@ -17,6 +17,7 @@ help:
 	@echo "  make sync / install  安装依赖 (uv sync)"
 	@echo "  make lock            更新 uv.lock"
 	@echo "  make up              只起 postgres"
+	@echo "  make up-langfuse     起 postgres + LangFuse UI (:3001)"
 	@echo "  make up-all          起全部 compose 服务"
 	@echo "  make down            停止本地基础设施"
 	@echo "  make db-init         初始化 pgvector 表"
@@ -40,6 +41,9 @@ lock:
 
 up:
 	cd $(ROOT_DIR) && $(COMPOSE_LOCAL) up -d postgres
+
+up-langfuse:
+	cd $(ROOT_DIR) && $(COMPOSE_LOCAL) up -d postgres langfuse-db-init langfuse
 
 up-all docker-up:
 	cd $(ROOT_DIR) && $(COMPOSE_LOCAL) up -d --build

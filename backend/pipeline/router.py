@@ -64,6 +64,8 @@ async def _run_chat_pipeline(
     background_tasks: BackgroundTasks,
     tenant: TenantContext,
 ):
+    from backend.observability.langfuse_client import flush_langfuse
+
     start = time.time()
 
     initial = make_initial_state(
@@ -127,6 +129,9 @@ async def _run_chat_pipeline(
             pipeline_latency_ms=latency,
             error_code="SYS_001",
         )
+    finally:
+        background_tasks.add_task(flush_langfuse)
+
 
 
 @router.post("/chat/streaming")

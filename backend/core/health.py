@@ -71,10 +71,20 @@ async def health_check():
 
     # 5. LangFuse（可选）
     try:
-        from backend.observability.langfuse_client import get_langfuse  # type: ignore
+        from backend.observability.langfuse_client import (  # type: ignore
+            get_langfuse,
+            langfuse_enabled,
+        )
 
-        get_langfuse()
-        checks["langfuse"] = {"status": "configured"}
+        if not langfuse_enabled():
+            checks["langfuse"] = {"status": "disabled"}
+        elif get_langfuse() is not None:
+            checks["langfuse"] = {
+                "status": "configured",
+                "host": __import__("os").getenv("LANGFUSE_HOST", ""),
+            }
+        else:
+            checks["langfuse"] = {"status": "not_configured"}
     except Exception:
         checks["langfuse"] = {"status": "not_configured"}
 

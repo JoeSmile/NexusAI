@@ -37,16 +37,45 @@ services:
       timeout: 10s
       retries: 3
 
-  langfuse:
-    image: ghcr.io/langfuse/langfuse:latest
+  langfuse-db-init:
+    image: pgvector/pgvector:pg16
+    volumes:
+      - ./backend/database/ensure_langfuse_db.sh:/ensure_langfuse_db.sh:ro
     environment:
-      DATABASE_URL: postgresql://contextgate:${DB_PASSWORD}@postgres:5432/contextgate
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
-      SALT: ${SALT}
-      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3001}
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: contextgate
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: contextgate
+    entrypoint: ["/bin/sh", "/ensure_langfuse_db.sh"]
     depends_on:
       postgres:
         condition: service_healthy
+    restart: "no"
+
+  langfuse:
+    image: ghcr.io/langfuse/langfuse:2
+    ports: ["3001:3000"]
+    environment:
+      DATABASE_URL: postgresql://contextgate:${DB_PASSWORD}@postgres:5432/langfuse
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      SALT: ${SALT}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:?set LANGFUSE_ENCRYPTION_KEY (64 hex chars)}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3001}
+      TELEMETRY_ENABLED: "false"
+      LANGFUSE_INIT_ORG_ID: ${LANGFUSE_INIT_ORG_ID:-contextgate-org}
+      LANGFUSE_INIT_ORG_NAME: ${LANGFUSE_INIT_ORG_NAME:-ContextGate}
+      LANGFUSE_INIT_PROJECT_ID: ${LANGFUSE_INIT_PROJECT_ID:-contextgate-project}
+      LANGFUSE_INIT_PROJECT_NAME: ${LANGFUSE_INIT_PROJECT_NAME:-ContextGate}
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-admin@contextgate.local}
+      LANGFUSE_INIT_USER_NAME: ${LANGFUSE_INIT_USER_NAME:-admin}
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      langfuse-db-init:
+        condition: service_completed_successfully
     restart: always
 
   nginx:
