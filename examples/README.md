@@ -81,7 +81,7 @@ make run         # uvicorn :8000
 | `streaming.html` | SSE 流式 | `/chat/streaming` 流式 token、abort(内容过滤)、retraction(超长) |
 | `intent.html` | 意图识别 | `/intent/analyze` + `/detect`:对接意图模型,配置 env/key 后返回意图+置信度 |
 | `rag.html` | RAG 知识库 | `/api/rag/ask` / `search` / `upload/pdf` / `init/sample` 全链路 |
-| `agent.html` | Agent 模块 | `/api/agent/chat` 多轮、`/memory`、`/tools`、`/followup` 回访 |
+| `agent.html` | Agent 模块 | `/agent/chat` 多轮、`/memory`、`/tools`、`/followup` 回访 |
 | `admin.html` | 管理 API | api-keys 增删 / llm-keys 加密管理 / pending-requests 审批 / audit 导出 |
 | `eval.html` | 评测 | `/evaluation/evaluate` / `batch` / `compare-prompts` 响应对比 |
 

@@ -16,7 +16,7 @@
 </style>
 </head>
 <body>
-<h1>Agent 模块 — /api/agent/*</h1>
+<h1>Agent 模块 — /agent/*</h1>
 <div class="desc">
   <b>测什么:</b>多轮 Agent 对话、记忆读写、工具列表、回访规划(followup)。<br>
   <b>前置:</b>X-API-Key(需 chat:write)。<br>
@@ -30,12 +30,12 @@
 <textarea id="text">帮我制定一个本周的 API 网关性能优化计划</textarea>
 
 <div style="display:flex; gap:12px; flex-wrap:wrap;">
-  <button onclick="call('chat')">POST /api/agent/chat</button>
-  <button onclick="call('status')" style="background:#334155;">GET /api/agent/status</button>
-  <button onclick="call('tools')" style="background:#334155;">GET /api/agent/tools</button>
-  <button onclick="call('memory')" style="background:#334155;">GET /api/agent/memory/alice</button>
-  <button onclick="call('followup')" style="background:#334155;">POST /api/agent/followup</button>
-  <button onclick="call('health')" style="background:#334155;">GET /api/agent/health</button>
+  <button onclick="call('chat')">POST /agent/chat</button>
+  <button onclick="call('status')" style="background:#334155;">GET /agent/status</button>
+  <button onclick="call('tools')" style="background:#334155;">GET /agent/tools</button>
+  <button onclick="call('memory')" style="background:#334155;">GET /agent/memory/alice</button>
+  <button onclick="call('followup')" style="background:#334155;">POST /agent/followup</button>
+  <button onclick="call('health')" style="background:#334155;">GET /agent/health</button>
 </div>
 
 <pre id="out">// 结果将显示在这里</pre>
@@ -51,7 +51,7 @@ async function call(mode) {
   const text = document.getElementById('text').value;
   out.textContent = '// 请求中...';
   try {
-    let url = BASE + '/api/agent/' + mode, opts = { headers: hdrs() };
+    let url = BASE + '/agent/' + mode, opts = { headers: hdrs() };
     if (mode === 'chat') {
       opts.method = 'POST';
       opts.body = JSON.stringify({ message: text, session_id: 'agent-' + Date.now(), user_id: 'alice' });
