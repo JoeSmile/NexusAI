@@ -20,16 +20,26 @@ COST_TABLE: dict[str, float] = {
 }
 
 
+def _price(model: str) -> float:
+    try:
+        from backend.core.model_registry import get_model
+
+        spec = get_model(model)
+        if spec is not None:
+            return float(spec.cost_per_1k)
+    except Exception:
+        pass
+    return COST_TABLE.get(model, COST_TABLE["default"])
+
+
 def estimate_cost(model: str, max_tokens: int = 1000) -> float:
     """估算一次调用的最大成本"""
-    price = COST_TABLE.get(model, COST_TABLE["default"])
-    return price * max_tokens / 1000
+    return _price(model) * max_tokens / 1000
 
 
 def calculate_cost(model: str, total_tokens: int) -> float:
     """计算实际成本"""
-    price = COST_TABLE.get(model, COST_TABLE["default"])
-    return price * total_tokens / 1000
+    return _price(model) * total_tokens / 1000
 
 
 def count_tokens(text: str) -> int:

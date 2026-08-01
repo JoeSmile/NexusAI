@@ -83,6 +83,11 @@ class Settings(BaseSettings):
     rag_rerank_enabled: bool = False
     rag_rerank_pool_size: int = 20
 
+    # Model registry / observability (Task 21)
+    model_registry_json: str = ""
+    langfuse_sample_short_path: float = 0.1
+    langfuse_sample_long_path: float = 1.0
+
     @model_validator(mode="after")
     def _resolve_fallbacks(self) -> Settings:
         if not self.llm_api_key:

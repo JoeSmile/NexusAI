@@ -68,6 +68,11 @@ class PipelineState(TypedDict):
     # ── 流式（07.07e）──
     stream_mode: bool
 
+    # ── A/B（Task 21.04）──
+    ab_experiment_id: str | None
+    ab_variant: str | None
+    ab_variant_config: dict
+
 
 def make_initial_state(
     tenant_id: str,
@@ -119,4 +124,7 @@ def make_initial_state(
         "llm_key_id": None,
         "llm_key_version": None,
         "stream_mode": False,
+        "ab_experiment_id": None,
+        "ab_variant": None,
+        "ab_variant_config": {},
     }
