@@ -107,48 +107,147 @@ class RAGService:
             logger.error(f"创建QA链失败: {e}")
             raise
     
+    def _hyde_hypothesis(self, question: str) -> str | None:
+        """用 LLM 生成简短假设文档（HyDE）；失败返回 None。"""
+        if self.llm is None:
+            return None
+        try:
+            prompt = (
+                "请用 2-3 句中文写一段可能回答下列问题的企业知识片段"
+                "（制度/流程口吻，不要提问）:\n"
+                f"问题: {question}"
+            )
+            resp = self.llm.invoke(prompt)
+            text = getattr(resp, "content", None) or str(resp)
+            text = (text or "").strip()
+            return text or None
+        except Exception as e:
+            logger.warning("HyDE 假设文档生成失败: %s", e)
+            return None
+
+    def _doc_key(self, doc) -> str:
+        meta = getattr(doc, "metadata", None) or {}
+        mid = meta.get("id") or meta.get("chunk_id") or meta.get("source")
+        if mid is not None:
+            return f"id:{mid}"
+        content = getattr(doc, "page_content", "") or ""
+        return f"c:{hash(content[:200])}"
+
+    def _merge_docs(self, *doc_lists) -> list:
+        seen: set[str] = set()
+        merged = []
+        for docs in doc_lists:
+            for doc in docs or []:
+                key = self._doc_key(doc)
+                if key in seen:
+                    continue
+                seen.add(key)
+                merged.append(doc)
+        return merged
+
+    def _llm_rerank(self, question: str, docs: list, top_n: int) -> list:
+        """轻量 LLM 打分重排；失败则截断原序。"""
+        if not docs or self.llm is None:
+            return docs[:top_n]
+        try:
+            lines = []
+            for i, doc in enumerate(docs):
+                snippet = (doc.page_content or "")[:280].replace("\n", " ")
+                lines.append(f"[{i}] {snippet}")
+            prompt = (
+                "你是检索重排器。根据与问题的相关性，输出最多 "
+                f"{top_n} 个文档编号，JSON 数组，例如 [2,0,5]。\n"
+                f"问题: {question}\n候选:\n" + "\n".join(lines)
+            )
+            resp = self.llm.invoke(prompt)
+            text = getattr(resp, "content", None) or str(resp)
+            import json
+            import re
+
+            match = re.search(r"\[[^\]]+\]", text or "")
+            if not match:
+                return docs[:top_n]
+            order = json.loads(match.group(0))
+            ranked = []
+            for idx in order:
+                if isinstance(idx, int) and 0 <= idx < len(docs):
+                    ranked.append(docs[idx])
+                if len(ranked) >= top_n:
+                    break
+            if ranked:
+                return ranked
+        except Exception as e:
+            logger.warning("LLM rerank 失败，降级截断: %s", e)
+        return docs[:top_n]
+
+    def retrieve_documents(self, question: str, search_k: int = 3) -> list:
+        """HyDE 双路召回 + 可选 LLM ReRank。"""
+        from config import Config
+
+        hyde_on = bool(getattr(Config, "RAG_HYDE_ENABLED", False))
+        rerank_on = bool(getattr(Config, "RAG_RERANK_ENABLED", False))
+        pool = int(getattr(Config, "RAG_RERANK_POOL_SIZE", 20) or 20)
+        fetch_k = pool if (hyde_on or rerank_on) else search_k
+
+        primary = self.kb_manager.search_similar(question, k=fetch_k)
+        docs = list(primary)
+
+        if hyde_on:
+            hypo = self._hyde_hypothesis(question)
+            if hypo:
+                secondary = self.kb_manager.search_similar(hypo, k=fetch_k)
+                docs = self._merge_docs(primary, secondary)
+                logger.info(
+                    "HyDE 双路召回: primary=%s secondary=%s merged=%s",
+                    len(primary),
+                    len(secondary),
+                    len(docs),
+                )
+
+        if rerank_on and docs:
+            docs = self._llm_rerank(question, docs, top_n=search_k)
+        else:
+            docs = docs[:search_k]
+        return docs
+
     def ask(self, question: str, search_k: int = 3) -> dict[str, Any]:
         """
-        向知识库提问
-        
-        Args:
-            question: 用户问题
-            search_k: 检索文档数量
-            
-        Returns:
-            包含答案和来源的字典
+        向知识库提问（支持 HyDE + LLM ReRank，由 config 开关控制）
         """
         try:
             logger.info(f"收到问题: {question[:50]}...")
-            
-            # 创建QA链
-            qa_chain = self.create_qa_chain(search_k)
-            
-            # 执行查询
-            result = qa_chain({"query": question})
-            
-            # 提取答案和来源
-            answer = result["result"]
-            source_documents = result.get("source_documents", [])
-            
-            # 整理来源信息
+            source_documents = self.retrieve_documents(question, search_k=search_k)
+
+            if self.llm is None:
+                raise RuntimeError(
+                    "RAG 需要可用的 LLM，请在 config.env 中配置 LLM_API_KEY 与 LLM_BASE_URL"
+                )
+
+            context = "\n\n".join(
+                d.page_content for d in source_documents if getattr(d, "page_content", None)
+            )
+            prompt = self.prompt_template.format(context=context or "（无检索结果）", question=question)
+            resp = self.llm.invoke(prompt)
+            answer = getattr(resp, "content", None) or str(resp)
+
             sources = []
             for doc in source_documents:
-                source_info = {
-                    "content": doc.page_content[:200] + "..." if len(doc.page_content) > 200 else doc.page_content,
-                    "metadata": doc.metadata
-                }
-                sources.append(source_info)
-            
+                content = doc.page_content or ""
+                sources.append(
+                    {
+                        "content": content[:200] + "..." if len(content) > 200 else content,
+                        "metadata": doc.metadata,
+                    }
+                )
+
             logger.info(f"回答生成成功，使用了 {len(sources)} 个知识源")
-            
             return {
                 "answer": answer,
                 "sources": sources,
                 "question": question,
-                "knowledge_count": len(sources)
+                "knowledge_count": len(sources),
             }
-            
+
         except Exception as e:
             logger.error(f"回答问题失败: {e}")
             raise
@@ -209,49 +308,9 @@ class RAGService:
         try:
             logger.info(f"结合上下文回答问题: {question[:50]}...")
             
-            # 第一步：扩大召回，使用 reranker（如果相关库存在）进行重排
-            knowledge_docs = []
-            try:
-                from langchain.retrievers import ContextualCompressionRetriever
-                from langchain.retrievers.document_compressors import CrossEncoderReranker
-                from langchain_community.cross_encoders import HuggingFaceCrossEncoder
-                
-                # 通过配置控制是否启用 Reranker 以及模型名称
-                reranker_enabled = getattr(Config, "ENABLE_RERANKER", True)
-                if not reranker_enabled:
-                    raise RuntimeError("Reranker disabled by configuration")
-                reranker_model_name = getattr(
-                    Config, "RERANKER_MODEL", "BAAI/bge-reranker-base"
-                )
-                
-                # 懒加载并缓存 HuggingFaceCrossEncoder 模型（实例级缓存）
-                if not hasattr(self, "_reranker_model") or self._reranker_model is None:
-                    logger.info(f"初始化 Reranker 模型: {reranker_model_name}")
-                    self._reranker_model = HuggingFaceCrossEncoder(
-                        model_name=reranker_model_name
-                    )
-                
-                # 获取基础检索器（Top 20）
-                base_retriever = self.kb_manager.vectorstore.as_retriever(
-                    search_kwargs={"k": 20}
-                )
-                
-                # 使用缓存的模型构建轻量级重排器（根据当前 search_k 调整 top_n）
-                compressor = CrossEncoderReranker(
-                    model=self._reranker_model,
-                    top_n=search_k,
-                )
-                compression_retriever = ContextualCompressionRetriever(
-                    base_compressor=compressor,
-                    base_retriever=base_retriever,
-                )
-                
-                knowledge_docs = compression_retriever.invoke(question)
-                logger.info(f"已使用 Reranker 完成重排序，获取 {len(knowledge_docs)} 条结果")
-            except Exception as e:
-                logger.warning(f"Reranker 尚未配置或初始化失败，降级为基础检索: {e}")
-                knowledge_docs = self.kb_manager.search_similar(question, k=search_k)
-            
+            # HyDE + LLM ReRank（与 ask() 共用；默认关闭，见 RAG_*_ENABLED）
+            knowledge_docs = self.retrieve_documents(question, search_k=search_k)
+
             # 构建增强的上下文
             knowledge_context = "\n\n".join([
                 f"【知识{i+1}】{doc.page_content}"

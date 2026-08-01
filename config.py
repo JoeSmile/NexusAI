@@ -78,6 +78,11 @@ class Settings(BaseSettings):
     hermes_shell_enabled: bool = False
     hermes_shell_timeout_sec: int = 60
 
+    # RAG deepening (Task 20.01)
+    rag_hyde_enabled: bool = False
+    rag_rerank_enabled: bool = False
+    rag_rerank_pool_size: int = 20
+
     @model_validator(mode="after")
     def _resolve_fallbacks(self) -> Settings:
         if not self.llm_api_key:
