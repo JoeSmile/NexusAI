@@ -15,7 +15,7 @@ if os.name == "nt" and hasattr(sys.stdout, "reconfigure"):
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
-from backend.modules.rag import KnowledgeBaseManager, PsychologyKnowledgeLoader
+from backend.modules.rag import EnterpriseKnowledgeLoader, KnowledgeBaseManager
 
 
 def main():
@@ -38,7 +38,7 @@ def main():
         print("→ 步骤 2/3: 加载企业知识...")
         print("  这可能需要几分钟，请耐心等待...\n")
         
-        loader = PsychologyKnowledgeLoader(kb_manager)
+        loader = EnterpriseKnowledgeLoader(kb_manager)
         loader.load_sample_knowledge()
         
         print("✓ 企业知识加载成功\n")

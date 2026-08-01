@@ -345,8 +345,8 @@ class RAGService:
             # 如果知识库未初始化，尝试自动初始化
             logger.info("知识库未初始化，尝试自动加载示例知识...")
             try:
-                from ..core.knowledge_base import PsychologyKnowledgeLoader
-                loader = PsychologyKnowledgeLoader(self.kb_manager)
+                from ..core.knowledge_base import EnterpriseKnowledgeLoader
+                loader = EnterpriseKnowledgeLoader(self.kb_manager)
                 loader.load_sample_knowledge()
                 
                 # 再次检查
@@ -479,7 +479,7 @@ if __name__ == "__main__":
         print(f"  {key}: {value}")
     
     print("\n测试问答:")
-    question = "我最近总是失眠，怎么办？"
+    question = "如何查询公司的信息安全管理制度？"
     print(f"问题: {question}")
     
     try:

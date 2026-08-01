@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict
 
 from backend.logging_config import get_logger
 
-from ..core.knowledge_base import KnowledgeBaseManager, PsychologyKnowledgeLoader
+from ..core.knowledge_base import EnterpriseKnowledgeLoader, KnowledgeBaseManager
 from ..services.rag_service import RAGIntegrationService, RAGService
 
 logger = get_logger(__name__)
@@ -60,7 +60,7 @@ class AskRequest(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "question": "我最近总是失眠，怎么办？",
+                "question": "如何查询公司的信息安全管理制度？",
                 "search_k": 3
             }
         }
@@ -159,7 +159,7 @@ async def init_sample_knowledge(request: LoadSampleRequest = None):
                 pass
         
         # 加载示例知识
-        loader = PsychologyKnowledgeLoader(kb_manager)
+        loader = EnterpriseKnowledgeLoader(kb_manager)
         loader.load_sample_knowledge()
         
         # 获取统计信息
@@ -199,7 +199,7 @@ async def init_knowledge_base_structure(request: LoadSampleRequest = None):
                 pass
         
         # 从知识库结构加载知识
-        loader = PsychologyKnowledgeLoader(kb_manager)
+        loader = EnterpriseKnowledgeLoader(kb_manager)
         loader.load_from_knowledge_base_structure()
         
         # 获取统计信息
@@ -236,7 +236,7 @@ async def upload_pdf(file: UploadFile = File(...)):
         try:
             # 加载PDF到知识库
             kb_manager = get_kb_manager()
-            loader = PsychologyKnowledgeLoader(kb_manager)
+            loader = EnterpriseKnowledgeLoader(kb_manager)
             loader.load_from_pdf(tmp_path)
             
             # 获取统计信息
@@ -388,7 +388,7 @@ async def test_rag():
             }
         
         # 执行测试查询
-        test_question = "我最近总是失眠，怎么办？"
+        test_question = "如何查询公司的信息安全管理制度？"
         result = rag_service.ask(test_question, search_k=2)
         
         return {
@@ -419,27 +419,27 @@ async def get_examples():
     """
     examples = [
         {
-            "category": "睡眠问题",
+            "category": "企业知识检索",
             "questions": [
-                "我最近总是失眠，怎么办？",
-                "有什么方法可以帮助我快速入睡？",
-                "睡眠质量差，白天很疲劳怎么办？"
+                "如何查询公司的信息安全管理制度？",
+                "合同审批流程是怎样的？",
+                "新员工入职需要办理哪些手续？"
             ]
         },
         {
-            "category": "焦虑应对",
+            "category": "数据与合规",
             "questions": [
-                "我经常感到焦虑不安，有什么缓解方法吗？",
-                "面对考试压力很焦虑，怎么调整？",
-                "如何进行深呼吸来缓解焦虑？"
+                "数据脱敏有哪些要求？",
+                "API Key 的管理规范是什么？",
+                "敏感信息如何安全存储？"
             ]
         },
         {
-            "category": "压力管理",
+            "category": "会议与文档",
             "questions": [
-                "工作压力太大，感觉喘不过气来",
-                "有什么放松身心的练习吗？",
-                "如何练习正念冥想？"
+                "如何快速总结会议纪要？",
+                "周报怎么写更清晰？",
+                "项目文档如何归档？"
             ]
         },
     ]

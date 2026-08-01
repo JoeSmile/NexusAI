@@ -393,8 +393,8 @@ class KnowledgeBaseManager:
             return {"status": "错误", "error": str(e)}
 
 
-class PsychologyKnowledgeLoader:
-    """知识加载器"""
+class EnterpriseKnowledgeLoader:
+    """企业知识加载器"""
     
     def __init__(self, kb_manager: KnowledgeBaseManager):
         """
@@ -404,7 +404,7 @@ class PsychologyKnowledgeLoader:
             kb_manager: 知识库管理器实例
         """
         self.kb_manager = kb_manager
-        logger.info("知识加载器初始化完成")
+        logger.info("企业知识加载器初始化完成")
     
     def load_sample_knowledge(self) -> None:
         """
@@ -521,10 +521,10 @@ class PsychologyKnowledgeLoader:
             
             # 定义知识库结构
             knowledge_structure = {
-                "clinical_guidelines": "临床指南",
-                "therapy_methods": "治疗方法", 
-                "self_help_tools": "自助工具",
-                "organization_policy": "机构政策"
+                "company_policies": "公司制度",
+                "product_docs": "产品文档",
+                "department_handbook": "部门手册",
+                "compliance_guide": "合规指南",
             }
             
             for folder, category in knowledge_structure.items():
@@ -578,7 +578,7 @@ if __name__ == "__main__":
     kb_manager = KnowledgeBaseManager()
     
     print("加载示例知识...")
-    loader = PsychologyKnowledgeLoader(kb_manager)
+    loader = EnterpriseKnowledgeLoader(kb_manager)
     loader.load_sample_knowledge()
     
     print("\n知识库统计信息:")
@@ -587,7 +587,7 @@ if __name__ == "__main__":
         print(f"  {key}: {value}")
     
     print("\n测试检索功能:")
-    query = "我最近总是失眠，怎么办？"
+    query = "如何查询公司的信息安全管理制度？"
     print(f"查询: {query}")
     results = kb_manager.search_similar(query, k=2)
     print(f"\n找到 {len(results)} 个相关文档:")

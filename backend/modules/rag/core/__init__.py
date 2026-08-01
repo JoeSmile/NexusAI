@@ -13,7 +13,7 @@ from .chunking_strategies import (
     SmallBigChunking,
     split_sentences_zh,
 )
-from .knowledge_base import KnowledgeBaseManager, PsychologyKnowledgeLoader
+from .knowledge_base import EnterpriseKnowledgeLoader, KnowledgeBaseManager
 from .langchain_compat import (
     Chroma,
     DirectoryLoader,
@@ -31,11 +31,11 @@ __all__ = [
     "DialogueSplitter",
     "DirectoryLoader",
     "Document",
+    "EnterpriseKnowledgeLoader",
     "KnowledgeBaseManager",
     "MarkdownStructureSplitter",
     "OpenAIEmbeddings",
     "ParentChildChunking",
-    "PsychologyKnowledgeLoader",
     "PyPDFLoader",
     "RecursiveCharacterTextSplitter",
     "SentenceTextSplitter",

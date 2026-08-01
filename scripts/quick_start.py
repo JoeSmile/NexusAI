@@ -103,8 +103,8 @@ def init_rag_knowledge():
         
         # 导入RAG模块
         from backend.modules.rag.core.knowledge_base import (
+            EnterpriseKnowledgeLoader,
             KnowledgeBaseManager,
-            PsychologyKnowledgeLoader,
         )
         
         kb_manager = KnowledgeBaseManager()
@@ -118,7 +118,7 @@ def init_rag_knowledge():
         print("→ 加载企业知识...")
         print("  这可能需要几分钟，请耐心等待...")
         
-        loader = PsychologyKnowledgeLoader(kb_manager)
+        loader = EnterpriseKnowledgeLoader(kb_manager)
         loader.load_sample_knowledge()
         
         # 尝试从知识库结构加载
