@@ -12,7 +12,7 @@ from fastapi import HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from ..core.exceptions import EXCEPTION_HANDLERS, EmotionalChatException
+from ..core.exceptions import EXCEPTION_HANDLERS, ContextGateException
 from ..core.utils.formatters import format_error
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
         try:
             return await call_next(request)
         
-        except EmotionalChatException as e:
+        except ContextGateException as e:
             # 处理自定义异常
             logger.error(f"自定义异常: {e.error_code} - {e.message}", extra={
                 "error_code": e.error_code,

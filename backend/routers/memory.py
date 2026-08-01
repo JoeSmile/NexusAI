@@ -165,28 +165,6 @@ async def update_memory_importance(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/users/{user_id}/emotion-trend")
-async def get_emotion_trend(user_id: str, days: int = 7):
-    """
-    获取用户情绪趋势
-    
-    Args:
-        user_id: 用户ID
-        days: 统计天数
-    """
-    try:
-        trend = await memory_service.get_emotion_trend(user_id, days)
-        
-        return {
-            "user_id": user_id,
-            "trend": trend,
-            "days": days
-        }
-    except Exception as e:
-        logger.error(f"获取情绪趋势失败: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @router.get("/users/{user_id}/statistics")
 async def get_memory_statistics(user_id: str):
     """

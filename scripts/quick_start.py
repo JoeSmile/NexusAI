@@ -115,7 +115,7 @@ def init_rag_knowledge():
             print(f"  文档数量: {stats.get('document_count', 0)}")
             return True
         
-        print("→ 加载心理健康知识...")
+        print("→ 加载企业知识...")
         print("  这可能需要几分钟，请耐心等待...")
         
         loader = PsychologyKnowledgeLoader(kb_manager)
@@ -170,7 +170,7 @@ def start_backend():
 
 def main():
     """主函数"""
-    print_header("心语情感陪伴机器人 - 快速启动")
+    print_header("ContextGate - 快速启动")
     
     print("本脚本将自动完成以下步骤:")
     print("  1. 检查依赖")

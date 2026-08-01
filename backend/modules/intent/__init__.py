@@ -1,6 +1,6 @@
 """
-情感意图识别模块
-Intent Recognition Module for Emotional Chat
+意图识别模块
+Intent Recognition Module
 """
 
 from .core.intent_classifier import IntentClassifier

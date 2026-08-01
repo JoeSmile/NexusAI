@@ -144,7 +144,7 @@ def create_simple_app():
                     else:
                         response = suggestions[0] if suggestions else "我在这里倾听，无论你想说什么都可以。"
                 else:
-                    response = "你好！我是你的情感陪伴机器人，有什么想聊的吗？"
+                    response = "你好！我是 ContextGate 助手，有什么可以帮你的吗？"
                 
                 return ChatResponse(
                     response=response,

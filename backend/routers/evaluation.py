@@ -39,8 +39,6 @@ async def evaluate_response(request: EvaluationRequest):
         evaluation_result = evaluation_engine.evaluate_response(
             user_message=request.user_message,
             bot_response=request.bot_response,
-            user_emotion=request.user_emotion or "neutral",
-            emotion_intensity=request.emotion_intensity or 5.0
         )
         
         # 检查是否有错误
@@ -55,14 +53,12 @@ async def evaluate_response(request: EvaluationRequest):
                 "message_id": request.message_id,
                 "user_message": request.user_message,
                 "bot_response": request.bot_response,
-                "user_emotion": request.user_emotion or "neutral",
-                "emotion_intensity": request.emotion_intensity or 5.0,
-                "empathy_score": evaluation_result.get("empathy_score"),
+                "accuracy_score": evaluation_result.get("accuracy_score"),
                 "naturalness_score": evaluation_result.get("naturalness_score"),
                 "safety_score": evaluation_result.get("safety_score"),
                 "total_score": evaluation_result.get("total_score"),
                 "average_score": evaluation_result.get("average_score"),
-                "empathy_reasoning": evaluation_result.get("empathy_reasoning", ""),
+                "accuracy_reasoning": evaluation_result.get("accuracy_reasoning", ""),
                 "naturalness_reasoning": evaluation_result.get("naturalness_reasoning", ""),
                 "safety_reasoning": evaluation_result.get("safety_reasoning", ""),
                 "overall_comment": evaluation_result.get("overall_comment", ""),
@@ -77,7 +73,7 @@ async def evaluate_response(request: EvaluationRequest):
             
             return EvaluationResponse(
                 evaluation_id=saved_evaluation.id,
-                empathy_score=saved_evaluation.empathy_score,
+                accuracy_score=saved_evaluation.accuracy_score,
                 naturalness_score=saved_evaluation.naturalness_score,
                 safety_score=saved_evaluation.safety_score,
                 average_score=saved_evaluation.average_score,
@@ -126,8 +122,6 @@ async def batch_evaluate(request: BatchEvaluationRequest):
                         "session_id": msg.session_id,
                         "user_message": user_msg.content,
                         "bot_response": msg.content,
-                        "user_emotion": user_msg.emotion or "neutral",
-                        "emotion_intensity": user_msg.emotion_intensity or 5.0
                     })
                     user_msg = None
             
@@ -143,14 +137,12 @@ async def batch_evaluate(request: BatchEvaluationRequest):
                     "message_id": conversations[i]["id"],
                     "user_message": conversations[i]["user_message"],
                     "bot_response": conversations[i]["bot_response"],
-                    "user_emotion": conversations[i]["user_emotion"],
-                    "emotion_intensity": conversations[i]["emotion_intensity"],
-                    "empathy_score": result.get("empathy_score"),
+                    "accuracy_score": result.get("accuracy_score"),
                     "naturalness_score": result.get("naturalness_score"),
                     "safety_score": result.get("safety_score"),
                     "total_score": result.get("total_score"),
                     "average_score": result.get("average_score"),
-                    "empathy_reasoning": result.get("empathy_reasoning", ""),
+                    "accuracy_reasoning": result.get("accuracy_reasoning", ""),
                     "naturalness_reasoning": result.get("naturalness_reasoning", ""),
                     "safety_reasoning": result.get("safety_reasoning", ""),
                     "overall_comment": result.get("overall_comment", ""),
@@ -187,8 +179,6 @@ async def compare_prompts(request: ComparePromptsRequest):
         comparison_result = evaluation_engine.compare_prompts(
             user_message=request.user_message,
             responses=request.responses,
-            user_emotion=request.user_emotion or "neutral",
-            emotion_intensity=request.emotion_intensity or 5.0
         )
         
         return comparison_result
@@ -213,7 +203,7 @@ async def get_evaluations(session_id: str = None, limit: int = 100):
                     "user_id": e.user_id,
                     "user_message": e.user_message[:100] + "..." if len(e.user_message or "") > 100 else e.user_message,
                     "bot_response": e.bot_response[:100] + "..." if len(e.bot_response or "") > 100 else e.bot_response,
-                    "empathy_score": e.empathy_score,
+                    "accuracy_score": e.accuracy_score,
                     "naturalness_score": e.naturalness_score,
                     "safety_score": e.safety_score,
                     "average_score": e.average_score,
@@ -275,17 +265,15 @@ async def get_evaluation_detail(evaluation_id: int):
                 "message_id": evaluation.message_id,
                 "user_message": evaluation.user_message,
                 "bot_response": evaluation.bot_response,
-                "user_emotion": evaluation.user_emotion,
-                "emotion_intensity": evaluation.emotion_intensity,
                 "scores": {
-                    "empathy": evaluation.empathy_score,
+                    "accuracy": evaluation.accuracy_score,
                     "naturalness": evaluation.naturalness_score,
                     "safety": evaluation.safety_score,
                     "average": evaluation.average_score,
                     "total": evaluation.total_score
                 },
                 "reasoning": {
-                    "empathy": evaluation.empathy_reasoning,
+                    "accuracy": evaluation.accuracy_reasoning,
                     "naturalness": evaluation.naturalness_reasoning,
                     "safety": evaluation.safety_reasoning
                 },
@@ -313,7 +301,7 @@ async def human_verify_evaluation(evaluation_id: int, request: HumanVerification
     try:
         with DatabaseManager() as db:
             human_scores = {
-                "empathy": request.empathy_score,
+                "accuracy": request.accuracy_score,
                 "naturalness": request.naturalness_score,
                 "safety": request.safety_score
             }
@@ -330,7 +318,7 @@ async def human_verify_evaluation(evaluation_id: int, request: HumanVerification
                 "message": "人工验证完成",
                 "evaluation_id": evaluation_id,
                 "ai_scores": {
-                    "empathy": evaluation.empathy_score,
+                    "accuracy": evaluation.accuracy_score,
                     "naturalness": evaluation.naturalness_score,
                     "safety": evaluation.safety_score,
                     "average": evaluation.average_score
@@ -363,7 +351,7 @@ async def generate_evaluation_report(
             evaluations = []
             for e in evaluations_db:
                 evaluations.append({
-                    "empathy_score": e.empathy_score,
+                    "accuracy_score": e.accuracy_score,
                     "naturalness_score": e.naturalness_score,
                     "safety_score": e.safety_score,
                     "average_score": e.average_score,

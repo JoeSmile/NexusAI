@@ -50,9 +50,7 @@ async def write_memory(state: PipelineState) -> PipelineState:
                 user_id=user_id,
                 role="user",
                 content=message,
-                emotion=state.get("emotion"),
-                emotion_intensity=state.get("emotion_intensity", 5.0),
-            )
+                                            )
         )
         session.add(
             ChatMessage(

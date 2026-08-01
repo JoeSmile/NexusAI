@@ -100,7 +100,6 @@ class PerformanceOptimizer:
     async def parallel_processing(
         self,
         user_input: str,
-        emotion_analyzer,
         safety_checker,
         memory_retriever,
     ) -> dict[str, Any]:
@@ -121,11 +120,7 @@ class PerformanceOptimizer:
                 pass
             return result
 
-        emotion_result, safety_result, memory_result = await asyncio.gather(
-            get_or_compute(
-                self.cache_key("emotion", user_input),
-                lambda: emotion_analyzer.analyze(user_input),
-            ),
+        safety_result, memory_result = await asyncio.gather(
             get_or_compute(
                 self.cache_key("safety", user_input),
                 lambda: safety_checker.check(user_input),
@@ -137,7 +132,6 @@ class PerformanceOptimizer:
         )
 
         return {
-            "emotion": emotion_result,
             "safety": safety_result,
             "memory": memory_result,
             "processing_time": time.time() - start_time,

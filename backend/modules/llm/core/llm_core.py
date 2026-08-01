@@ -98,102 +98,6 @@ ContextGate："""
             self.llm = None
             self.chain = None
         
-        # 情感关键词映射
-        self.emotion_keywords = {
-            "happy": ["开心", "高兴", "快乐", "兴奋", "满意", "幸福", "😊", "😄", "🎉"],
-            "sad": ["难过", "伤心", "沮丧", "失落", "痛苦", "抑郁", "😢", "😭", "💔"],
-            "angry": ["愤怒", "生气", "恼火", "愤怒", "暴躁", "😠", "😡", "🔥"],
-            "anxious": ["焦虑", "担心", "紧张", "不安", "恐惧", "😰", "😨", "😟"],
-            "excited": ["兴奋", "激动", "期待", "迫不及待", "兴奋", "🎊", "✨", "🚀"],
-            "confused": ["困惑", "迷茫", "不明白", "不懂", "疑惑", "😕", "🤔", "❓"],
-            "frustrated": ["沮丧", "挫败", "失望", "无奈", "😤", "😩", "😒"],
-            "lonely": ["孤独", "寂寞", "孤单", "😔", "😞", "💭"],
-            "grateful": ["感谢", "感激", "谢谢", "🙏", "💝", "❤️"]
-        }
-        
-    
-    def analyze_emotion(self, message):
-        """分析用户消息的情感"""
-        message_lower = message.lower()
-        
-        emotion_scores = {}
-        for emotion, keywords in self.emotion_keywords.items():
-            score = sum(1 for keyword in keywords if keyword in message_lower)
-            if score > 0:
-                emotion_scores[emotion] = score
-        
-        if emotion_scores:
-            dominant_emotion = max(emotion_scores, key=emotion_scores.get)
-            intensity = min(emotion_scores[dominant_emotion] * 2, 10)
-        else:
-            dominant_emotion = "neutral"
-            intensity = 5
-        
-        suggestions = self._get_emotion_suggestions(dominant_emotion)
-        
-        return {
-            "emotion": dominant_emotion,
-            "intensity": intensity,
-            "keywords": self.emotion_keywords.get(dominant_emotion, []),
-            "suggestions": suggestions
-        }
-    
-    def _get_emotion_suggestions(self, emotion):
-        """根据情感类型获取建议"""
-        suggestions_map = {
-            "happy": [
-                "很高兴看到你这么开心！有什么特别的事情想要分享吗？",
-                "你的快乐感染了我！让我们一起保持这种积极的状态吧！",
-                "太棒了！有什么秘诀让心情保持这么好的吗？"
-            ],
-            "sad": [
-                "我理解你现在的心情，每个人都会有难过的时刻。",
-                "可以告诉我发生了什么吗？我愿意倾听。",
-                "虽然现在很难过，但这些感受都是正常的，你并不孤单。"
-            ],
-            "angry": [
-                "我能感受到你的愤怒，让我们先深呼吸一下。",
-                "是什么事情让你感到愤怒？我们可以一起分析一下。",
-                "愤怒是正常的情绪，重要的是如何表达和处理它。"
-            ],
-            "anxious": [
-                "焦虑确实让人感到不安，让我们一起面对它。",
-                "可以告诉我你在担心什么吗？有时候说出来会好很多。",
-                "深呼吸，我们可以一步一步来解决你担心的问题。"
-            ],
-            "excited": [
-                "你的兴奋很有感染力！有什么好事要发生了吗？",
-                "兴奋的感觉真棒！让我们一起期待美好的事情！",
-                "看到你这么兴奋，我也跟着开心起来了！"
-            ],
-            "confused": [
-                "困惑是学习过程中的正常现象，我们一起理清思路。",
-                "可以具体告诉我哪里让你感到困惑吗？",
-                "慢慢来，我们可以一步步分析，直到你完全理解。"
-            ],
-            "frustrated": [
-                "挫败感确实让人沮丧，但这也是成长的一部分。",
-                "让我们换个角度思考这个问题，也许能找到新的解决方案。",
-                "你已经很努力了，偶尔的挫折不代表失败。"
-            ],
-            "lonely": [
-                "孤独的感觉确实不好受，但你并不孤单，我在这里。",
-                "孤独时，我们往往会想到很多，想聊聊你的想法吗？",
-                "有时候我们需要独处，但如果你需要陪伴，我随时在这里。"
-            ],
-            "grateful": [
-                "感恩的心很美好，感谢你愿意分享这份美好。",
-                "感恩能让我们更加珍惜身边的一切。",
-                "你的感恩之心让我也很感动，谢谢你的分享。"
-            ],
-            "neutral": [
-                "今天感觉怎么样？有什么想聊的吗？",
-                "我在这里倾听，无论你想说什么都可以。",
-                "有时候平淡的日子也很珍贵，不是吗？"
-            ]
-        }
-        return suggestions_map.get(emotion, suggestions_map["neutral"])
-    
     def is_safe_input(self, text):
         """
         安全检查（使用完整的验证机制）
@@ -210,8 +114,7 @@ ContextGate："""
         
         # 如果没有API key，直接使用fallback
         if not self.api_key:
-            emotion_data = self.analyze_emotion(user_input)
-            return self._get_fallback_response(user_input, emotion_data)
+            return self._get_fallback_response(user_input)
         
         # 构建历史对话（短期记忆 - MySQL）
         db_manager = DatabaseManager()
@@ -301,77 +204,13 @@ ContextGate："""
             print(f"API调用失败 ({self.model}): {e}")
             return self._get_fallback_response(user_input)
     
-    def _get_fallback_response(self, user_input, emotion_data=None):
-        """提供备选回应当API调用失败时"""
-        if emotion_data is None:
-            # 如果没有提供情感数据，则分析用户输入
-            emotion_data = self.analyze_emotion(user_input)
-        emotion = emotion_data.get("emotion", "neutral")
-        suggestions = emotion_data.get("suggestions", [])
-        
-        # 基于情感类型提供合适的回应（符合ContextGatePrompt：3-4句话，不使用表情符号）
-        fallback_responses = {
-            "happy": [
-                "听起来你心情很好。你的快乐让我也感到温暖。有什么特别的事情想要分享吗？",
-                "看到你这么开心，我也替你高兴。这种积极的状态真好。愿意多说说是什么让你这么开心吗？",
-                "你的愉快心情很有感染力。保持这样的状态很重要。想聊聊让你开心的事情吗？"
-            ],
-            "sad": [
-                "听起来你现在很难过。这种感觉确实不好受。我在这里倾听，你愿意说说发生了什么吗？",
-                "我能感受到你的伤心。每个人都会有这样的时刻，这些感受都是正常的。你并不孤单。",
-                "你现在的心情一定很沉重。谢谢你愿意告诉我。想多聊聊吗？"
-            ],
-            "angry": [
-                "听起来你很愤怒。这种情绪确实很强烈。是什么事情让你这么生气？",
-                "我能感受到你的愤怒。这确实让人很不舒服。你愿意说说具体发生了什么吗？",
-                "听起来有些事情真的惹恼了你。这种感觉很正常。想聊聊是什么让你这么生气吗？"
-            ],
-            "anxious": [
-                "听起来你很焦虑。这种不安的感觉确实让人难受。你在担心什么呢？",
-                "我能感受到你的紧张。焦虑的时候确实很不好受。可以跟我说说你担心的事情吗？",
-                "你现在似乎很不安。这种焦虑感很沉重。想聊聊让你担心的事情吗？"
-            ],
-            "excited": [
-                "听起来你很兴奋。这种期待的感觉真好。有什么好事要发生了吗？",
-                "我能感受到你的激动。这种兴奋很有感染力。是什么让你这么期待呢？",
-                "你似乎对某件事充满期待。这种感觉真棒。愿意分享一下吗？"
-            ],
-            "confused": [
-                "听起来你感到困惑。这种迷茫的感觉确实让人不安。能说说是什么让你困惑吗？",
-                "我能理解你的迷茫。有些事情确实让人摸不着头脑。想聊聊具体是什么让你困惑吗？",
-                "你现在似乎有些迷茫。这种感觉很正常。愿意说说让你困惑的事情吗？"
-            ],
-            "frustrated": [
-                "听起来你很挫败。这种感觉确实很沮丧。是什么事情让你这么受挫？",
-                "我能感受到你的沮丧。这确实很让人失望。想说说发生了什么吗？",
-                "你现在一定很沮丧。这种挫败感真的不好受。愿意聊聊吗？"
-            ],
-            "lonely": [
-                "听起来你感到孤独。这种感觉确实很难受。我在这里陪着你。你想聊聊吗？",
-                "我理解你的困扰。如果需要，我可以帮你分析问题或查找相关资料。",
-                "你现在一定很孤单。这种感觉很沉重。想说说你的想法吗？"
-            ],
-            "grateful": [
-                "听起来你心怀感激。这种感恩的心很美好。是什么让你有这样的感受？",
-                "我能感受到你的感恩之心。这很温暖。愿意分享是什么让你心存感激吗？",
-                "你的感恩之心很动人。这种积极的情绪很珍贵。想多说说吗？"
-            ],
-            "neutral": [
-                "今天感觉怎么样？我在这里倾听。有什么想聊的吗？",
-                "我在这里陪伴你。无论你想说什么，我都愿意倾听。",
-                "你现在的心情如何？想聊聊今天的事情吗？"
-            ]
-        }
-        
-        # 根据情感选择回应，如果没有对应的情感则使用建议或默认回应
-        if fallback_responses.get(emotion):
-            import random
-            return random.choice(fallback_responses[emotion])
-        elif suggestions:
-            return suggestions[0]
-        else:
-            return "我在这里倾听你的心声。无论你想说什么，我都会认真倾听。你并不孤单。"
-    
+    def _get_fallback_response(self, user_input):
+        """提供备选回应（API 不可用时）"""
+        return (
+            "我暂时无法连接模型服务。请检查 LLM API 配置后重试。"
+            f"（收到您的消息：{user_input[:80]}…）"
+        )
+
     def chat(self, request):
         """处理聊天请求"""
         session_id = request.session_id or str(uuid.uuid4())
@@ -379,11 +218,7 @@ ContextGate："""
         
         print(f"Chat请求: session_id={session_id}, user_id={user_id}, message={request.message[:50]}...")
         
-        # 分析情感
-        emotion_data = self.analyze_emotion(request.message)
-        
         # 保存用户消息到数据库
-        user_message = None
         try:
             db_manager = DatabaseManager()
             with db_manager as db:
@@ -393,24 +228,11 @@ ContextGate："""
                     db.create_session(session_id, user_id)
                     print("会话创建完成")
                 
-                user_message = db.save_message(
+                db.save_message(
                     session_id=session_id,
                     user_id=user_id,
                     role="user",
                     content=request.message,
-                    emotion=emotion_data["emotion"],
-                    emotion_intensity=emotion_data["intensity"]
-                )
-                
-                # 保存分析结果
-                db.save_emotion_analysis(
-                    session_id=session_id,
-                    user_id=user_id,
-                    message_id=user_message.id,
-                    emotion=emotion_data["emotion"],
-                    intensity=emotion_data["intensity"],
-                    keywords=emotion_data["keywords"],
-                    suggestions=emotion_data["suggestions"]
                 )
         except Exception as e:
             print(f"数据库操作失败: {e}")
@@ -428,28 +250,13 @@ ContextGate："""
                 user_id=user_id,
                 role="assistant",
                 content=response_text,
-                emotion=emotion_data.get("emotion", "neutral")
             )
-        
-        # 保存对话到向量数据库（长期记忆）
-        if self.vector_store:
-            try:
-                self.vector_store.add_conversation(
-                    session_id=session_id,
-                    message=request.message,
-                    response=response_text,
-                    emotion=emotion_data["emotion"]
-                )
-            except Exception as e:
-                print(f"保存到向量数据库失败: {e}")
         
         return ChatResponse(
             response=response_text,
             session_id=session_id,
-            emotion=emotion_data["emotion"],
-            suggestions=emotion_data["suggestions"][:3]
         )
-    
+
     def get_session_summary(self, session_id):
         """获取会话摘要"""
         db_manager = DatabaseManager()
@@ -459,37 +266,11 @@ ContextGate："""
             if not messages:
                 return {"error": "会话不存在"}
             
-            # 统计情感分布
-            emotion_counts = {}
-            for msg in messages:
-                if msg.emotion:
-                    emotion_counts[msg.emotion] = emotion_counts.get(msg.emotion, 0) + 1
-            
             return {
                 "session_id": session_id,
                 "message_count": len(messages),
-                "emotion_distribution": emotion_counts,
                 "created_at": messages[-1].created_at.isoformat() if messages else None,
                 "updated_at": messages[0].created_at.isoformat() if messages else None
             }
-    
-    def get_user_emotion_trends(self, user_id):
-        """获取用户情感趋势"""
-        db_manager = DatabaseManager()
-        with db_manager as db:
-            emotion_history = db.get_user_emotion_history(user_id, limit=100)
-            
-            if not emotion_history:
-                return {"error": "没有情感数据"}
-            
-            # 分析情感趋势
-            emotions = [e.emotion for e in emotion_history]
-            intensities = [e.intensity for e in emotion_history]
-            
-            return {
-                "user_id": user_id,
-                "total_records": len(emotion_history),
-                "recent_emotions": emotions[:10],
-                "average_intensity": sum(intensities) / len(intensities) if intensities else 0,
-                "emotion_counts": {emotion: emotions.count(emotion) for emotion in set(emotions)}
-            }
+
+

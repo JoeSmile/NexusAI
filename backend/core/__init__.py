@@ -6,21 +6,20 @@
 from .config import Config, get_config
 from .exceptions import (
     ConfigurationError,
+    ContextGateException,
     DatabaseError,
-    EmotionalChatException,
     RAGError,
     ValidationError,
 )
-from .interfaces import IChatEngine, IContextService, IEmotionAnalyzer, IMemoryService, IRAGService
+from .interfaces import IChatEngine, IContextService, IMemoryService, IRAGService
 
 __all__ = [
     "Config",
     "ConfigurationError",
     "DatabaseError",
-    "EmotionalChatException",
+    "ContextGateException",
     "IChatEngine",
     "IContextService",
-    "IEmotionAnalyzer",
     "IMemoryService",
     "IRAGService",
     "RAGError",

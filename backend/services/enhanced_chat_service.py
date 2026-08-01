@@ -17,7 +17,6 @@ from backend.database import ChatMessage, ChatSession, DatabaseManager
 from backend.models import ChatRequest, ChatResponse
 from backend.services.enhanced_context_assembler import EnhancedContextAssembler
 from backend.services.enhanced_memory_manager import EnhancedMemoryManager
-from backend.services.proactive_recall_system import ProactiveRecallSystem
 from backend.services.user_profile_builder import UserProfileBuilder
 
 
@@ -29,13 +28,11 @@ class EnhancedChatService:
         use_rag: bool = True,
         use_intent: bool = True,
         use_enhanced_processor: bool = True,
-        enable_proactive_recall: bool = True,
     ):
         self._cfg = {
             "use_rag": use_rag,
             "use_intent": use_intent,
             "use_enhanced_processor": use_enhanced_processor,
-            "enable_proactive_recall": enable_proactive_recall,
         }
 
     @cached_property
@@ -55,12 +52,6 @@ class EnhancedChatService:
     @cached_property
     def context_assembler(self):
         return EnhancedContextAssembler()
-
-    @cached_property
-    def proactive_recall(self):
-        if self._cfg.get("enable_proactive_recall"):
-            return ProactiveRecallSystem()
-        return None
 
     @cached_property
     def enhanced_processor(self):
@@ -137,20 +128,8 @@ class EnhancedChatService:
         if preprocessed and preprocessed.get("blocked"):
             return self._create_blocked_response(session_id, preprocessed)
         
-        # ============ 第2步：内容分析 ============
-        emotion_result = self.chat_engine.analyze_emotion(message)
-        emotion = emotion_result.get("emotion", "neutral")
-        emotion_intensity = emotion_result.get("intensity", 5.0)
-        
         # ============ 第3步：意图识别 ============
         intent_result = await self._analyze_intent(user_id, message)
-        
-        # ============ 第4步：主动回忆检查 ============
-        proactive_prompt = None
-        if self.proactive_recall:
-            proactive_prompt = await self.proactive_recall.generate_proactive_response(
-                user_id, message, emotion
-            )
         
         # ============ 第5步：获取对话历史 ============
         chat_history = await self._get_conversation_history(session_id, limit=15)
@@ -160,13 +139,11 @@ class EnhancedChatService:
             user_id=user_id,
             session_id=session_id,
             current_message=message,
-            chat_history=chat_history,
-            emotion=emotion,
-            emotion_intensity=emotion_intensity
+            chat_history=chat_history
         )
         
         # ============ 第7步：构建增强Prompt ============
-        system_prompt = self._build_system_prompt(context, proactive_prompt)
+        system_prompt = self._build_system_prompt(context)
         self.context_assembler.build_prompt_context(
             context, system_prompt
         )
@@ -175,12 +152,12 @@ class EnhancedChatService:
         rag_result = None
         if self.rag_enabled and self.rag_service:
             rag_result = await self._try_rag_enhancement(
-                message, emotion, chat_history
+                message, chat_history
             )
         
         # ============ 第9步：生成回复 ============
         response = await self._generate_response(
-            request, rag_result, session_id, emotion, emotion_intensity
+            request, rag_result, session_id
         )
         
         # ============ 第10步：添加上下文信息 ============
@@ -190,8 +167,7 @@ class EnhancedChatService:
         
         # ============ 第11步：保存对话到数据库 ============
         await self._save_conversation(
-            session_id, user_id, message, response.response, 
-            emotion, emotion_intensity
+            session_id, user_id, message, response.response
         )
         
         # ============ 第12步：处理并存储记忆 ============
@@ -199,9 +175,7 @@ class EnhancedChatService:
             session_id=session_id,
             user_id=user_id,
             user_message=message,
-            bot_response=response.response,
-            emotion=emotion,
-            emotion_intensity=emotion_intensity
+            bot_response=response.response
         )
         
         return response
@@ -244,8 +218,6 @@ class EnhancedChatService:
                     {
                         "role": msg.role,
                         "content": msg.content,
-                        "emotion": msg.emotion,
-                        "emotion_intensity": msg.emotion_intensity,
                         "timestamp": msg.created_at.isoformat() if msg.created_at else None
                     }
                     for msg in messages
@@ -254,23 +226,16 @@ class EnhancedChatService:
             print(f"获取对话历史失败: {e}")
             return []
     
-    def _build_system_prompt(self, context: dict[str, Any], proactive_prompt: str | None) -> str:
+    def _build_system_prompt(self, context: dict[str, Any]) -> str:
         """构建系统Prompt"""
-        system_prompt = """你是"ContextGate"，企业级 LLM 信息平台的智能助手，专业、准确、安全。"""
-        
-        # 如果有主动回忆提示，添加到系统Prompt
-        if proactive_prompt:
-            system_prompt += f"\n\n【主动关怀】\n在适当的时候，你可以主动提及：{proactive_prompt}"
-        
-        return system_prompt
+        return """你是"ContextGate"，企业级 LLM 信息平台的智能助手，专业、准确、安全。"""
     
-    async def _try_rag_enhancement(self, message: str, emotion: str, 
+    async def _try_rag_enhancement(self, message: str,
                                   chat_history: list[dict]) -> dict | None:
         """尝试RAG增强"""
         try:
             rag_result = self.rag_service.enhance_response(
                 message=message,
-                emotion=emotion,
                 conversation_history=chat_history
             )
             return rag_result
@@ -279,15 +244,12 @@ class EnhancedChatService:
             return None
     
     async def _generate_response(self, request: ChatRequest, rag_result: dict | None,
-                                session_id: str, emotion: str, 
-                                emotion_intensity: float) -> ChatResponse:
+                                session_id: str) -> ChatResponse:
         """生成回复"""
         if rag_result and rag_result.get("use_rag"):
             # 使用RAG增强的回复
             return ChatResponse(
                 response=rag_result["answer"],
-                emotion=emotion,
-                emotion_intensity=emotion_intensity,
                 session_id=session_id,
                 timestamp=datetime.now()
             )
@@ -300,7 +262,6 @@ class EnhancedChatService:
                 return ChatResponse(
                     response="抱歉，我遇到了一些技术问题，请稍后再试。",
                     session_id=session_id,
-                    emotion="neutral",
                     timestamp=datetime.now()
                 )
     
@@ -337,9 +298,8 @@ class EnhancedChatService:
             "system_version": "enhanced_v1.0"
         }
     
-    async def _save_conversation(self, session_id: str, user_id: str, 
-                                user_message: str, bot_response: str,
-                                emotion: str, emotion_intensity: float):
+    async def _save_conversation(self, session_id: str, user_id: str,
+                                user_message: str, bot_response: str):
         """保存对话到数据库"""
         try:
             with DatabaseManager() as db:
@@ -357,8 +317,6 @@ class EnhancedChatService:
                     user_id=user_id,
                     role="user",
                     content=user_message,
-                    emotion=emotion,
-                    emotion_intensity=emotion_intensity
                 )
                 
                 # 保存助手消息
@@ -367,7 +325,6 @@ class EnhancedChatService:
                     user_id=user_id,
                     role="assistant",
                     content=bot_response,
-                    emotion=emotion
                 )
                 
         except Exception as e:
@@ -379,7 +336,6 @@ class EnhancedChatService:
         """创建被阻止的响应"""
         return ChatResponse(
             response=preprocessed.get("friendly_message", "输入无效，请重新输入"),
-            emotion="neutral",
             session_id=session_id,
             timestamp=datetime.now(),
             context={
@@ -411,8 +367,6 @@ class EnhancedChatService:
                             "id": msg.id,
                             "role": msg.role,
                             "content": msg.content,
-                            "emotion": msg.emotion,
-                            "emotion_intensity": msg.emotion_intensity,
                             "timestamp": msg.created_at.isoformat() if msg.created_at else None
                         }
                         for msg in messages
@@ -505,12 +459,3 @@ class EnhancedChatService:
         """获取用户重要记忆"""
         return await self.memory_manager.get_important_memories(user_id, limit)
     
-    async def get_emotion_insights(self, user_id: str) -> dict[str, Any]:
-        """获取用户情绪洞察"""
-        if self.proactive_recall:
-            trend_data = await self.proactive_recall.emotion_tracker.track_emotion_changes(
-                user_id, days=7
-            )
-            return trend_data
-        return {}
-

@@ -60,20 +60,16 @@ EVALUATION_PROMPT_TEMPLATE = """你是一位专业的企业AI助手评估专家�
 **机器人回应：**
 {bot_response}
 
-**用户上下文：**
-- 用户状态：{user_emotion}
-- 状态强度：{emotion_intensity}/10
-
 ---
 
 **请按照以下JSON格式输出评分结果：**
 
 ```json
 {{
-  "empathy_score": <1-5分>,
+  "accuracy_score": <1-5分>,
   "naturalness_score": <1-5分>,
   "safety_score": <1-5分>,
-  "empathy_reasoning": "<对准确性维度的详细评价>",
+  "accuracy_reasoning": "<对准确性维度的详细评价>",
   "naturalness_reasoning": "<对自然度的详细评价>",
   "safety_reasoning": "<对安全性的详细评价>",
   "overall_comment": "<总体评价和建议>",
@@ -135,8 +131,6 @@ class EvaluationEngine:
         self,
         user_message: str,
         bot_response: str,
-        user_emotion: str = "neutral",
-        emotion_intensity: float = 5.0,
         additional_context: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         """
@@ -145,8 +139,6 @@ class EvaluationEngine:
         Args:
             user_message: 用户消息
             bot_response: 机器人回应
-            user_emotion: 用户情感
-            emotion_intensity: 情感强度 (0-10)
             additional_context: 额外的上下文信息
         
         Returns:
@@ -155,7 +147,7 @@ class EvaluationEngine:
         if not self.api_key:
             return {
                 "error": "评估引擎未配置API_KEY",
-                "empathy_score": 0,
+                "accuracy_score": 0,
                 "naturalness_score": 0,
                 "safety_score": 0
             }
@@ -166,12 +158,10 @@ class EvaluationEngine:
                 result_text = self.chain.invoke({
                     "user_message": user_message,
                     "bot_response": bot_response,
-                    "user_emotion": user_emotion,
-                    "emotion_intensity": emotion_intensity
                 })
             else:
                 result_text = self._call_api_traditional(
-                    user_message, bot_response, user_emotion, emotion_intensity
+                    user_message, bot_response
                 )
             
             # 解析JSON结果
@@ -180,12 +170,10 @@ class EvaluationEngine:
             # 添加元数据
             evaluation_result["evaluated_at"] = datetime.now().isoformat()
             evaluation_result["model"] = self.model
-            evaluation_result["user_emotion"] = user_emotion
-            evaluation_result["emotion_intensity"] = emotion_intensity
             
             # 计算总分
             evaluation_result["total_score"] = (
-                evaluation_result.get("empathy_score", 0) +
+                evaluation_result.get("accuracy_score", 0) +
                 evaluation_result.get("naturalness_score", 0) +
                 evaluation_result.get("safety_score", 0)
             )
@@ -199,22 +187,19 @@ class EvaluationEngine:
             logger.error(f"评估失败: {e}")
             return {
                 "error": str(e),
-                "empathy_score": 0,
+                "accuracy_score": 0,
                 "naturalness_score": 0,
                 "safety_score": 0,
                 "evaluated_at": datetime.now().isoformat()
             }
     
     def _call_api_traditional(
-        self, user_message: str, bot_response: str,
-        user_emotion: str, emotion_intensity: float
+        self, user_message: str, bot_response: str
     ) -> str:
         """使用传统HTTP请求调用API"""
         prompt = EVALUATION_PROMPT_TEMPLATE.format(
             user_message=user_message,
-            bot_response=bot_response,
-            user_emotion=user_emotion,
-            emotion_intensity=emotion_intensity
+            bot_response=bot_response
         )
         
         try:
@@ -276,7 +261,7 @@ class EvaluationEngine:
             result = json.loads(json_str)
             
             # 验证必需字段
-            required_fields = ["empathy_score", "naturalness_score", "safety_score"]
+            required_fields = ["accuracy_score", "naturalness_score", "safety_score"]
             for field in required_fields:
                 if field not in result:
                     result[field] = 3  # 默认中等分数
@@ -294,7 +279,7 @@ class EvaluationEngine:
             logger.error(f"原始文本: {result_text[:500]}")
             # 返回默认结果
             return {
-                "empathy_score": 3,
+                "accuracy_score": 3,
                 "naturalness_score": 3,
                 "safety_score": 3,
                 "overall_comment": "评估解析失败，使用默认分数",
@@ -326,8 +311,6 @@ class EvaluationEngine:
             result = self.evaluate_response(
                 user_message=conv.get("user_message", ""),
                 bot_response=conv.get("bot_response", ""),
-                user_emotion=conv.get("user_emotion", "neutral"),
-                emotion_intensity=conv.get("emotion_intensity", 5.0),
                 additional_context=conv.get("context")
             )
             
@@ -342,9 +325,7 @@ class EvaluationEngine:
     def compare_prompts(
         self,
         user_message: str,
-        responses: dict[str, str],
-        user_emotion: str = "neutral",
-        emotion_intensity: float = 5.0
+        responses: dict[str, str]
     ) -> dict[str, Any]:
         """
         比较不同Prompt生成的回应
@@ -352,8 +333,6 @@ class EvaluationEngine:
         Args:
             user_message: 用户消息
             responses: Prompt名称到回应的映射，如 {"prompt_v1": "回应1", "prompt_v2": "回应2"}
-            user_emotion: 用户情感
-            emotion_intensity: 情感强度
         
         Returns:
             比较结果
@@ -365,9 +344,7 @@ class EvaluationEngine:
             
             evaluation = self.evaluate_response(
                 user_message=user_message,
-                bot_response=bot_response,
-                user_emotion=user_emotion,
-                emotion_intensity=emotion_intensity
+                bot_response=bot_response
             )
             
             comparison_results[prompt_name] = evaluation
@@ -375,7 +352,6 @@ class EvaluationEngine:
         # 生成对比总结
         summary = {
             "user_message": user_message,
-            "user_emotion": user_emotion,
             "prompt_evaluations": comparison_results,
             "ranking": self._rank_prompts(comparison_results),
             "best_prompt": None,
@@ -396,7 +372,7 @@ class EvaluationEngine:
             rankings.append({
                 "prompt_name": prompt_name,
                 "average_score": evaluation.get("average_score", 0),
-                "empathy_score": evaluation.get("empathy_score", 0),
+                "accuracy_score": evaluation.get("accuracy_score", 0),
                 "naturalness_score": evaluation.get("naturalness_score", 0),
                 "safety_score": evaluation.get("safety_score", 0),
                 "total_score": evaluation.get("total_score", 0)
@@ -427,14 +403,14 @@ class EvaluationEngine:
         total_count = len(evaluations)
         
         # 计算平均分
-        avg_empathy = sum(e.get("empathy_score", 0) for e in evaluations) / total_count
+        avg_accuracy = sum(e.get("accuracy_score", 0) for e in evaluations) / total_count
         avg_naturalness = sum(e.get("naturalness_score", 0) for e in evaluations) / total_count
         avg_safety = sum(e.get("safety_score", 0) for e in evaluations) / total_count
         avg_total = sum(e.get("average_score", 0) for e in evaluations) / total_count
         
         # 分数分布
         score_distribution = {
-            "empathy": self._get_score_distribution([e.get("empathy_score", 0) for e in evaluations]),
+            "accuracy": self._get_score_distribution([e.get("accuracy_score", 0) for e in evaluations]),
             "naturalness": self._get_score_distribution([e.get("naturalness_score", 0) for e in evaluations]),
             "safety": self._get_score_distribution([e.get("safety_score", 0) for e in evaluations])
         }
@@ -452,7 +428,7 @@ class EvaluationEngine:
         return {
             "total_evaluations": total_count,
             "average_scores": {
-                "empathy": round(avg_empathy, 2),
+                "accuracy": round(avg_accuracy, 2),
                 "naturalness": round(avg_naturalness, 2),
                 "safety": round(avg_safety, 2),
                 "overall": round(avg_total, 2)
@@ -497,9 +473,7 @@ class EvaluationEngine:
 # 便捷函数
 def evaluate_single_response(
     user_message: str,
-    bot_response: str,
-    user_emotion: str = "neutral",
-    emotion_intensity: float = 5.0
+    bot_response: str
 ) -> dict[str, Any]:
     """
     便捷函数：评估单个回应
@@ -507,9 +481,7 @@ def evaluate_single_response(
     engine = EvaluationEngine()
     return engine.evaluate_response(
         user_message=user_message,
-        bot_response=bot_response,
-        user_emotion=user_emotion,
-        emotion_intensity=emotion_intensity
+        bot_response=bot_response
     )
 
 
@@ -520,16 +492,12 @@ if __name__ == "__main__":
     
     test_cases = [
         {
-            "user_message": "我今天工作被批评了，感觉很沮丧",
-            "bot_response": "听起来你今天遇到了挫折。被批评确实让人难受。我在这里倾听，你愿意说说具体发生了什么吗？",
-            "user_emotion": "sad",
-            "emotion_intensity": 7.0
+            "user_message": "请帮我分析这份季度销售数据",
+            "bot_response": "根据数据，本季度销售额环比增长12%，主要来自华东区域。"
         },
         {
-            "user_message": "我感觉很焦虑，不知道怎么办",
-            "bot_response": "你应该多运动，运动可以缓解焦虑。",
-            "user_emotion": "anxious",
-            "emotion_intensity": 8.0
+            "user_message": "如何配置 API Key？",
+            "bot_response": "请参考部署文档中的密钥管理章节。"
         }
     ]
     
@@ -550,14 +518,12 @@ if __name__ == "__main__":
     print("="*80 + "\n")
     
     comparison = engine.compare_prompts(
-        user_message="我今天心情不太好",
+        user_message="请总结这份合同的关键条款",
         responses={
             "简短回应": "哦，怎么了？",
             "标准回应": "根据你描述的情况，可以从以下几个方面分析：...",
-            "建议型回应": "心情不好的时候可以出去散散步，或者找朋友聊聊天。"
-        },
-        user_emotion="sad",
-        emotion_intensity=6.0
+            "建议型回应": "建议关注合同中的违约责任与保密条款。"
+        }
     )
     
     print(json.dumps(comparison, indent=2, ensure_ascii=False))

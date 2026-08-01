@@ -23,19 +23,15 @@ class MemoryService:
         user_id: str,
         user_message: str,
         bot_response: str,
-        emotion: str | None = None,
-        emotion_intensity: float | None = None,
     ) -> list[dict[str, Any]]:
         key = f"turn:{session_id}"
         value = f"user: {user_message}\nassistant: {bot_response}"
-        if emotion:
-            value += f"\nemotion: {emotion}:{emotion_intensity}"
         mid = store_user_memory(
             tenant_id=self.tenant_id,
             user_id=user_id,
             key=key,
             value=value,
-            confidence=float(emotion_intensity or 5.0) / 10.0,
+            confidence=0.5,
             source="conversation",
         )
         if mid is None:
@@ -47,7 +43,7 @@ class MemoryService:
                 "session_id": session_id,
                 "content": value,
                 "type": "conversation",
-                "importance": float(emotion_intensity or 5.0) / 10.0,
+                "importance": 0.5,
             }
         ]
 
@@ -68,9 +64,6 @@ class MemoryService:
             results = [r for r in results if r.get("type") == memory_type]
         return results
 
-    async def get_emotion_trend(self, user_id: str, days: int = 7) -> dict[str, Any]:
-        # 业务域情绪趋势已退役；保留空结构兼容旧 API
-        return {"user_id": user_id, "days": days, "trend": [], "note": "emotion_trends_removed"}
 
     async def get_important_memories(
         self, user_id: str, limit: int = 5

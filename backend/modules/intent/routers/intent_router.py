@@ -111,7 +111,7 @@ async def build_prompt(
     根据用户上下文构建大模型prompt
     
     Args:
-        user_context: 用户上下文（包含情感和意图分析）
+        user_context: 用户上下文（包含意图分析）
         intent_service: 意图服务实例
         
     Returns:
@@ -121,7 +121,6 @@ async def build_prompt(
         ```json
         {
             "analysis": {
-                "emotion": {"primary": "焦虑"},
                 "intent": {
                     "intent": "advice",
                     "confidence": 0.85,
@@ -158,11 +157,6 @@ async def get_intent_types():
         意图类型列表及说明
     """
     intent_types = {
-        "emotion": {
-            "name": "情感表达",
-            "description": "用户表达需求或困扰，需要理解与回应",
-            "examples": ["我好难过", "今天心情不好", "感到很焦虑"]
-        },
         "advice": {
             "name": "寻求建议",
             "description": "用户寻求建议或解决方案",

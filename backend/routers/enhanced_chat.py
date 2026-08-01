@@ -18,8 +18,7 @@ logger = get_logger(__name__)
 enhanced_chat_service = EnhancedChatService(
     use_rag=True,
     use_intent=True,
-    use_enhanced_processor=True,
-    enable_proactive_recall=True
+    use_enhanced_processor=True
 )
 
 
@@ -32,7 +31,7 @@ async def enhanced_chat(request: ChatRequest):
     - 短期记忆滑动窗口 + 关键轮次保留
     - 长期记忆向量检索 + 时间衰减
     - 动态用户画像构建
-    - 主动回忆与情感追踪
+    - 主动回忆
     """
     try:
         response = await enhanced_chat_service.chat(request)
@@ -102,7 +101,7 @@ async def get_user_profile(user_id: str):
     
     返回：
     - 核心关注点
-    - 情绪趋势
+    - 会话统计
     - 沟通风格
     - 统计信息
     """
@@ -137,25 +136,6 @@ async def get_user_memories(user_id: str, limit: int = 10):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/users/{user_id}/emotion-insights")
-async def get_emotion_insights(user_id: str):
-    """
-    获取用户情绪洞察
-    
-    返回：
-    - 情绪趋势（最近7天）
-    - 当前状态
-    - 显著变化点
-    - 情绪时间线
-    """
-    try:
-        insights = await enhanced_chat_service.get_emotion_insights(user_id)
-        return insights
-    except Exception as e:
-        logger.error(f"获取情绪洞察错误: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @router.get("/system/status")
 async def get_system_status():
     """
@@ -173,10 +153,6 @@ async def get_system_status():
             "user_profile": {
                 "enabled": True,
                 "description": "动态用户画像构建"
-            },
-            "proactive_recall": {
-                "enabled": enhanced_chat_service.proactive_recall is not None,
-                "description": "主动回忆与情感追踪"
             },
             "rag": {
                 "enabled": enhanced_chat_service.rag_enabled,

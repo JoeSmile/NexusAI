@@ -14,11 +14,11 @@ class TestBasicIntegration:
         """测试模块导入"""
         # 测试核心模块可以正常导入
         from backend.core.config import Config, get_config
-        from backend.core.exceptions import EmotionalChatException
+        from backend.core.exceptions import ContextGateException
         
         assert Config is not None
         assert get_config is not None
-        assert EmotionalChatException is not None
+        assert ContextGateException is not None
     
     @pytest.mark.asyncio
     async def test_config_loading(self):
@@ -33,15 +33,15 @@ class TestBasicIntegration:
     
     def test_exception_handling(self):
         """测试异常处理"""
-        from backend.core.exceptions import DatabaseError, EmotionalChatException, ValidationError
+        from backend.core.exceptions import ContextGateException, DatabaseError, ValidationError
         
         # 测试异常可以正常创建
-        exc = EmotionalChatException("测试错误")
+        exc = ContextGateException("测试错误")
         assert str(exc) == "测试错误"
         
         val_exc = ValidationError("验证失败", field="test")
         assert val_exc.field == "test"
         
         db_exc = DatabaseError("数据库错误")
-        assert isinstance(db_exc, EmotionalChatException)
+        assert isinstance(db_exc, ContextGateException)
 

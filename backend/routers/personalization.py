@@ -365,9 +365,7 @@ async def delete_user_config(user_id: str, db: Session = Depends(get_db)):
 @router.get("/preview/{user_id}")
 async def preview_prompt(
     user_id: str,
-    context: str = "用户说：今天心情不太好...",
-    emotion: str | None = None,
-    intensity: float | None = None,
+    context: str = "用户说：请帮我分析这份数据...",
     db: Session = Depends(get_db)
 ):
     """
@@ -378,15 +376,13 @@ async def preview_prompt(
     **参数**:
     - user_id: 用户ID
     - context: 对话上下文（默认测试文本）
-    - emotion: 情绪类型（可选）
-    - intensity: 情绪强度（可选）
     
     **返回**:
     生成的完整Prompt文本
     
     **示例**:
     ```
-    GET /api/personalization/preview/user_123?context=今天很开心&emotion=happy&intensity=8
+    GET /api/personalization/preview/user_123?context=请帮我总结这份报告
     ```
     """
     try:
@@ -397,23 +393,14 @@ async def preview_prompt(
         # 创建Prompt组合器
         composer = PromptComposer(config)
         
-        # 构建情绪状态
-        emotion_state = None
-        if emotion and intensity is not None:
-            emotion_state = {
-                "emotion": emotion,
-                "intensity": intensity
-            }
-        
         # 生成Prompt
-        prompt = composer.compose(context=context, emotion_state=emotion_state)
+        prompt = composer.compose(context=context)
         
         return {
             "user_id": user_id,
             "config_summary": composer.get_summary(),
             "prompt": prompt,
-            "context": context,
-            "emotion_state": emotion_state
+            "context": context
         }
         
     except Exception as e:

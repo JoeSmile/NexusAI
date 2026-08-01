@@ -14,10 +14,6 @@ ROUTING_RULES: dict[str, dict[str, str | int]] = {
         "model": os.getenv("MODEL_CHEAP", "deepseek-chat"),
         "max_tokens": 100,
     },
-    "emotion": {
-        "model": os.getenv("MODEL_CHEAP", "deepseek-chat"),
-        "max_tokens": 200,
-    },
     "advice": {
         "model": os.getenv("MODEL_GOOD", "deepseek-chat"),
         "max_tokens": 500,

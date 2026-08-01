@@ -7,7 +7,7 @@
 from typing import Any
 
 
-class EmotionalChatException(Exception):
+class ContextGateException(Exception):
     """ContextGate机器人基础异常类"""
     
     def __init__(
@@ -30,19 +30,19 @@ class EmotionalChatException(Exception):
         }
 
 
-class ConfigurationError(EmotionalChatException):
+class ConfigurationError(ContextGateException):
     """配置错误"""
 
 
-class DatabaseError(EmotionalChatException):
+class DatabaseError(ContextGateException):
     """数据库错误"""
 
 
-class RAGError(EmotionalChatException):
+class RAGError(ContextGateException):
     """RAG知识库错误"""
 
 
-class ValidationError(EmotionalChatException):
+class ValidationError(ContextGateException):
     """验证错误"""
     
     def __init__(
@@ -66,15 +66,15 @@ class ValidationError(EmotionalChatException):
         return result
 
 
-class AuthenticationError(EmotionalChatException):
+class AuthenticationError(ContextGateException):
     """认证错误"""
 
 
-class AuthorizationError(EmotionalChatException):
+class AuthorizationError(ContextGateException):
     """授权错误"""
 
 
-class RateLimitError(EmotionalChatException):
+class RateLimitError(ContextGateException):
     """频率限制错误"""
     
     def __init__(
@@ -94,7 +94,7 @@ class RateLimitError(EmotionalChatException):
         return result
 
 
-class ExternalServiceError(EmotionalChatException):
+class ExternalServiceError(ContextGateException):
     """外部服务错误"""
     
     def __init__(
@@ -117,31 +117,28 @@ class ExternalServiceError(EmotionalChatException):
         return result
 
 
-class MemoryError(EmotionalChatException):
+class MemoryError(ContextGateException):
     """记忆系统错误"""
 
 
-class EmotionAnalysisError(EmotionalChatException):
-    """分析错误"""
 
-
-class ContextError(EmotionalChatException):
+class ContextError(ContextGateException):
     """上下文管理错误"""
 
 
-class ChatError(EmotionalChatException):
+class ChatError(ContextGateException):
     """聊天服务错误"""
 
 
-class EvaluationError(EmotionalChatException):
+class EvaluationError(ContextGateException):
     """评估系统错误"""
 
 
-class FeedbackError(EmotionalChatException):
+class FeedbackError(ContextGateException):
     """反馈系统错误"""
 
 
-class AgentError(EmotionalChatException):
+class AgentError(ContextGateException):
     """Agent系统错误"""
 
 
@@ -156,11 +153,10 @@ EXCEPTION_HANDLERS = {
     ExternalServiceError: lambda e: (503, {"error": "外部服务不可用", "details": e.to_dict()}),
     RAGError: lambda e: (500, {"error": "知识库错误", "details": e.message}),
     MemoryError: lambda e: (500, {"error": "记忆系统错误", "details": e.message}),
-    EmotionAnalysisError: lambda e: (500, {"error": "分析错误", "details": e.message}),
     ContextError: lambda e: (500, {"error": "上下文错误", "details": e.message}),
     ChatError: lambda e: (500, {"error": "聊天服务错误", "details": e.message}),
     EvaluationError: lambda e: (500, {"error": "评估系统错误", "details": e.message}),
     FeedbackError: lambda e: (500, {"error": "反馈系统错误", "details": e.message}),
     AgentError: lambda e: (500, {"error": "Agent系统错误", "details": e.message}),
-    EmotionalChatException: lambda e: (500, {"error": "系统错误", "details": e.message}),
+    ContextGateException: lambda e: (500, {"error": "系统错误", "details": e.message}),
 }

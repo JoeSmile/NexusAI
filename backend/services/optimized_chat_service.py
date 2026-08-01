@@ -35,7 +35,6 @@ class OptimizedChatService:
 
         # 显式占位 — 原 ChatService 父类从未提供这些依赖；避免 AttributeError
         self.llm_client = None
-        self.emotion_analyzer = None
         self.safety_checker = None
         self.memory_retriever = None
 
@@ -77,7 +76,6 @@ class OptimizedChatService:
             
             return {
                 "response": response,
-                "emotion": processing_result.get("emotion"),
                 "memory_used": processing_result.get("memory"),
                 "processing_time": processing_result.get("processing_time"),
                 "total_time": total_time,
@@ -142,24 +140,21 @@ class OptimizedChatService:
         """并行处理用户输入"""
         try:
             if not all(
-                [self.emotion_analyzer, self.safety_checker, self.memory_retriever]
+                [self.safety_checker, self.memory_retriever]
             ):
                 return {
-                    "emotion": {"emotion": "neutral", "intensity": 5.0},
                     "safety": {"safe": True, "confidence": 0.9},
                     "memory": {"relevant_memories": []},
                     "processing_time": 0.0,
                 }
             return await self.performance_optimizer.parallel_processing(
                 user_input,
-                self.emotion_analyzer,
                 self.safety_checker,
                 self.memory_retriever,
             )
         except Exception as e:
             logger.error(f"并行处理失败: {e}")
             return {
-                "emotion": {"emotion": "neutral", "intensity": 5.0},
                 "safety": {"safe": True, "confidence": 0.9},
                 "memory": {"relevant_memories": []},
                 "processing_time": 0.0,
@@ -174,8 +169,7 @@ class OptimizedChatService:
             
             async def compute_prompt():
                 return self._construct_prompt(
-                    user_input, 
-                    processing_result.get("emotion", {}),
+                    user_input,
                     processing_result.get("memory", {}),
                     processing_result.get("safety", {})
                 )
@@ -236,13 +230,11 @@ class OptimizedChatService:
         except Exception as e:
             logger.error(f"保存对话失败: {e}")
     
-    def _construct_prompt(self, user_input: str, emotion: dict, 
+    def _construct_prompt(self, user_input: str,
                          memory: dict, safety: dict) -> str:
         """构造Prompt"""
         prompt_parts = [
             "你是ContextGate企业信息平台助手。",
-            f"用户情感: {emotion.get('emotion', 'neutral')}",
-            f"情感强度: {emotion.get('intensity', 5.0)}",
         ]
         
         if memory.get('relevant_memories'):

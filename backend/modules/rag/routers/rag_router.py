@@ -71,7 +71,6 @@ class AskWithContextRequest(BaseModel):
     """带上下文的问答请求"""
     question: str
     conversation_history: list[dict[str, str]] | None = None
-    user_emotion: str | None = None
     search_k: int = 3
 
     model_config = ConfigDict(
@@ -80,9 +79,8 @@ class AskWithContextRequest(BaseModel):
                 "question": "有什么具体的方法可以帮助我入睡吗？",
                 "conversation_history": [
                     {"role": "user", "content": "我最近压力很大"},
-                    {"role": "assistant", "content": "我理解你现在的压力..."}
+                    {"role": "assistant", "content": "以下是分析结果..."}
                 ],
-                "user_emotion": "焦虑",
                 "search_k": 3
             }
         }
@@ -142,7 +140,7 @@ async def init_sample_knowledge(request: LoadSampleRequest = None):
     """
     初始化示例知识库
     
-    加载内置的心理健康知识到向量数据库
+    加载内置的企业知识到向量数据库
     """
     try:
         logger.info("开始初始化示例知识库...")
@@ -266,7 +264,7 @@ async def ask_question(request: AskRequest):
     """
     向知识库提问
     
-    基于知识库内容生成专业的心理健康建议
+    基于知识库内容生成专业的回答
     """
     try:
         logger.info(f"收到问答请求: {request.question[:50]}...")
@@ -291,7 +289,7 @@ async def ask_with_context(request: AskWithContextRequest):
     """
     结合上下文的问答
     
-    考虑对话历史和用户情绪，生成更个性化的回答
+    考虑对话历史，生成更精准的回答
     """
     try:
         logger.info(f"收到带上下文的问答请求: {request.question[:50]}...")
@@ -300,7 +298,6 @@ async def ask_with_context(request: AskWithContextRequest):
         result = rag_service.ask_with_context(
             question=request.question,
             conversation_history=request.conversation_history,
-            user_emotion=request.user_emotion,
             search_k=request.search_k
         )
         
@@ -445,14 +442,6 @@ async def get_examples():
                 "如何练习正念冥想？"
             ]
         },
-        {
-            "category": "情绪调节",
-            "questions": [
-                "情绪低落时怎么办？",
-                "如何培养积极的心态？",
-                "怎样建立心理韧性？"
-            ]
-        }
     ]
     
     return {

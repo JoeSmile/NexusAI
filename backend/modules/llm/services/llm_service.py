@@ -183,80 +183,13 @@ class LLMService:
                 status_code=500
             )
     
-    async def analyze_emotion(self, text: str) -> dict[str, Any]:
-        """
-        内容分析
-        
-        Args:
-            text: 要分析的文本
-            
-        Returns:
-            分析结果
-        """
-        try:
-            # 构建分析提示
-            prompt = f"""
-请分析以下文本的情绪状态，返回JSON格式的结果：
 
-文本：{text}
-
-请返回以下格式的JSON：
-{{
-    "emotion": "主要情绪（如：开心、难过、愤怒、焦虑、平静等）",
-    "intensity": 情绪强度（0-10的数字）,
-    "confidence": 分析置信度（0-1的数字）,
-    "details": {{
-        "positive_score": 积极情绪得分（0-1）,
-        "negative_score": 消极情绪得分（0-1）,
-        "neutral_score": 中性情绪得分（0-1）,
-        "keywords": ["提取的关键词1", "关键词2"]
-    }}
-}}
-"""
-            
-            messages = [
-                ChatMessage(role="user", content=prompt)
-            ]
-            
-            response = await self.chat_completion(
-                messages=messages,
-                temperature=0.3,
-                max_tokens=500
-            )
-            
-            # 解析响应
-            import json
-            try:
-                result = json.loads(response.content)
-                return result
-            except json.JSONDecodeError:
-                # 如果JSON解析失败，返回默认结果
-                return {
-                    "emotion": "neutral",
-                    "intensity": 5.0,
-                    "confidence": 0.5,
-                    "details": {
-                        "positive_score": 0.5,
-                        "negative_score": 0.5,
-                        "neutral_score": 0.5,
-                        "keywords": []
-                    }
-                }
-                
-        except Exception as e:
-            raise ExternalServiceError(
-                message=f"内容分析失败: {e!s}",
-                service_name="LLM",
-                status_code=500
-            )
-    
-    async def extract_memories(self, text: str, emotion: str) -> list[dict[str, Any]]:
+    async def extract_memories(self, text: str) -> list[dict[str, Any]]:
         """
         从文本中提取记忆
         
         Args:
             text: 输入文本
-            emotion: 情绪信息
             
         Returns:
             提取的记忆列表
@@ -266,17 +199,15 @@ class LLMService:
 请从以下文本中提取重要的记忆信息，返回JSON格式的结果：
 
 文本：{text}
-情绪：{emotion}
 
 请返回以下格式的JSON数组：
 [
     {{
         "content": "记忆内容",
-        "type": "记忆类型（如：personal, emotional, factual, preference）",
+        "type": "记忆类型（如：personal, factual, preference）",
         "importance": 重要性评分（0-1的数字）,
         "keywords": ["关键词1", "关键词2"],
-        "emotion": "相关情绪"
-    }}
+            }}
 ]
 
 只提取真正重要和有价值的记忆，不要提取过于琐碎的信息。
@@ -337,7 +268,6 @@ class LLMService:
 你的职责：
 1. 倾听用户的心声，给予温暖的支持
 2. 提供专业的心理健康建议
-3. 帮助用户管理情绪和压力
 4. 鼓励用户积极面对生活
 
 回复要求：
@@ -353,8 +283,6 @@ class LLMService:
                 context_info = []
                 if context.get("memories"):
                     context_info.append(f"相关记忆：{context['memories']}")
-                if context.get("emotion_trend"):
-                    context_info.append(f"情绪趋势：{context['emotion_trend']}")
                 if context.get("user_profile"):
                     context_info.append(f"用户画像：{context['user_profile']}")
                 

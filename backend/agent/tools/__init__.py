@@ -19,7 +19,6 @@ from .scheduler_service import SchedulerService
 def __getattr__(name):
     """延迟导入 agent_tools 中的函数"""
     _agent_tools_funcs = [
-        "get_user_mood_trend",
         "play_meditation_audio",
         "set_daily_reminder",
         "search_mental_health_resources",
@@ -36,7 +35,6 @@ __all__ = [
     "PsychologyDB",
     "SchedulerService",
     # Agent核心工具函数（延迟导入）
-    "get_user_mood_trend",
     "play_meditation_audio",
     "set_daily_reminder",
     "search_mental_health_resources",

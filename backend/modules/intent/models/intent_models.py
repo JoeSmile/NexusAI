@@ -11,7 +11,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class IntentType(StrEnum):
     """用户意图类型枚举"""
-    EMOTION = "emotion"          # 情绪表达（遗留意图）
     ADVICE = "advice"            # 寻求建议
     CONVERSATION = "conversation"  # 普通对话
     FUNCTION = "function"        # 功能请求（提醒、记录）
@@ -39,9 +38,7 @@ class IntentResult(BaseModel):
                 "intent": "advice",
                 "confidence": 0.92,
                 "source": "model",
-                "secondary_intents": {
-                    "emotion": 0.65
-                },
+                "secondary_intents": {},
                 "metadata": {
                     "keywords": ["怎么办", "建议"]
                 }

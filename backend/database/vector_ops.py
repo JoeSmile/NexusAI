@@ -33,13 +33,10 @@ def add_chat_turn(
     user_id: str,
     user_message: str,
     assistant_message: str,
-    emotion: str | None = None,
 ) -> None:
     """写入一轮对话并生成 embedding（替代 VectorStore.add_conversation）"""
     session_factory = get_pg_session()
     combined = f"用户: {user_message}\n助手: {assistant_message}"
-    if emotion:
-        combined += f"\n情感: {emotion}"
     emb = embed_text(combined)
     with session_factory.Session() as session:
         session.add(
@@ -49,7 +46,6 @@ def add_chat_turn(
                 user_id=user_id,
                 role="user",
                 content=user_message,
-                emotion=emotion,
                 embedding=embed_text(user_message),
             )
         )
@@ -60,7 +56,6 @@ def add_chat_turn(
                 user_id=user_id,
                 role="assistant",
                 content=assistant_message,
-                emotion=emotion,
                 embedding=emb,
             )
         )
@@ -86,7 +81,6 @@ def search_memories(
             "id": r.id,
             "content": r.content,
             "role": r.role,
-            "emotion": r.emotion,
             "session_id": r.session_id,
             "created_at": r.created_at.isoformat() if r.created_at else None,
         }
@@ -108,7 +102,7 @@ def search_similar_conversations(
     with session_factory.Session() as session:
         sql = text(
             """
-            SELECT id, session_id, content, emotion, created_at,
+            SELECT id, session_id, content, created_at,
                    1 - (embedding <=> :vec::vector) AS similarity
             FROM chat_messages
             WHERE tenant_id = :tid
@@ -136,7 +130,6 @@ def search_similar_conversations(
         metas.append(
             {
                 "session_id": r.session_id,
-                "emotion": r.emotion or "neutral",
                 "timestamp": r.created_at.isoformat() if r.created_at else "",
             }
         )
@@ -236,8 +229,6 @@ def search_user_memories(
             "similarity": float(r.similarity or 0.0),
             "timestamp": r.created_at.isoformat() if r.created_at else "",
             "type": r.source or "other",
-            "emotion": "neutral",
-            "intensity": 5.0,
             "extraction_method": r.source or "unknown",
         }
         for r in rows

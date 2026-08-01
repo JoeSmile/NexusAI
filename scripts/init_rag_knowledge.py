@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 RAG知识库初始化脚本
-快速初始化心理健康知识库
+快速初始化企业知识库
 """
 
 import os
@@ -21,7 +21,7 @@ from backend.modules.rag import KnowledgeBaseManager, PsychologyKnowledgeLoader
 def main():
     """初始化知识库"""
     print("\n" + "=" * 70)
-    print(" 心语机器人 - RAG知识库初始化")
+    print(" ContextGate - RAG知识库初始化")
     print("=" * 70 + "\n")
     
     try:
@@ -35,13 +35,13 @@ def main():
         print("✓ 知识库管理器初始化成功\n")
         
         # 2. 加载示例知识
-        print("→ 步骤 2/3: 加载心理健康知识...")
+        print("→ 步骤 2/3: 加载企业知识...")
         print("  这可能需要几分钟，请耐心等待...\n")
         
         loader = PsychologyKnowledgeLoader(kb_manager)
         loader.load_sample_knowledge()
         
-        print("✓ 心理健康知识加载成功\n")
+        print("✓ 企业知识加载成功\n")
         
         # 3. 验证知识库
         print("→ 步骤 3/3: 验证知识库...")

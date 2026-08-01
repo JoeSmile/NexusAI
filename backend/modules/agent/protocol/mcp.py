@@ -8,7 +8,6 @@ MCP协议结构：
     "content": str,              # 自然语言内容（用户输入或AI回复）
     "context": {                 # 结构化上下文
         "user_profile": {},      # 用户画像
-        "emotion_state": {},     # 情感状态
         "task_goal": {},         # 任务目标
         "memory_summary": {},    # 记忆摘要
         "conversation_history": [] # 对话历史
@@ -73,7 +72,6 @@ class MCPToolResponse(BaseModel):
 class MCPContext(BaseModel):
     """MCP上下文结构"""
     user_profile: dict[str, Any] | None = Field(None, description="用户画像")
-    emotion_state: dict[str, Any] | None = Field(None, description="情感状态")
     task_goal: dict[str, Any] | None = Field(None, description="任务目标")
     memory_summary: dict[str, Any] | None = Field(None, description="记忆摘要")
     conversation_history: list[dict[str, Any]] | None = Field(None, description="对话历史")
@@ -83,7 +81,6 @@ class MCPContext(BaseModel):
         """转换为字典"""
         return {
             "user_profile": self.user_profile,
-            "emotion_state": self.emotion_state,
             "task_goal": self.task_goal,
             "memory_summary": self.memory_summary,
             "conversation_history": self.conversation_history,
@@ -207,9 +204,7 @@ class MCPProtocol:
         self,
         user_id: str,
         session_id: str,
-        current_message: str,
-        emotion: str | None = None,
-        emotion_intensity: float | None = None
+        current_message: str
     ) -> MCPContext:
         """
         从上下文服务获取并填充上下文
@@ -218,8 +213,6 @@ class MCPProtocol:
             user_id: 用户ID
             session_id: 会话ID
             current_message: 当前消息
-            emotion: 当前情绪
-            emotion_intensity: 情绪强度
             
         Returns:
             填充后的MCPContext
@@ -232,19 +225,12 @@ class MCPProtocol:
             context_data = await self.context_service.build_context(
                 user_id=user_id,
                 session_id=session_id,
-                current_message=current_message,
-                emotion=emotion,
-                emotion_intensity=emotion_intensity
+                current_message=current_message
             )
             
             # 将上下文数据转换为MCPContext
             mcp_context = MCPContext(
                 user_profile=context_data.get("user_profile", {}).get("full"),
-                emotion_state={
-                    "emotion": context_data.get("emotion_context", {}).get("current_emotion"),
-                    "intensity": context_data.get("emotion_context", {}).get("current_intensity"),
-                    "trend": context_data.get("emotion_context", {}).get("trend")
-                },
                 memory_summary={
                     "recent_events": context_data.get("memories", {}).get("recent_events", []),
                     "concerns": context_data.get("memories", {}).get("concerns", []),
@@ -264,7 +250,6 @@ class MCPProtocol:
     def create_user_input(
         content: str,
         user_profile: dict[str, Any] | None = None,
-        emotion_state: dict[str, Any] | None = None,
         conversation_history: list[dict[str, Any]] | None = None
     ) -> MCPMessage:
         """
@@ -273,7 +258,6 @@ class MCPProtocol:
         Args:
             content: 用户输入内容
             user_profile: 用户画像
-            emotion_state: 情感状态
             conversation_history: 对话历史
             
         Returns:
@@ -281,7 +265,6 @@ class MCPProtocol:
         """
         context = MCPContext(
             user_profile=user_profile,
-            emotion_state=emotion_state,
             conversation_history=conversation_history
         )
         
@@ -298,10 +281,7 @@ class MCPProtocol:
         content: str,
         user_id: str,
         session_id: str,
-        emotion: str | None = None,
-        emotion_intensity: float | None = None,
         user_profile: dict[str, Any] | None = None,
-        emotion_state: dict[str, Any] | None = None,
         conversation_history: list[dict[str, Any]] | None = None
     ) -> MCPMessage:
         """
@@ -311,30 +291,24 @@ class MCPProtocol:
             content: 用户输入内容
             user_id: 用户ID（用于自动填充上下文）
             session_id: 会话ID（用于自动填充上下文）
-            emotion: 当前情绪（可选，如果提供会传递给上下文服务）
-            emotion_intensity: 情绪强度（可选）
             user_profile: 用户画像（可选，如果提供则覆盖自动填充的）
-            emotion_state: 情感状态（可选，如果提供则覆盖自动填充的）
             conversation_history: 对话历史（可选，如果提供则覆盖自动填充的）
             
         Returns:
             MCP消息（包含自动填充的上下文）
         """
         # 如果提供了显式参数，优先使用；否则尝试从上下文服务获取
-        if user_profile is None or emotion_state is None or conversation_history is None:
+        if user_profile is None or conversation_history is None:
             # 尝试从上下文服务自动填充
             auto_context = await self._enrich_context_from_service(
                 user_id=user_id,
                 session_id=session_id,
-                current_message=content,
-                emotion=emotion,
-                emotion_intensity=emotion_intensity
+                current_message=content
             )
             
             # 合并自动填充的上下文和显式提供的参数
             context = MCPContext(
                 user_profile=user_profile or auto_context.user_profile,
-                emotion_state=emotion_state or auto_context.emotion_state,
                 memory_summary=auto_context.memory_summary,
                 conversation_history=conversation_history or auto_context.conversation_history,
                 metadata=auto_context.metadata
@@ -343,7 +317,6 @@ class MCPProtocol:
             # 如果所有参数都提供了，直接使用
             context = MCPContext(
                 user_profile=user_profile,
-                emotion_state=emotion_state,
                 conversation_history=conversation_history
             )
         
@@ -549,7 +522,6 @@ class MCPProtocol:
         
         # 合并各个字段（附加上下文优先）
         merged.user_profile = additional_context.user_profile or base_context.user_profile
-        merged.emotion_state = additional_context.emotion_state or base_context.emotion_state
         merged.task_goal = additional_context.task_goal or base_context.task_goal
         merged.memory_summary = additional_context.memory_summary or base_context.memory_summary
         
@@ -713,8 +685,7 @@ if __name__ == "__main__":
     
     # 示例1：创建用户输入消息（静态方法，不自动填充上下文）
     user_msg = protocol.create_user_input(
-        content="我最近心情很不好，感觉很焦虑",
-        emotion_state={"emotion": "焦虑", "intensity": 7.5}
+        content="请帮我分析这份季度报告"
     )
     print("用户输入消息（静态方法）：")
     print(user_msg.to_json())
@@ -726,8 +697,6 @@ if __name__ == "__main__":
     #     content="我最近心情很不好，感觉很焦虑",
     #     user_id="user_123",
     #     session_id="session_456",
-    #     emotion="焦虑",
-    #     emotion_intensity=7.5
     # )
     # print("用户输入消息（自动填充上下文）：")
     # print(user_msg_with_context.to_json())
@@ -740,7 +709,7 @@ if __name__ == "__main__":
     )
     planner_msg = protocol.create_planner_output(
         content="识别到相关需求，需要检索相关记忆",
-        task_goal={"goal_type": "emotional_support", "complexity": "medium"},
+        task_goal={"goal_type": "task", "complexity": "medium"},
         tool_calls=[tool_call]
     )
     print("Planner输出消息：")

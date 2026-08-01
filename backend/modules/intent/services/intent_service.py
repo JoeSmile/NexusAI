@@ -115,18 +115,6 @@ class IntentService:
                 "avoid": ["说教", "轻视", "劝阻"],
                 "prompt_hint": "安全预警模式：需要提供明确的求助指引"
             },
-            IntentType.EMOTION: {
-                "response_style": "专业、清晰、务实",
-                "priority": "high",
-                "actions": [
-                    "积极倾听",
-                    "情感验证",
-                    "提供情绪宣泄空间",
-                    "适当的安慰"
-                ],
-                "avoid": ["立即给建议", "否定感受"],
-                "prompt_hint": "LLM Gateway模式：重点在于准确理解和解决问题"
-            },
             IntentType.ADVICE: {
                 "response_style": "建设性、实用、温和",
                 "priority": "medium",
@@ -211,13 +199,12 @@ class IntentService:
         构建大模型的prompt
         
         Args:
-            user_context: 用户上下文，包含情感和意图分析结果
+            user_context: 用户上下文，包含意图分析结果
             
         Returns:
             构建好的prompt字符串
         """
-        # 提取情感和意图信息
-        emotion = user_context.get("analysis", {}).get("emotion", {}).get("primary", "平静")
+        # 提取意图信息
         intent_data = user_context.get("analysis", {}).get("intent", {})
         intent = intent_data.get("intent", "conversation")
         
@@ -246,9 +233,8 @@ class IntentService:
 你是"ContextGate"企业信息平台助手。请根据用户的意图，给予专业、准确的回应。
 
 【用户状态分析】
-- 当前情绪：{emotion}
 - 主要意图：{intent}
-- 响应风格：{suggestion.get('response_style', '温和、理解')}
+- 响应风格：{suggestion.get('response_style', '专业、清晰')}
 
 【响应指导】
 - 优先行动：{', '.join(suggestion.get('actions', [])[:3])}

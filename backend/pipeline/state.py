@@ -27,8 +27,6 @@ class PipelineState(TypedDict):
     warm_memory: dict[str, str]
 
     # ── 分析结果 ──
-    emotion: str | None
-    emotion_intensity: float
     intent: str | None
     intent_confidence: float
     entities: dict[str, str]
@@ -95,8 +93,6 @@ def make_initial_state(
         "raw_input": message,
         "hot_memory": [],
         "warm_memory": {},
-        "emotion": None,
-        "emotion_intensity": 5.0,
         "intent": None,
         "intent_confidence": 0.0,
         "entities": {},

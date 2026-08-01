@@ -12,20 +12,12 @@ from ..models import ChatRequest, ChatResponse
 
 
 @dataclass
-class EmotionResult:
-    """分析结果"""
-    emotion: str
-    intensity: float
-    confidence: float
-    details: dict[str, Any]
-
 
 @dataclass
 class MemoryInfo:
     """记忆信息"""
     id: str
     content: str
-    emotion: str
     importance: float
     timestamp: str
     metadata: dict[str, Any]
@@ -37,7 +29,6 @@ class ContextInfo:
     user_id: str
     session_id: str
     memories: list[MemoryInfo]
-    emotion_history: list[EmotionResult]
     user_profile: dict[str, Any]
     conversation_summary: str
 
@@ -63,32 +54,13 @@ class IChatEngine(ABC):
     async def get_session_summary(self, session_id: str) -> dict[str, Any]:
         """获取会话摘要"""
     
-    @abstractmethod
-    async def get_user_emotion_trends(self, user_id: str, days: int = 7) -> dict[str, Any]:
-        """获取用户情绪趋势"""
-
-
-class IEmotionAnalyzer(ABC):
-    """分析器接口"""
-    
-    @abstractmethod
-    async def analyze_emotion(self, text: str) -> EmotionResult:
-        """分析文本情绪"""
-    
-    @abstractmethod
-    async def analyze_emotion_batch(self, texts: list[str]) -> list[EmotionResult]:
-        """批量分析情绪"""
-    
-    @abstractmethod
-    async def get_emotion_history(self, user_id: str, limit: int = 50) -> list[EmotionResult]:
-        """获取用户情绪历史"""
 
 
 class IMemoryService(ABC):
     """记忆服务接口"""
     
     @abstractmethod
-    async def extract_memories(self, text: str, emotion: str) -> list[dict[str, Any]]:
+    async def extract_memories(self, text: str) -> list[dict[str, Any]]:
         """从文本中提取记忆"""
     
     @abstractmethod
@@ -126,8 +98,7 @@ class IContextService(ABC):
         user_id: str,
         session_id: str,
         current_message: str,
-        emotion: str,
-        emotion_intensity: float
+
     ) -> ContextInfo:
         """构建对话上下文"""
     
@@ -135,8 +106,7 @@ class IContextService(ABC):
     async def update_context(
         self,
         context: ContextInfo,
-        new_message: str,
-        new_emotion: EmotionResult
+        new_message: str
     ) -> ContextInfo:
         """更新上下文"""
     
@@ -157,7 +127,6 @@ class IRAGService(ABC):
         self,
         question: str,
         conversation_history: list[dict[str, str]] | None = None,
-        user_emotion: str | None = None,
         search_k: int = 3
     ) -> RAGResult:
         """带上下文的提问"""

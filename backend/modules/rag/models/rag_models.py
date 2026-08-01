@@ -32,7 +32,6 @@ class RAGRequest(BaseModel):
     search_k: int = Field(3, ge=1, le=10, description="检索文档数量")
     use_context: bool = Field(True, description="是否使用上下文")
     conversation_history: list[dict[str, str]] | None = Field(None, description="对话历史")
-    user_emotion: str | None = Field(None, description="用户情绪")
 
     @field_validator('question')
     @classmethod
@@ -120,13 +119,6 @@ class RAGConfig(BaseModel):
 
 class RAGTriggerConfig(BaseModel):
     """RAG触发配置"""
-    emotion_triggers: list[str] = Field(
-        default=[
-            "焦虑", "抑郁", "压力大", "紧张", "恐惧", 
-            "悲伤", "愤怒", "失眠", "孤独"
-        ],
-        description="情绪触发词"
-    )
     keyword_triggers: list[str] = Field(
         default=[
             "怎么办", "如何", "方法", "建议", "技巧", "练习",

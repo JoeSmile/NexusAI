@@ -22,7 +22,7 @@ from backend.agent import get_agent_core
 async def main():
     """主演示函数"""
     print("=" * 60)
-    print("心语Agent演示")
+    print("ContextGate Agent演示")
     print("=" * 60)
     
     # 创建Agent Core实例
@@ -39,7 +39,7 @@ async def main():
         user_id=user_id
     )
     print("用户：我最近心情很不好，感觉很焦虑")
-    print(f"心语：{result1['response']}")
+    print(f"ContextGate：{result1['response']}")
     print(f"情绪：{result1['emotion']} (强度: {result1['emotion_intensity']})")
     print(f"执行了 {len(result1['actions'])} 个行动")
     if result1.get('followup_scheduled'):
@@ -53,7 +53,7 @@ async def main():
         user_id=user_id
     )
     print("用户：我最近睡不好，怎么办？")
-    print(f"心语：{result2['response']}")
+    print(f"ContextGate：{result2['response']}")
     print(f"情绪：{result2['emotion']} (强度: {result2['emotion_intensity']})")
     print(f"执行了 {len(result2['actions'])} 个行动")
     if result2.get('followup_scheduled'):
@@ -67,7 +67,7 @@ async def main():
         user_id=user_id
     )
     print("用户：什么是正念冥想？")
-    print(f"心语：{result3['response']}")
+    print(f"ContextGate：{result3['response']}")
     print(f"情绪：{result3['emotion']} (强度: {result3['emotion_intensity']})")
     
     # 获取Agent状态

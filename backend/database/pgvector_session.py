@@ -49,8 +49,6 @@ class ChatMessage(Base):
     user_id = Column(String(100), nullable=False, index=True)
     role = Column(String(20), nullable=False)
     content = Column(Text, nullable=False)
-    emotion = Column(String(50))
-    emotion_intensity = Column(Float, default=5.0)
     embedding = Column(Vector(1536), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -81,7 +79,6 @@ class ColdMemory(Base):
     user_id = Column(String(100), nullable=False, index=True)
     session_id = Column(String(100))
     summary = Column(Text, nullable=False)
-    emotion_tags = Column(JSON)
     embedding = Column(Vector(1536), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -299,8 +296,7 @@ class PGVectorSession:
         with self.Session() as session:
             sql = text(
                 """
-                SELECT id, tenant_id, session_id, user_id, role, content,
-                       emotion, emotion_intensity, created_at,
+                SELECT id, tenant_id, session_id, user_id, role, content, created_at,
                        1 - (embedding <=> :vec::vector) AS similarity
                 FROM chat_messages
                 WHERE tenant_id = :tid
@@ -327,8 +323,6 @@ class PGVectorSession:
                     user_id=r.user_id,
                     role=r.role,
                     content=r.content,
-                    emotion=r.emotion,
-                    emotion_intensity=r.emotion_intensity,
                     created_at=r.created_at,
                 )
                 for r in rows

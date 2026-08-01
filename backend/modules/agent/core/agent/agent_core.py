@@ -85,13 +85,10 @@ class AgentCore:
         """初始化现有系统组件"""
         try:
             from backend.context_assembler import ContextAssembler
-            from backend.emotion_analyzer import EmotionAnalyzer
             
-            self.emotion_analyzer = EmotionAnalyzer()
             self.context_assembler = ContextAssembler()
         except ImportError as e:
             print(f"警告：无法导入现有组件: {e!s}")
-            self.emotion_analyzer = None
             self.context_assembler = None
     
     async def process(
@@ -122,7 +119,6 @@ class AgentCore:
             # 编码当前输入为记忆
             current_memory = self.memory_hub.encode({
                 "content": user_input,
-                "emotion": perception.get("emotion_data", {}),
                 "user_id": user_id,
                 "role": "user"
             })
@@ -132,7 +128,6 @@ class AgentCore:
                 query=user_input,
                 user_id=user_id,
                 context={
-                    "emotion": perception.get("emotion", ""),
                     "time_range": 30
                 },
                 top_k=5
@@ -211,8 +206,6 @@ class AgentCore:
                 "interaction_id": interaction_id,
                 "response": execution_results.get("response", ""),
                 "actions": execution_results.get("actions", []),
-                "emotion": perception.get("emotion", ""),
-                "emotion_intensity": perception.get("emotion_intensity", 0),
                 "evaluation": evaluation,
                 "followup_scheduled": followup is not None,
                 "response_time": response_time
@@ -253,16 +246,12 @@ class AgentCore:
         start_time = datetime.now()
         
         try:
-            # ===== 阶段1: 感知层 =====
-            perception = await self._perceive(user_input, user_id)
-            
-            # ===== 阶段2: 记忆检索 =====
+            # ===== 阶段1: 记忆检索 =====
             # 检索相关记忆
             relevant_memories = self.memory_hub.retrieve(
                 query=user_input,
                 user_id=user_id,
                 context={
-                    "emotion": perception.get("emotion", ""),
                     "time_range": 30
                 },
                 top_k=5
@@ -279,11 +268,6 @@ class AgentCore:
             user_mcp_message = self.mcp_protocol.create_user_input(
                 content=user_input,
                 user_profile={**user_profile, "user_id": user_id} if user_profile else {"user_id": user_id},
-                emotion_state={
-                    "emotion": perception.get("emotion", "平静"),
-                    "intensity": perception.get("emotion_intensity", 5.0),
-                    "data": perception.get("emotion_data", {})
-                },
                 conversation_history=conversation_history[-10:]  # 最近10轮对话
             )
             user_mcp_message.metadata = {
@@ -304,13 +288,11 @@ class AgentCore:
             # 合并上下文和工具结果
             final_context = MCPContext(
                 user_profile=user_mcp_message.context.user_profile,
-                emotion_state=user_mcp_message.context.emotion_state,
                 task_goal=planner_mcp_message.context.task_goal,
                 memory_summary={
                     "memories": [
                         {
                             "content": m.get("content", ""),
-                            "emotion": m.get("emotion", {}),
                             "importance": m.get("importance", 0)
                         }
                         for m in relevant_memories
@@ -358,7 +340,6 @@ class AgentCore:
             # ===== 阶段9: 记忆巩固 =====
             current_memory = self.memory_hub.encode({
                 "content": user_input,
-                "emotion": perception.get("emotion_data", {}),
                 "user_id": user_id,
                 "role": "user"
             })
@@ -435,7 +416,6 @@ class AgentCore:
                 full_context = self.context_assembler.assemble(
                     user_id=context.user_profile.get("user_id") if context.user_profile else None,
                     current_message=user_input,
-                    emotion_data=context.emotion_state or {},
                     memories=context.memory_summary.get("memories", []) if context.memory_summary else []
                 )
             else:
@@ -458,9 +438,8 @@ class AgentCore:
             if self.llm:
                 response = await self._call_llm(full_context, user_input)
             else:
-                # 降级：使用模板回复
-                emotion = context.emotion_state.get("emotion") if context.emotion_state else "平静"
-                response = self._template_response(emotion, tool_responses)
+                # 降级：使用基础回复
+                response = "我暂时无法调用模型服务，请稍后再试。"
             
             return response
         
@@ -468,25 +447,7 @@ class AgentCore:
             print(f"生成回复失败: {e!s}")
             return "我理解你的感受。能多告诉我一些吗？"
     
-    def _template_response(self, emotion: str, tool_responses: list) -> str:
-        """模板回复（降级方案）"""
-        templates = {
-            "焦虑": "我能感受到你的焦虑。深呼吸，我们一起来面对。有什么具体让你担心的吗？",
-            "难过": "我能理解你现在的难过。允许自己感受这些情绪是很重要的。想聊聊吗？",
-            "愤怒": "我听到了你的愤怒。这些感受是完全正常的。能告诉我发生了什么吗？",
-            "开心": "真为你感到开心！能分享一下是什么让你这么高兴吗？",
-        }
-        
-        base_response = templates.get(emotion, "我在这里倾听。想跟我聊聊吗？")
-        
-        # 如果有工具结果，添加相关信息
-        if tool_responses:
-            successful_tools = [tr for tr in tool_responses if tr.success]
-            if successful_tools:
-                base_response += " 我已经为你查找了一些相关信息。"
-        
-        return base_response
-    
+
     async def _perceive(
         self, 
         user_input: str, 
@@ -502,26 +463,10 @@ class AgentCore:
         """
         perception = {}
         
-        # 1. 内容分析
-        if self.emotion_analyzer:
-            try:
-                emotion_result = self.emotion_analyzer.analyze(user_input)
-                perception["emotion"] = emotion_result.get("emotion", "平静")
-                perception["emotion_intensity"] = emotion_result.get("intensity", 5.0)
-                perception["emotion_data"] = emotion_result
-            except Exception as e:
-                print(f"内容分析失败: {e!s}")
-                perception["emotion"] = "平静"
-                perception["emotion_intensity"] = 5.0
-        else:
-            # 简单的情绪判断
-            perception["emotion"] = self._simple_emotion_detect(user_input)
-            perception["emotion_intensity"] = 5.0
-        
-        # 2. 意图识别（基于规则）
+        # 1. 意图识别（基于规则）
         perception["intent"] = self._identify_intent(user_input)
         
-        # 3. 实体提取（简化实现）
+        # 2. 实体提取（简化实现）
         perception["entities"] = self._extract_entities(user_input)
         
         return perception
@@ -604,7 +549,6 @@ class AgentCore:
                 full_context = self.context_assembler.assemble(
                     user_id=context.get("user_id"),
                     current_message=user_input,
-                    emotion_data=context.get("perception", {}).get("emotion_data"),
                     memories=context.get("memories", [])
                 )
             else:
@@ -664,41 +608,7 @@ class AgentCore:
         # 简化：返回模板
         return "我理解你的感受。让我们一起面对这个问题。"
     
-    def _template_response(
-        self,
-        context: dict[str, Any],
-        tool_outputs: list[dict[str, Any]]
-    ) -> str:
-        """模板回复（降级方案）"""
-        perception = context.get("perception", {})
-        emotion = perception.get("emotion", "")
-        
-        # 基于情绪的模板回复
-        templates = {
-            "焦虑": "我能感受到你的焦虑。深呼吸，我们一起来面对。有什么具体让你担心的吗？",
-            "难过": "我能理解你现在的难过。允许自己感受这些情绪是很重要的。想聊聊吗？",
-            "愤怒": "我听到了你的愤怒。这些感受是完全正常的。能告诉我发生了什么吗？",
-            "开心": "真为你感到开心！能分享一下是什么让你这么高兴吗？",
-        }
-        
-        return templates.get(emotion, "我在这里倾听。想跟我聊聊吗？")
-    
-    def _simple_emotion_detect(self, text: str) -> str:
-        """简单的情绪检测"""
-        emotion_keywords = {
-            "焦虑": ["焦虑", "担心", "紧张", "不安"],
-            "难过": ["难过", "伤心", "失落", "沮丧"],
-            "愤怒": ["生气", "愤怒", "气愤", "恼火"],
-            "开心": ["开心", "高兴", "快乐", "兴奋"],
-            "恐惧": ["害怕", "恐惧", "惊恐"],
-        }
-        
-        for emotion, keywords in emotion_keywords.items():
-            if any(kw in text for kw in keywords):
-                return emotion
-        
-        return "平静"
-    
+
     def _identify_intent(self, text: str) -> str:
         """识别用户意图"""
         if any(kw in text for kw in ["怎么办", "怎么做", "如何", "帮我"]):
@@ -708,7 +618,7 @@ class AgentCore:
         elif any(kw in text for kw in ["计划", "打算", "决定"]):
             return "behavior_change"
         else:
-            return "emotional_support"
+            return "general_chat"
     
     def _extract_entities(self, text: str) -> list[str]:
         """提取实体（简化实现）"""
@@ -807,7 +717,7 @@ if __name__ == "__main__":
         )
         print("用户：我最近心情很不好，感觉很焦虑")
         print(f"ContextGate：{result1['response']}")
-        print(f"情绪：{result1['emotion']} (强度: {result1['emotion_intensity']})")
+        print(f"回复：{result1['response'][:60]}")
         print(f"执行了 {len(result1['actions'])} 个行动")
         
         print("\n" + "-" * 60 + "\n")
@@ -820,7 +730,7 @@ if __name__ == "__main__":
         )
         print("用户：我最近睡不好，怎么办？")
         print(f"ContextGate：{result2['response']}")
-        print(f"情绪：{result2['emotion']} (强度: {result2['emotion_intensity']})")
+        print(f"回复：{result2['response'][:60]}")
         print(f"执行了 {len(result2['actions'])} 个行动")
         if result2.get('followup_scheduled'):
             print("✓ 已安排回访")

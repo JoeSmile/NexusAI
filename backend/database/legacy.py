@@ -154,23 +154,8 @@ class ChatMessage(Base):
     user_id = Column(String(100), index=True)
     role = Column(String(20))  # user, assistant
     content = Column(Text)
-    emotion = Column(String(50))  # 情感标签
-    emotion_intensity = Column(Float)  # 情感强度
     created_at = Column(DateTime, default=datetime.utcnow)
 
-class EmotionAnalysis(Base):
-    """反馈记录表"""
-    __tablename__ = "emotion_analysis"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    session_id = Column(String(100), index=True)
-    user_id = Column(String(100), index=True)
-    message_id = Column(BigInteger)  # 关联到chat_messages.id
-    emotion = Column(String(50))
-    intensity = Column(Float)
-    keywords = Column(Text)  # JSON格式存储关键词
-    suggestions = Column(Text)  # JSON格式存储建议
-    created_at = Column(DateTime, default=datetime.utcnow)
 
 class Knowledge(Base):
     """知识库表"""
@@ -204,7 +189,7 @@ class UserFeedback(Base):
     session_id = Column(String(100), index=True)
     user_id = Column(String(100), index=True)
     message_id = Column(BigInteger, index=True)  # 关联到chat_messages.id
-    feedback_type = Column(String(50))  # irrelevant(答非所问), lack_empathy(缺乏关怀), overstepping(越界建议), helpful(有帮助), other
+    feedback_type = Column(String(50))  # irrelevant(答非所问), overstepping(越界建议), helpful(有帮助), other
     rating = Column(Integer)  # 1-5分评分
     comment = Column(Text)  # 用户的详细评论
     user_message = Column(Text)  # 用户消息内容（快照）
@@ -224,11 +209,9 @@ class ResponseEvaluation(Base):
     # 评估对象
     user_message = Column(Text)  # 用户消息（快照）
     bot_response = Column(Text)  # 机器人回复（快照）
-    user_emotion = Column(String(50))  # 用户情感
-    emotion_intensity = Column(Float)  # 情感强度
     
     # 评估维度分数 (1-5)
-    empathy_score = Column(Float)  # 关怀程度（遗留字段）
+    accuracy_score = Column(Float)  # 准确度评分
     naturalness_score = Column(Float)  # 自然度
     safety_score = Column(Float)  # 安全性
     
@@ -237,7 +220,7 @@ class ResponseEvaluation(Base):
     average_score = Column(Float)  # 平均分
     
     # 评估详情 (JSON格式)
-    empathy_reasoning = Column(Text)  # 关怀评价理由（遗留字段）
+    accuracy_reasoning = Column(Text)  # 准确度评价理由
     naturalness_reasoning = Column(Text)  # 自然度评价理由
     safety_reasoning = Column(Text)  # 安全性评价理由
     overall_comment = Column(Text)  # 总体评价
@@ -273,12 +256,10 @@ class UserProfileDB(Base):
     
     # 沟通偏好
     communication_style = Column(String(50), default="默认")  # 沟通风格偏好
-    emotional_baseline = Column(String(50), default="稳定")  # 情绪基线
     
     # 统计信息
     total_sessions = Column(Integer, default=0)  # 总会话数
     total_messages = Column(Integer, default=0)  # 总消息数
-    avg_emotion_intensity = Column(Float)  # 平均情绪强度
     
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -298,8 +279,6 @@ class MemoryItem(Base):
     memory_type = Column(String(50))  # event, relationship, commitment, preference, concern
     
     # 关联信息
-    emotion = Column(String(50))  # 相关情绪
-    emotion_intensity = Column(Float)  # 情绪强度
     importance = Column(Float)  # 重要性评分 (0-1)
     
     # 提取信息
@@ -379,7 +358,6 @@ class UserPersonalization(Base):
     style = Column(String(50), default="简洁")  # 风格: 简洁/详细/诗意/直接
     formality = Column(Float, default=0.3)  # 正式程度 (0-1)
     enthusiasm = Column(Float, default=0.5)  # 活泼度 (0-1)
-    empathy_level = Column(Float, default=0.0)  # 关怀程度 (0-1)
     humor_level = Column(Float, default=0.3)  # 幽默程度 (0-1)
     response_length = Column(String(20), default="medium")  # 回复长度: short/medium/long
     use_emoji = Column(Boolean, default=False)  # 是否使用emoji
@@ -480,15 +458,14 @@ class DatabaseManager:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.db.close()
 
-    def save_message(self, session_id, user_id, role, content, emotion=None, emotion_intensity=None):
+    def save_message(self, session_id, user_id, role, content):
         """保存聊天消息"""
         message = ChatMessage(
             session_id=session_id,
             user_id=user_id,
             role=role,
             content=content,
-            emotion=emotion,
-            emotion_intensity=emotion_intensity
+            # emotion 相关字段已移除
         )
         self.db.add(message)
         self.db.commit()
@@ -503,29 +480,8 @@ class DatabaseManager:
             .limit(limit)\
             .all()
     
-    def save_emotion_analysis(self, session_id, user_id, message_id, emotion, intensity, keywords, suggestions):
-        """保存分析结果"""
-        analysis = EmotionAnalysis(
-            session_id=session_id,
-            user_id=user_id,
-            message_id=message_id,
-            emotion=emotion,
-            intensity=intensity,
-            keywords=str(keywords),
-            suggestions=str(suggestions)
-        )
-        self.db.add(analysis)
-        self.db.commit()
-        return analysis
-    
-    def get_user_emotion_history(self, user_id, limit=100):
-        """获取用户情感历史"""
-        return self.db.query(EmotionAnalysis)\
-            .filter(EmotionAnalysis.user_id == user_id)\
-            .order_by(EmotionAnalysis.created_at.desc())\
-            .limit(limit)\
-            .all()
-    
+
+
     def save_knowledge(self, title, content, category, tags=None):
         """保存知识"""
         knowledge = Knowledge(
@@ -675,14 +631,12 @@ class DatabaseManager:
             message_id=evaluation_data.get("message_id"),
             user_message=evaluation_data.get("user_message"),
             bot_response=evaluation_data.get("bot_response"),
-            user_emotion=evaluation_data.get("user_emotion"),
-            emotion_intensity=evaluation_data.get("emotion_intensity"),
-            empathy_score=evaluation_data.get("empathy_score"),
+            accuracy_score=evaluation_data.get("accuracy_score"),
             naturalness_score=evaluation_data.get("naturalness_score"),
             safety_score=evaluation_data.get("safety_score"),
             total_score=evaluation_data.get("total_score"),
             average_score=evaluation_data.get("average_score"),
-            empathy_reasoning=evaluation_data.get("empathy_reasoning"),
+            accuracy_reasoning=evaluation_data.get("accuracy_reasoning"),
             naturalness_reasoning=evaluation_data.get("naturalness_reasoning"),
             safety_reasoning=evaluation_data.get("safety_reasoning"),
             overall_comment=evaluation_data.get("overall_comment"),
@@ -721,7 +675,7 @@ class DatabaseManager:
             return {
                 "total_count": 0,
                 "average_scores": {
-                    "empathy": 0,
+                    "accuracy": 0,
                     "naturalness": 0,
                     "safety": 0,
                     "overall": 0
@@ -729,7 +683,7 @@ class DatabaseManager:
             }
         
         total_count = len(evaluations)
-        avg_empathy = sum(e.empathy_score or 0 for e in evaluations) / total_count
+        avg_accuracy = sum(e.accuracy_score or 0 for e in evaluations) / total_count
         avg_naturalness = sum(e.naturalness_score or 0 for e in evaluations) / total_count
         avg_safety = sum(e.safety_score or 0 for e in evaluations) / total_count
         avg_overall = sum(e.average_score or 0 for e in evaluations) / total_count
@@ -737,15 +691,15 @@ class DatabaseManager:
         return {
             "total_count": total_count,
             "average_scores": {
-                "empathy": round(avg_empathy, 2),
+                "accuracy": round(avg_accuracy, 2),
                 "naturalness": round(avg_naturalness, 2),
                 "safety": round(avg_safety, 2),
                 "overall": round(avg_overall, 2)
             },
             "score_ranges": {
-                "empathy": {
-                    "min": min(e.empathy_score or 0 for e in evaluations),
-                    "max": max(e.empathy_score or 0 for e in evaluations)
+                "accuracy": {
+                    "min": min(e.accuracy_score or 0 for e in evaluations),
+                    "max": max(e.accuracy_score or 0 for e in evaluations)
                 },
                 "naturalness": {
                     "min": min(e.naturalness_score or 0 for e in evaluations),
@@ -766,7 +720,7 @@ class DatabaseManager:
             # 计算人工评分与AI评分的差异
             ai_avg = evaluation.average_score or 0
             human_avg = (
-                human_scores.get("empathy", 0) +
+                human_scores.get("accuracy", 0) +
                 human_scores.get("naturalness", 0) +
                 human_scores.get("safety", 0)
             ) / 3.0

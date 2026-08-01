@@ -28,7 +28,6 @@ class MLIntentClassifier:
         """
         self.model_path = model_path or "intent_bert_model"
         self.labels = [
-            IntentType.EMOTION,
             IntentType.ADVICE,
             IntentType.CHAT,
             IntentType.FUNCTION,
@@ -116,13 +115,6 @@ class MLIntentClassifier:
             return IntentResult(
                 intent=IntentType.FUNCTION,
                 confidence=0.70,
-                source="model",
-                metadata={"method": "heuristic"}
-            )
-        elif any(word in text_lower for word in ["难过", "伤心", "焦虑", "压抑", "生气"]):
-            return IntentResult(
-                intent=IntentType.EMOTION,
-                confidence=0.80,
                 source="model",
                 metadata={"method": "heuristic"}
             )

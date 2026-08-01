@@ -18,7 +18,6 @@ from .interfaces import (
     IChatEngine,
     IContextService,
     IDatabaseService,
-    IEmotionAnalyzer,
     ILogger,
     IMemoryService,
     IRAGService,
@@ -83,17 +82,6 @@ class ContextServiceFactory(ServiceFactory):
     
     def get_service_type(self) -> type[IContextService]:
         return IContextService
-
-
-class EmotionAnalyzerFactory(ServiceFactory):
-    """分析器工厂 — Batch 3.1: emotion_analyzer 已删除"""
-    
-    def create_service(self, *args, **kwargs) -> IEmotionAnalyzer:
-        """创建分析器实例"""
-        raise ConfigurationError("EmotionAnalyzer 已在 Batch 3.1 移除")
-    
-    def get_service_type(self) -> type[IEmotionAnalyzer]:
-        return IEmotionAnalyzer
 
 
 class RAGServiceFactory(ServiceFactory):
@@ -276,7 +264,6 @@ class ApplicationContext:
         self._registry.register_factory(IDatabaseService, DatabaseServiceFactory(), singleton=True)
         self._registry.register_factory(IValidationService, ValidationServiceFactory(), singleton=True)
         
-        self._registry.register_factory(IEmotionAnalyzer, EmotionAnalyzerFactory())
         self._registry.register_factory(IMemoryService, MemoryServiceFactory())
         self._registry.register_factory(IContextService, ContextServiceFactory())
         self._registry.register_factory(IChatEngine, ChatEngineFactory())
@@ -360,11 +347,6 @@ def get_memory_service() -> IMemoryService:
 def get_context_service() -> IContextService:
     """获取上下文服务"""
     return get_service(IContextService)
-
-
-def get_emotion_analyzer() -> IEmotionAnalyzer:
-    """获取分析器"""
-    return get_service(IEmotionAnalyzer)
 
 
 def get_rag_service() -> IRAGService:

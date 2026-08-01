@@ -192,17 +192,15 @@ class RAGService:
         self,
         question: str,
         conversation_history: list[dict[str, str]] | None = None,
-        user_emotion: str | None = None,
         search_k: int = 3
     ) -> dict[str, Any]:
         """
-        结合对话上下文和用户情绪的知识问答
+        结合对话上下文的知识问答
         
         Args:
             question: 用户问题
             conversation_history: 对话历史
-            user_emotion: 用户当前情绪
-            search_k: 检索文档数量
+                search_k: 检索文档数量
             
         Returns:
             包含答案和来源的字典
@@ -272,13 +270,9 @@ class RAGService:
                     history_lines.append(f"{role}: {content}")
                 history_context = "\n".join(history_lines)
             
-            # 构建情绪上下文
-            emotion_context = f"用户当前情绪: {user_emotion}" if user_emotion else ""
-            
             # 构建完整的prompt
             enhanced_prompt = f"""你是"ContextGate"，一个专业的心理健康陪伴机器人。
 
-{emotion_context}
 
 最近对话：
 {history_context}
@@ -317,8 +311,7 @@ class RAGService:
                 "sources": sources,
                 "question": question,
                 "knowledge_count": len(sources),
-                "used_emotion_context": user_emotion is not None,
-                "used_history_context": conversation_history is not None
+                    "used_history_context": conversation_history is not None
             }
             
         except Exception as e:
@@ -386,14 +379,13 @@ class RAGIntegrationService:
         self.rag_service = rag_service or RAGService()
         logger.info("RAG集成服务初始化完成")
     
-    def should_use_rag(self, message: str, emotion: str | None = None) -> bool:
+    def should_use_rag(self, message: str) -> bool:
         """
         判断是否应该使用RAG
         
         Args:
             message: 用户消息
-            emotion: 用户情绪
-            
+                
         Returns:
             是否使用RAG
         """
@@ -406,8 +398,7 @@ class RAGIntegrationService:
             prompt = f"""
             判断以下用户的求助是否需要专业的心理学知识（如CBT/正念/临床建议/放松技巧等）来回答。
             用户输入: "{message}"
-            当前用户情绪: "{emotion or '未知'}"
-            如果需要引入心理学知识提供建议，请回复 "True"；如果只是普通的闲聊或寒暄，请回复 "False"。
+                如果需要引入心理学知识提供建议，请回复 "True"；如果只是普通的闲聊或寒暄，请回复 "False"。
             仅回复 "True" 或 "False"。
             """
             
@@ -423,31 +414,23 @@ class RAGIntegrationService:
         # Fallback 到原有的关键词方法
         rag_triggers = [
             "怎么办", "如何", "方法", "建议", "技巧", "练习",
-            "失眠", "焦虑", "抑郁", "压力", "紧张", "担心", "害怕",
-            "孤独", "悲伤", "愤怒", "烦躁", "疲惫", "无助",
-            "正念", "冥想", "放松", "呼吸", "认知", "行为",
-            "睡眠", "运动", "饮食", "关系", "工作", "学习"
-        ]
-        
-        professional_emotions = [
-            "焦虑", "抑郁", "压力大", "紧张", "恐惧", "悲伤", "愤怒"
+            "文档", "方案", "流程", "规范", "报告", "分析", "总结",
+            "合同", "数据", "指标", "政策", "制度", "部署", "配置"
         ]
         
         message_lower = message.lower()
         has_trigger = any(trigger in message_lower for trigger in rag_triggers)
-        needs_professional = emotion and any(prof in emotion for prof in professional_emotions)
-        
-        should_use = has_trigger or needs_professional
+            
+        should_use = has_trigger
         
         if should_use:
-            logger.info(f"触发RAG(关键词回退): trigger={has_trigger}, emotion={needs_professional}")
+            logger.info(f"触发RAG(关键词回退): trigger={has_trigger}")
         
         return should_use
     
     def enhance_response(
         self,
         message: str,
-        emotion: str | None = None,
         conversation_history: list[dict[str, str]] | None = None
     ) -> dict[str, Any]:
         """
@@ -455,15 +438,14 @@ class RAGIntegrationService:
         
         Args:
             message: 用户消息
-            emotion: 用户情绪
-            conversation_history: 对话历史
+                conversation_history: 对话历史
             
         Returns:
             增强的回复字典
         """
         try:
             # 判断是否应该使用RAG
-            if not self.should_use_rag(message, emotion):
+            if not self.should_use_rag(message):
                 return {
                     "use_rag": False,
                     "reason": "当前对话不需要专业知识库支持"
@@ -473,7 +455,6 @@ class RAGIntegrationService:
             result = self.rag_service.ask_with_context(
                 question=message,
                 conversation_history=conversation_history,
-                user_emotion=emotion,
                 search_k=3
             )
             

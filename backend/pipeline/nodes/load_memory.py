@@ -20,7 +20,7 @@ async def load_memory(state: PipelineState) -> PipelineState:
         with session_factory.Session() as session:
             recent = session.execute(
                 text("""
-                    SELECT role, content, emotion, created_at
+                    SELECT role, content, created_at
                     FROM chat_messages
                     WHERE tenant_id = :tid AND user_id = :uid
                     ORDER BY created_at DESC LIMIT 5
@@ -37,7 +37,7 @@ async def load_memory(state: PipelineState) -> PipelineState:
             ).fetchall()
 
         state["hot_memory"] = [
-            {"role": r.role, "content": r.content, "emotion": r.emotion}
+            {"role": r.role, "content": r.content}
             for r in reversed(recent)
         ]
         state["warm_memory"] = {p.key: p.value for p in profile}

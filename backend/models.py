@@ -8,7 +8,6 @@ class Message(BaseModel):
     role: str  # "user" or "assistant"
     content: str
     timestamp: datetime = Field(default_factory=datetime.now)
-    emotion: str | None = None  # 情感标签
 
 class ChatSession(BaseModel):
     session_id: str
@@ -16,7 +15,6 @@ class ChatSession(BaseModel):
     messages: list[Message] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
-    emotion_state: dict[str, Any] | None = None  # 当前情感状态
 
 class ChatRequest(BaseModel):
     message: str
@@ -28,8 +26,6 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     response: str
     session_id: str
-    emotion: str | None = None
-    emotion_intensity: float | None = None
     suggestions: list[str] | None = None
     timestamp: datetime = Field(default_factory=datetime.now)
     context: dict[str, Any] | None = None
@@ -51,25 +47,16 @@ class MultimodalResponse(BaseModel):
     """多模态聊天响应"""
     response: str
     session_id: str
-    emotion: str | None = None
-    emotion_intensity: float | None = None
     suggestions: list[str] | None = None
     timestamp: datetime = Field(default_factory=datetime.now)
     context: dict[str, Any] | None = None
     audio_url: str | None = None  # 语音回复URL
-    multimodal_emotion: dict[str, Any] | None = None  # 多模态情感融合结果
-
-class EmotionAnalysis(BaseModel):
-    emotion: str
-    confidence: float
-    intensity: float
-    suggestions: list[str]
 
 class FeedbackRequest(BaseModel):
     session_id: str
     user_id: str | None = None
     message_id: int | None = None
-    feedback_type: str  # irrelevant, lack_empathy, overstepping, helpful, other
+    feedback_type: str  # irrelevant, overstepping, helpful, other
     rating: int  # 1-5
     comment: str | None = None
     user_message: str | None = None
@@ -100,14 +87,12 @@ class EvaluationRequest(BaseModel):
     message_id: int | None = None
     user_message: str
     bot_response: str
-    user_emotion: str | None = "neutral"
-    emotion_intensity: float | None = 5.0
     prompt_version: str | None = None  # 用于A/B测试
 
 class EvaluationResponse(BaseModel):
     """评估响应模型"""
     evaluation_id: int
-    empathy_score: float
+    accuracy_score: float
     naturalness_score: float
     safety_score: float
     average_score: float
@@ -127,13 +112,11 @@ class ComparePromptsRequest(BaseModel):
     """Prompt对比请求模型"""
     user_message: str
     responses: dict[str, str]  # prompt_name -> bot_response
-    user_emotion: str | None = "neutral"
-    emotion_intensity: float | None = 5.0
 
 class HumanVerificationRequest(BaseModel):
     """人工验证请求模型"""
     evaluation_id: int
-    empathy_score: int  # 1-5
+    accuracy_score: int  # 1-5
     naturalness_score: int  # 1-5
     safety_score: int  # 1-5
     comment: str | None = None
@@ -168,7 +151,6 @@ class PersonalizationConfig(BaseModel):
     style: str = "简洁"
     formality: float = 0.3
     enthusiasm: float = 0.5
-    empathy_level: float = 0.8
     humor_level: float = 0.3
     response_length: str = "medium"
     use_emoji: bool = False
@@ -200,7 +182,6 @@ class PersonalizationUpdateRequest(BaseModel):
     style: str | None = None
     formality: float | None = None
     enthusiasm: float | None = None
-    empathy_level: float | None = None
     humor_level: float | None = None
     response_length: str | None = None
     use_emoji: bool | None = None

@@ -119,22 +119,12 @@ class ToolCaller:
                 "query": {"type": "string", "required": True, "description": "搜索关键词"},
                 "user_id": {"type": "string", "required": True, "description": "用户ID"},
                 "time_range": {"type": "int", "required": False, "default": 30, "description": "时间范围（天）"},
-                "emotion_filter": {"type": "string", "required": False, "description": "情绪过滤"}
-            },
+                            },
             category="memory"
         )
         
         self.registry.register(
-            name="get_emotion_log",
-            description="获取用户情绪变化记录",
-            function=self._get_emotion_log,
-            parameters={
-                "user_id": {"type": "string", "required": True, "description": "用户ID"},
-                "days": {"type": "int", "required": False, "default": 7, "description": "查询天数"},
-                "emotion_type": {"type": "string", "required": False, "description": "情绪类型"}
-            },
-            category="memory"
-        )
+            )
         
         # ========== 定时任务工具 ==========
         
@@ -224,25 +214,13 @@ class ToolCaller:
                 return func(*args, **kwargs)
             return wrapper
         
-        get_user_mood_trend = _lazy_import_agent_tools('get_user_mood_trend')
         play_meditation_audio = _lazy_import_agent_tools('play_meditation_audio')
         set_daily_reminder = _lazy_import_agent_tools('set_daily_reminder')
         search_mental_health_resources = _lazy_import_agent_tools('search_mental_health_resources')
         send_follow_up_message = _lazy_import_agent_tools('send_follow_up_message')
         
-        # 1. 获取用户情绪趋势
-        self.registry.register(
-            name="get_user_mood_trend",
-            description="获取近N天情绪变化曲线，判断是否需干预",
-            function=get_user_mood_trend,
-            parameters={
-                "user_id": {"type": "string", "required": True, "description": "用户ID"},
-                "days": {"type": "int", "required": False, "default": 7, "description": "查询天数，默认7天"}
-            },
-            category="emotion"
-        )
         
-        # 2. 播放冥想音频
+        # 1. 播放冥想音频
         self.registry.register(
             name="play_meditation_audio",
             description="播放冥想音频，缓解焦虑",
@@ -508,8 +486,7 @@ class ToolCaller:
         self,
         query: str,
         user_id: str,
-        time_range: int = 30,
-        emotion_filter: str | None = None
+        time_range: int = 30
     ) -> dict[str, Any]:
         """搜索记忆工具实现"""
         try:
@@ -518,8 +495,6 @@ class ToolCaller:
             memory_hub = get_memory_hub()
             
             context = {"time_range": time_range}
-            if emotion_filter:
-                context["emotion"] = emotion_filter
             
             results = memory_hub.retrieve(
                 query=query,
@@ -533,7 +508,6 @@ class ToolCaller:
                 "memories": [
                     {
                         "content": m.get("content", ""),
-                        "emotion": m.get("emotion", {}),
                         "timestamp": m.get("timestamp", "").isoformat() if hasattr(m.get("timestamp", ""), "isoformat") else str(m.get("timestamp", "")),
                         "importance": m.get("importance", 0)
                     }
@@ -548,50 +522,7 @@ class ToolCaller:
                 "error": str(e)
             }
     
-    async def _get_emotion_log(
-        self,
-        user_id: str,
-        days: int = 7,
-        emotion_type: str | None = None
-    ) -> dict[str, Any]:
-        """获取情绪日志工具实现"""
-        try:
-            from .memory_hub import get_memory_hub
-            
-            memory_hub = get_memory_hub()
-            action_log = memory_hub.get_action_log(user_id, days)
-            
-            # 过滤情绪相关的日志
-            emotion_logs = []
-            for log in action_log:
-                if log.get("emotion"):
-                    if not emotion_type or log["emotion"] == emotion_type:
-                        emotion_logs.append(log)
-            
-            # 分析趋势
-            emotions = {}
-            for log in emotion_logs:
-                emotion = log["emotion"]
-                emotions[emotion] = emotions.get(emotion, 0) + 1
-            
-            dominant_emotion = max(emotions.items(), key=lambda x: x[1])[0] if emotions else "平静"
-            
-            return {
-                "logs": emotion_logs,
-                "summary": {
-                    "dominant_emotion": dominant_emotion,
-                    "emotion_distribution": emotions,
-                    "total_count": len(emotion_logs)
-                }
-            }
-        
-        except Exception as e:
-            return {
-                "logs": [],
-                "summary": {},
-                "error": str(e)
-            }
-    
+
     async def _set_reminder(
         self,
         content: str,

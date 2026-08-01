@@ -9,8 +9,6 @@ import uuid
 from datetime import UTC, datetime, timezone
 from typing import Any
 
-from ..interfaces import EmotionResult
-
 
 def format_response(
     data: Any = None,
@@ -87,22 +85,10 @@ def format_timestamp(
         return dt.strftime(format_type)
 
 
-def format_emotion_result(emotion_result: EmotionResult) -> dict[str, Any]:
-    """格式化分析结果"""
-    return {
-        "emotion": emotion_result.emotion,
-        "intensity": round(emotion_result.intensity, 2),
-        "confidence": round(emotion_result.confidence, 3),
-        "details": emotion_result.details,
-        "timestamp": datetime.now(UTC).isoformat()
-    }
-
 
 def format_chat_message(
     role: str,
     content: str,
-    emotion: str | None = None,
-    emotion_intensity: float | None = None,
     metadata: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     """格式化聊天消息"""
@@ -112,12 +98,6 @@ def format_chat_message(
         "content": content,
         "timestamp": datetime.now(UTC).isoformat()
     }
-    
-    if emotion:
-        message["emotion"] = emotion
-    
-    if emotion_intensity is not None:
-        message["emotion_intensity"] = round(emotion_intensity, 2)
     
     if metadata:
         message["metadata"] = metadata
@@ -151,7 +131,6 @@ def format_session_info(
 def format_memory_info(
     memory_id: str,
     content: str,
-    emotion: str,
     importance: float,
     created_at: datetime | None = None,
     metadata: dict[str, Any] | None = None
@@ -160,7 +139,6 @@ def format_memory_info(
     memory_info = {
         "id": memory_id,
         "content": content,
-        "emotion": emotion,
         "importance": round(importance, 3),
         "created_at": format_timestamp(created_at) if created_at else None
     }
@@ -174,7 +152,6 @@ def format_memory_info(
 def format_user_profile(
     user_id: str,
     preferences: dict[str, Any] | None = None,
-    emotion_history: list[dict[str, Any]] | None = None,
     session_count: int = 0,
     total_messages: int = 0,
     created_at: datetime | None = None,
@@ -192,8 +169,6 @@ def format_user_profile(
     if preferences:
         profile["preferences"] = preferences
     
-    if emotion_history:
-        profile["emotion_history"] = emotion_history[:10]  # 只保留最近10条
     
     return profile
 
@@ -273,7 +248,6 @@ def format_statistics(
     total_sessions: int,
     total_messages: int,
     active_sessions: int,
-    emotion_distribution: dict[str, int] | None = None,
     time_range: str | None = None
 ) -> dict[str, Any]:
     """格式化统计信息"""
@@ -285,8 +259,6 @@ def format_statistics(
         "timestamp": datetime.now(UTC).isoformat()
     }
     
-    if emotion_distribution:
-        stats["emotion_distribution"] = emotion_distribution
     
     if time_range:
         stats["time_range"] = time_range

@@ -1,5 +1,5 @@
 """
-Runtime — Emotional Chat Agent Runtime
+Runtime — ContextGate Agent Runtime
 
 从线性 Workflow 升级为 Runtime + Skills 架构：
 - Protocol-first: 三协议抽象 (LLM / Tool / Permission)
