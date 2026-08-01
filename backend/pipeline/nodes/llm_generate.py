@@ -21,9 +21,16 @@ async def llm_generate(state: PipelineState) -> PipelineState:
     base_url = state.get("llm_base_url") or os.getenv("LLM_BASE_URL", "")
     message = state.get("raw_input", state["message"])
 
+    messages: list[dict[str, str]] = []
+    ab_cfg = state.get("ab_variant_config") or {}
+    system_prompt = ab_cfg.get("system_prompt")
+    if system_prompt and isinstance(system_prompt, str):
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": message})
+
     result = await harness.generate(
         model=model,
-        messages=[{"role": "user", "content": message}],
+        messages=messages,
         tenant_id=tenant_id,
         api_key=api_key,
         base_url=base_url,

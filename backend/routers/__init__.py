@@ -2,6 +2,7 @@
 路由模块 - API路由定义
 """
 
+from backend.routers.ab import router as ab_router
 from backend.routers.admin import router as admin_router
 from backend.routers.audit import router as audit_router
 from backend.routers.evaluation import router as evaluation_router
@@ -20,6 +21,7 @@ except Exception:  # pragma: no cover
     agent_router = None
 
 __all__ = [
+    "ab_router",
     "admin_router",
     "agent_router",
     "audit_router",

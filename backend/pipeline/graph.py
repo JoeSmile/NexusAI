@@ -7,6 +7,7 @@ from backend.pipeline.nodes.analyze_parallel import analyze_parallel
 from backend.pipeline.nodes.auth_check import auth_check
 from backend.pipeline.nodes.build_context import build_context
 from backend.pipeline.nodes.cache_check import cache_check, should_skip_to_end
+from backend.pipeline.nodes.experiment_hook import experiment_hook
 from backend.pipeline.nodes.guardrails_input import (
     guardrails_input,
     should_block_to_end,
@@ -31,6 +32,7 @@ def build_pipeline():
     builder.add_node("guardrails_input", guardrails_input)
     builder.add_node("analyze_parallel", analyze_parallel)
     builder.add_node("build_context", build_context)
+    builder.add_node("experiment_hook", experiment_hook)
     builder.add_node("model_router", model_router)
     builder.add_node("llm_generate", llm_generate)
     builder.add_node("guardrails_output", guardrails_output)
@@ -60,7 +62,8 @@ def build_pipeline():
         },
     )
     builder.add_edge("analyze_parallel", "build_context")
-    builder.add_edge("build_context", "model_router")
+    builder.add_edge("build_context", "experiment_hook")
+    builder.add_edge("experiment_hook", "model_router")
 
     builder.add_conditional_edges(
         "model_router",
