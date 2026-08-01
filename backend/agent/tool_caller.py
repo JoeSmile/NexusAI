@@ -123,9 +123,6 @@ class ToolCaller:
             category="memory"
         )
         
-        self.registry.register(
-            )
-        
         # ========== 定时任务工具 ==========
         
         self.registry.register(
