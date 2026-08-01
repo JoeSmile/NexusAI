@@ -97,10 +97,11 @@ async def model_router(state: PipelineState) -> PipelineState:
 
 
 def route_short_or_long(state: PipelineState) -> str:
-    """条件边: 短路径 → conversion_hook，否则 → llm_generate（stream_mode 交由路由层 stream）"""
-    fr = state.get("finish_reason", "")
-    if fr in ("skill_executed", "PENDING_APPROVAL", "AUTH_002"):
-        return "conversion_hook"
-    if state.get("stream_mode"):
-        return "conversion_hook"
-    return "llm_generate"
+    """条件边: 仅「非流式的长路径」去 llm_generate；其余(短路径/错误/流式)一律 conversion_hook。
+
+    反向判断而非枚举终止态: skill 失败(finish_reason=error / 任意错误字符串)已有响应,
+    必须终止并记转化,不能遗漏式落进 LLM 被覆盖(曾致错误被吞 + 双份成本 + 审计不一致)。
+    """
+    if state.get("finish_reason") == "routed_to_llm" and not state.get("stream_mode"):
+        return "llm_generate"
+    return "conversion_hook"

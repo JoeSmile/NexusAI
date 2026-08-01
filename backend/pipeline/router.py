@@ -233,16 +233,11 @@ async def chat_streaming(
             },
         )
 
-    if final.get("finish_reason") in (
-        "skill_executed",
-        "cache_hit",
-        "blocked",
-        "PENDING_APPROVAL",
-        "AUTH_002",
-    ):
+    if final.get("finish_reason") != "routed_to_llm":
         return JSONResponse({"response": final.get("response", "")})
 
     from backend.core.harness import LLMHarness
+    from backend.pipeline.nodes.conversion_hook import conversion_hook
     from backend.pipeline.nodes.write_memory import write_memory
 
     harness = LLMHarness()
@@ -290,6 +285,9 @@ async def chat_streaming(
                 final["response"] = buffer
                 final["finish_reason"] = "llm_generated"
                 await write_memory(final)
+                # SSE 长路径: 图在 conversion_hook 处已结束(stream_mode),此处补记转化。
+                # 仅正常结束(含 retraction)记;abort/断连/异常已提前 return,不会到这。
+                await conversion_hook(final)
             yield "data: [DONE]\n\n"
 
         except asyncio.CancelledError:
