@@ -27,6 +27,22 @@ def _stable_bucket(user_id: str, experiment_id: str) -> float:
     return int(digest[:8], 16) / 0xFFFFFFFF
 
 
+def _pick_variant(
+    score: float, groups: list[str], weights: list[float]
+) -> str:
+    """按累计权重在 [0,1) score 上选组；与 zip(strict=False) 行为一致。"""
+    if not groups:
+        return "A"
+    cumulative = 0.0
+    variant = groups[-1]
+    for group, weight in zip(groups, weights, strict=False):
+        cumulative += weight
+        if score < cumulative:
+            variant = group
+            break
+    return variant
+
+
 def get_active_experiment(experiment_id: str | None = None) -> dict[str, Any] | None:
     """取启用中的实验；未指定 id 时取最新一条 enabled。"""
     session_factory = get_pg_session()
@@ -111,13 +127,7 @@ def assign_variant(
             variant = existing.group
         else:
             score = _stable_bucket(user_id, eid)
-            cumulative = 0.0
-            variant = exp["groups"][-1]
-            for group, weight in zip(exp["groups"], exp["weights"], strict=False):
-                cumulative += weight
-                if score < cumulative:
-                    variant = group
-                    break
+            variant = _pick_variant(score, exp["groups"], exp["weights"])
             if persist:
                 session.execute(
                     text(
