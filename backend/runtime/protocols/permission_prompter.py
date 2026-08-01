@@ -7,7 +7,7 @@ ConversationRuntime to be reused by:
 2. Sub-Agents (non-interactive, prompter=None → auto-deny)
 3. Tests (mock implementations)
 
-Adapted for emotional chat:
+Adapted for ContextGate:
 - 增加内容安全相关的权限类型
 - 危机检测策略需要高等级权限
 """

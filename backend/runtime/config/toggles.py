@@ -13,7 +13,6 @@ Module Toggles — per-module enable/disable switches
 3. 隔离测试：开发期间可以只开某个模块
 
 LLM Gateway模块列表：
-  emotion_skill        — 分析 Skill（遗留）
   memory_skill         — 记忆检索 Skill
   planning_skill       — 任务规划 Skill
   reflect_skill        — 反思评估 Skill
@@ -50,20 +49,18 @@ class ModuleToggles:
     Usage::
 
         toggles = ModuleToggles()
-        toggles.set_enabled("emotion_skill", False)
-
-        if toggles.is_enabled("emotion_skill"):
+    
+        if toggles.is_enabled("memory_skill"):
             ...
 
     环境变量覆盖（优先级最高）::
 
-        EMOTIONAL_CHAT__MODULES__EMOTION_SKILL__ENABLED=true
+        EMOTIONAL_CHAT__MODULES__MEMORY_SKILL__ENABLED=true
     """
 
     # 所有模块的默认状态
     _DEFAULTS: dict[str, bool] = {
         # Skills — 默认启用
-        "emotion_skill": True,
         "memory_skill": True,
         "planning_skill": True,
         "reflect_skill": True,

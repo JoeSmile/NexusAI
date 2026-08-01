@@ -30,7 +30,7 @@ def _resolve_default_base() -> Path:
     val = os.environ.get("EMOTIONAL_CHAT_WORKSPACE_BASE")
     if val:
         return Path(val)
-    return Path.home() / ".emotional_chat"
+    return Path.home() / ".contextgate"
 
 
 @dataclass
@@ -53,7 +53,7 @@ class WorkspaceManager:
 
         mgr = WorkspaceManager()
         ws = mgr.create_workspace(user_id="user_123")
-        # ws.root = Path("/home/user/.emotional_chat/users/user_123")
+        # ws.root = Path("/home/user/.contextgate/users/user_123")
     """
 
     def __init__(self, base_dir: Path | None = None):

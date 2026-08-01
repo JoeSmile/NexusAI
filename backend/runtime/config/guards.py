@@ -9,8 +9,8 @@ Usage::
 
     from runtime.config.guards import is_module_enabled
 
-    if is_module_enabled("emotion_skill"):
-        result = await emotion_skill.execute(context)
+    if is_module_enabled("memory_skill"):
+        result = await memory_skill.execute(context)
     ...
 
     from runtime.config.guards import require_module

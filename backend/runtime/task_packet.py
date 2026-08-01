@@ -8,7 +8,7 @@ Hierarchy:
   TaskPacket (business task) → DAGPlan → DAGTask[] (tool call units)
 
 LLM Gateway场景的 TaskPacket 示例：
-  - "帮助用户缓解焦虑" → emotion_skill + memory_skill + planning_skill
+  - "整理季度经营数据" → planning_skill + tool_skill + reflect_skill
   - "进行心理健康评估" → tool_skill(assessment) + reflect_skill
   - "安排回访任务" → planning_skill + tool_skill(scheduler)
 """
@@ -57,7 +57,7 @@ class AcceptanceTest:
 
     name: str
     description: str
-    assertion: str  # 评估表达式 (e.g., "output.contains('empathy')")
+    assertion: str  # 评估表达式 (e.g., "output.contains('data')")
     required: bool = True
 
 
@@ -69,8 +69,8 @@ class TaskPacket:
     Usage::
 
         packet = TaskPacket(
-            objective="帮助用户缓解焦虑",
-            skills=["emotion_skill", "memory_skill", "planning_skill"],
+            objective="整理季度经营数据",
+            skills=["planning_skill", "tool_skill"],
             priority=TaskPriority.HIGH,
         )
     """
@@ -85,7 +85,6 @@ class TaskPacket:
     user_input: str = ""
     user_id: str = ""
     session_id: str = ""
-    emotion_context: dict[str, Any] = field(default_factory=dict)
     # 约束
     max_iterations: int = 10
     timeout_seconds: float = 300.0

@@ -43,7 +43,6 @@ class LifecycleMixin:
         llm_client=None,
         tool_executor=None,
         memory_hub=None,
-        emotion_analyzer=None,
     ):
         # ── Identity ──
         self._session_id = session_id or f"session_{uuid.uuid4().hex[:8]}"
@@ -70,7 +69,6 @@ class LifecycleMixin:
             llm_client=llm_client,
             tool_executor=tool_executor,
             memory_hub=memory_hub,
-            emotion_analyzer=emotion_analyzer,
         )
 
         # ── Policy ──
@@ -102,7 +100,6 @@ class LifecycleMixin:
         llm_client=None,
         tool_executor=None,
         memory_hub=None,
-        emotion_analyzer=None,
     ) -> None:
         """注册默认 Skills（如果用户没有提供自定义 Skills）"""
         if skills:
@@ -116,7 +113,6 @@ class LifecycleMixin:
         from runtime.skills.reflect_skill import ReflectSkill
         from runtime.skills.tool_skill import ToolSkill
 
-        _ = emotion_analyzer  # 保留参数兼容旧调用方
         self._skill_registry.register(MemorySkill(memory_hub=memory_hub), order=1)
         self._skill_registry.register(PlanningSkill(llm_client=llm_client), order=2)
         self._skill_registry.register(ToolSkill(tool_executor=tool_executor), order=3)

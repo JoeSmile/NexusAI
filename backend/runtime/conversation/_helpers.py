@@ -19,7 +19,6 @@ class TurnResult:
     response: str = ""
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
     skill_results: dict[str, Any] = field(default_factory=dict)
-    emotion_tag: str | None = None
     usage: dict[str, int] = field(default_factory=dict)
     iterations: int = 0
     stop_reason: str = ""  # "complete" | "budget_exceeded" | "error" | "cancelled"
@@ -32,7 +31,6 @@ def _done_dict(result: TurnResult) -> dict[str, Any]:
         "type": "done",
         "success": result.success,
         "response": result.response,
-        "emotion_tag": result.emotion_tag,
         "stop_reason": result.stop_reason,
         "iterations": result.iterations,
         "usage": result.usage,

@@ -4,7 +4,7 @@ Protocol 1: LLM Client — LLM 调用抽象
 Defines the contract for LLM interaction. All ConversationRuntime
 modules depend on this Protocol, never on concrete implementations.
 
-Adapted for emotional chat:
+Adapted for ContextGate:
 - 支持 stream 和 complete 两种调用模式
 - 统一的 AssistantEvent 事件格式
 - 支持 tool_use 和纯文本两种输出
@@ -28,7 +28,6 @@ class AssistantEvent:
     call_id: str | None = None
     usage: dict | None = None  # {prompt_tokens, completion_tokens, cache_*}
     # LLM Gateway扩展字段
-    emotion_tag: str | None = None  # "empathy" | "encouragement" | "neutral" | ...
 
 
 @dataclass
@@ -39,7 +38,6 @@ class TurnSummary:
     tool_calls: list[dict] = field(default_factory=list)
     usage: dict = field(default_factory=dict)  # {input_tokens, output_tokens, total_tokens}
     iterations: int = 0
-    emotion_analysis: dict | None = None  # 分析结果（可选，遗留字段）
 
 
 class LLMClient(Protocol):

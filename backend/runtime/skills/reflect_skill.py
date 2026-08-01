@@ -35,8 +35,6 @@ class FollowupType(StrEnum):
     """回访类型"""
     ROUTINE_CHECK = "routine_check"
     GOAL_TRACKING = "goal_tracking"
-    EMOTIONAL_SUPPORT = "emotional_support"
-    CRISIS_INTERVENTION = "crisis_intervention"
 
 
 class ReflectSkill(Skill):
@@ -154,30 +152,10 @@ class ReflectSkill(Skill):
 
     async def _plan_followup(self, context: SkillContext, **kwargs) -> dict[str, Any] | None:
         """规划回访任务"""
-        emotion_data = context.emotion_data
-
-        # 基于情绪状态决定回访类型
-        if emotion_data.get("is_crisis"):
-            return {
-                "type": FollowupType.CRISIS_INTERVENTION.value,
-                "message": "检查用户安全状况",
-                "schedule_hours": 1,
-                "priority": "critical",
-            }
-
-        emotion = emotion_data.get("emotion", "")
-        if emotion in ["sad", "anxious", "lonely"]:
-            return {
-                "type": FollowupType.EMOTIONAL_SUPPORT.value,
-                "message": "关心用户当前状态",
-                "schedule_hours": 4,
-                "priority": "high",
-            }
-
         # 默认常规检查
         return {
             "type": FollowupType.ROUTINE_CHECK.value,
-            "message": "日常关心",
+            "message": "例行跟进",
             "schedule_hours": 24,
             "priority": "low",
         }
@@ -213,7 +191,7 @@ class ReflectSkill(Skill):
         """生成改进建议"""
         improvements = []
         if result == InteractionResult.FAILURE:
-            improvements.append("尝试更直接的情感回应策略")
+            improvements.append("尝试更直接的回应用户策略")
         if metrics.get("response_time", 0) > 5.0:
             improvements.append("减少工具调用以提升响应速度")
         if not metrics.get("has_tool_calls") and metrics.get("feedback_score", 0.5) < 0.5:

@@ -34,7 +34,7 @@ class ActivityTracker:
     Usage::
 
         tracker = ActivityTracker(session_id="session_123")
-        tracker.record_skill("emotion_skill", success=True, duration_ms=50)
+        tracker.record_skill("memory_skill", success=True, duration_ms=50)
     """
 
     def __init__(self, session_id: str = "", max_records: int = 1000):

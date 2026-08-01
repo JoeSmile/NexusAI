@@ -73,16 +73,16 @@ class PolicyEngine:
 
         engine = PolicyEngine(rules=[
             PolicyRule(
-                rule_id="crisis_intervention",
+                rule_id="dangerous_tool",
                 priority=100,
-                description="安全预警策略",
-                condition="emotion.is_crisis == true",
+                description="危险工具拦截策略",
+                condition="tool == 'rm'",
                 action_chain=[
-                    PolicyAction(type=ActionType.ESCALATE_TO_HUMAN, reason="检测到危机信号"),
+                    PolicyAction(type=ActionType.DENY, reason="禁止危险命令"),
                 ],
             ),
         ])
-        actions = engine.evaluate({"emotion": {"is_crisis": True}, "tool": "respond"})
+        actions = engine.evaluate({"tool": "rm"})
         for action in actions:
             if action.type == ActionType.ESCALATE_TO_HUMAN:
                 ...
@@ -90,50 +90,6 @@ class PolicyEngine:
 
     # LLM Gateway场景的默认规则
     _DEFAULT_RULES: list[PolicyRule] = [
-        PolicyRule(
-            rule_id="crisis_intervention",
-            priority=100,
-            description="安全预警 — 检测到高风险信号时升级到人工",
-            condition="emotion.is_crisis == true",
-            action_chain=[
-                PolicyAction(
-                    type=ActionType.ESCALATE_TO_HUMAN,
-                    params={"urgency": "critical"},
-                    reason="检测到危机信号，需要人工介入",
-                ),
-                PolicyAction(
-                    type=ActionType.ALERT,
-                    params={"channel": "crisis_team"},
-                    reason="通知安全预警团队",
-                ),
-            ],
-        ),
-        PolicyRule(
-            rule_id="high_intensity_emotion",
-            priority=80,
-            description="高情绪强度 — 降级到安全回应",
-            condition="emotion.intensity >= 9.0",
-            action_chain=[
-                PolicyAction(
-                    type=ActionType.DEGRADE,
-                    params={"fallback": "safe_empathy_response"},
-                    reason="情绪强度过高，使用安全回应策略",
-                ),
-            ],
-        ),
-        PolicyRule(
-            rule_id="sensitive_assessment",
-            priority=60,
-            description="敏感评估 — 心理评估需要确认",
-            condition="tool == 'psychological_assessment'",
-            action_chain=[
-                PolicyAction(
-                    type=ActionType.ASK,
-                    params={"message": "即将进行心理健康评估，是否继续？"},
-                    reason="心理评估需要用户确认",
-                ),
-            ],
-        ),
         PolicyRule(
             rule_id="tool_rate_limit",
             priority=40,
@@ -172,9 +128,8 @@ class PolicyEngine:
         Args:
             context: 评估上下文，如:
                 {
-                    "tool": "psychological_assessment",
-                    "args": {"urgency": "critical"},
-                    "emotion": {"is_crisis": True, "intensity": 8.0},
+                    "tool": "bash",
+                    "args": {"cmd": "ls"},
                     "tool_call_count": 3,
                 }
 
@@ -207,8 +162,6 @@ class PolicyEngine:
 
         支持简单表达式语法：
         - "tool == 'bash'"                    → context["tool"] == "bash"
-        - "emotion.is_crisis == true"          → context["emotion"]["is_crisis"] == True
-        - "emotion.intensity >= 9.0"           → context["emotion"]["intensity"] >= 9.0
         - "tool_call_count >= 5"               → context["tool_call_count"] >= 5
         """
         try:
@@ -249,7 +202,7 @@ class PolicyEngine:
             return False
 
     def _resolve_path(self, path: str, context: dict[str, Any]) -> Any:
-        """解析点分隔路径，如 'emotion.is_crisis' → context['emotion']['is_crisis']"""
+        """解析点分隔路径，如 'tool_call_count' → context['tool_call_count']"""
         parts = path.split(".")
         value = context
         for part in parts:

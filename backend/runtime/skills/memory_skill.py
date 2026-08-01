@@ -120,7 +120,6 @@ class MemorySkill(Skill):
                     query=context.user_input,
                     user_id=context.user_id,
                     context={
-                        "emotion": context.emotion_data.get("emotion", ""),
                         "time_range": kwargs.get("time_range", 30),
                     },
                     top_k=kwargs.get("top_k", 5),
@@ -140,7 +139,6 @@ class MemorySkill(Skill):
             try:
                 memory = self._memory_hub.encode({
                     "content": content,
-                    "emotion": context.emotion_data,
                     "user_id": context.user_id,
                     "role": kwargs.get("role", "user"),
                 })

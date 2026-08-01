@@ -45,7 +45,7 @@ class TurnMixin:
 
         ReAct loop:
           1. 构建 SkillContext
-          2. 执行 Skill 链 (emotion → memory → planning → tool → reflect)
+          2. 执行 Skill 链 (memory → planning → tool → reflect)
           3. 策略评估 (policy engine)
           4. LLM 生成响应
           5. 记忆巩固
@@ -102,9 +102,7 @@ class TurnMixin:
                     skill_results[skill.name] = result
 
                     # 更新 context
-                    if skill.name == "emotion_skill" and result.success:
-                        context.emotion_data = result.output or {}
-                    elif skill.name == "memory_skill" and result.success and result.output:
+                    if skill.name == "memory_skill" and result.success and result.output:
                         if isinstance(result.output, list):
                             context.memories = result.output
 
@@ -152,7 +150,6 @@ class TurnMixin:
                             interaction={
                                 "id": self._session_id,
                                 "user_input": user_input,
-                                "emotion_data": context.emotion_data,
                                 "skill_results": {k: v.to_dict() for k, v in skill_results.items()},
                                 "response": response,
                                 "response_time": time.time() - start_time,
@@ -163,13 +160,10 @@ class TurnMixin:
                         logger.warning("Reflect evaluation failed: %s", e)
 
             # ── 6. 返回结果 ──
-            emotion_tag = context.emotion_data.get("emotion") if context.emotion_data else None
-
             return TurnResult(
                 success=True,
                 response=response,
                 skill_results={k: v.to_dict() for k, v in skill_results.items()},
-                emotion_tag=emotion_tag,
                 iterations=self._current_iteration,
                 stop_reason="complete" if not self._cancel_requested else "cancelled",
                 usage={
@@ -208,7 +202,6 @@ class TurnMixin:
                 iteration=self._current_iteration,
                 model=getattr(self._llm, "model_name", "unknown"),
                 is_fallback=False,
-                emotion_tag=context.emotion_data.get("emotion", ""),
                 user_id=self._user_id,
             )
             injection = self._dispatcher.dispatch_pre_llm_call(hook_ctx)
@@ -253,11 +246,6 @@ class TurnMixin:
         # 注入 Skill 结果到消息中
         context_parts = []
 
-        if context.emotion_data:
-            emotion = context.emotion_data.get("emotion", "neutral")
-            intensity = context.emotion_data.get("emotion_intensity", 5.0)
-            context_parts.append(f"[情感状态: {emotion}, 强度: {intensity:.1f}]")
-
         if context.memories:
             mem_texts = [m.get("content", "") for m in context.memories[:3] if m.get("content")]
             if mem_texts:
@@ -280,7 +268,6 @@ class TurnMixin:
         return {
             "tool": skill_name,
             "args": {},
-            "emotion": context.emotion_data,
             "tool_call_count": self._tool_call_count,
         }
 

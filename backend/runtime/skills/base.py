@@ -11,7 +11,6 @@ Skill Protocol — 技能系统的核心抽象
 从 Workflow 到 Skill 的映射：
   原 7 阶段 Workflow          →  Skill
   ─────────────────────────────────────────
-  阶段1: 感知层               →  (EmotionSkill 已移除)
   阶段2: 记忆检索 (memory)    →  MemorySkill
   阶段3: 任务规划 (planner)   →  PlanningSkill
   阶段4: 执行计划 (tool)      →  ToolSkill
@@ -43,7 +42,6 @@ class SkillContext:
     iteration: int = 0  # 当前 ReAct 迭代次数 (1-based)
     # LLM Gateway上下文
     user_input: str = ""
-    emotion_data: dict[str, Any] = field(default_factory=dict)
     memories: list[dict[str, Any]] = field(default_factory=list)
     user_profile: dict[str, Any] = field(default_factory=dict)
     # 执行上下文
@@ -61,7 +59,6 @@ class SkillResult:
     error: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
     # LLM Gateway扩展
-    emotion_tag: str | None = None  # 当前情感标签
     confidence: float = 1.0  # 结果置信度 [0, 1]
     # Skill 调用信息
     skill_name: str = ""
@@ -73,7 +70,6 @@ class SkillResult:
             "success": self.success,
             "output": self.output,
             "error": self.error,
-            "emotion_tag": self.emotion_tag,
             "confidence": self.confidence,
             "skill_name": self.skill_name,
             "execution_time_ms": self.execution_time_ms,

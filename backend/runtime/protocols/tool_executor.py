@@ -4,7 +4,7 @@ Protocol 2: Tool Executor — 工具执行抽象
 Defines the contract for tool execution. Tools always return ToolResult
 and never raise exceptions (error in .error field).
 
-Adapted for emotional chat:
+Adapted for ContextGate:
 - 工具包含LLM Gateway专用工具 (心理数据库、日历、音频播放器等)
 - ToolResult 包含工具类别标记
 """
@@ -23,7 +23,7 @@ class ToolResult:
     error: str | None = None
     metadata: dict = field(default_factory=dict)
     # LLM Gateway扩展字段
-    tool_category: str = "general"  # "emotion" | "memory" | "calendar" | "general"
+    tool_category: str = "general"  # "memory" | "calendar" | "general"
 
     @property
     def is_error(self) -> bool:

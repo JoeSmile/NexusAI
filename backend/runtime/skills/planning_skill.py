@@ -28,7 +28,6 @@ logger = logging.getLogger(__name__)
 class GoalType(StrEnum):
     """目标类型"""
     INFORMATION_QUERY = "information_query"
-    EMOTIONAL_SUPPORT = "emotional_support"
     PROBLEM_SOLVING = "problem_solving"
     BEHAVIOR_CHANGE = "behavior_change"
     CASUAL_CHAT = "casual_chat"
@@ -44,7 +43,6 @@ class Complexity(StrEnum):
 class Strategy(StrEnum):
     """执行策略"""
     DIRECT_RESPONSE = "direct_response"
-    EMPATHY_FIRST = "empathy_first"
     TOOL_USE = "tool_use"
     SCHEDULED_FOLLOWUP = "scheduled_followup"
     CONVERSATIONAL = "conversational"
@@ -111,7 +109,7 @@ class PlanningSkill(Skill):
         执行任务规划
 
         Args:
-            context: 包含 user_input, emotion_data, memories 的上下文
+            context: 包含 user_input, memories 的上下文
 
         Returns:
             SkillResult，output 包含 ExecutionPlan.to_dict()
@@ -132,10 +130,9 @@ class PlanningSkill(Skill):
 
         try:
             user_input = context.user_input
-            emotion_data = context.emotion_data
 
             # 1. 目标识别
-            goal = self._identify_goal(user_input, emotion_data)
+            goal = self._identify_goal(user_input)
 
             # 2. 复杂度判断
             if goal["complexity"] == Complexity.SIMPLE.value:
@@ -146,7 +143,7 @@ class PlanningSkill(Skill):
                 )
             else:
                 # 3. 策略选择
-                strategy = self._select_strategy(goal, emotion_data)
+                strategy = self._select_strategy(goal)
 
                 # 4. 生成步骤
                 steps = self._generate_steps(goal, strategy, context)
@@ -158,7 +155,6 @@ class PlanningSkill(Skill):
             return SkillResult(
                 success=True,
                 output=plan.to_dict(),
-                emotion_tag=emotion_data.get("emotion") if emotion_data else None,
                 skill_name=self.name,
                 execution_time_ms=execution_time,
             )
@@ -172,21 +168,9 @@ class PlanningSkill(Skill):
                 execution_time_ms=time.time() * 1000 - start_ms,
             )
 
-    def _identify_goal(self, user_input: str, emotion_data: dict) -> dict[str, Any]:
+    def _identify_goal(self, user_input: str) -> dict[str, Any]:
         """识别用户目标（规则优先）"""
-        emotion_data.get("emotion", "") if emotion_data else ""
-        intensity = emotion_data.get("emotion_intensity", 5.0) if emotion_data else 5.0
-
-        # 规则1：高强度信号 → 关怀支持
-        if intensity >= 7.0:
-            return {
-                "goal_type": GoalType.EMOTIONAL_SUPPORT.value,
-                "complexity": Complexity.MEDIUM.value,
-                "urgency": "high",
-                "description": "用户表达强烈困扰，需要关怀支持",
-            }
-
-        # 规则2：问题关键词 → 问题解决
+        # 规则1：问题关键词 → 问题解决
         problem_keywords = ["怎么办", "怎么做", "如何", "帮我", "建议"]
         if any(kw in user_input for kw in problem_keywords):
             return {
@@ -196,7 +180,7 @@ class PlanningSkill(Skill):
                 "description": "用户寻求解决方案",
             }
 
-        # 规则3：查询关键词 → 信息查询
+        # 规则2：查询关键词 → 信息查询
         query_keywords = ["是什么", "为什么", "什么时候", "在哪里"]
         if any(kw in user_input for kw in query_keywords):
             return {
@@ -206,7 +190,7 @@ class PlanningSkill(Skill):
                 "description": "用户查询信息",
             }
 
-        # 规则4：改变关键词 → 行为改变
+        # 规则3：改变关键词 → 行为改变
         change_keywords = ["打算", "计划", "决定", "想要", "改变"]
         if any(kw in user_input for kw in change_keywords):
             return {
@@ -224,13 +208,11 @@ class PlanningSkill(Skill):
             "description": "日常对话",
         }
 
-    def _select_strategy(self, goal: dict, emotion_data: dict) -> Strategy:
+    def _select_strategy(self, goal: dict) -> Strategy:
         """选择执行策略"""
         goal_type = goal.get("goal_type", "")
 
-        if goal_type == GoalType.EMOTIONAL_SUPPORT.value:
-            return Strategy.EMPATHY_FIRST
-        elif goal_type == GoalType.PROBLEM_SOLVING.value:
+        if goal_type == GoalType.PROBLEM_SOLVING.value:
             return Strategy.TOOL_USE
         elif goal_type == GoalType.BEHAVIOR_CHANGE.value:
             return Strategy.CONVERSATIONAL
@@ -245,11 +227,7 @@ class PlanningSkill(Skill):
         """生成执行步骤"""
         steps = []
 
-        if strategy == Strategy.EMPATHY_FIRST:
-            steps.append({"action": "empathy_respond", "parameters": {"emotion_data": context.emotion_data}})
-            steps.append({"action": "support", "parameters": {"goal": goal}})
-
-        elif strategy == Strategy.TOOL_USE:
+        if strategy == Strategy.TOOL_USE:
             steps.append({"action": "tool_call", "parameters": {"goal": goal}})
             steps.append({"action": "respond", "parameters": {"include_tool_result": True}})
 

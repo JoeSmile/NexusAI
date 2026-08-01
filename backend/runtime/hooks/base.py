@@ -10,8 +10,7 @@ Hook Protocol — 生命周期钩子
   • on_tool_use_failure 可以返回一个 dict 来替代错误结果
 
 LLM Gateway场景的典型 Hook：
-  • 危机检测 Hook — 在 pre_llm_call 中注入安全指令
-  • 情感追踪 Hook — 在 post_llm_call 中记录情感变化
+  • 安全指令 Hook — 在 pre_llm_call 中注入安全指令
   • 工具降级 Hook — 在 tool_use_failure 中返回安全默认值
 """
 
@@ -37,7 +36,6 @@ class HookContext:
     model: str  # 当前模型名
     is_fallback: bool  # 是否在使用降级模型
     # LLM Gateway扩展
-    emotion_tag: str = ""  # 当前情感标签
     user_id: str = ""
     metadata: dict = field(default_factory=dict)
 
@@ -121,8 +119,7 @@ class HookDispatcher:
     Usage::
 
         dispatcher = HookDispatcher([
-            CrisisDetectionHook(),
-            EmotionTrackingHook(),
+            SafetyInjectionHook(),
         ])
 
         # 分发事件
