@@ -134,6 +134,10 @@ async def _run_chat_pipeline(
 
 
 
+def _sse_data(payload: dict) -> str:
+    return "data: " + json.dumps(payload, ensure_ascii=False) + "\n\n"
+
+
 @router.post("/chat/streaming")
 async def chat_streaming(
     request: Request,
@@ -143,8 +147,14 @@ async def chat_streaming(
 ):
     """
     SSE（04.11）+ abort/retraction（09.04）+ LLMHarness.stream（07.07e）。
-    短路径 JSON；长路径真流式（有 key 时 OpenAI astream，否则 mock 切片）。
+    短路径 JSON；长路径真流式。支持 15s 心跳、客户端断开中止、统一 error 事件。
+    注意: Last-Event-ID 断点续传尚未实现。
     """
+    import asyncio
+    import logging
+
+    logger = logging.getLogger(__name__)
+
     initial = make_initial_state(
         tenant_id=tenant.tenant_id,
         user_id=body.user_id or tenant.user_id,
@@ -160,7 +170,27 @@ async def chat_streaming(
     )
     initial["stream_mode"] = True
 
-    final = await compiled_graph.ainvoke(initial)
+    try:
+        final = await compiled_graph.ainvoke(initial)
+    except ContextGateException as e:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "type": "error",
+                "code": getattr(e, "code", "SYS_001"),
+                "message": str(e),
+            },
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "type": "error",
+                "code": "SYS_001",
+                "message": str(e),
+            },
+        )
+
     if final.get("finish_reason") in (
         "skill_executed",
         "cache_hit",
@@ -179,47 +209,60 @@ async def chat_streaming(
 
     async def event_stream() -> AsyncIterator[str]:
         buffer = ""
-        async for tok in harness.stream(
+        token_iter = harness.stream(
             model=model,
             messages=[{"role": "user", "content": prompt}],
             tenant_id=final["tenant_id"],
             api_key=final.get("llm_api_key") or "",
             base_url=final.get("llm_base_url") or "",
-        ):
-            buffer += tok
-            if _STREAM_FILTER.search(buffer):
-                yield (
-                    "data: "
-                    + json.dumps(
-                        {"type": "abort", "reason": "content_filter"},
-                        ensure_ascii=False,
-                    )
-                    + "\n\n"
-                )
-                yield "data: [DONE]\n\n"
+        ).__aiter__()
+
+        try:
+            while True:
+                if await request.is_disconnected():
+                    logger.info("SSE client disconnected — stop generation")
+                    break
+                try:
+                    tok = await asyncio.wait_for(token_iter.__anext__(), timeout=15.0)
+                except StopAsyncIteration:
+                    break
+                except TimeoutError:
+                    yield ": ping\n\n"
+                    continue
+
+                buffer += tok
+                if _STREAM_FILTER.search(buffer):
+                    yield _sse_data({"type": "abort", "reason": "content_filter"})
+                    yield "data: [DONE]\n\n"
+                    return
+                yield _sse_data({"token": tok})
+
+            if not buffer and await request.is_disconnected():
                 return
-            yield (
-                "data: "
-                + json.dumps({"token": tok}, ensure_ascii=False)
-                + "\n\n"
-            )
 
-        if len(buffer) > 4000:
-            yield (
-                "data: "
-                + json.dumps(
-                    {"type": "retraction", "reason": "length_exceeded"},
-                    ensure_ascii=False,
-                )
-                + "\n\n"
-            )
-            buffer = buffer[:4000]
+            if len(buffer) > 4000:
+                yield _sse_data({"type": "retraction", "reason": "length_exceeded"})
+                buffer = buffer[:4000]
 
-        final["response"] = buffer
-        final["finish_reason"] = "llm_generated"
-        await write_memory(final)
-        background_tasks.add_task(lambda: None)
-        yield "data: [DONE]\n\n"
+            if buffer:
+                final["response"] = buffer
+                final["finish_reason"] = "llm_generated"
+                await write_memory(final)
+            yield "data: [DONE]\n\n"
+
+        except asyncio.CancelledError:
+            logger.info("SSE cancelled — abort LLM stream")
+            raise
+        except Exception as e:
+            logger.exception("SSE stream error: %s", e)
+            yield _sse_data(
+                {
+                    "type": "error",
+                    "code": "LLM_002",
+                    "message": str(e),
+                }
+            )
+            yield "data: [DONE]\n\n"
 
     return StreamingResponse(
         event_stream(),

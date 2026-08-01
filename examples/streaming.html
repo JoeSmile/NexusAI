@@ -20,9 +20,10 @@
 <body>
 <h1>SSE 流式聊天 — /chat/streaming</h1>
 <div class="desc">
-  <b>测什么:</b>LangGraph 管线长路径的真流式输出:token 逐字推送、短路径(缓存/skill)返回 JSON、内容过滤 abort、超长 retraction。<br>
+  <b>测什么:</b>LangGraph 管线长路径的真流式输出:token 逐字推送、短路径(缓存/skill)返回 JSON、内容过滤 abort、超长 retraction、空闲心跳 <code>: ping</code>、客户端中止。<br>
   <b>前置:</b>X-API-Key(需 chat:write);LLM_MOCK=true 时输出 mock 切片(逐字),false 时走真实模型 astream。<br>
-  <b>预期:</b>事件流 <code>data: {"token":"..."}</code> 逐条到达,结尾 <code>data: [DONE]</code>;重复相同消息应命中缓存返回 JSON(非流式)。
+  <b>预期:</b>事件流 <code>data: {"token":"..."}</code> 逐条到达,结尾 <code>data: [DONE]</code>;也可能收到 <code>type:abort|retraction|error</code>。<br>
+  <b>说明:</b>当前不支持 <code>Last-Event-ID</code> 断点续传;断线后需重新请求。
 </div>
 
 <label for="apiKey">X-API-Key</label>
@@ -70,12 +71,19 @@ async function start() {
       buf += dec.decode(value, { stream: true });
       const lines = buf.split('\n\n'); buf = lines.pop();
       for (const ev of lines) {
+        if (ev.startsWith(':')) { out.textContent += '[heartbeat] ' + ev + '\n'; continue; }
         if (!ev.startsWith('data:')) continue;
         n++;
         const payload = ev.slice(5).trim();
         out.textContent += payload + '\n';
         out.scrollTop = out.scrollHeight;
         if (payload === '[DONE]') { stat.textContent = '✓ 完成,事件数: ' + n + ',耗时: ' + Math.round(performance.now() - t0) + 'ms'; return; }
+        try {
+          const obj = JSON.parse(payload);
+          if (obj.type === 'error') { stat.textContent = '✗ error ' + obj.code + ': ' + obj.message; }
+          else if (obj.type === 'abort') { stat.textContent = '⛔ abort: ' + obj.reason; }
+          else if (obj.type === 'retraction') { stat.textContent = '↩ retraction: ' + obj.reason; }
+        } catch (_) {}
       }
     }
     stat.textContent = '✓ 连接关闭,事件数: ' + n;

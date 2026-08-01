@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 from collections.abc import AsyncIterator
 from typing import Any
@@ -134,7 +135,10 @@ class LLMHarness(Harness):
             )
             if text is None:
                 text = mock_response(model, prompt)
+            task = asyncio.current_task()
             for ch in text:
+                if task is not None and task.cancelled():
+                    raise asyncio.CancelledError()
                 collected.append(ch)
                 yield ch
         else:
@@ -153,7 +157,10 @@ class LLMHarness(Harness):
                     stream=True,
                     max_tokens=int(kwargs.get("max_tokens", 1000)),
                 )
+                task = asyncio.current_task()
                 async for chunk in stream:  # type: ignore[union-attr]
+                    if task is not None and task.cancelled():
+                        raise asyncio.CancelledError()
                     delta = chunk.choices[0].delta.content if chunk.choices else None
                     if delta:
                         collected.append(delta)
