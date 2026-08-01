@@ -102,9 +102,12 @@ curl -X POST http://localhost:8000/chat \
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Compliance](docs/COMPLIANCE.md)
+- [Security Policy](docs/SECURITY.md)
 - [Security Audit](docs/SECURITY_AUDIT.md)
 - [Deployment](docs/DEPLOYMENT.md)
+- [Roadmap](docs/ROADMAP.md)
 - [Contributing](CONTRIBUTING.md)
+- [Code of Conduct](docs/CODE_OF_CONDUCT.md)
 
 ## License
 
