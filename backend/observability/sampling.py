@@ -6,6 +6,9 @@ import random
 from contextvars import ContextVar
 
 _tracing_enabled: ContextVar[bool] = ContextVar("langfuse_tracing_enabled", default=True)
+_sample_decided: ContextVar[bool | None] = ContextVar(
+    "langfuse_sample_decided", default=None
+)
 
 _SHORT_FINISH = frozenset(
     {
@@ -33,12 +36,19 @@ def sample_rate_for(finish_reason: str | None) -> float:
 
 
 def should_sample(finish_reason: str | None) -> bool:
+    """同一请求内只掷一次骰子；后续调用复用结果。"""
+    decided = _sample_decided.get()
+    if decided is not None:
+        return decided
     rate = sample_rate_for(finish_reason)
     if rate >= 1.0:
-        return True
-    if rate <= 0.0:
-        return False
-    return random.random() < rate
+        result = True
+    elif rate <= 0.0:
+        result = False
+    else:
+        result = random.random() < rate
+    _sample_decided.set(result)
+    return result
 
 
 def set_tracing_enabled(enabled: bool) -> None:
@@ -47,3 +57,9 @@ def set_tracing_enabled(enabled: bool) -> None:
 
 def tracing_enabled() -> bool:
     return bool(_tracing_enabled.get())
+
+
+def reset_sampling_state(*, enabled: bool = True) -> None:
+    """请求开始时重置采样状态。"""
+    _tracing_enabled.set(enabled)
+    _sample_decided.set(None)

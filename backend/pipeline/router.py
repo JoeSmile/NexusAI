@@ -71,11 +71,12 @@ async def _run_chat_pipeline(
     )
     from backend.observability.sampling import (
         is_short_path,
-        set_tracing_enabled,
+        reset_sampling_state,
         should_sample,
+        tracing_enabled,
     )
 
-    set_tracing_enabled(True)
+    reset_sampling_state(enabled=True)
     start = time.time()
     finish_reason = "error"
 
@@ -166,7 +167,9 @@ async def _run_chat_pipeline(
             error_code="SYS_001",
         )
     finally:
-        if should_sample(finish_reason):
+        # 与 model_router 短路径降采样共用同一决策（should_sample 幂等）
+        keep = should_sample(finish_reason) and tracing_enabled()
+        if keep:
             background_tasks.add_task(flush_langfuse)
         else:
             background_tasks.add_task(discard_langfuse_buffer)
