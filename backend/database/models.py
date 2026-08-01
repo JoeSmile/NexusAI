@@ -371,7 +371,7 @@ def create_tables():
     创建数据库表（不推荐直接使用）
 
     警告：请使用 Alembic 迁移系统来管理数据库结构变更
-    使用命令：python scripts/db_manager.py init
+    使用命令：uv run alembic upgrade head
 
     当 PostgreSQL 不可达且 USE_SQLITE_FALLBACK=1 时，回退到本地 SQLite。
     """
