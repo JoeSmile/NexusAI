@@ -18,7 +18,6 @@ from backend.core.exceptions import (
 from backend.core.utils.formatters import format_error, format_response, format_timestamp
 from backend.core.utils.helpers import (
     calculate_similarity,
-    extract_emotion_keywords,
     generate_id,
     sanitize_text,
 )
@@ -242,14 +241,6 @@ class TestHelpers:
         long_text = "x" * 3000
         sanitized = sanitize_text(long_text, max_length=100)
         assert len(sanitized) <= 100
-    
-    def test_extract_emotion_keywords(self):
-        """测试情绪关键词提取"""
-        text = "我今天很开心，但是有点焦虑"
-        keywords = extract_emotion_keywords(text)
-        
-        assert "开心" in keywords
-        assert "焦虑" in keywords
     
     def test_calculate_similarity(self):
         """测试相似度计算"""

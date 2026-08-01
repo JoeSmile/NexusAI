@@ -19,19 +19,17 @@ from backend.database.vector_ops import add_chat_turn, search_user_memories
 class _ExtractorShim:
     """替代已删除的 MemoryExtractor — 保守启发式"""
 
-    def should_extract_memory(self, user_message, emotion=None, emotion_intensity=None) -> bool:
+    def should_extract_memory(self, user_message) -> bool:
         return len(user_message or "") >= 8
 
-    def extract_memories(self, user_message, bot_response, emotion=None, emotion_intensity=None):
+    def extract_memories(self, user_message, bot_response):
         return [
             {
                 "id": None,
                 "content": user_message,
                 "summary": (user_message or "")[:100],
                 "type": "conversation",
-                "importance": min(float(emotion_intensity or 5.0) / 10.0, 1.0),
-                "emotion": emotion or "neutral",
-                "intensity": emotion_intensity or 5.0,
+                "importance": 0.5,
                 "extraction_method": "heuristic",
             }
         ]
@@ -49,7 +47,6 @@ class _VectorStoreShim:
         user_id,
         user_message,
         assistant_message,
-        emotion=None,
         metadata=None,
     ):
         add_chat_turn(
@@ -58,7 +55,6 @@ class _VectorStoreShim:
             user_id,
             user_message,
             assistant_message,
-            emotion,
         )
 
     def search(self, query, user_id=None, n_results=5, **kwargs):
@@ -86,14 +82,12 @@ class MemoryDecayCalculator:
         return original_score * (decay_rate ** days_ago)
     
     @staticmethod
-    def calculate_importance_boost(memory_type: str, emotion_intensity: float, 
-                                   access_count: int = 0) -> float:
+    def calculate_importance_boost(memory_type: str, access_count: int = 0) -> float:
         """
         计算记忆重要性提升系数
         
         Args:
             memory_type: 记忆类型
-            emotion_intensity: 情绪强度
             access_count: 被访问次数
             
         Returns:
@@ -111,13 +105,10 @@ class MemoryDecayCalculator:
         
         type_boost = type_weights.get(memory_type, 1.0)
         
-        # 情绪强度加成（高强度情绪的记忆更重要）
-        emotion_boost = 1.0 + (emotion_intensity - 5.0) / 10.0  # 范围：0.5-1.5
-        
         # 访问频率加成（被经常回忆的记忆更重要）
         access_boost = 1.0 + min(access_count * 0.05, 0.5)  # 最多+50%
         
-        return type_boost * emotion_boost * access_boost
+        return type_boost * access_boost
 
 
 class ShortTermMemory:
@@ -201,23 +192,17 @@ class ShortTermMemory:
             是否重要
         """
         content = message.get("content", "").lower()
-        emotion_intensity = message.get("emotion_intensity", 5.0)
         
         # 默认判断标准
         important_keywords = [
             "总是", "从不", "一直", "每次", "永远",  # 频率词
             "承诺", "保证", "答应", "同意",  # 承诺类
             "最重要", "关键", "核心", "主要",  # 强调词
-            "失眠", "焦虑", "抑郁", "痛苦",  # 心理健康
             "辞职", "分手", "离婚", "搬家",  # 重大事件
         ]
         
         # 包含重要关键词
         if any(keyword in content for keyword in important_keywords):
-            return True
-        
-        # 高强度情绪（>7.5）
-        if emotion_intensity > 7.5:
             return True
         
         # 用户明确请求（以"请"开头或包含疑问词）
@@ -243,9 +228,7 @@ class EnhancedMemoryManager:
                                    session_id: str, 
                                    user_id: str,
                                    user_message: str, 
-                                   bot_response: str,
-                                   emotion: str | None = None,
-                                   emotion_intensity: float | None = None) -> list[dict[str, Any]]:
+                                   bot_response: str) -> list[dict[str, Any]]:
         """
         处理对话并提取记忆
         
@@ -254,19 +237,17 @@ class EnhancedMemoryManager:
             user_id: 用户ID
             user_message: 用户消息
             bot_response: 机器人回复
-            emotion: 情绪
-            emotion_intensity: 情绪强度
             
         Returns:
             提取的记忆列表
         """
         # 1. 判断是否需要提取记忆
-        if not self.extractor.should_extract_memory(user_message, emotion, emotion_intensity):
+        if not self.extractor.should_extract_memory(user_message):
             return []
         
         # 2. 提取记忆
         memories = self.extractor.extract_memories(
-            user_message, bot_response, emotion, emotion_intensity
+            user_message, bot_response
         )
         
         # 3. 计算重要性提升
@@ -275,7 +256,6 @@ class EnhancedMemoryManager:
             # 计算重要性
             importance_boost = self.decay_calculator.calculate_importance_boost(
                 memory.get("type", "other"),
-                emotion_intensity or 5.0,
                 0  # 新记忆访问次数为0
             )
             
@@ -340,8 +320,6 @@ class EnhancedMemoryManager:
                     content=memory.get("content", ""),
                     summary=memory.get("summary", ""),
                     memory_type=memory.get("type", "other"),
-                    emotion=memory.get("emotion"),
-                    emotion_intensity=memory.get("intensity"),
                     importance=memory.get("importance", 0.5),
                     extraction_method=memory.get("extraction_method", "unknown"),
                     keywords=json.dumps(memory.get("keywords", []), ensure_ascii=False)
@@ -368,7 +346,6 @@ class EnhancedMemoryManager:
                                n_results: int = 5,
                                days_limit: int | None = 30,
                                min_importance: float = 0.3,
-                               emotion_filter: str | None = None,
                                enable_decay: bool = True) -> list[dict[str, Any]]:
         """
         检索相关记忆（支持时间衰减）
@@ -379,7 +356,6 @@ class EnhancedMemoryManager:
             n_results: 返回结果数量
             days_limit: 时间限制（天数）
             min_importance: 最小重要性阈值
-            emotion_filter: 情绪过滤
             enable_decay: 是否启用时间衰减
             
         Returns:
@@ -413,9 +389,6 @@ class EnhancedMemoryManager:
 
                 similarity = float(item.get("similarity", 0))
                 if similarity < 0.25:
-                    continue
-
-                if emotion_filter and item.get("emotion") != emotion_filter:
                     continue
 
                 importance = float(item.get("importance", 0.5))
@@ -487,8 +460,6 @@ class EnhancedMemoryManager:
                         "content": m.content,
                         "summary": m.summary,
                         "type": m.memory_type,
-                        "emotion": m.emotion,
-                        "intensity": m.emotion_intensity,
                         "importance": m.importance,
                         "access_count": m.access_count,
                         "created_at": m.created_at.isoformat() if m.created_at else None,

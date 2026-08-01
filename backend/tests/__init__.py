@@ -87,11 +87,9 @@ async def mock_cache():
 def sample_chat_request():
     """示例聊天请求"""
     return {
-        "message": "你好，我今天心情不好",
+        "message": "你好，请帮我整理今天的会议纪要",
         "user_id": "test_user_123",
         "session_id": "test_session_456",
-        "emotion": "难过",
-        "emotion_intensity": 6.5,
         "use_memory": True,
         "use_rag": True
     }
@@ -103,15 +101,12 @@ def sample_chat_response():
     return {
         "success": True,
         "message": "回复生成成功",
-        "response": "我理解你现在的心情不好，能告诉我发生了什么吗？",
-        "emotion": "难过",
-        "emotion_intensity": 6.5,
+        "response": "已为您整理会议纪要，要点如下：",
         "session_id": "test_session_456",
         "timestamp": "2025-10-16T14:30:00Z",
         "status_code": 200,
         "context": {
             "memories_count": 3,
-            "emotion_trend": "上升",
             "has_profile": True,
             "used_rag": False
         }
@@ -123,8 +118,7 @@ def sample_memory():
     """示例记忆"""
     return {
         "id": "memory_123",
-        "content": "用户今天心情不好",
-        "emotion": "难过",
+        "content": "用户偏好结构化的工作汇报",
         "importance": 0.8,
         "timestamp": "2025-10-16T14:30:00Z",
         "metadata": {
@@ -139,12 +133,12 @@ def sample_memory():
 def sample_rag_result():
     """示例RAG结果"""
     return {
-        "answer": "根据心理学研究，当你感到难过时，可以尝试以下方法...",
+        "answer": "根据企业知识库，数字化转型的关键要素包括：",
         "sources": [
             {
-                "content": "心理学研究表明...",
+                "content": "数字化转型白皮书摘要...",
                 "metadata": {
-                    "topic": "情绪管理",
+                    "topic": "企业数字化",
                     "source": "内置知识库"
                 }
             }
@@ -212,15 +206,3 @@ def create_mock_openai_response(content: str = "测试回复"):
     }
 
 
-def create_mock_emotion_analysis(emotion: str = "neutral", intensity: float = 5.0):
-    """创建模拟分析结果"""
-    return {
-        "emotion": emotion,
-        "intensity": intensity,
-        "confidence": 0.85,
-        "details": {
-            "positive_score": 0.3,
-            "negative_score": 0.7,
-            "neutral_score": 0.5
-        }
-    }

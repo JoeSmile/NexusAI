@@ -1,7 +1,7 @@
 """
 MemoryStore — 路径寻址记忆存储
 
-参考 ai-buddy 六层记忆架构实现，适配 emotional_chat 场景。
+参考 ai-buddy 六层记忆架构实现，适配 ContextGate 场景。
 
 六层作用域：
   L1 组织级  (organization)  — 全局知识库，系统 prompt 注入，只读

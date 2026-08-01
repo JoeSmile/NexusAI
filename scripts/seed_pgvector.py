@@ -30,31 +30,18 @@ SEED_CHATS = [
         "user_id": "alice",
         "tenant_id": "acme",
         "messages": [
-            ("user", "最近项目压力好大，每天都加班到很晚", "焦虑", 8),
+            ("user", "请帮我整理今天项目周会的会议纪要"),
             (
                 "assistant",
-                "听起来你最近工作压力很大。能具体说说是什么样的项目吗？有时候说出来会好一些。",
-                "共情",
-                7,
+                "已整理会议纪要：1) 确认 Q3 里程碑时间表 2) API 网关性能优化进入开发阶段 3) 下周评审数据脱敏方案。",
             ),
             (
                 "user",
-                "公司在做一个新的AI平台，我是后端负责人，deadline特别紧",
-                "焦虑",
-                7,
+                "会议里提到的数据脱敏方案能再详细说明一下吗",
             ),
             (
                 "assistant",
-                "作为后端负责人确实压力不小。你有跟团队或者上级沟通过进度的压力吗？",
-                "关心",
-                6,
-            ),
-            ("user", "说了也没用，老板就是催。我感觉快撑不住了", "无助", 9),
-            (
-                "assistant",
-                "这种感觉确实很难受。不过请记住，你的健康比任何项目都重要。要不要试试把大任务拆成小块？",
-                "建议",
-                5,
+                "数据脱敏方案要点：对敏感字段（手机号、身份证、API Key）采用 AES-256 加密存储，日志输出前做 PII 识别与遮蔽，测试环境使用合成数据。",
             ),
         ],
     },
@@ -63,19 +50,15 @@ SEED_CHATS = [
         "user_id": "bob",
         "tenant_id": "beta",
         "messages": [
-            ("user", "今天面试被拒了，心情很低落", "悲伤", 7),
+            ("user", "我们想评估一下 LLM 网关选型，主要看哪些维度？"),
             (
                 "assistant",
-                "被拒绝确实让人沮丧。不过每次面试都是一次学习经验，能说说是什么岗位吗？",
-                "共情",
-                6,
+                "建议从六个维度评估：1) 多租户隔离与 RBAC 2) 可观测性（全链路 trace）3) 模型路由与成本控制 4) 安全护栏（注入检测/输出审查）5) 缓存与性能 6) 审计合规能力。",
             ),
-            ("user", "是一个大厂的前端岗位，准备了好久还是没过", "悲伤", 8),
+            ("user", "安全护栏这块有哪些具体能力？"),
             (
                 "assistant",
-                "大厂的竞争确实激烈。能走到面试这一步已经很厉害了。要不要我帮你梳理一下面试中的亮点？",
-                "鼓励",
-                5,
+                "安全护栏包括：Prompt 注入检测、PII 脱敏、输出内容审查、速率限制、断路器、异常检测与审计日志，覆盖输入到输出的全链路。",
             ),
         ],
     },
@@ -84,12 +67,10 @@ SEED_CHATS = [
         "user_id": "alice",
         "tenant_id": "acme",
         "messages": [
-            ("user", "今天跟朋友出去玩了，心情好了很多", "高兴", 7),
+            ("user", "LangFuse 的 trace 数据怎么和我们自己的审计系统对接？"),
             (
                 "assistant",
-                "真为你高兴！适当的社交和放松确实能帮助缓解压力。",
-                "开心",
-                5,
+                "LangFuse 提供导出 API 与 webhook，可将 trace/span 数据同步到自建审计系统；生产环境建议只导出脱敏后的元数据，敏感内容保留在域内。",
             ),
         ],
     },
@@ -98,12 +79,10 @@ SEED_CHATS = [
         "user_id": "bob",
         "tenant_id": "beta",
         "messages": [
-            ("user", "我该怎样提高自己的技术水平？", "中性", 5),
+            ("user", "小模型本地部署的量化方案怎么选？"),
             (
                 "assistant",
-                "这是个很好的问题。建议你可以从这几个方面入手：1) 选择一个方向深耕 2) 多做开源项目 3) 定期复盘总结",
-                "建议",
-                5,
+                "推荐 7B 级模型 Q4 量化（约 4GB 显存），用 vLLM 提供 OpenAI 兼容接口；32G 内存 + 16G 显存可同时跑 1-2 个量化模型，按场景注册为独立 provider key。",
             ),
         ],
     },
@@ -138,7 +117,7 @@ def seed_data() -> None:
             if existing_msgs:
                 print(f"  ⏭  {sid}: 已有 {existing_msgs} 条消息，跳过")
                 continue
-            for i, (role, content, emotion, intensity) in enumerate(chat["messages"]):
+            for i, (role, content) in enumerate(chat["messages"]):
                 session.add(
                     ChatMessage(
                         tenant_id=tid,
@@ -146,8 +125,6 @@ def seed_data() -> None:
                         user_id=uid,
                         role=role,
                         content=content,
-                        emotion=emotion,
-                        emotion_intensity=intensity,
                         embedding=_mock_embedding(),
                         created_at=datetime.utcnow()
                         - timedelta(minutes=len(chat["messages"]) - i),

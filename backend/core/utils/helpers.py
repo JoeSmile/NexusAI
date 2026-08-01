@@ -69,24 +69,6 @@ def sanitize_text(text: str, max_length: int = 2000) -> str:
     return text
 
 
-def extract_emotion_keywords(text: str) -> list[str]:
-    """从文本中提取情绪关键词"""
-    emotion_keywords = {
-        "positive": ["开心", "快乐", "兴奋", "满足", "幸福", "愉悦", "轻松", "平静", "好", "棒", "赞"],
-        "negative": ["难过", "悲伤", "愤怒", "焦虑", "恐惧", "失望", "沮丧", "紧张", "坏", "糟", "烦"],
-        "neutral": ["正常", "一般", "平淡", "无聊", "困惑", "思考", "还行", "可以"]
-    }
-    
-    found_keywords = []
-    text_lower = text.lower()
-    
-    for _category, keywords in emotion_keywords.items():
-        for keyword in keywords:
-            if keyword in text_lower:
-                found_keywords.append(keyword)
-    
-    return found_keywords
-
 
 def calculate_similarity(text1: str, text2: str) -> float:
     """计算文本相似度（简单的Jaccard相似度）"""
@@ -392,7 +374,6 @@ if __name__ == "__main__":
     print("生成ID:", generate_id("test", 8))
     print("计算哈希:", calculate_hash("hello world"))
     print("文本相似度:", calculate_similarity("hello world", "hello there"))
-    print("提取情绪关键词:", extract_emotion_keywords("我今天很开心，但有点焦虑"))
     print("格式化持续时间:", format_duration(3661))
     print("格式化文件大小:", format_file_size(1024000))
     print("遮蔽敏感数据:", mask_sensitive_data("13812345678"))

@@ -26,8 +26,6 @@ class EnhancedContextAssembler:
         session_id: str,
         current_message: str,
         chat_history: list[dict[str, Any]],
-        emotion: str | None = None,
-        emotion_intensity: float | None = None,
     ) -> dict[str, Any]:
         """组装完整的对话上下文（独立 IO 步骤并行）。"""
         important_markers = self._identify_important_turns(chat_history)
@@ -50,10 +48,6 @@ class EnhancedContextAssembler:
             "user_id": user_id,
             "session_id": session_id,
             "current_message": current_message,
-            "current_emotion": {
-                "emotion": emotion,
-                "intensity": emotion_intensity,
-            },
             "short_term_memory": {
                 "messages": short_term_context,
                 "count": len(short_term_context) if short_term_context else 0,
@@ -109,8 +103,7 @@ class EnhancedContextAssembler:
             
             # 构造消息对象
             message_obj = {
-                "content": msg.get("content", ""),
-                "emotion_intensity": msg.get("emotion_intensity", 5.0)
+                "content": msg.get("content", "")
             }
             
             # 使用短期记忆管理器的判断逻辑
@@ -158,12 +151,8 @@ class EnhancedContextAssembler:
                 prompt_parts.append(f"{role}: {content}")
             prompt_parts.append("\n")
         
-        # 4. 当前消息和情绪
+        # 4. 当前消息
         prompt_parts.append("【当前状态】")
-        current_emotion = context.get("current_emotion", {})
-        if current_emotion.get("emotion"):
-            prompt_parts.append(f"用户情绪: {current_emotion['emotion']} (强度: {current_emotion.get('intensity', 5.0):.1f}/10)")
-        
         prompt_parts.append(f"用户消息: {context.get('current_message', '')}")
         prompt_parts.append("\n")
         
@@ -196,11 +185,6 @@ class EnhancedContextAssembler:
         short_term_count = context.get("short_term_memory", {}).get("count", 0)
         long_term_count = context.get("long_term_memory", {}).get("count", 0)
         summary_parts.append(f"上下文: {short_term_count}轮对话, {long_term_count}条记忆")
-        
-        # 当前情绪
-        current_emotion = context.get("current_emotion", {})
-        if current_emotion.get("emotion"):
-            summary_parts.append(f"情绪: {current_emotion['emotion']}")
         
         return " | ".join(summary_parts)
 

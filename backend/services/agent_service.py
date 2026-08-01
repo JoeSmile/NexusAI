@@ -99,7 +99,6 @@ class AgentService:
                 "interaction_id": record.get("interaction_id"),
                 "user_id": record.get("user_id"),
                 "timestamp": record.get("timestamp").isoformat() if record.get("timestamp") else None,
-                "emotion": record.get("perception", {}).get("emotion"),
                 "plan_strategy": record.get("plan", {}).get("strategy"),
                 "actions_count": len(record.get("results", {}).get("actions", [])),
                 "evaluation_score": record.get("evaluation", {}).get("score"),

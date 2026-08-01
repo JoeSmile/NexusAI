@@ -139,7 +139,6 @@ class PersonalizationService:
         self,
         user_id: str,
         context: str,
-        emotion_state: dict | None = None,
         db: Session = None
     ) -> str:
         """
@@ -148,7 +147,6 @@ class PersonalizationService:
         Args:
             user_id: 用户ID
             context: 对话上下文
-            emotion_state: 情绪状态
             db: 数据库会话
         
         Returns:
@@ -162,7 +160,7 @@ class PersonalizationService:
         else:
             composer = self.create_prompt_composer(user_id, db)
         
-        return composer.compose(context=context, emotion_state=emotion_state)
+        return composer.compose(context=context)
     
     def clear_cache(self, user_id: str | None = None):
         """
@@ -223,11 +221,7 @@ if __name__ == "__main__":
     print("=" * 60)
     composer = PromptComposer(default_config)
     prompt = composer.compose(
-        context="用户说：今天心情不太好",
-        emotion_state={
-            "emotion": "sad",
-            "intensity": 6.5
-        }
+        context="用户说：请帮我整理项目周报"
     )
     print(prompt)
 

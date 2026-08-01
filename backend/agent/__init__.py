@@ -29,7 +29,6 @@ from .reflector import Reflector, get_reflector
 from .tool_caller import ToolCaller, get_tool_caller
 
 # 旧版 AgentCore 可通过显式导入使用
-# from backend.agent.agent_core import AgentCore as LegacyAgentCore
 
 __all__ = [
     # 默认使用 V2

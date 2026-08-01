@@ -60,7 +60,7 @@ class PolicyRule:
     rule_id: str
     priority: int  # 数字越大优先级越高
     description: str
-    condition: str  # 表达式字符串 (e.g., "tool == 'psychological_assessment' && args.urgency == 'critical'")
+    condition: str  # 表达式字符串 (e.g., "tool == 'bash' && args.safe == true")
     action_chain: list[PolicyAction] = field(default_factory=list)
     enabled: bool = True
 

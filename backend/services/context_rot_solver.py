@@ -186,7 +186,6 @@ class ContextSummarizer:
             "user_goals": "用户表达的目标或需求",
             "key_decisions": "达成的重要决定或共识",
             "unresolved_issues": "未解决的问题",
-            "emotional_state": "情绪状态变化",
             "last_stop_point": "上次停止的位置或上下文"
         }
         
@@ -198,7 +197,6 @@ class ContextSummarizer:
             "user_goals": self._extract_goals(turns),
             "key_decisions": self._extract_decisions(turns),
             "unresolved_issues": self._extract_unresolved(turns),
-            "emotional_state": self._extract_emotion_trend(turns),
             "last_stop_point": turns[-1].get("content", "")[:200] if turns else "",
             "turn_count": len(turns),
             "time_span": self._calculate_time_span(turns),
@@ -257,21 +255,7 @@ class ContextSummarizer:
                     break
         return unresolved[:3]
     
-    def _extract_emotion_trend(self, turns: list[dict[str, Any]]) -> str:
-        """提取情绪趋势"""
-        emotions = [turn.get("emotion", "neutral") for turn in turns if turn.get("emotion")]
-        if not emotions:
-            return "稳定"
-        
-        # 简单趋势分析
-        unique_emotions = list(set(emotions))
-        if len(unique_emotions) > 2:
-            return "波动"
-        elif len(unique_emotions) == 1:
-            return f"持续{unique_emotions[0]}"
-        else:
-            return f"从{unique_emotions[0]}到{unique_emotions[1]}"
-    
+
     def _calculate_time_span(self, turns: list[dict[str, Any]]) -> str:
         """计算时间跨度"""
         timestamps = [turn.get("timestamp") for turn in turns if turn.get("timestamp")]

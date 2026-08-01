@@ -3,15 +3,11 @@ External Tools - 外部工具模块
 
 提供各种外部工具实现：
 - 日历API
-- 音频播放服务
-- 心理资源数据库
 - 定时提醒服务
 - Agent核心工具函数
 """
 
-from .audio_player import AudioPlayer
 from .calendar_api import CalendarAPI
-from .psychology_db import PsychologyDB
 from .scheduler_service import SchedulerService
 
 
@@ -19,9 +15,7 @@ from .scheduler_service import SchedulerService
 def __getattr__(name):
     """延迟导入 agent_tools 中的函数"""
     _agent_tools_funcs = [
-        "play_meditation_audio",
         "set_daily_reminder",
-        "search_mental_health_resources",
         "send_follow_up_message"
     ]
     if name in _agent_tools_funcs:
@@ -31,13 +25,9 @@ def __getattr__(name):
 
 __all__ = [
     "CalendarAPI",
-    "AudioPlayer",
-    "PsychologyDB",
     "SchedulerService",
     # Agent核心工具函数（延迟导入）
-    "play_meditation_audio",
     "set_daily_reminder",
-    "search_mental_health_resources",
     "send_follow_up_message"
 ]
 

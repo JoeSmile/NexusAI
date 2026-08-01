@@ -120,7 +120,6 @@ async def get_user_config(user_id: str, db: Session = Depends(get_db)):
                     "style": "简洁",
                     "formality": 0.3,
                     "enthusiasm": 0.5,
-                    "empathy_level": 0.8,
                     "humor_level": 0.3,
                     "response_length": "medium",
                     "use_emoji": False,
@@ -148,7 +147,6 @@ async def get_user_config(user_id: str, db: Session = Depends(get_db)):
             "style": config_db.style,
             "formality": config_db.formality,
             "enthusiasm": config_db.enthusiasm,
-            "empathy_level": config_db.empathy_level,
             "humor_level": config_db.humor_level,
             "response_length": config_db.response_length,
             "use_emoji": config_db.use_emoji,
@@ -197,7 +195,6 @@ async def create_or_update_config(
         "role": "智慧导师",
         "role_name": "智者",
         "tone": "沉稳",
-        "empathy_level": 0.7,
         "use_emoji": true
     }
     ```
@@ -240,7 +237,6 @@ async def create_or_update_config(
                 "style": update_data.style or "简洁",
                 "formality": update_data.formality if update_data.formality is not None else 0.3,
                 "enthusiasm": update_data.enthusiasm if update_data.enthusiasm is not None else 0.5,
-                "empathy_level": update_data.empathy_level if update_data.empathy_level is not None else 0.8,
                 "humor_level": update_data.humor_level if update_data.humor_level is not None else 0.3,
                 "response_length": update_data.response_length or "medium",
                 "use_emoji": update_data.use_emoji if update_data.use_emoji is not None else False,

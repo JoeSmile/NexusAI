@@ -35,8 +35,6 @@ class ContextService:
         user_id: str,
         session_id: str,
         current_message: str,
-        emotion: str | None = None,
-        emotion_intensity: float | None = None,
         auto_reduce: bool = True,
     ) -> dict[str, Any]:
         memories = await self.memory_service.retrieve_memories(
@@ -47,8 +45,6 @@ class ContextService:
             "session_id": session_id,
             "current_message": current_message,
             "memories": memories,
-            "emotion": emotion,
-            "emotion_intensity": emotion_intensity,
         }
 
     async def build_prompt(self, context: dict[str, Any]) -> str:

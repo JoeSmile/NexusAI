@@ -5,10 +5,9 @@
 
 from .decorators import cache, log_execution, rate_limit, retry, validate_input
 from .dependency_injection import Container, Dependency, Singleton, Transient
-from .formatters import format_emotion_result, format_error, format_response, format_timestamp
+from .formatters import format_error, format_response, format_timestamp
 from .helpers import (
     calculate_similarity,
-    extract_emotion_keywords,
     generate_id,
     merge_dicts,
     sanitize_text,
@@ -46,12 +45,10 @@ __all__ = [
     "format_response",
     "format_error",
     "format_timestamp",
-    "format_emotion_result",
     
     # 辅助函数
     "generate_id",
     "sanitize_text",
-    "extract_emotion_keywords",
     "calculate_similarity",
     "merge_dicts"
 ]

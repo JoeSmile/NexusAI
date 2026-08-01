@@ -35,7 +35,6 @@ class ToolType(StrEnum):
     CALENDAR = "calendar"
     REMINDER = "reminder"
     KNOWLEDGE_SEARCH = "knowledge_search"
-    EMOTION_ANALYSIS = "emotion_analysis"
     MEMORY_RETRIEVAL = "memory_retrieval"
     EXTERNAL_API = "external_api"
 
@@ -46,7 +45,6 @@ class AgentRequest(BaseModel):
     user_id: str = Field(..., description="用户ID")
     session_id: str = Field(..., description="会话ID")
     context: dict[str, Any] | None = Field(None, description="上下文信息")
-    user_emotion: str | None = Field(None, description="用户情绪")
     available_tools: list[str] | None = Field(None, description="可用工具列表")
     max_actions: int = Field(10, ge=1, le=50, description="最大动作数量")
 

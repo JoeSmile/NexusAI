@@ -91,7 +91,7 @@ async def streaming_chat_with_metadata(request: dict[str, Any]):
             processing_result = await optimized_chat_service._parallel_process_input(user_input)
             
             # 发送处理结果
-            yield f"data: {json.dumps({'type': 'analysis', 'emotion': processing_result.get('emotion'), 'processing_time': processing_result.get('processing_time')})}\n\n"
+            yield f"data: {json.dumps({'type': 'analysis', 'processing_time': processing_result.get('processing_time')})}\n\n"
             
             # 构建优化的Prompt
             prompt = await optimized_chat_service._build_optimized_prompt(user_input, processing_result)
@@ -233,7 +233,6 @@ async def websocket_chat(websocket):
                 # 发送分析结果
                 await websocket.send_text(json.dumps({
                     "type": "analysis",
-                    "emotion": processing_result.get("emotion"),
                     "processing_time": processing_result.get("processing_time")
                 }))
                 

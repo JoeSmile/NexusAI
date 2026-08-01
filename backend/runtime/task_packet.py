@@ -9,7 +9,7 @@ Hierarchy:
 
 LLM Gateway场景的 TaskPacket 示例：
   - "整理季度经营数据" → planning_skill + tool_skill + reflect_skill
-  - "进行心理健康评估" → tool_skill(assessment) + reflect_skill
+  - "整理季度报表" → tool_skill + reflect_skill
   - "安排回访任务" → planning_skill + tool_skill(scheduler)
 """
 

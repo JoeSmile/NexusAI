@@ -19,7 +19,6 @@ class PerformanceConfig:
     # 缓存配置
     CACHE_ENABLED = os.getenv("CACHE_ENABLED", "true").lower() == "true"
     CACHE_DEFAULT_TTL = int(os.getenv("CACHE_DEFAULT_TTL", "3600"))  # 1小时
-    CACHE_EMOTION_TTL = int(os.getenv("CACHE_EMOTION_TTL", "1800"))  # 30分钟
     CACHE_MEMORY_TTL = int(os.getenv("CACHE_MEMORY_TTL", "3600"))  # 1小时
     CACHE_PROMPT_TTL = int(os.getenv("CACHE_PROMPT_TTL", "1800"))  # 30分钟
     
@@ -70,7 +69,6 @@ class PerformanceConfig:
         return {
             "enabled": cls.CACHE_ENABLED,
             "default_ttl": cls.CACHE_DEFAULT_TTL,
-            "emotion_ttl": cls.CACHE_EMOTION_TTL,
             "memory_ttl": cls.CACHE_MEMORY_TTL,
             "prompt_ttl": cls.CACHE_PROMPT_TTL,
             "redis_url": cls.REDIS_URL,

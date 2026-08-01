@@ -31,13 +31,12 @@ class PromptComposer:
         """获取基础Prompt"""
         return "你是ContextGate企业信息平台助手，专业、准确、安全，服务于企业用户的日常工作。"
     
-    def compose(self, context: str = "", emotion_state: dict | None = None) -> str:
+    def compose(self, context: str = "") -> str:
         """
         组合生成最终Prompt
         
         Args:
             context: 对话上下文
-            emotion_state: 用户状态（保留兼容，不再用于生成指令）
         
         Returns:
             组合后的完整Prompt
@@ -48,12 +47,7 @@ class PromptComposer:
         # 2. 表达风格指令
         style_prompt = self._build_style_prompt()
         
-        # 3. 用户状态指令（兼容保留，恒为空）
-        emotion_prompt = ""
-        if emotion_state:
-            emotion_prompt = self._build_emotion_prompt(emotion_state)
-        
-        # 4. 记忆与偏好
+        # 3. 记忆与偏好
         memory_prompt = self._build_memory_prompt()
         
         # 5. 安全与边界
@@ -68,8 +62,6 @@ class PromptComposer:
 
 【表达要求】
 {style_prompt}
-
-{emotion_prompt}
 
 【用户背景与偏好】
 {memory_prompt}
@@ -159,16 +151,6 @@ class PromptComposer:
         
         return prompt
     
-    def _build_emotion_prompt(self, emotion_state: dict) -> str:
-        """
-        用户状态指令（旧项目的响应策略已移除，恒为空）。
-        
-        保留签名以兼容调用方，恒返回空串。
-        
-        Returns:
-            空字符串
-        """
-        return ""
 
     def _build_memory_prompt(self) -> str:
         """构建记忆与偏好Prompt"""
@@ -226,7 +208,6 @@ class PromptComposer:
             "role_name": self.config.get("role_name", "ContextGate"),
             "tone": self.config.get("tone", "专业"),
             "style": self.config.get("style", "简洁"),
-            "empathy_level": self.config.get("empathy_level", 0.0),
             "use_emoji": self.config.get("use_emoji", False),
             "response_length": self.config.get("response_length", "medium")
         }
@@ -353,7 +334,6 @@ if __name__ == "__main__":
         "style": "简洁",
         "formality": 0.3,
         "enthusiasm": 0.5,
-        "empathy_level": 0.0,
         "humor_level": 0.3,
         "response_length": "medium",
         "use_emoji": False,
@@ -370,11 +350,7 @@ if __name__ == "__main__":
     print("测试1: 基础Prompt生成")
     print("=" * 60)
     prompt = composer.compose(
-        context="用户说：今天工作很累，感觉压力很大。",
-        emotion_state={
-            "emotion": "anxious",
-            "intensity": 7.5
-        }
+        context="用户说：请帮我整理今天的会议纪要。"
     )
     print(prompt)
     

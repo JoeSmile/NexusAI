@@ -53,22 +53,21 @@ class RAGService:
         if self.llm is None:
             logger.warning("RAG: LLM Harness 未能创建 ChatOpenAI，部分 RAG 能力不可用")
         
-        # 心理健康专用prompt模板
+        # RAG 通用 prompt 模板
         self.prompt_template = PromptTemplate(
-            template="""你是"ContextGate"，一个专业的心理健康陪伴机器人。你正在使用专业的心理学知识库来回答用户的问题。
+            template="""你是"ContextGate"，企业级 LLM 信息平台的智能助手。你正在使用企业知识库来回答用户的问题。
 
 参考知识：
 {context}
 
 用户问题：{question}
 
-请基于上述专业知识，用专业、准确的语气回答用户。注意：
-1. 优先使用知识库中的科学方法和技巧
+请基于上述知识，用专业、准确的语气回答用户。注意：
+1. 优先使用知识库中的内容作为依据
 2. 用通俗易懂的语言解释专业概念
-3. 提供具体可操作的建议
-4. 回答准确并标注依据
-5. 如果知识库中有相关练习或技巧，详细说明步骤
-6. 询问用户是否需要进一步的指导或陪伴
+3. 提供具体可操作的信息
+4. 知识库中没有依据时明确说明，不编造
+5. 回答简洁并标注来源（如有）
 
 回答：""",
             input_variables=["context", "question"]
@@ -271,24 +270,24 @@ class RAGService:
                 history_context = "\n".join(history_lines)
             
             # 构建完整的prompt
-            enhanced_prompt = f"""你是"ContextGate"，一个专业的心理健康陪伴机器人。
+            enhanced_prompt = f"""你是"ContextGate"，企业级 LLM 信息平台的智能助手。
 
 
 最近对话：
 {history_context}
 
-参考的专业知识：
+参考的企业知识：
 {knowledge_context}
 
 用户当前问题：{question}
 
-请基于上述专业知识和对话上下文，用专业、准确的语气回答用户。注意：
+请基于上述知识和对话上下文，用专业、准确的语气回答用户。注意：
 1. 结合用户上下文给出准确回答
 2. 结合对话历史，提供连贯的回应
-3. 优先使用知识库中的科学方法和技巧
+3. 优先使用知识库中的内容作为依据
 4. 用通俗易懂的语言解释专业概念
-5. 提供具体可操作的建议
-6. 询问用户是否需要进一步的指导或陪伴
+5. 提供具体可操作的信息
+6. 知识库无依据时明确说明，不编造
 
 回答："""
             
@@ -396,9 +395,9 @@ class RAGIntegrationService:
         # 优先使用大模型进行意图分类判断
         try:
             prompt = f"""
-            判断以下用户的求助是否需要专业的心理学知识（如CBT/正念/临床建议/放松技巧等）来回答。
+            判断以下用户的问题是否需要企业知识库中的专业知识来回答。
             用户输入: "{message}"
-                如果需要引入心理学知识提供建议，请回复 "True"；如果只是普通的闲聊或寒暄，请回复 "False"。
+                如果需要引入知识库内容提供建议，请回复 "True"；如果只是普通的闲聊或寒暄，请回复 "False"。
             仅回复 "True" 或 "False"。
             """
             
