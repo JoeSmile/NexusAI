@@ -182,8 +182,6 @@ class RAGService:
 
     def retrieve_documents(self, question: str, search_k: int = 3) -> list:
         """HyDE 双路召回 + 可选 LLM ReRank。"""
-        from config import Config
-
         hyde_on = bool(getattr(Config, "RAG_HYDE_ENABLED", False))
         rerank_on = bool(getattr(Config, "RAG_RERANK_ENABLED", False))
         pool = int(getattr(Config, "RAG_RERANK_POOL_SIZE", 20) or 20)
