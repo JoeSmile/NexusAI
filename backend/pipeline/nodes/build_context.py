@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.observability.decorators import observe
+from backend.observability.decorators import enrich_span, observe
 from backend.pipeline.state import PipelineState
 
 
@@ -22,4 +22,9 @@ async def build_context(state: PipelineState) -> PipelineState:
 
     context_parts.append(f"user: {state['message']}")
     state["raw_input"] = "\n".join(context_parts)
+    enrich_span(
+        input_data={"message": state.get("message")},
+        output_data={"raw_input_len": len(state["raw_input"] or "")},
+        metadata={"intent": state.get("intent")},
+    )
     return state

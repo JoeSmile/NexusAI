@@ -64,9 +64,20 @@ async def _run_chat_pipeline(
     background_tasks: BackgroundTasks,
     tenant: TenantContext,
 ):
-    from backend.observability.langfuse_client import flush_langfuse
+    from backend.observability.decorators import enrich_span, langfuse_context
+    from backend.observability.langfuse_client import (
+        discard_langfuse_buffer,
+        flush_langfuse,
+    )
+    from backend.observability.sampling import (
+        is_short_path,
+        set_tracing_enabled,
+        should_sample,
+    )
 
+    set_tracing_enabled(True)
     start = time.time()
+    finish_reason = "error"
 
     initial = make_initial_state(
         tenant_id=tenant.tenant_id,
@@ -86,6 +97,7 @@ async def _run_chat_pipeline(
         final = await compiled_graph.ainvoke(initial)
         latency = (time.time() - start) * 1000
         final["pipeline_latency_ms"] = latency
+        finish_reason = final.get("finish_reason") or "llm_generated"
 
         log_audit(
             background_tasks,
@@ -105,6 +117,29 @@ async def _run_chat_pipeline(
             user_agent=request.headers.get("User-Agent", ""),
         )
 
+        enrich_span(
+            input_data={"message": final.get("message"), "trace_id": final.get("trace_id")},
+            output_data={
+                "finish_reason": finish_reason,
+                "model": final.get("selected_model"),
+                "total_cost": final.get("total_cost"),
+            },
+            metadata={
+                "path": "short" if is_short_path(finish_reason) else "long",
+                "ab_experiment_id": final.get("ab_experiment_id"),
+                "ab_variant": final.get("ab_variant"),
+            },
+        )
+        try:
+            langfuse_context.update_current_trace(  # type: ignore[attr-defined]
+                metadata={
+                    "trace_id": final.get("trace_id"),
+                    "path": "short" if is_short_path(finish_reason) else "long",
+                }
+            )
+        except Exception:
+            pass
+
         return ChatResponse(
             response=final["response"],
             trace_id=final["trace_id"],
@@ -120,6 +155,7 @@ async def _run_chat_pipeline(
         raise
     except Exception as e:
         latency = (time.time() - start) * 1000
+        finish_reason = "error"
         return ChatResponse(
             response=f"系统错误: {e!s}",
             trace_id=initial["trace_id"],
@@ -130,7 +166,10 @@ async def _run_chat_pipeline(
             error_code="SYS_001",
         )
     finally:
-        background_tasks.add_task(flush_langfuse)
+        if should_sample(finish_reason):
+            background_tasks.add_task(flush_langfuse)
+        else:
+            background_tasks.add_task(discard_langfuse_buffer)
 
 
 

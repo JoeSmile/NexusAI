@@ -6,7 +6,7 @@ import os
 
 from backend.core.fallback import get_fallback
 from backend.core.harness import LLMHarness
-from backend.observability.decorators import observe
+from backend.observability.decorators import enrich_span, observe
 from backend.pipeline.state import PipelineState
 
 harness = LLMHarness()
@@ -53,4 +53,14 @@ async def llm_generate(state: PipelineState) -> PipelineState:
         state["response"] = str(result.output or "")
         state["finish_reason"] = "llm_generated"
 
+    enrich_span(
+        input_data={"model": model, "messages": messages},
+        output_data=state.get("response"),
+        metadata={
+            "path": "long",
+            "total_tokens": state.get("total_tokens"),
+            "total_cost": state.get("total_cost"),
+            "ab_variant": state.get("ab_variant"),
+        },
+    )
     return state

@@ -4,9 +4,16 @@ from __future__ import annotations
 
 from backend.core.cost_manager import estimate_cost
 from backend.core.model_registry import get_model, select_model_for_intent
-from backend.observability.decorators import observe
+from backend.observability.decorators import enrich_span, observe
+from backend.observability.sampling import set_tracing_enabled, should_sample
 from backend.pipeline.state import PipelineState
 from backend.skills.registry import registry
+
+
+def _maybe_disable_short_path_trace(finish_reason: str) -> None:
+    """短路径按配置降采样：未命中则关闭后续 span。"""
+    if not should_sample(finish_reason):
+        set_tracing_enabled(False)
 
 
 @observe(name="pipeline.model_router")
@@ -35,6 +42,15 @@ async def model_router(state: PipelineState) -> PipelineState:
                     state["approval_request_id"] = result.approval_request_id
                 if result.error:
                     state["error_code"] = result.error
+                enrich_span(
+                    metadata={
+                        "path": "short",
+                        "intent": intent,
+                        "skill_id": skill.id,
+                    },
+                    output_data=state.get("finish_reason"),
+                )
+                _maybe_disable_short_path_trace(state["finish_reason"])
                 return state
         except Exception as e:
             state["response"] = f"Skill 执行错误: {e!s}"

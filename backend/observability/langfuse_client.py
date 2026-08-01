@@ -72,3 +72,27 @@ def flush_langfuse() -> None:
         client.flush()
     except Exception:
         pass
+
+
+def discard_langfuse_buffer() -> None:
+    """丢弃未 flush 的缓冲（短路径未命中采样时用）。"""
+    global _lf, _init_attempted
+    client = _lf
+    _lf = None
+    _init_attempted = False
+    if client is None:
+        return
+    try:
+        tm = getattr(client, "task_manager", None) or getattr(
+            client, "_task_manager", None
+        )
+        if tm is not None and hasattr(tm, "shutdown"):
+            tm.shutdown(flush=False)
+            return
+    except Exception:
+        pass
+    try:
+        # 无 shutdown(flush=False) 时至少释放引用，避免显式 flush
+        del client
+    except Exception:
+        pass
