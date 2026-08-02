@@ -14,6 +14,7 @@ from backend.core.auth.models import TenantContext
 from backend.core.auth.permissions import require_permission
 from backend.core.errors import ContextGateException, ErrorCode
 from backend.logging_config import get_logger
+from backend.modules.rag.cache import bump_epoch
 
 from ..core.knowledge_base import EnterpriseKnowledgeLoader, KnowledgeBaseManager
 from ..services.rag_service import RAGIntegrationService, RAGService
@@ -51,6 +52,35 @@ def get_integration_service() -> RAGIntegrationService:
     if _integration_service is None:
         _integration_service = RAGIntegrationService(get_rag_service())
     return _integration_service
+
+
+def _rag_guard(
+    tenant: TenantContext = Depends(require_permission("chat:write")),
+) -> TenantContext:
+    """RAG 统一守卫:认证 + 请求限流(超限抛 RATE_001,由全局 handler 结构化返回)。"""
+    from backend.modules.rag.cache import check_rate_limit
+
+    check_rate_limit(tenant.tenant_id, miss=False)
+    return tenant
+
+
+def _rag_errors(fn):
+    """端点错误统一处理:ContextGateException/HTTPException 放行,其余记日志转 500。"""
+    import functools
+
+    @functools.wraps(fn)
+    async def wrapper(*args, **kwargs):
+        try:
+            return await fn(*args, **kwargs)
+        except ContextGateException:
+            raise
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("RAG 端点异常: %s", e)
+            raise HTTPException(status_code=500, detail=str(e))
+
+    return wrapper
 
 
 # ========== 请求模型 ==========
@@ -121,152 +151,151 @@ class LoadSampleRequest(BaseModel):
 # ========== API端点 ==========
 
 @router.get("/status")
-async def get_status():
+@_rag_errors
+async def get_status(
+    tenant: TenantContext = Depends(_rag_guard),
+):
     """
     获取知识库状态
     """
-    try:
-        kb_manager = get_kb_manager()
-        stats = kb_manager.get_stats()
-        
-        return {
-            "success": True,
-            "data": stats
-        }
-    except Exception as e:
-        logger.error(f"获取知识库状态失败: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
+    kb_manager = get_kb_manager()
+    stats = kb_manager.get_stats()
+    
+    return {
+        "success": True,
+        "data": stats
+    }
 
 @router.post("/init/sample")
-async def init_sample_knowledge(request: LoadSampleRequest = None):
+@_rag_errors
+async def init_sample_knowledge(
+    request: LoadSampleRequest | None = None,
+    tenant: TenantContext = Depends(_rag_guard),
+):
     """
     初始化示例知识库
     
     加载内置的企业知识到向量数据库
     """
-    try:
-        logger.info("开始初始化示例知识库...")
-        
-        if request is None:
-            request = LoadSampleRequest()
-        
-        kb_manager = get_kb_manager()
-        
-        # 如果要覆盖，先删除现有集合
-        if request.overwrite:
-            try:
-                kb_manager.delete_collection()
-                logger.info("已删除现有知识库")
-            except Exception:
-                pass
-        
-        # 加载示例知识
-        loader = EnterpriseKnowledgeLoader(kb_manager)
-        loader.load_sample_knowledge()
-        
-        # 获取统计信息
-        stats = kb_manager.get_stats()
-        
-        return {
-            "success": True,
-            "message": "示例知识库初始化成功",
-            "data": stats
-        }
-    except Exception as e:
-        logger.error(f"初始化示例知识库失败: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
+    tid = tenant.tenant_id
+    logger.info("开始初始化示例知识库...")
+    
+    if request is None:
+        request = LoadSampleRequest()
+    
+    kb_manager = get_kb_manager()
+    
+    # 如果要覆盖，先删除现有集合
+    if request.overwrite:
+        try:
+            kb_manager.delete_collection()
+            logger.info("已删除现有知识库")
+        except Exception:
+            pass
+    
+    # 加载示例知识
+    loader = EnterpriseKnowledgeLoader(kb_manager)
+    loader.load_sample_knowledge()
+    bump_epoch(tid)
+    
+    # 获取统计信息
+    stats = kb_manager.get_stats()
+    
+    return {
+        "success": True,
+        "message": "示例知识库初始化成功",
+        "data": stats
+    }
 
 @router.post("/init/knowledge-base")
-async def init_knowledge_base_structure(request: LoadSampleRequest = None):
+@_rag_errors
+async def init_knowledge_base_structure(
+    request: LoadSampleRequest | None = None,
+    tenant: TenantContext = Depends(_rag_guard),
+):
     """
     从标准知识库结构初始化知识库
     
     加载knowledge_base目录下的分类知识文档
     """
+    tid = tenant.tenant_id
+    logger.info("开始从知识库结构初始化...")
+    
+    if request is None:
+        request = LoadSampleRequest()
+    
+    kb_manager = get_kb_manager()
+    
+    # 如果要覆盖，先删除现有集合
+    if request.overwrite:
+        try:
+            kb_manager.delete_collection()
+            logger.info("已删除现有知识库")
+        except Exception:
+            pass
+    
+    # 从知识库结构加载知识
+    loader = EnterpriseKnowledgeLoader(kb_manager)
+    loader.load_from_knowledge_base_structure()
+    bump_epoch(tid)
+    
+    # 获取统计信息
+    stats = kb_manager.get_stats()
+    
+    return {
+        "success": True,
+        "message": "知识库结构初始化成功",
+        "data": stats
+    }
+
+@router.post("/upload/pdf")
+@_rag_errors
+async def upload_pdf(
+    file: UploadFile = File(...),
+    tenant: TenantContext = Depends(_rag_guard),
+):
+    """
+    上传PDF文档到知识库
+    """
+    tid = tenant.tenant_id
+    logger.info(f"收到PDF上传请求: {file.filename}")
+    
+    # 验证文件类型
+    if not file.filename.endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="只支持PDF文件")
+    
+    # 保存临时文件
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
+        content = await file.read()
+        tmp_file.write(content)
+        tmp_path = tmp_file.name
+    
     try:
-        logger.info("开始从知识库结构初始化...")
-        
-        if request is None:
-            request = LoadSampleRequest()
-        
+        # 加载PDF到知识库
         kb_manager = get_kb_manager()
-        
-        # 如果要覆盖，先删除现有集合
-        if request.overwrite:
-            try:
-                kb_manager.delete_collection()
-                logger.info("已删除现有知识库")
-            except Exception:
-                pass
-        
-        # 从知识库结构加载知识
         loader = EnterpriseKnowledgeLoader(kb_manager)
-        loader.load_from_knowledge_base_structure()
+        loader.load_from_pdf(tmp_path)
+        bump_epoch(tid)
         
         # 获取统计信息
         stats = kb_manager.get_stats()
         
         return {
             "success": True,
-            "message": "知识库结构初始化成功",
+            "message": f"PDF文档 {file.filename} 已成功添加到知识库",
             "data": stats
         }
-    except Exception as e:
-        logger.error(f"从知识库结构初始化失败: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/upload/pdf")
-async def upload_pdf(file: UploadFile = File(...)):
-    """
-    上传PDF文档到知识库
-    """
-    try:
-        logger.info(f"收到PDF上传请求: {file.filename}")
-        
-        # 验证文件类型
-        if not file.filename.endswith('.pdf'):
-            raise HTTPException(status_code=400, detail="只支持PDF文件")
-        
-        # 保存临时文件
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
-            content = await file.read()
-            tmp_file.write(content)
-            tmp_path = tmp_file.name
-        
-        try:
-            # 加载PDF到知识库
-            kb_manager = get_kb_manager()
-            loader = EnterpriseKnowledgeLoader(kb_manager)
-            loader.load_from_pdf(tmp_path)
-            
-            # 获取统计信息
-            stats = kb_manager.get_stats()
-            
-            return {
-                "success": True,
-                "message": f"PDF文档 {file.filename} 已成功添加到知识库",
-                "data": stats
-            }
-        finally:
-            # 清理临时文件
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"上传PDF失败: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
+    finally:
+        # 清理临时文件
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+    
 
 @router.post("/upload")
 async def upload_multimodal(
     file: UploadFile = File(...),
     category: str = "general",
-    tenant: TenantContext = Depends(require_permission("chat:write")),
+    tenant: TenantContext = Depends(_rag_guard),
 ):
     """
     统一上传：pdf / text / audio(wav|mp3|m4a) / image(png|jpg)。
@@ -299,6 +328,7 @@ async def upload_multimodal(
             kb_manager = get_kb_manager()
             loader = EnterpriseKnowledgeLoader(kb_manager)
             loader.load_from_pdf(tmp_path)
+            bump_epoch(tenant_id)
             return {
                 "success": True,
                 "source_type": "pdf",
@@ -358,6 +388,7 @@ async def upload_multimodal(
                 ErrorCode.FILE_INVALID_TYPE.value, f"不支持的类型 {kind}"
             )
 
+        bump_epoch(tenant_id)
         return {
             "success": True,
             "source_type": kind,
@@ -383,112 +414,111 @@ async def upload_multimodal(
 
 
 @router.post("/ask")
-async def ask_question(request: AskRequest):
+@_rag_errors
+async def ask_question(
+    request: AskRequest,
+    tenant: TenantContext = Depends(_rag_guard),
+):
     """
     向知识库提问
     
     基于知识库内容生成专业的回答
     """
-    try:
-        logger.info(f"收到问答请求: {request.question[:50]}...")
-        
-        rag_service = get_rag_service()
-        result = rag_service.ask(
-            question=request.question,
-            search_k=request.search_k
-        )
-        
-        return {
-            "success": True,
-            "data": result
-        }
-    except Exception as e:
-        logger.error(f"问答失败: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
+    logger.info(f"收到问答请求: {request.question[:50]}...")
+    
+    rag_service = get_rag_service()
+    result = rag_service.ask(
+        question=request.question,
+        search_k=request.search_k,
+        tenant_id=tenant.tenant_id,
+        user_id=tenant.user_id,
+    )
+    
+    return {
+        "success": True,
+        "data": result
+    }
 
 @router.post("/ask/context")
-async def ask_with_context(request: AskWithContextRequest):
+@_rag_errors
+async def ask_with_context(
+    request: AskWithContextRequest,
+    tenant: TenantContext = Depends(_rag_guard),
+):
     """
     结合上下文的问答
     
-    考虑对话历史，生成更精准的回答
+    考虑对话历史，生成更精准的回答(不做 L1,只吃 L2 embed 缓存)
     """
-    try:
-        logger.info(f"收到带上下文的问答请求: {request.question[:50]}...")
-        
-        rag_service = get_rag_service()
-        result = rag_service.ask_with_context(
-            question=request.question,
-            conversation_history=request.conversation_history,
-            search_k=request.search_k
-        )
-        
-        return {
-            "success": True,
-            "data": result
-        }
-    except Exception as e:
-        logger.error(f"带上下文的问答失败: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
+    logger.info(f"收到带上下文的问答请求: {request.question[:50]}...")
+    
+    rag_service = get_rag_service()
+    result = rag_service.ask_with_context(
+        question=request.question,
+        conversation_history=request.conversation_history,
+        search_k=request.search_k
+    )
+    
+    return {
+        "success": True,
+        "data": result
+    }
 
 @router.post("/search")
-async def search_knowledge(request: SearchRequest):
+@_rag_errors
+async def search_knowledge(
+    request: SearchRequest,
+    tenant: TenantContext = Depends(_rag_guard),
+):
     """
     搜索知识库
     
     只返回相关知识片段，不生成回答
     """
-    try:
-        logger.info(f"收到搜索请求: {request.query[:50]}...")
-        
-        rag_service = get_rag_service()
-        results = rag_service.search_knowledge(
-            query=request.query,
-            k=request.k
-        )
-        
-        return {
-            "success": True,
-            "data": {
-                "query": request.query,
-                "results": results,
-                "count": len(results)
-            }
+    logger.info(f"收到搜索请求: {request.query[:50]}...")
+    
+    rag_service = get_rag_service()
+    results = rag_service.search_knowledge(
+        query=request.query,
+        k=request.k
+    )
+    
+    return {
+        "success": True,
+        "data": {
+            "query": request.query,
+            "results": results,
+            "count": len(results)
         }
-    except Exception as e:
-        logger.error(f"搜索失败: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
+    }
 
 @router.delete("/reset")
-async def reset_knowledge_base():
+@_rag_errors
+async def reset_knowledge_base(
+    tenant: TenantContext = Depends(_rag_guard),
+):
     """
     重置知识库
     
     删除所有向量数据（谨慎使用）
     """
-    try:
-        logger.warning("收到重置知识库请求")
-        
-        kb_manager = get_kb_manager()
-        kb_manager.delete_collection()
-        
-        # 重置全局实例
-        global _kb_manager, _rag_service, _integration_service
-        _kb_manager = None
-        _rag_service = None
-        _integration_service = None
-        
-        return {
-            "success": True,
-            "message": "知识库已重置"
-        }
-    except Exception as e:
-        logger.error(f"重置知识库失败: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
+    tid = tenant.tenant_id
+    logger.warning("收到重置知识库请求 tenant=%s", tid)
+    
+    kb_manager = get_kb_manager()
+    kb_manager.delete_collection()
+    bump_epoch(tid)
+    
+    # 重置全局实例
+    global _kb_manager, _rag_service, _integration_service
+    _kb_manager = None
+    _rag_service = None
+    _integration_service = None
+    
+    return {
+        "success": True,
+        "message": "知识库已重置"
+    }
 
 @router.get("/test")
 async def test_rag():

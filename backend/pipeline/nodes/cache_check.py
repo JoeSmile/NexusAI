@@ -81,7 +81,7 @@ async def cache_check(state: PipelineState) -> PipelineState:
 
     from backend.core.metrics import cache_misses
 
-    cache_misses.labels(tenant=tenant_id).inc()
+    cache_misses.labels(tenant=tenant_id, cache_type="pipeline").inc()
     return state
 
 

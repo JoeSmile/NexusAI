@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 EMBED_DIM = 1536  # pgvector 列维度；API 返回更短时补零
 
-EmbedMode = Literal["api", "hash", "api-error", "unconfigured"]
+EmbedMode = Literal["api", "hash", "api-error", "cache", "unconfigured"]
 _last_embed_mode: EmbedMode | None = None
 
 
@@ -116,22 +116,44 @@ def embedding_model_label() -> str:
         return name
     if mode == "api-error":
         return f"{name}(api-error)"
+    if mode == "cache":
+        return f"{name}(cache)"
     # hash / unconfigured
     return f"{name}(hash)"
 
 
 def embed_text(text: str) -> list[float]:
-    """生成 embedding。优先 registry embedding 模型;无 key/失败则哈希兜底。"""
+    """生成 embedding。优先 registry embedding 模型;无 key/失败则哈希兜底。
+
+    L2 缓存(Task 29):归一化文本 → redis `rag:e:{model}:{hash}`;命中补零到 1536。
+    """
+    from backend.modules.rag.cache import (
+        get_redis,
+        l2_get,
+        l2_set,
+        normalize,
+        record_l2_miss,
+    )
+
+    # 与 L1/L2 key 一致:归一化后文本作为 embed 输入
+    norm = normalize(text or "")
     spec, api_key, base_url = _resolve_embedding_endpoint()
     dims = int(os.getenv("EMBEDDING_DIMENSIONS", "768") or "768")
+
+    cached = l2_get(spec.name, norm)
+    if cached is not None:
+        _set_embed_mode("cache")  # L2 命中:非真实 API 调用(仅此前已成功过)
+        return _pad_or_trim(cached)
 
     if not api_key or not base_url:
         logger.debug(
             "未配置 embedding API key/base_url，使用哈希 embedding（非语义，仅本地联通）"
         )
         _set_embed_mode("unconfigured")
-        return _hash_embed(text)
+        return _hash_embed(norm)
 
+    if get_redis() is not None:
+        record_l2_miss()
     try:
         from openai import OpenAI
 
@@ -139,7 +161,7 @@ def embed_text(text: str) -> list[float]:
         try:
             resp = client.embeddings.create(
                 model=spec.name,
-                input=text[:8000],
+                input=norm[:8000],
                 dimensions=dims,
             )
         except Exception as e:
@@ -151,14 +173,18 @@ def embed_text(text: str) -> list[float]:
                 )
                 resp = client.embeddings.create(
                     model=spec.name,
-                    input=text[:8000],
+                    input=norm[:8000],
                 )
             else:
                 raise
         vec = list(resp.data[0].embedding)
         _set_embed_mode("api")
+        try:
+            l2_set(spec.name, norm, vec)
+        except Exception:
+            pass
         return _pad_or_trim(vec)
     except Exception as e:
         logger.warning("API embedding 失败，回退哈希向量（非语义）: %s", e)
         _set_embed_mode("api-error")
-        return _hash_embed(text)
+        return _hash_embed(norm)

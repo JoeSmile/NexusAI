@@ -39,7 +39,7 @@ cache_hits = Counter(
 cache_misses = Counter(
     "contextgate_cache_misses_total",
     "Total cache misses",
-    labelnames=["tenant"],
+    labelnames=["tenant", "cache_type"],
 )
 
 # ── 护栏指标 ──

@@ -4,6 +4,7 @@ RAG服务层
 负责检索增强生成的业务逻辑
 """
 
+import time
 from typing import Any
 
 # 使用兼容层处理 langchain 导入
@@ -212,22 +213,25 @@ class RAGService:
             docs = docs[:search_k]
         return docs
 
-    @staticmethod
-    def _embedding_cost_if_miss(norm_q: str) -> float:
-        """L2 未命中时的单次 embedding 调用成本预估(美元);redis 不可用或 L2 命中为 0。"""
-        from backend.core.cost_manager import _price, count_tokens
-        from backend.core.model_registry import select_embedding_model
-        from backend.modules.rag.cache import get_redis, l2_get
-
-        try:
-            if get_redis() is None:
-                return 0.0
-            spec = select_embedding_model()
-            if l2_get(spec.name, norm_q) is not None:
-                return 0.0
-            return count_tokens(norm_q) * _price(spec.name) / 1000.0
-        except Exception:
-            return 0.0
+    def _ask_response(
+        self,
+        *,
+        answer: str,
+        sources: list[dict[str, Any]],
+        question: str,
+        knowledge_count: int,
+        cache_hit: bool,
+        t0: float,
+    ) -> dict[str, Any]:
+        """统一 ask 响应结构(命中/等锁/未命中三路共用)。"""
+        return {
+            "answer": answer,
+            "sources": sources,
+            "question": question,
+            "knowledge_count": knowledge_count,
+            "cache_hit": cache_hit,
+            "latency_ms": (time.perf_counter() - t0) * 1000,
+        }
 
     def ask(
         self,
@@ -243,13 +247,13 @@ class RAGService:
 
         L1 答案缓存(Task 29):命中直接返回;miss 经单飞锁后算并写入。
         """
-        import time
         import uuid
 
         from backend.core.audit import write_audit_sync
         from backend.modules.rag.cache import (
             acquire_lock,
             check_rate_limit,
+            estimate_embedding_cost_if_miss,
             l1_get,
             l1_key,
             l1_set,
@@ -300,14 +304,14 @@ class RAGService:
 
             hit = l1_get(tid, question)
             if hit:
-                out = {
-                    "answer": hit.get("answer", ""),
-                    "sources": hit.get("sources", []),
-                    "question": hit.get("question", question),
-                    "knowledge_count": hit.get("knowledge_count", 0),
-                    "cache_hit": True,
-                    "latency_ms": (time.perf_counter() - t0) * 1000,
-                }
+                out = self._ask_response(
+                    answer=hit.get("answer", ""),
+                    sources=hit.get("sources", []),
+                    question=hit.get("question", question),
+                    knowledge_count=hit.get("knowledge_count", 0),
+                    cache_hit=True,
+                    t0=t0,
+                )
                 _audit(cache_hit=True, cost=0.0, answer=out["answer"])
                 return out
 
@@ -318,20 +322,20 @@ class RAGService:
             if not got_lock:
                 waited = wait_l1(tid, question, timeout_ms=500)
                 if waited:
-                    out = {
-                        "answer": waited.get("answer", ""),
-                        "sources": waited.get("sources", []),
-                        "question": waited.get("question", question),
-                        "knowledge_count": waited.get("knowledge_count", 0),
-                        "cache_hit": True,
-                        "latency_ms": (time.perf_counter() - t0) * 1000,
-                    }
+                    out = self._ask_response(
+                        answer=waited.get("answer", ""),
+                        sources=waited.get("sources", []),
+                        question=waited.get("question", question),
+                        knowledge_count=waited.get("knowledge_count", 0),
+                        cache_hit=True,
+                        t0=t0,
+                    )
                     _audit(cache_hit=True, cost=0.0, answer=out["answer"])
                     return out
 
             try:
                 # 预估本次 embedding 成本:L2 未命中才会真调 API(Task 29 审计修正)
-                embed_cost = self._embedding_cost_if_miss(norm_q)
+                embed_cost = estimate_embedding_cost_if_miss(norm_q)
 
                 source_documents = self.retrieve_documents(question, search_k=search_k)
 
@@ -364,14 +368,14 @@ class RAGService:
                         }
                     )
 
-                result = {
-                    "answer": answer,
-                    "sources": sources,
-                    "question": question,
-                    "knowledge_count": len(sources),
-                    "cache_hit": False,
-                    "latency_ms": (time.perf_counter() - t0) * 1000,
-                }
+                result = self._ask_response(
+                    answer=answer,
+                    sources=sources,
+                    question=question,
+                    knowledge_count=len(sources),
+                    cache_hit=False,
+                    t0=t0,
+                )
                 l1_set(tid, question, result)
                 logger.info(f"回答生成成功，使用了 {len(sources)} 个知识源")
                 # 审计成本 = LLM 真实/估算成本 + embedding 成本(L2 命中时 embed 为 0)

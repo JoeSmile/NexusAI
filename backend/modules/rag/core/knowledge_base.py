@@ -364,12 +364,14 @@ class KnowledgeBaseManager:
                     .count()
                 )
             from backend.database.embeddings import embedding_model_label
+            from backend.modules.rag.cache import cache_stats_snapshot
 
             return {
                 "status": "就绪",
                 "document_count": count,
                 "backend": "pgvector",
                 "embedding_model": embedding_model_label(),
+                "cache": cache_stats_snapshot(),
             }
         except Exception as e:
             logger.error(f"获取统计信息失败: {e}")

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
@@ -114,9 +115,9 @@ async def test_get_key_chain_orders_and_limits(monkeypatch, decrypt_ok):
 @pytest.mark.asyncio
 async def test_get_key_chain_excludes_cooling_keys(monkeypatch, decrypt_ok):
     """行为断言:SQL 含冷却谓词时,桩按 PG 语义排除冷却中 key。"""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     fresh = _row(id=2, key_version=2, encrypted_key="fresh")
     fresh.last_failed_at = None
     cooling = _row(id=1, key_version=1, encrypted_key="cool")

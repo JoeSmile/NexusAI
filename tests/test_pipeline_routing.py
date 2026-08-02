@@ -5,7 +5,6 @@ import pytest
 from backend.pipeline.nodes.conversion_hook import conversion_hook
 from backend.pipeline.nodes.model_router import route_short_or_long
 
-
 # ── route_short_or_long: 反向判断(仅非流式长路径去 llm_generate)──
 
 

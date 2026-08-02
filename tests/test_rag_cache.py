@@ -125,7 +125,7 @@ def test_l2_same_text_one_api_call(fake_redis, monkeypatch):
     assert calls["n"] == 1
     assert len(a) == 1536
     assert a[:768] == pytest.approx(b[:768])
-    assert emb_mod._last_embed_mode == "api"
+    assert emb_mod._last_embed_mode == "cache"  # 第二次为 L2 命中,非真实 API 调用
 
 
 def test_l2_model_key_isolation(fake_redis):
@@ -332,9 +332,11 @@ def test_embedding_cost_zero_on_l2_hit(fake_redis, monkeypatch):
         return SimpleNamespace(content="答案", metadata={"cost": 0.00042})
 
     svc = _make_rag_service(invoke)
-    # 直接验证预估函数:L2 已命中 → 0
-    est = svc._embedding_cost_if_miss(rag_cache.normalize("缓存命中问题"))
+    # 直接验证预估函数:L2 已命中 → 0(函数已移至 cache 模块,只读探测不计命中)
+    est = rag_cache.estimate_embedding_cost_if_miss(rag_cache.normalize("缓存命中问题"))
     assert est == 0.0
+    # 修复 l2_hit 双计:probe 命中不得计入 l2_hit(全链路 ask 后仍为 0)
+    assert rag_cache._stats["l2_hit"] == 0
     # 全链路:L2 命中 + L1 miss → 审计 cost 只含 LLM
     r = svc.ask("缓存命中问题", tenant_id="t1")
     assert r["cache_hit"] is False
