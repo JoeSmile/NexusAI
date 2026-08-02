@@ -61,6 +61,30 @@ async def health_check():
         }
 
 
+def _redis_unavailable_http(exc: Exception) -> HTTPException:
+    """Redis 不可达时返回结构化 503，避免裸 500（EVID-04）。"""
+    return HTTPException(
+        status_code=503,
+        detail={"code": "CACHE_001", "message": "redis_unavailable", "detail": str(exc)},
+    )
+
+
+def _looks_like_redis_error(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    name = exc.__class__.__name__.lower()
+    needles = (
+        "redis",
+        "connection refused",
+        "connect call failed",
+        "error 61",
+        "error 111",
+        "6379",
+        "timeout",
+        "connectionerror",
+    )
+    return "redis" in name or any(n in msg for n in needles)
+
+
 @router.get("/cache/stats")
 async def get_cache_stats():
     """
@@ -78,7 +102,9 @@ async def get_cache_stats():
         }
     except Exception as e:
         logger.error(f"获取缓存统计失败: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        if _looks_like_redis_error(e):
+            raise _redis_unavailable_http(e) from e
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/cache/clear")
@@ -107,7 +133,9 @@ async def clear_cache(pattern: str | None = None):
         }
     except Exception as e:
         logger.error(f"清除缓存失败: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        if _looks_like_redis_error(e):
+            raise _redis_unavailable_http(e) from e
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/streams/active")

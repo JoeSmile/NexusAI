@@ -44,6 +44,9 @@ class ErrorCode(StrEnum):
     RAG_DEP_MISSING = "RAG_001"
     RAG_EMPTY_EXTRACT = "RAG_002"
 
+    # ── 缓存 (CACHE_0xx) ──
+    CACHE_UNAVAILABLE = "CACHE_001"
+
     # ── 系统 (SYS_0xx) ──
     INTERNAL_ERROR = "SYS_001"
     SKILL_NOT_FOUND = "SKILL_001"
@@ -114,6 +117,8 @@ def _code_to_status(code: str) -> int:
         return 400
     if code.startswith("RAG_"):
         return 501 if code == "RAG_001" else 422
+    if code.startswith("CACHE_"):
+        return 503
     if code.startswith("COST_"):
         return 402
     return 500
