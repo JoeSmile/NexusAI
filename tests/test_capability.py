@@ -153,3 +153,95 @@ async def test_invoke_model_stream_and_auth(
         assert all(
             f.get("cost_source") == "harness" for f in frames if "cost_source" in f
         )
+
+
+def test_build_dify_request_shape(tenant_user: TenantContext) -> None:
+    from backend.core.capability.connectors.external_app import build_dify_request
+
+    spec = CapabilitySpec(
+        id="dify-contract-review",
+        name="Dify合同",
+        kind=CapabilityKind.EXTERNAL_APP,
+        provider=CapabilityProvider.DIFY,
+        permission="chat:write",
+        spec={
+            "governance": True,
+            "base_url": "https://api.dify.ai/v1",
+            "api_key_ref": "DIFY_API_KEY",
+            "api_key": "test-key",
+            "workflow_id": "wf-1",
+        },
+    )
+    req = build_dify_request(spec, {"message": "审合同"}, tenant_user)
+    assert req.method == "POST"
+    assert req.url == "https://api.dify.ai/v1/workflows/run"
+    assert req.headers["Authorization"] == "Bearer test-key"
+    assert req.json_body["response_mode"] == "streaming"
+    assert req.json_body["inputs"]["query"] == "审合同"
+    assert req.json_body["workflow_id"] == "wf-1"
+    assert req.provider == "dify"
+
+
+def test_parse_dify_sse_to_unified_frames() -> None:
+    from backend.core.capability.connectors.external_app import parse_upstream_sse_line
+
+    frames = parse_upstream_sse_line(
+        'data: {"event":"text_chunk","data":{"text":"hi"}}',
+        provider="dify",
+    )
+    assert frames == [{"event": "token", "data": "hi"}]
+
+
+def test_audit_prefix_includes_upstream() -> None:
+    """审计无独立 upstream 列时用 input_text 前缀（与 router 约定一致）。"""
+    cost_source = "invoke"
+    upstream = "dify"
+    tags = f"[cost_source={cost_source}][upstream={upstream}]"
+    assert "upstream=dify" in tags
+
+
+@pytest.mark.asyncio
+async def test_invoke_external_mock_and_circuit(
+    tenant_user: TenantContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from backend.core.capability.connectors import external_app as ext
+    from backend.core.capability.errors import CapabilityUpstreamError
+    from backend.core.circuit_breaker import CircuitState
+
+    monkeypatch.setenv("CAPABILITY_UPSTREAM_MOCK", "true")
+    monkeypatch.setenv("LLM_PROVIDER", "mock")
+    ext._BREAKERS.clear()
+
+    spec = CapabilitySpec(
+        id="dify-mock",
+        name="dify-mock",
+        kind=CapabilityKind.EXTERNAL_APP,
+        provider=CapabilityProvider.DIFY,
+        permission="chat:write",
+        cost_model={"cost_per_1k": 1.0},
+        spec={
+            "governance": True,
+            "base_url": "https://api.dify.ai/v1",
+            "api_key": "k",
+        },
+    )
+    frames: list[dict] = []
+    async for f in ext.invoke_external(spec, {"message": "x"}, tenant_user):
+        frames.append(f)
+    assert any(f.get("event") == "token" for f in frames)
+    usage = next(f for f in frames if f.get("event") == "usage")
+    assert usage["data"]["upstream"] == "dify"
+    assert usage.get("cost_source") == "invoke"
+    done = frames[-1]
+    assert done["event"] == "done"
+    assert done["data"]["upstream"] == "dify"
+
+    # 断路器打开 → CAP_003，不 hang
+    b = ext._breaker(f"cap:dify:{spec.id}")
+    b._state = CircuitState.OPEN
+    b._last_failure_time = 1e12  # 远未来，保持 open
+    with pytest.raises(CapabilityUpstreamError) as ei:
+        async for _ in ext.invoke_external(spec, {"message": "x"}, tenant_user):
+            pass
+    assert ei.value.code == ErrorCode.CAP_UPSTREAM_ERROR.value
+    assert "circuit_open" in ei.value.message

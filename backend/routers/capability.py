@@ -154,9 +154,13 @@ def _schedule_audit(
     output_text: str,
     latency_ms: float,
     error_code: str | None = None,
+    upstream: str | None = None,
 ) -> None:
-    # audit_logs 无 metadata 列：cost_source 前缀写进 input_text（同 RAG cache_hit 约定）
-    prefixed = f"[cost_source={cost_source}] {input_text}".strip()
+    # audit_logs 无 metadata 列：标记前缀写进 input_text（同 RAG cache_hit 约定）
+    tags = f"[cost_source={cost_source}]"
+    if upstream:
+        tags += f"[upstream={upstream}]"
+    prefixed = f"{tags} {input_text}".strip()
     log_audit(
         background_tasks,
         tenant_id=tenant.tenant_id,
@@ -221,21 +225,27 @@ async def _invoke_short(
     cap_id: str,
     payload: dict[str, Any],
     tenant: TenantContext,
-) -> tuple[str, str, dict[str, Any]]:
-    """短路径：聚合 token，返回 (response_text, cost_source, done_meta)。"""
+) -> tuple[str, str, dict[str, Any], str | None]:
+    """短路径：聚合 token → (response, cost_source, done_meta, upstream)。"""
     lf: dict[str, Any] = {}
     _inject_langfuse_parent(lf)
     chunks: list[str] = []
     cost_source = "harness"
     done_meta: dict[str, Any] = {}
+    upstream: str | None = None
     async for frame in invoke(cap_id, payload, tenant):
         if frame.get("event") == "token":
             chunks.append(str(frame.get("data") or ""))
         if frame.get("cost_source"):
             cost_source = str(frame["cost_source"])
-        if frame.get("event") == "done" and isinstance(frame.get("data"), dict):
-            done_meta = frame["data"]
-    return "".join(chunks), cost_source, done_meta
+        data = frame.get("data")
+        if frame.get("event") == "usage" and isinstance(data, dict) and data.get("upstream"):
+            upstream = str(data["upstream"])
+        if frame.get("event") == "done" and isinstance(data, dict):
+            done_meta = data
+            if data.get("upstream"):
+                upstream = str(data["upstream"])
+    return "".join(chunks), cost_source, done_meta, upstream
 
 
 @router.post("/{cap_id}/invoke")
@@ -263,7 +273,9 @@ async def invoke_capability(
 
     if not wants_stream:
         try:
-            text, cost_source, done_meta = await _invoke_short(cap_id, payload, tenant)
+            text, cost_source, done_meta, upstream = await _invoke_short(
+                cap_id, payload, tenant
+            )
         except ContextGateException:
             _schedule_langfuse_flush(background_tasks, short_path=True)
             raise
@@ -281,6 +293,7 @@ async def invoke_capability(
             input_text=input_preview,
             output_text=text,
             latency_ms=latency,
+            upstream=upstream,
         )
         _schedule_langfuse_flush(background_tasks, short_path=True)
         return {
@@ -288,6 +301,7 @@ async def invoke_capability(
             "capability_id": cap_id,
             "kind": done_meta.get("kind"),
             "cost_source": cost_source,
+            "upstream": upstream,
             "finish_reason": "completed",
         }
 
@@ -333,6 +347,7 @@ async def _invoke_streaming(
     async def event_stream() -> AsyncIterator[str]:
         buffer = ""
         cost_source = "harness"
+        upstream: str | None = None
         error_code: str | None = None
         pending = first
 
@@ -357,6 +372,9 @@ async def _invoke_streaming(
 
                 if frame.get("cost_source"):
                     cost_source = str(frame["cost_source"])
+                data = frame.get("data")
+                if isinstance(data, dict) and data.get("upstream"):
+                    upstream = str(data["upstream"])
                 if frame.get("event") == "token":
                     buffer += str(frame.get("data") or "")
                 yield _frame_to_sse(frame)
@@ -392,6 +410,7 @@ async def _invoke_streaming(
                     output_text=buffer,
                     latency_ms=latency,
                     error_code=error_code,
+                    upstream=upstream,
                 )
             _schedule_langfuse_flush(background_tasks, short_path=False)
 
