@@ -582,12 +582,44 @@ class AgentCore:
     async def _generate_response(self, user_input: str, context: dict, tool_outputs: list) -> str:
         """生成回复"""
         if self.llm:
-            return await self._call_llm("", user_input)
+            system = ""
+            perception = context.get("perception") or {}
+            if perception:
+                system = f"perception={perception}"
+            if tool_outputs:
+                system = (system + "\n" if system else "") + f"tools={tool_outputs[:3]}"
+            return await self._call_llm(system, user_input)
         return self._template_response(context.get("perception", {}), tool_outputs)
 
     async def _call_llm(self, context: str, user_input: str) -> str:
-        """调用 LLM"""
-        return "我暂时无法调用模型服务，请稍后再试。"
+        """调用 LLM — 与 Runtime 路径共用 get_llm_client / complete_chat。"""
+        if self.llm is None:
+            return "我暂时无法调用模型服务，请稍后再试。"
+
+        messages = [{"role": "user", "content": user_input}]
+        system = context.strip() or None
+        try:
+            if hasattr(self.llm, "acomplete_chat"):
+                text = await self.llm.acomplete_chat(messages, system=system)
+            elif hasattr(self.llm, "complete_chat"):
+                text = self.llm.complete_chat(messages, system=system)
+            elif hasattr(self.llm, "ainvoke"):
+                from langchain_core.messages import HumanMessage, SystemMessage
+
+                lc = []
+                if system:
+                    lc.append(SystemMessage(content=system))
+                lc.append(HumanMessage(content=user_input))
+                result = await self.llm.ainvoke(lc)
+                text = getattr(result, "content", None) or str(result)
+            else:
+                return "我暂时无法调用模型服务，请稍后再试。"
+        except Exception as e:
+            # 不吞成「抱歉」软文案：向上抛，由调用方决定降级/记录
+            logger.error("Legacy _call_llm 失败: %s", e, exc_info=True)
+            raise
+
+        return text or ""
 
     def _template_response(self, perception: dict, tool_outputs: list) -> str:
         """模板回复"""

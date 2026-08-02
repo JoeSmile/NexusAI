@@ -92,9 +92,13 @@ def complete_via_provider(
             return hit
         return _mock_or_eval_json(model, prompt)
 
+    # openai / record：无密钥必须显式失败，避免误以为在打真模型（Task 26 review）
     key = api_key or os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or ""
     if not key:
-        return _mock_or_eval_json(model, prompt)
+        raise RuntimeError(
+            f"LLM_PROVIDER={provider} 需要配置 LLM_API_KEY（或 OPENAI_API_KEY）；"
+            "离线演示请使用 LLM_PROVIDER=mock 或 LLM_PROVIDER=replay"
+        )
 
     from openai import OpenAI
 
