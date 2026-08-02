@@ -1,4 +1,5 @@
 import { useAuthStore } from '@/stores/authStore'
+import { useForbiddenStore } from '@/stores/forbiddenStore'
 import type { ApiErrorBody } from '@/types/api'
 
 export class ApiError extends Error {
@@ -125,12 +126,20 @@ export async function apiFetch(
       body = undefined
     }
     const parsed = parseErrorPayload(body)
+    const needed = parsed.needed || parsed.message
+    useForbiddenStore.getState().setForbidden({
+      code: parsed.code || 'AUTH_002',
+      needed,
+      message: parsed.message || 'forbidden',
+      path,
+      at: Date.now(),
+    })
     throw new ApiError({
       status: 403,
       code: parsed.code || 'AUTH_002',
       message: parsed.message || 'forbidden',
       forbidden: true,
-      needed: parsed.needed || parsed.message,
+      needed,
       body,
     })
   }

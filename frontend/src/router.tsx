@@ -2,6 +2,7 @@ import { Navigate, Outlet, createBrowserRouter, useLocation } from 'react-router
 
 import { AppShell } from '@/components/layout/AppShell'
 import LoginPage from '@/pages/login'
+import AdminPanel from '@/pages/panels/admin'
 import PlaceholderPanel from '@/pages/panels/PlaceholderPanel'
 import { useAuthStore } from '@/stores/authStore'
 
@@ -27,7 +28,7 @@ export const router = createBrowserRouter([
           { index: true, element: <Navigate to="/panels/chat" replace /> },
           { path: 'panels/chat', element: <PlaceholderPanel /> },
           { path: 'panels/rag', element: <PlaceholderPanel /> },
-          { path: 'panels/admin', element: <PlaceholderPanel /> },
+          { path: 'panels/admin', element: <AdminPanel /> },
           { path: 'panels/audit', element: <PlaceholderPanel /> },
           { path: 'panels/agent', element: <PlaceholderPanel /> },
           { path: 'panels/eval', element: <PlaceholderPanel /> },

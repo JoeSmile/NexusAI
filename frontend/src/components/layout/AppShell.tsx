@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 
 import { Badge } from '@/components/ui/badge'
+import { RoleSwitcher } from '@/components/role/RoleSwitcher'
 import { useAuthStore } from '@/stores/authStore'
 import { cn } from '@/lib/utils'
 
@@ -57,11 +58,8 @@ export function AppShell() {
           {env}
         </Badge>
         <div className="text-muted-foreground ml-auto flex items-center gap-3 text-xs">
-          {/* 30.14 RoleSwitcher 挂载点 */}
-          <span data-testid="role-switcher-slot" className="rounded-md border border-border px-2 py-1">
-            角色: {activeRole}
-          </span>
-          <span className="text-muted-foreground">测试 FE</span>
+          <RoleSwitcher />
+          <span className="hidden sm:inline">测试 FE · {activeRole}</span>
         </div>
       </header>
       <div className="flex min-h-0 flex-1">
