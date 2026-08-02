@@ -47,6 +47,13 @@ class ErrorCode(StrEnum):
     # ── 缓存 (CACHE_0xx) ──
     CACHE_UNAVAILABLE = "CACHE_001"
 
+    # ── 能力层 (CAP_0xx) ──
+    CAP_NOT_FOUND = "CAP_001"
+    CAP_DISABLED = "CAP_002"
+    CAP_UPSTREAM_ERROR = "CAP_003"
+    CAP_GOVERNANCE_REQUIRED = "CAP_004"
+    CAP_QUOTA_EXCEEDED = "CAP_005"
+
     # ── 系统 (SYS_0xx) ──
     INTERNAL_ERROR = "SYS_001"
     SKILL_NOT_FOUND = "SKILL_001"
@@ -121,4 +128,12 @@ def _code_to_status(code: str) -> int:
         return 503
     if code.startswith("COST_"):
         return 402
+    if code.startswith("CAP_"):
+        return {
+            "CAP_001": 404,
+            "CAP_002": 403,
+            "CAP_003": 502,
+            "CAP_004": 403,
+            "CAP_005": 429,
+        }.get(code, 400)
     return 500
