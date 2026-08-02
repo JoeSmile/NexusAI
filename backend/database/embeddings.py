@@ -6,10 +6,25 @@ import hashlib
 import logging
 import math
 import os
+from typing import Literal
 
 logger = logging.getLogger(__name__)
 
 EMBED_DIM = 1536  # pgvector 列维度；API 返回更短时补零
+
+EmbedMode = Literal["api", "hash", "api-error", "unconfigured"]
+_last_embed_mode: EmbedMode | None = None
+
+
+def _set_embed_mode(mode: EmbedMode) -> None:
+    global _last_embed_mode
+    _last_embed_mode = mode
+
+
+def reset_embed_mode_for_tests() -> None:
+    """测试用:清空上次调用结果缓存。"""
+    global _last_embed_mode
+    _last_embed_mode = None
 
 
 def _hash_embed(text: str, dim: int = EMBED_DIM) -> list[float]:
@@ -30,7 +45,7 @@ def _hash_embed(text: str, dim: int = EMBED_DIM) -> list[float]:
 
 
 def _dimensions_unsupported(exc: BaseException) -> bool:
-    """供应商不接受 dimensions 参数时的启发式(不用做字符串精确匹配业务错误)。"""
+    """供应商不接受 dimensions 参数时的启发式。"""
     msg = str(exc).lower()
     return "dimension" in msg or "dimensions" in msg
 
@@ -41,50 +56,80 @@ def _pad_or_trim(vec: list[float]) -> list[float]:
     return vec[:EMBED_DIM]
 
 
-def _resolve_api_key(api_key_ref: str) -> str:
-    return (
-        os.getenv("EMBEDDING_API_KEY")
-        or (os.getenv(api_key_ref) if api_key_ref else "")
-        or os.getenv("QWEN_API_KEY")
-        or os.getenv("LLM_API_KEY")
-        or os.getenv("OPENAI_API_KEY")
-        or ""
-    )
+def _is_dashscope_url(base_url: str) -> bool:
+    u = (base_url or "").lower()
+    return "dashscope" in u or "aliyuncs" in u
 
 
-def embedding_uses_hash_fallback() -> bool:
-    """供 status/stats 展示:当前是否会因缺 key/url 走哈希。"""
+def _resolve_embedding_endpoint() -> tuple[object, str, str]:
+    """返回 (spec, api_key, base_url)。"""
     from backend.core.model_registry import select_embedding_model
 
     spec = select_embedding_model()
-    api_key = _resolve_api_key(spec.api_key_ref)
     base_url = (
         spec.base_url
         or os.getenv("EMBEDDING_BASE_URL")
         or os.getenv("LLM_BASE_URL")
         or ""
     ).rstrip("/")
+    api_key = _resolve_api_key(spec.api_key_ref, base_url)
+    return spec, api_key, base_url
+
+
+def _resolve_api_key(api_key_ref: str, base_url: str = "") -> str:
+    """按 endpoint 解析 key:DashScope 不用 DeepSeek/OpenAI 的 LLM_API_KEY 冒充。"""
+    if os.getenv("EMBEDDING_API_KEY"):
+        return os.getenv("EMBEDDING_API_KEY") or ""
+
+    if api_key_ref:
+        ref_val = os.getenv(api_key_ref) or ""
+        if ref_val:
+            return ref_val
+
+    qwen = os.getenv("QWEN_API_KEY") or ""
+    if _is_dashscope_url(base_url):
+        # Task 28 review Important #2: 禁止用 deepseek LLM_API_KEY 打 dashscope
+        return qwen
+
+    if qwen:
+        return qwen
+    return os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or ""
+
+
+def embedding_uses_hash_fallback() -> bool:
+    """True = 当前配置不足以打真实 embedding API(缺 key/url)。"""
+    _spec, api_key, base_url = _resolve_embedding_endpoint()
     return not (api_key and base_url)
+
+
+def embedding_model_label() -> str:
+    """供 /status、get_stats:反映配置 + 最近一次 embed 结果。"""
+    from backend.core.model_registry import select_embedding_model
+
+    name = select_embedding_model().name
+    mode = _last_embed_mode
+    if mode is None:
+        if embedding_uses_hash_fallback():
+            return f"{name}(hash)"
+        return name
+    if mode == "api":
+        return name
+    if mode == "api-error":
+        return f"{name}(api-error)"
+    # hash / unconfigured
+    return f"{name}(hash)"
 
 
 def embed_text(text: str) -> list[float]:
     """生成 embedding。优先 registry embedding 模型;无 key/失败则哈希兜底。"""
-    from backend.core.model_registry import select_embedding_model
-
-    spec = select_embedding_model()
-    api_key = _resolve_api_key(spec.api_key_ref)
-    base_url = (
-        spec.base_url
-        or os.getenv("EMBEDDING_BASE_URL")
-        or os.getenv("LLM_BASE_URL")
-        or ""
-    ).rstrip("/")
+    spec, api_key, base_url = _resolve_embedding_endpoint()
     dims = int(os.getenv("EMBEDDING_DIMENSIONS", "768") or "768")
 
     if not api_key or not base_url:
         logger.debug(
             "未配置 embedding API key/base_url，使用哈希 embedding（非语义，仅本地联通）"
         )
+        _set_embed_mode("unconfigured")
         return _hash_embed(text)
 
     try:
@@ -111,7 +156,9 @@ def embed_text(text: str) -> list[float]:
             else:
                 raise
         vec = list(resp.data[0].embedding)
+        _set_embed_mode("api")
         return _pad_or_trim(vec)
     except Exception as e:
         logger.warning("API embedding 失败，回退哈希向量（非语义）: %s", e)
+        _set_embed_mode("api-error")
         return _hash_embed(text)

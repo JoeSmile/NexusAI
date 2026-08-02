@@ -363,17 +363,13 @@ class KnowledgeBaseManager:
                     .filter_by(tenant_id=self.tenant_id)
                     .count()
                 )
-            from backend.core.model_registry import select_embedding_model
-            from backend.database.embeddings import embedding_uses_hash_fallback
+            from backend.database.embeddings import embedding_model_label
 
-            emb_name = select_embedding_model().name
-            if embedding_uses_hash_fallback():
-                emb_name = f"{emb_name}(hash)"
             return {
                 "status": "就绪",
                 "document_count": count,
                 "backend": "pgvector",
-                "embedding_model": emb_name,
+                "embedding_model": embedding_model_label(),
             }
         except Exception as e:
             logger.error(f"获取统计信息失败: {e}")
