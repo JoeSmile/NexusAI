@@ -421,11 +421,6 @@ class AgentCore:
             relevant_memories = []
             user_profile = {}
             if self.memory_hub:
-                current_memory = self.memory_hub.encode({
-                    "content": user_input,
-                    "user_id": user_id,
-                    "role": "user",
-                })
                 relevant_memories = self.memory_hub.retrieve(
                     query=user_input, user_id=user_id,
                     context={"time_range": 30},
@@ -458,8 +453,9 @@ class AgentCore:
                 )
 
             # ===== 阶段5: 记忆巩固 =====
+            # NOTE(EVID-14): MemoryHub 无 consolidate 方法，原调用必抛 AttributeError。
+            # 记忆巩固未实现；update_working_memory 仍执行，恢复时在此补回。
             if self.memory_hub:
-                self.memory_hub.consolidate(current_memory if 'current_memory' in dir() else None)
                 self.memory_hub.update_working_memory(conversation=[
                     {"role": "user", "content": user_input},
                     {"role": "assistant", "content": execution_results.get("response", "")},

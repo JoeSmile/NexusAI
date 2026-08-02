@@ -56,8 +56,7 @@ class LifecycleMixin:
 
         # ── FSM ──
         self._fsm = SessionFSM()
-        if is_module_enabled("session_fsm"):
-            self._fsm.transition(SessionState.IDLE)
+        # 初始状态即 IDLE，无需（也不能）transition(IDLE) — 自迁移非法(EVID-14)
 
         # ── Hooks ──
         self._dispatcher = HookDispatcher(hooks or [])
