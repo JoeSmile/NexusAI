@@ -112,6 +112,125 @@ async def test_get_key_chain_orders_and_limits(monkeypatch, decrypt_ok):
 
 
 @pytest.mark.asyncio
+async def test_get_key_chain_excludes_cooling_keys(monkeypatch, decrypt_ok):
+    """行为断言:SQL 含冷却谓词时,桩按 PG 语义排除冷却中 key。"""
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime.now(timezone.utc)
+    fresh = _row(id=2, key_version=2, encrypted_key="fresh")
+    fresh.last_failed_at = None
+    cooling = _row(id=1, key_version=1, encrypted_key="cool")
+    cooling.last_failed_at = now - timedelta(seconds=10)  # 仍在 60s 冷却内
+
+    class _CoolingSession:
+        def __init__(self):
+            self.calls: list[tuple[str, dict | None]] = []
+
+        def execute(self, sql, params=None):
+            self.calls.append((str(sql), params))
+            sql_s = str(sql)
+            rows = [fresh, cooling]
+            # 若 SQL 丢掉冷却谓词,冷却 key 会泄漏进结果 → 测试失败
+            if "last_failed_at" in sql_s and params:
+                cooldown = int(params["cooldown"])
+                filtered = []
+                for r in rows:
+                    if getattr(r, "last_failed_at", None) is None:
+                        filtered.append(r)
+                    elif r.last_failed_at <= now - timedelta(seconds=cooldown):
+                        filtered.append(r)
+                rows = filtered
+            rows = sorted(rows, key=lambda r: -r.key_version)[: int(params["lim"])]
+            return MagicMock(fetchall=lambda: rows)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return None
+
+    session = _CoolingSession()
+    factory = MagicMock()
+    factory.Session.return_value = session
+    monkeypatch.setattr(key_repo, "get_pg_session", lambda: factory)
+    monkeypatch.setattr(key_repo, "_cooldown_seconds", lambda: 60)
+
+    repo = key_repo.LLMKeyRepository()
+    chain = await repo.get_key_chain("t1", "default", limit=3)
+    assert [k.id for k in chain] == ["2"]
+    assert "last_failed_at" in session.calls[0][0]
+
+
+@pytest.mark.asyncio
+async def test_health_restore_skips_admin_deactivate(monkeypatch):
+    """人工停用(failures=0)不应被 verify 成功重新激活。"""
+    import backend.core.key_health as kh
+
+    row = SimpleNamespace(
+        id=9, encrypted_key="enc", base_url="https://x", is_active=False
+    )
+    before = SimpleNamespace(consecutive_failures=0, is_active=False)
+    updates: list[dict] = []
+
+    class _Sess:
+        def __init__(self):
+            self.phase = 0
+
+        def execute(self, sql, params=None):
+            s = str(sql)
+            r = MagicMock()
+            if "SELECT *" in s or "encrypted_key" in s and "WHERE id" in s and "consecutive" not in s:
+                r.fetchone = lambda: row
+            elif "consecutive_failures, is_active" in s:
+                r.fetchone = lambda: before
+            elif "UPDATE" in s.upper():
+                updates.append(dict(params or {}))
+                r.fetchone = lambda: None
+            else:
+                r.fetchone = lambda: row
+            return r
+
+        def commit(self):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return None
+
+    factory = MagicMock()
+    factory.Session.return_value = _Sess()
+    monkeypatch.setattr(kh, "get_pg_session", lambda: factory)
+    km = MagicMock()
+    km.decrypt.return_value = "ok-key"
+    monkeypatch.setattr(kh, "KeyManager", lambda: km)
+
+    class _Client:
+        def __init__(self, *a, **k):
+            pass
+
+        @property
+        def models(self):
+            async def _list():
+                return []
+
+            return SimpleNamespace(list=_list)
+
+    import openai as openai_mod
+
+    monkeypatch.setattr(openai_mod, "AsyncOpenAI", _Client)
+    monkeypatch.setattr(kh, "_max_consecutive_failures", lambda: 3)
+    monkeypatch.setattr(kh, "_audit_health", lambda *a, **k: None)
+
+    result = await kh.verify_key_by_id(9)
+    assert result["status"] == "ok"
+    # CASE 用 consecutive_failures >= max_fail 才置 true;failures=0 保持原 is_active
+    assert updates
+    assert updates[0].get("max_fail") == 3
+
+
+@pytest.mark.asyncio
 async def test_get_key_is_first_of_chain(monkeypatch, decrypt_ok):
     rows = [_row(id=9, key_version=9, encrypted_key="top")]
     session = _RecordingSession(fetchall=rows)
@@ -221,6 +340,58 @@ def test_classify_switchable_status():
     assert key_failover.classify_switchable_status(_APIStatusError(429)) == 429
     assert key_failover.classify_switchable_status(_APIStatusError(500)) is None
     assert key_failover.classify_switchable_status(RuntimeError("nope")) is None
+
+
+@pytest.mark.asyncio
+async def test_load_key_chain_sync_works_under_running_loop(monkeypatch):
+    """Important #2: 已有 event loop 时仍能拉到候选链(线程池),不再返回空。"""
+    import backend.core.harness.llm_client as llm_client
+    from backend.core.key_repository import LLMKey
+
+    async def _fake_chain(tid, provider, limit=3):
+        return [
+            LLMKey("1", tid, provider, "", "k", 1, True, None),
+        ]
+
+    class _Repo:
+        async def get_key_chain(self, tid, provider, limit=3):
+            return await _fake_chain(tid, provider, limit)
+
+    monkeypatch.setattr(
+        "backend.core.key_repository.LLMKeyRepository",
+        _Repo,
+    )
+    chain = llm_client._load_key_chain_sync("t1", "deepseek", limit=3)
+    assert len(chain) == 1
+    assert chain[0].api_key == "k"
+
+
+@pytest.mark.asyncio
+async def test_llm_generate_passes_key_provider(monkeypatch):
+    """Important #1: harness.generate 收到 model registry provider,非写死 default。"""
+    from backend.pipeline.nodes import llm_generate as lg
+    from backend.pipeline.state import make_initial_state
+
+    captured: dict = {}
+
+    class _H:
+        async def generate(self, **kwargs):
+            captured.update(kwargs)
+            return SimpleNamespace(
+                success=True,
+                output="ok",
+                latency_ms=1.0,
+                error=None,
+                metadata={"input_tokens": 1, "output_tokens": 1, "cost": 0.0},
+            )
+
+    monkeypatch.setattr(lg, "harness", _H())
+    state = make_initial_state("t1", "u1", "s1", "hi")
+    state["selected_model"] = "deepseek-v4-flash"
+    state["llm_key_provider"] = "deepseek"
+    state["finish_reason"] = "routed_to_llm"
+    await lg.llm_generate(state)
+    assert captured.get("provider") == "deepseek"
 
 
 @pytest.mark.asyncio

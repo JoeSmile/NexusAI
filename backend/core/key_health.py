@@ -58,7 +58,6 @@ async def verify_key_by_id(key_id: int) -> dict:
 
         encrypted_key = row.encrypted_key
         base_url = row.base_url
-        was_active = bool(row.is_active)
 
     km = KeyManager()
     plain_key = km.decrypt(encrypted_key)
@@ -74,7 +73,21 @@ async def verify_key_by_id(key_id: int) -> dict:
 
     repo = LLMKeyRepository()
     if ok:
+        # 仅当此前因连续失败被系统摘除(consecutive_failures ≥ 阈值)时才恢复
+        # is_active;人工停用(failures=0)保持 false(Task 27 review Important #3)
+        max_fail = _max_consecutive_failures()
         with session_factory.Session() as session:
+            before = session.execute(
+                text(
+                    "SELECT consecutive_failures, is_active FROM llm_api_keys WHERE id = :id"
+                ),
+                {"id": key_id},
+            ).fetchone()
+            system_deactivated = bool(
+                before
+                and not before.is_active
+                and int(before.consecutive_failures or 0) >= max_fail
+            )
             session.execute(
                 text(
                     """
@@ -83,18 +96,21 @@ async def verify_key_by_id(key_id: int) -> dict:
                         last_verified_ok = true,
                         consecutive_failures = 0,
                         last_failed_at = NULL,
-                        is_active = true
+                        is_active = CASE
+                            WHEN consecutive_failures >= :max_fail THEN true
+                            ELSE is_active
+                        END
                     WHERE id = :id
                     """
                 ),
-                {"id": key_id},
+                {"id": key_id, "max_fail": max_fail},
             )
             session.commit()
-        if not was_active:
+        if system_deactivated:
             _audit_health(
                 "llm_key_restored",
                 key_id,
-                f"key_id={key_id} verify ok → is_active=true",
+                f"key_id={key_id} verify ok → system deactivate restored",
             )
         return {"status": "ok", "key_id": key_id}
 

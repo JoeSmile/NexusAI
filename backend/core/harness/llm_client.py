@@ -74,8 +74,13 @@ def _mock_or_eval_json(model: str, prompt: str) -> str:
 def _load_key_chain_sync(
     tenant_id: str, key_provider: str, limit: int = 3
 ) -> list:
-    """尽力同步拉取候选链;失败则返回空(由调用方回退 env)。"""
+    """同步拉取候选链。
+
+    无事件循环时用 asyncio.run;已在 async 上下文中则在线程池跑新 loop,
+    避免 get_running_loop 时直接返回空(Task 27 review Important #2)。
+    """
     import asyncio
+    import concurrent.futures
 
     from backend.core.key_repository import LLMKeyRepository
 
@@ -85,13 +90,14 @@ def _load_key_chain_sync(
         )
 
     try:
-        asyncio.get_running_loop()
-    except RuntimeError:
         try:
+            asyncio.get_running_loop()
+        except RuntimeError:
             return asyncio.run(_load())
-        except Exception:
-            return []
-    return []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(asyncio.run, _load()).result(timeout=10)
+    except Exception:
+        return []
 
 
 def complete_via_provider(
@@ -173,6 +179,8 @@ def _build_langchain_chat_model(
     temperature: float,
     api_key: str | None,
     base_url: str | None,
+    tenant_id: str = "default",
+    key_provider: str = "default",
 ) -> Any:
     """构造兼容 LangChain BaseChatModel 的客户端（invoke/predict + complete_chat）。"""
     from langchain_core.language_models.chat_models import BaseChatModel
@@ -187,6 +195,8 @@ def _build_langchain_chat_model(
         temperature: float = 0.7
         openai_api_key: str | None = None
         openai_api_base: str | None = None
+        tenant_id: str = "default"
+        key_provider: str = "default"
 
         @property
         def _llm_type(self) -> str:
@@ -206,6 +216,8 @@ def _build_langchain_chat_model(
                 temperature=self.temperature,
                 api_key=self.openai_api_key,
                 base_url=self.openai_api_base,
+                tenant_id=self.tenant_id,
+                key_provider=self.key_provider,
             )
             return ChatResult(
                 generations=[ChatGeneration(message=AIMessage(content=text))]
@@ -221,18 +233,37 @@ def _build_langchain_chat_model(
                 temperature=self.temperature,
                 api_key=self.openai_api_key,
                 base_url=self.openai_api_base,
+                tenant_id=self.tenant_id,
+                key_provider=self.key_provider,
             )
 
         async def acomplete_chat(
             self, messages: list[dict], system: str | None = None
         ) -> str:
-            return self.complete_chat(messages, system=system)
+            """异步路径:await 预载候选链再调用,不依赖线程池同步加载。"""
+            from backend.core.key_repository import LLMKeyRepository
+
+            chain = await LLMKeyRepository().get_key_chain(
+                self.tenant_id, self.key_provider, limit=3
+            )
+            return complete_via_provider(
+                self.model_name,
+                _normalize_messages(messages, system=system),
+                temperature=self.temperature,
+                api_key=self.openai_api_key,
+                base_url=self.openai_api_base,
+                tenant_id=self.tenant_id,
+                key_provider=self.key_provider,
+                key_chain=chain or None,
+            )
 
     return HarnessChatModel(
         model_name=model,
         temperature=temperature,
         openai_api_key=api_key,
         openai_api_base=base_url,
+        tenant_id=tenant_id,
+        key_provider=key_provider,
     )
 
 
@@ -246,11 +277,15 @@ class _FallbackLLMClient:
         temperature: float = 0.7,
         api_key: str | None = None,
         base_url: str | None = None,
+        tenant_id: str = "default",
+        key_provider: str = "default",
     ):
         self.model_name = model
         self.temperature = temperature
         self._api_key = api_key
         self._base_url = base_url
+        self.tenant_id = tenant_id
+        self.key_provider = key_provider
 
     def invoke(self, input_: Any, config: Any = None, **kwargs: Any) -> Any:
         text = complete_via_provider(
@@ -259,6 +294,8 @@ class _FallbackLLMClient:
             temperature=self.temperature,
             api_key=self._api_key,
             base_url=self._base_url,
+            tenant_id=self.tenant_id,
+            key_provider=self.key_provider,
         )
         return type("Msg", (), {"content": text})()
 
@@ -272,16 +309,32 @@ class _FallbackLLMClient:
             temperature=self.temperature,
             api_key=self._api_key,
             base_url=self._base_url,
+            tenant_id=self.tenant_id,
+            key_provider=self.key_provider,
         )
 
     async def acomplete_chat(
         self, messages: list[dict], system: str | None = None
     ) -> str:
-        return self.complete_chat(messages, system=system)
+        from backend.core.key_repository import LLMKeyRepository
+
+        chain = await LLMKeyRepository().get_key_chain(
+            self.tenant_id, self.key_provider, limit=3
+        )
+        return complete_via_provider(
+            self.model_name,
+            _normalize_messages(messages, system=system),
+            temperature=self.temperature,
+            api_key=self._api_key,
+            base_url=self._base_url,
+            tenant_id=self.tenant_id,
+            key_provider=self.key_provider,
+            key_chain=chain or None,
+        )
 
     # Agent 旧探测名（无 LangChain 时不会冲突）
     async def agenerate(self, messages: list[dict], system: str | None = None) -> str:
-        return self.complete_chat(messages, system=system)
+        return await self.acomplete_chat(messages, system=system)
 
     def generate(self, messages: list[dict], system: str | None = None) -> str:
         return self.complete_chat(messages, system=system)
@@ -292,6 +345,8 @@ def get_llm_client(
     temperature: float = 0.7,
     model: str | None = None,
     prefer_evaluation_model: bool = False,
+    tenant_id: str = "default",
+    key_provider: str = "default",
     **_extra: Any,
 ) -> Any:
     """
@@ -311,6 +366,8 @@ def get_llm_client(
             temperature=temperature,
             api_key=settings.api_key,
             base_url=settings.base_url,
+            tenant_id=tenant_id,
+            key_provider=key_provider,
         )
     except ImportError:
         return _FallbackLLMClient(
@@ -318,4 +375,6 @@ def get_llm_client(
             temperature=temperature,
             api_key=settings.api_key,
             base_url=settings.base_url,
+            tenant_id=tenant_id,
+            key_provider=key_provider,
         )

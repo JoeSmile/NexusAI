@@ -59,11 +59,12 @@ class PipelineState(TypedDict):
     error_code: str | None
     langfuse_span: Any | None
 
-    # ── 扩展 (Task 18 LLM Key) ──
+    # ── 扩展 (Task 18/27 LLM Key) ──
     llm_api_key: str | None
     llm_base_url: str | None
     llm_key_id: str | None
     llm_key_version: int | None
+    llm_key_provider: str | None  # model registry provider, for key chain failover
 
     # ── 流式（07.07e）──
     stream_mode: bool
@@ -123,6 +124,7 @@ def make_initial_state(
         "llm_base_url": None,
         "llm_key_id": None,
         "llm_key_version": None,
+        "llm_key_provider": None,
         "stream_mode": False,
         "ab_experiment_id": None,
         "ab_variant": None,

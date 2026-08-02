@@ -38,6 +38,17 @@ async def llm_generate(state: PipelineState) -> PipelineState:
     except Exception:
         pass
 
+    key_provider = state.get("llm_key_provider") or "default"
+    if key_provider == "default":
+        try:
+            from backend.core.model_registry import get_model as _get_model
+
+            _spec = _get_model(model)
+            if _spec is not None and _spec.provider:
+                key_provider = _spec.provider
+        except Exception:
+            pass
+
     result = await harness.generate(
         model=model,
         messages=messages,
@@ -45,6 +56,7 @@ async def llm_generate(state: PipelineState) -> PipelineState:
         api_key=api_key,
         base_url=base_url,
         max_tokens=max_tokens,
+        provider=key_provider,
     )
 
     state["total_tokens"] = result.metadata.get("input_tokens", 0) + result.metadata.get(

@@ -68,6 +68,7 @@ async def model_router(state: PipelineState) -> PipelineState:
     state["selected_model"] = spec.name
     state["estimated_cost"] = estimate_cost(spec.name, spec.max_tokens)
     state["finish_reason"] = "routed_to_llm"
+    state["llm_key_provider"] = spec.provider or "default"
 
     if spec.base_url:
         state["llm_base_url"] = spec.base_url

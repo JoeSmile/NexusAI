@@ -252,6 +252,7 @@ async def chat_streaming(
             tenant_id=final["tenant_id"],
             api_key=final.get("llm_api_key") or "",
             base_url=final.get("llm_base_url") or "",
+            provider=final.get("llm_key_provider") or "default",
         ).__aiter__()
 
         try:
