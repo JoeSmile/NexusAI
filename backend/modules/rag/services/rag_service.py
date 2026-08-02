@@ -21,8 +21,8 @@ try:
 except ImportError:  # pragma: no cover
     PromptTemplate = None
 
+from backend.core.harness import get_llm_client
 from backend.logging_config import get_logger
-from backend.modules.llm.harness import try_create_chat_openai
 from config import Config
 
 from ..core.knowledge_base import KnowledgeBaseManager
@@ -49,9 +49,10 @@ class RAGService:
                 logger.warning(f"加载向量存储失败，可能需要先初始化知识库: {e}")
         
         self.kb_manager = kb_manager
-        self.llm = try_create_chat_openai(temperature=0.7)
+        # Task 26 / EVID-08: 走 LLM_PROVIDER mock|record|replay|openai，不再硬依赖 API_KEY
+        self.llm = get_llm_client(temperature=0.7)
         if self.llm is None:
-            logger.warning("RAG: LLM Harness 未能创建 ChatOpenAI，部分 RAG 能力不可用")
+            logger.warning("RAG: get_llm_client 返回空，部分 RAG 能力不可用")
         
         # RAG 通用 prompt 模板
         self.prompt_template = PromptTemplate(
@@ -86,7 +87,10 @@ class RAGService:
             QA链实例
         """
         if self.llm is None:
-            raise RuntimeError("RAG 需要可用的 LLM，请在 config.env 中配置 LLM_API_KEY 与 LLM_BASE_URL")
+            raise RuntimeError(
+                "RAG 需要可用的 LLM（LLM_PROVIDER=mock|record|replay|openai；"
+                "真实调用时请配置 LLM_API_KEY 与 LLM_BASE_URL）"
+            )
         try:
             retriever = self.kb_manager.get_retriever(search_kwargs={"k": search_k})
             
@@ -218,7 +222,8 @@ class RAGService:
 
             if self.llm is None:
                 raise RuntimeError(
-                    "RAG 需要可用的 LLM，请在 config.env 中配置 LLM_API_KEY 与 LLM_BASE_URL"
+                    "RAG 需要可用的 LLM（LLM_PROVIDER=mock|record|replay|openai；"
+                    "真实调用时请配置 LLM_API_KEY 与 LLM_BASE_URL）"
                 )
 
             context = "\n\n".join(
@@ -302,7 +307,10 @@ class RAGService:
             包含答案和来源的字典
         """
         if self.llm is None:
-            raise RuntimeError("RAG 需要可用的 LLM，请在 config.env 中配置 LLM_API_KEY 与 LLM_BASE_URL")
+            raise RuntimeError(
+                "RAG 需要可用的 LLM（LLM_PROVIDER=mock|record|replay|openai；"
+                "真实调用时请配置 LLM_API_KEY 与 LLM_BASE_URL）"
+            )
         try:
             logger.info(f"结合上下文回答问题: {question[:50]}...")
             

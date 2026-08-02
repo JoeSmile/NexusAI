@@ -80,15 +80,34 @@ class _LLMClientAdapter:
 
         text = ""
 
-        if self._llm and hasattr(self._llm, "agenerate"):
-            text = await self._llm.agenerate(messages, system=system_prompt)
-        elif self._llm and hasattr(self._llm, "generate"):
-            text = self._llm.generate(messages, system=system_prompt)
+        if self._llm is None:
+            text = "我暂时无法调用模型服务，请稍后再试。"
+        elif hasattr(self._llm, "acomplete_chat"):
+            # Task 26: harness 工厂（避免与 LangChain BaseChatModel.agenerate 签名冲突）
+            text = await self._llm.acomplete_chat(messages, system=system_prompt)
+        elif hasattr(self._llm, "complete_chat"):
+            text = self._llm.complete_chat(messages, system=system_prompt)
+        elif hasattr(self._llm, "ainvoke"):
+            from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+
+            lc_messages = []
+            if system_prompt:
+                lc_messages.append(SystemMessage(content=system_prompt))
+            for m in messages:
+                role = m.get("role", "user") if isinstance(m, dict) else "user"
+                content = m.get("content", "") if isinstance(m, dict) else str(m)
+                if role == "system":
+                    lc_messages.append(SystemMessage(content=content))
+                elif role == "assistant":
+                    lc_messages.append(AIMessage(content=content))
+                else:
+                    lc_messages.append(HumanMessage(content=content))
+            result = await self._llm.ainvoke(lc_messages)
+            text = getattr(result, "content", None) or str(result)
         else:
-            # 降级: 使用模板回复
             text = "我暂时无法调用模型服务，请稍后再试。"
 
-        return TurnSummary(text=text, usage={"input_tokens": 0, "output_tokens": 0})
+        return TurnSummary(text=text or "", usage={"input_tokens": 0, "output_tokens": 0})
 
 
 class _ToolExecutorAdapter:
@@ -659,5 +678,8 @@ def get_agent_core() -> AgentCore:
     """获取全局 AgentCore 实例"""
     global _agent_core_instance
     if _agent_core_instance is None:
-        _agent_core_instance = AgentCore()
+        from backend.core.harness import get_llm_client
+
+        # Task 26 / EVID-08: Agent 旁路走统一 LLM_PROVIDER 抽象
+        _agent_core_instance = AgentCore(llm_client=get_llm_client(temperature=0.7))
     return _agent_core_instance

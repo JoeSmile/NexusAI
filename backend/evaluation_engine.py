@@ -20,8 +20,9 @@ except ImportError:
     StrOutputParser = None
 
 # 导入日志配置
+from backend.core.harness import get_llm_client
 from backend.logging_config import get_logger
-from backend.modules.llm.harness import resolve_llm_settings, try_create_chat_openai
+from backend.modules.llm.harness import resolve_llm_settings
 
 logger = get_logger(__name__)
 
@@ -92,40 +93,30 @@ class EvaluationEngine:
     
     def __init__(self):
         """初始化评估引擎"""
-        # 初始化 API 配置（经 LLM Harness；评估模型可走 EVALUATION_MODEL）
+        # 初始化 API 配置（经统一工厂；评估模型可走 EVALUATION_MODEL）
         _cfg = resolve_llm_settings(prefer_evaluation_model=True)
         self.api_key = _cfg.api_key
         self.api_base_url = _cfg.base_url
         self.model = _cfg.model
-        
-        if not self.api_key:
-            logger.warning("评估引擎: API_KEY 未设置，评估功能将不可用")
-            self.llm = None
-            self.chain = None
-            return
-        
-        # 初始化 LangChain 组件
-        if LANGCHAIN_AVAILABLE:
+
+        # Task 26 / EVID-08: mock/replay 无需 API_KEY
+        self.llm = get_llm_client(
+            temperature=0.3,
+            prefer_evaluation_model=True,
+        )
+        self.chain = None
+
+        if LANGCHAIN_AVAILABLE and self.llm is not None:
             try:
-                self.llm = try_create_chat_openai(
-                    temperature=0.3,
-                    prefer_evaluation_model=True,
-                )
-                if not self.llm:
-                    self.chain = None
-                else:
-                    self.prompt = ChatPromptTemplate.from_template(EVALUATION_PROMPT_TEMPLATE)
-                    self.output_parser = StrOutputParser()
-                    self.chain = self.prompt | self.llm | self.output_parser
-                    logger.info(f"✓ 评估引擎初始化成功 (模型: {self.model})")
+                self.prompt = ChatPromptTemplate.from_template(EVALUATION_PROMPT_TEMPLATE)
+                self.output_parser = StrOutputParser()
+                self.chain = self.prompt | self.llm | self.output_parser
+                logger.info(f"✓ 评估引擎初始化成功 (模型: {self.model})")
             except Exception as e:
                 logger.error(f"评估引擎初始化失败: {e}")
-                self.llm = None
                 self.chain = None
-        else:
-            self.llm = None
-            self.chain = None
-            logger.warning("评估引擎: LangChain 未安装，将使用传统HTTP请求方式")
+        elif not LANGCHAIN_AVAILABLE:
+            logger.warning("评估引擎: LangChain 未安装，将使用 complete_chat / HTTP 方式")
     
     def evaluate_response(
         self,
@@ -144,7 +135,7 @@ class EvaluationEngine:
         Returns:
             评估结果字典
         """
-        if not self.api_key:
+        if self.llm is None and not self.api_key:
             return {
                 "error": "评估引擎未配置API_KEY",
                 "accuracy_score": 0,
@@ -159,6 +150,20 @@ class EvaluationEngine:
                     "user_message": user_message,
                     "bot_response": bot_response,
                 })
+            elif self.llm is not None and hasattr(self.llm, "complete_chat"):
+                prompt = EVALUATION_PROMPT_TEMPLATE.format(
+                    user_message=user_message,
+                    bot_response=bot_response,
+                )
+                result_text = self.llm.complete_chat(
+                    [
+                        {
+                            "role": "system",
+                            "content": "你是一位专业的评估专家，负责评价聊天机器人的回应质量。",
+                        },
+                        {"role": "user", "content": prompt},
+                    ]
+                )
             else:
                 result_text = self._call_api_traditional(
                     user_message, bot_response
