@@ -108,6 +108,7 @@ curl -X POST http://localhost:8000/chat \
 - [Security Audit](docs/SECURITY_AUDIT.md)
 - [Deployment](docs/DEPLOYMENT.md)
 - [Roadmap](docs/ROADMAP.md)
+- [Strategy](docs/strategy/README.md) — 护城河 / 生存率 / 求职打法
 - [Contributing](CONTRIBUTING.md)
 - [Code of Conduct](docs/CODE_OF_CONDUCT.md)
 
