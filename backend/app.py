@@ -279,7 +279,7 @@ def create_app() -> FastAPI:
             "memory_system": {
                 "enabled": True,
                 "components": ["记忆提取器", "记忆管理器", "上下文组装器"],
-                "storage": ["向量数据库 (pgvector)", "关系数据库 (PostgreSQL)"],
+                "storage": ["PostgreSQL 单库(pgvector 扩展承载向量列,与关系表同库)"],
             },
             "features": {
                 "memory_extraction": "自动记忆提取",
