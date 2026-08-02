@@ -10,9 +10,10 @@
 ```bash
 cp config.env.example config.env    # config.env 已 gitignore
 # 编辑 config.env:
-#   LLM_API_KEY=sk-xxx              # 你的 LLM key(deepseek/智谱/OpenAI 兼容)
-#   LLM_BASE_URL=https://api.deepseek.com
-#   DEFAULT_MODEL=deepseek-chat
+#   LLM_API_KEY=sk-xxx              # 主 LLM key(或按 provider 分列 QWEN_API_KEY / DEEPSEEK_API_KEY)
+#   LLM_BASE_URL=https://api.deepseek.com/v1
+#   DEFAULT_MODEL=deepseek-v4-flash
+#   MODEL_CHEAP=qwen-turbo           # 小模型档;qwen 端点由 MODEL_REGISTRY_JSON 提供
 ```
 
 | env 键 | 作用 | 默认 |
@@ -20,8 +21,9 @@ cp config.env.example config.env    # config.env 已 gitignore
 | `APP_ENV` | 环境分层:dev / test / demo,加载 `config/{APP_ENV}.env` | dev |
 | `LLM_PROVIDER` | mock(确定性伪响应)/ record(真实调用+落盘)/ replay(回放 fixture,未命中降级 mock)/ openai(始终真实) | replay |
 | `LLM_API_KEY` | 主 LLM key(运行时优先 KeyManager 加密库) | 空 |
-| `LLM_BASE_URL` / `DEFAULT_MODEL` | 模型端点与默认模型 | deepseek |
-| `MODEL_CHEAP/GOOD/BEST` | model_router 三档模型 | deepseek-chat |
+| `LLM_BASE_URL` / `DEFAULT_MODEL` | 模型端点与默认模型 | deepseek-v4-flash(默认端点 deepseek) |
+| `MODEL_CHEAP/GOOD/BEST` | model_router 三档模型 | cheap=qwen-turbo / good·best=deepseek-v4-flash |
+| `MODEL_REGISTRY_JSON` | 额外模型注册(per-model base_url/api_key_ref/tier,按 name 覆盖 env 默认) | 空 |
 | `LANGFUSE_ENABLED` | LangFuse trace 开关(UI: http://localhost:3001) | true |
 | `LLM_KEY_MASTER_KEY` | Task 18 加密主密钥(`secrets.token_hex(32)` 生成;不设则走 env 明文) | 空 |
 

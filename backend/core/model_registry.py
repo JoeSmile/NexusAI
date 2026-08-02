@@ -139,13 +139,13 @@ def select_model_for_intent(intent: str) -> ModelSpec:
     ]
     if tier_candidates:
         return min(tier_candidates, key=lambda s: (float(s.cost_per_1k), s.name))
-    # fallback: any enabled chat model
-    for spec in reg.values():
-        if spec.enabled and spec.capability == "chat":
-            return spec
-    return ModelSpec(
-        name=os.getenv("MODEL_BEST", _DEFAULT_MODEL), provider="default"
-    )
+    # fallback: 按 tier 优先级取最强可用(best>good>cheap),而非 dict 顺序 —
+    # GOOD/BEST 同名模型会互相覆盖(如均配 deepseek-v4-flash),顺序 fallback 会错落到 cheap 档
+    for tier in ("best", "good", "cheap"):
+        for spec in reg.values():
+            if spec.enabled and spec.capability == "chat" and spec.tier == tier:
+                return spec
+    return ModelSpec(name=os.getenv("MODEL_BEST", _DEFAULT_MODEL), provider="default")
 
 
 def list_models() -> list[ModelSpec]:
