@@ -15,7 +15,6 @@ from typing import Any
 
 from backend.core.auth.models import TenantContext
 from backend.core.capability.errors import (
-    CapabilityGovernanceRequiredError,
     CapabilityNotFoundError,
     CapabilityUpstreamError,
 )
@@ -68,8 +67,9 @@ async def _invoke_model(
 
     messages = _messages_from_payload(payload)
     if not messages:
-        raise CapabilityGovernanceRequiredError(
-            message="invalid_payload",
+        raise ContextGateException(
+            ErrorCode.REQ_INVALID.value,
+            "invalid_payload",
             detail="messages_or_message_required",
         )
 
@@ -197,28 +197,44 @@ async def invoke(
             full = "".join(collected)
             if full:
                 await guard_output_text(full)
-            record_cap_quota_usage(tenant.tenant_id, calls=1)
+            # 日成本桶：model 路径用粗算（harness 已记 metrics；此处仅配额计数）
+            usage_cost = 0.0
+            try:
+                from backend.core.cost_manager import calculate_cost, count_tokens
+
+                usage_cost = float(
+                    calculate_cost(spec.name, count_tokens(full)) if full else 0.0
+                )
+            except Exception:
+                usage_cost = 0.0
+            record_cap_quota_usage(tenant.tenant_id, calls=1, cost=usage_cost)
             yield frame
         return
 
     if spec.kind == CapabilityKind.EXTERNAL_APP:
+        usage_cost = 0.0
         async for frame in _invoke_external_app(spec, safe_payload, tenant):
             if frame.get("event") == "token":
                 collected.append(str(frame.get("data") or ""))
+            if frame.get("event") == "usage":
+                usage_cost = float((frame.get("data") or {}).get("cost") or 0)
             yield frame
         if collected:
             await guard_output_text("".join(collected))
-        record_cap_quota_usage(tenant.tenant_id, calls=1)
+        record_cap_quota_usage(tenant.tenant_id, calls=1, cost=usage_cost)
         return
 
     if spec.kind == CapabilityKind.AGENT:
+        usage_cost = 0.0
         async for frame in _invoke_agent(spec, safe_payload, tenant):
             if frame.get("event") == "token":
                 collected.append(str(frame.get("data") or ""))
+            if frame.get("event") == "usage":
+                usage_cost = float((frame.get("data") or {}).get("cost") or 0)
             yield frame
         if collected:
             await guard_output_text("".join(collected))
-        record_cap_quota_usage(tenant.tenant_id, calls=1)
+        record_cap_quota_usage(tenant.tenant_id, calls=1, cost=usage_cost)
         return
 
     # tool / workflow / datasource — 后续扩展（保持 CAP_001，拍板 A）

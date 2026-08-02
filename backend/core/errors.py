@@ -54,6 +54,9 @@ class ErrorCode(StrEnum):
     CAP_GOVERNANCE_REQUIRED = "CAP_004"
     CAP_QUOTA_EXCEEDED = "CAP_005"
 
+    # ── 请求校验 (REQ_0xx) ──
+    REQ_INVALID = "REQ_001"
+
     # ── 系统 (SYS_0xx) ──
     INTERNAL_ERROR = "SYS_001"
     SKILL_NOT_FOUND = "SKILL_001"
@@ -136,4 +139,6 @@ def _code_to_status(code: str) -> int:
             "CAP_004": 403,
             "CAP_005": 429,
         }.get(code, 400)
+    if code.startswith("REQ_"):
+        return 400
     return 500

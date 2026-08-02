@@ -200,7 +200,8 @@ class CapabilityRegistry:
                         )
                         self.register(spec)
                         n += 1
-                    except (ValueError, TypeError) as exc:
+                    except Exception as exc:
+                        # 含 CAP_004 治理未声明等；跳过坏行，不中断整表加载
                         logger.warning("skip capability row %s: %s", row.id, exc)
         except Exception as exc:
             # 迁移未跑 / DB 不可用时不阻断启动
