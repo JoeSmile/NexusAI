@@ -198,6 +198,8 @@ class LlmApiKey(Base):
     expires_at = Column(DateTime, nullable=True)
     last_verified = Column(DateTime, nullable=True)
     last_verified_ok = Column(Boolean, nullable=True)
+    last_failed_at = Column(DateTime, nullable=True)  # Task 27: 冷却依据
+    consecutive_failures = Column(Integer, default=0, nullable=False)  # Task 27: 摘除依据
     description = Column(Text, default="")
     created_by = Column(String(128))
     created_at = Column(DateTime, default=datetime.utcnow)

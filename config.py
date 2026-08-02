@@ -64,6 +64,10 @@ class Settings(BaseSettings):
 
     llm_key_master_key: str = ""
 
+    # LLM Key 故障转移 (Task 27)
+    key_cooldown_seconds: int = 60
+    key_max_consecutive_failures: int = 3
+
     redis_url: str = "redis://localhost:6379"
     cache_ttl: int = 3600
 
