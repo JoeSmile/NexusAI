@@ -1,6 +1,7 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
+import { RoleSwitcher } from '@/components/role/RoleSwitcher'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,15 +13,9 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ROLES, useAuthStore } from '@/stores/authStore'
-import type { RoleName } from '@/types/api'
-
-const ROLE_LABEL: Record<RoleName, string> = {
-  user: 'user',
-  tenant_admin: 'tenant_admin',
-  auditor: 'auditor',
-  super_admin: 'super_admin',
-}
+import { ROLE_BADGE, ROLE_SHORT } from '@/components/role/roleStyles'
+import { useAuthStore } from '@/stores/authStore'
+import { cn } from '@/lib/utils'
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -28,12 +23,15 @@ export default function LoginPage() {
   const loginWithKey = useAuthStore((s) => s.loginWithKey)
   const keys = useAuthStore((s) => s.keys)
   const activeRole = useAuthStore((s) => s.activeRole)
-  const switchRole = useAuthStore((s) => s.switchRole)
 
-  const [role, setRole] = useState<RoleName>(activeRole)
   const [keyInput, setKeyInput] = useState(keys[activeRole] || '')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const role = activeRole
+
+  useEffect(() => {
+    setKeyInput(keys[role] || '')
+  }, [role, keys])
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -56,28 +54,16 @@ export default function LoginPage() {
         <CardHeader>
           <CardTitle className="text-xl font-semibold">ContextGate</CardTitle>
           <CardDescription className="text-muted-foreground text-xs">
-            测试 FE 登录 — 填入 API Key，经 /health 探活后写入角色槽位
+            测试 FE 登录 — 选择角色槽位，填入 API Key，经 /health 探活
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={onSubmit}>
-            <div className="flex flex-wrap gap-1.5">
-              {ROLES.map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => {
-                    setRole(r)
-                    switchRole(r)
-                    setKeyInput(keys[r] || '')
-                  }}
-                  className="focus-visible:outline-none"
-                >
-                  <Badge variant={role === r ? 'default' : 'outline'}>
-                    {ROLE_LABEL[r]}
-                  </Badge>
-                </button>
-              ))}
+            <div className="flex items-center justify-between gap-2">
+              <Badge className={cn('rounded-full', ROLE_BADGE[role])}>
+                {ROLE_SHORT[role]}
+              </Badge>
+              <RoleSwitcher />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="api-key">X-API-Key（{role}）</Label>

@@ -29,9 +29,10 @@ export class ApiError extends Error {
 
 function redirectToLogin(): void {
   if (typeof window === 'undefined') return
-  const path = window.location.pathname
-  if (path === '/login') return
-  window.location.assign('/login')
+  const path = window.location.pathname + window.location.search
+  if (window.location.pathname === '/login') return
+  const next = encodeURIComponent(path || '/')
+  window.location.assign(`/login?next=${next}`)
 }
 
 function parseErrorPayload(data: unknown): {

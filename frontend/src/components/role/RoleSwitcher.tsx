@@ -6,25 +6,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { ROLE_BADGE, ROLE_SHORT } from '@/components/role/roleStyles'
 import { useForbiddenStore } from '@/stores/forbiddenStore'
 import { ROLES, useAuthStore } from '@/stores/authStore'
-import type { RoleName } from '@/types/api'
 import { cn } from '@/lib/utils'
-
-/** 角色徽章色：user 灰 / tadmin 蓝 / auditor 青(避紫) / super 橙 */
-const ROLE_BADGE: Record<RoleName, string> = {
-  user: 'bg-secondary text-muted-foreground',
-  tenant_admin: 'bg-[var(--primary)] text-white',
-  auditor: 'bg-[var(--chart-4)] text-white',
-  super_admin: 'bg-[var(--warning)] text-white',
-}
-
-const ROLE_SHORT: Record<RoleName, string> = {
-  user: 'user',
-  tenant_admin: 'tadmin',
-  auditor: 'auditor',
-  super_admin: 'super',
-}
 
 export function RoleSwitcher() {
   const activeRole = useAuthStore((s) => s.activeRole)

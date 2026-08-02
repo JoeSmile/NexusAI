@@ -30,26 +30,34 @@ export function SSEPanel({
   const { start, abort } = useSSEStream()
   const [message, setMessage] = useState('hello')
   const [text, setText] = useState('')
-  const [heartbeat, setHeartbeat] = useState(false)
+  const [live, setLive] = useState(false)
   const [status, setStatus] = useState<StatusKind>('idle')
   const [hint, setHint] = useState('空态 — 输入消息后开始流式')
-  const pingTimer = useRef<number | null>(null)
+  const demoAbort = useRef(false)
+  const liveTimer = useRef<number | null>(null)
 
   useEffect(() => () => abort(), [abort])
 
-  const flashHeartbeat = () => {
-    setHeartbeat(true)
-    if (pingTimer.current) window.clearTimeout(pingTimer.current)
-    pingTimer.current = window.setTimeout(() => setHeartbeat(false), 600)
+  const flashLive = () => {
+    setLive(true)
+    if (liveTimer.current) window.clearTimeout(liveTimer.current)
+    liveTimer.current = window.setTimeout(() => setLive(false), 600)
   }
 
   const runDemo = async () => {
+    demoAbort.current = false
     setText('')
     setStatus('pending')
     setHint('演示打字机…')
     const src = demoText || 'ContextGate SSE demo stream.'
     for (const ch of src) {
+      if (demoAbort.current) {
+        setStatus('warning')
+        setHint('已 abort')
+        return
+      }
       setText((t) => t + ch)
+      flashLive()
       await new Promise((r) => setTimeout(r, 28))
     }
     setStatus('success')
@@ -63,13 +71,13 @@ export function SSEPanel({
     }
     setText('')
     setStatus('pending')
-    setHint('流式中…')
+    setHint('流式中（: ping 被解析器忽略；● 表示收到 token）')
     await start(
       endpoint,
       { method: 'POST', body: JSON.stringify({ message }) },
       {
         onToken: (t) => {
-          flashHeartbeat()
+          flashLive()
           setText((prev) => prev + t)
         },
         onAbort: (reason) => {
@@ -88,6 +96,13 @@ export function SSEPanel({
     )
   }
 
+  const onAbortClick = () => {
+    demoAbort.current = true
+    abort()
+    setStatus('warning')
+    setHint('已 abort')
+  }
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-2">
@@ -100,14 +115,11 @@ export function SSEPanel({
         <div className="flex items-center gap-2">
           <StatusBadge status={status} />
           <span
-            className={
-              heartbeat
-                ? 'text-primary text-xs'
-                : 'text-muted-foreground text-xs'
-            }
+            className={live ? 'text-primary text-xs' : 'text-muted-foreground text-xs'}
             aria-live="polite"
+            title="流活动指示（token 到达时闪烁；SSE : ping 已忽略）"
           >
-            {heartbeat ? '♥ ping' : '·'}
+            {live ? '● live' : '·'}
           </span>
         </div>
       </CardHeader>
@@ -124,15 +136,7 @@ export function SSEPanel({
           <Button type="button" onClick={() => void onStart()} disabled={status === 'pending'}>
             开始
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              abort()
-              setStatus('warning')
-              setHint('已 abort')
-            }}
-          >
+          <Button type="button" variant="outline" onClick={onAbortClick}>
             Abort
           </Button>
         </div>

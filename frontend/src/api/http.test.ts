@@ -37,6 +37,7 @@ describe('api http', () => {
     const assign = vi.fn()
     vi.stubGlobal('location', {
       pathname: '/panels/chat',
+      search: '',
       assign,
     })
     vi.stubGlobal(
@@ -60,7 +61,9 @@ describe('api http', () => {
       code: 'AUTH_001',
     })
     expect(useAuthStore.getState().keys.user).toBe('')
-    expect(assign).toHaveBeenCalledWith('/login')
+    expect(assign).toHaveBeenCalledWith(
+      expect.stringMatching(/^\/login\?next=/),
+    )
   })
 
   it('403 returns structured forbidden + needed', async () => {
@@ -104,7 +107,7 @@ describe('api http', () => {
     })
     const assign = vi.fn()
     const fetchMock = vi.fn()
-    vi.stubGlobal('location', { pathname: '/', assign })
+    vi.stubGlobal('location', { pathname: '/', search: '', assign })
     vi.stubGlobal('fetch', fetchMock)
 
     await expect(apiGet('/api/capabilities')).rejects.toMatchObject({
@@ -112,6 +115,8 @@ describe('api http', () => {
       code: 'AUTH_001',
     })
     expect(fetchMock).not.toHaveBeenCalled()
-    expect(assign).toHaveBeenCalledWith('/login')
+    expect(assign).toHaveBeenCalledWith(
+      expect.stringMatching(/^\/login\?next=/),
+    )
   })
 })

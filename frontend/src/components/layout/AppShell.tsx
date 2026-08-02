@@ -1,7 +1,16 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 
+import { useNavigate } from 'react-router-dom'
+
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { RoleSwitcher } from '@/components/role/RoleSwitcher'
 import { useAuthStore } from '@/stores/authStore'
 import { cn } from '@/lib/utils'
@@ -32,7 +41,9 @@ function resolveEnv(raw: unknown): AppEnv {
 }
 
 export function AppShell() {
+  const navigate = useNavigate()
   const activeRole = useAuthStore((s) => s.activeRole)
+  const clear = useAuthStore((s) => s.clear)
   const [env, setEnv] = useState<AppEnv>('dev')
 
   useEffect(() => {
@@ -59,7 +70,24 @@ export function AppShell() {
         </Badge>
         <div className="text-muted-foreground ml-auto flex items-center gap-3 text-xs">
           <RoleSwitcher />
-          <span className="hidden sm:inline">测试 FE · {activeRole}</span>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="ghost" size="sm" aria-label="用户菜单">
+                菜单
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem disabled>角色 · {activeRole}</DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  clear()
+                  navigate('/login', { replace: true })
+                }}
+              >
+                退出并清空槽位
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
       <div className="flex min-h-0 flex-1">

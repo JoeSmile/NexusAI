@@ -12,10 +12,13 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { ROLE_BADGE, ROLE_SHORT } from '@/components/role/roleStyles'
+import { Badge } from '@/components/ui/badge'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { useAuthStore } from '@/stores/authStore'
 import { useForbiddenStore } from '@/stores/forbiddenStore'
 import type { RoleName } from '@/types/api'
+import { cn } from '@/lib/utils'
 
 export type FieldDef = {
   name: string
@@ -120,7 +123,9 @@ export function RequestPanel({
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge status={kind as 'idle' | 'pending' | 'success' | 'error' | 'warning'} />
-          <span className="text-muted-foreground text-xs">{role}</span>
+          <Badge className={cn('rounded-full', ROLE_BADGE[role])}>
+            {ROLE_SHORT[role]}
+          </Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
