@@ -40,10 +40,10 @@ lock:
 	cd $(ROOT_DIR) && uv lock
 
 up:
-	cd $(ROOT_DIR) && $(COMPOSE_LOCAL) up -d postgres
+	cd $(ROOT_DIR) && $(COMPOSE_LOCAL) up -d postgres redis
 
 up-langfuse:
-	cd $(ROOT_DIR) && $(COMPOSE_LOCAL) up -d postgres langfuse-db-init langfuse
+	cd $(ROOT_DIR) && $(COMPOSE_LOCAL) up -d postgres redis langfuse-db-init langfuse
 
 up-all docker-up:
 	cd $(ROOT_DIR) && $(COMPOSE_LOCAL) up -d --build
