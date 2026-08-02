@@ -12,12 +12,13 @@ from pydantic import BaseModel, ConfigDict, Field
 class IntentType(StrEnum):
     """用户意图类型枚举"""
 
+    CRISIS = "crisis"  # 危机检测(安全兜底,保留)
+    GREETING = "greeting"  # 问候/寒暄(触发 greeting skill 短路径,EVID-16 补)
     KNOWLEDGE_QUERY = "knowledge_query"  # 企业知识库 / 制度查询
-    ADVICE = "advice"  # 操作建议（中性，非情感倾诉）
+    ADVICE = "advice"  # 操作建议(中性,非情感倾诉)
     CONVERSATION = "conversation"  # 普通对话
-    FUNCTION = "function"  # 功能请求（提醒、记录）
-    CRISIS = "crisis"  # 危机检测（遗留意图）
-    CHAT = "chat"  # 闲聊（打招呼、寒暄）
+    FUNCTION = "function"  # 功能请求(提醒、记录)
+    CHAT = "chat"  # 闲聊(寒暄之外的日常对话)
 
 
 class IntentResult(BaseModel):

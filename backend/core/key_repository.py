@@ -10,6 +10,7 @@ LLM API Key 数据库读写层。
 
 from __future__ import annotations
 
+import os
 import time
 from collections import OrderedDict
 from dataclasses import dataclass
@@ -108,18 +109,42 @@ class LLMKeyRepository:
     def _env_fallback(self, tenant_id: str, provider: str) -> LLMKey | None:
         from config import Config
 
-        fallback = getattr(Config, "LLM_API_KEY_FALLBACK", None) or getattr(
-            Config, "LLM_API_KEY", None
-        )
+        # EVID-17: env fallback 必须 spec 感知 — 按 provider 找 registry 模型,
+        # 用它的 api_key_ref(如 QWEN_API_KEY)+ base_url(如百炼),否则 qwen key
+        # 会被发到 LLM_BASE_URL(deepseek)端点 → 400。
+        spec = None
+        try:
+            from backend.core.model_registry import get_registry
+
+            spec = next(
+                (s for s in get_registry().values() if s.provider == provider),
+                None,
+            )
+        except Exception:
+            spec = None
+
+        key_ref = spec.api_key_ref if spec else None
+        fallback: str = os.getenv(key_ref, "") if key_ref else ""
+        if not fallback:
+            fb_cfg: str | None = getattr(Config, "LLM_API_KEY_FALLBACK", None) or getattr(
+                Config, "LLM_API_KEY", None
+            )
+            fallback = fb_cfg or ""
         if not fallback:
             return None
+        base: str = ""
+        if spec and spec.base_url:
+            base = spec.base_url
+        if not base:
+            base_cfg: str | None = getattr(Config, "LLM_BASE_URL_FALLBACK", None) or getattr(
+                Config, "LLM_BASE_URL", ""
+            )
+            base = base_cfg or ""
         return LLMKey(
             id="fallback",
             tenant_id=tenant_id,
             provider=provider,
-            base_url=getattr(Config, "LLM_BASE_URL_FALLBACK", None)
-            or getattr(Config, "LLM_BASE_URL", "")
-            or "",
+            base_url=base or "",
             api_key=fallback,
             key_version=0,
             is_active=True,

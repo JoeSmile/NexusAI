@@ -18,6 +18,11 @@ class RuleBasedIntentEngine:
             "自残", "割腕", "跳楼", "了结", "没有意义",
             "活着很累", "不想继续", "解脱",
         ],
+        # 问候优先于闲聊(EVID-16: 补 greeting 意图,greeting skill 才能触发短路径)
+        IntentType.GREETING: [
+            "你好", "您好", "哈喽", "嗨", "hello", "hi", "hey",
+            "早上好", "中午好", "下午好", "晚上好", "大家好",
+        ],
         # 企业知识查询优先于 advice，避免「如何查询制度」落入倾诉/建议兜底
         IntentType.KNOWLEDGE_QUERY: [
             "如何查询", "怎么查询", "查询公司", "公司的", "管理制度",
@@ -34,9 +39,8 @@ class RuleBasedIntentEngine:
             "帮我记", "创建提醒", "添加事项",
         ],
         IntentType.CHAT: [
-            "你好", "早上好", "晚上好", "hi", "hello",
             "在吗", "你是谁", "你叫什么", "天气",
-            "谢谢", "再见", "拜拜", "哈哈",
+            "谢谢", "再见", "拜拜", "哈哈", "聊聊",
         ],
     }
     

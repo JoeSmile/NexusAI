@@ -3,11 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-import json
-import os
 
 from backend.observability.decorators import observe
-from backend.pipeline.llm_helper import generate_text
 from backend.pipeline.state import PipelineState
 
 
@@ -49,28 +46,22 @@ async def analyze_parallel(state: PipelineState) -> PipelineState:
 
 
 async def _analyze_intent(message: str) -> dict:
-    mock = os.getenv("LLM_MOCK", "true").lower() == "true"
-    if mock:
-        greetings = ["你好", "嗨", "hello", "hi", "早上好", "晚上好"]
-        advices = ["怎么办", "建议", "帮帮我", "有什么办法", "我该"]
+    """意图分析 — 与 /intent/detect 同源(规则+模型混合,离线可用)。
 
-        if any(g in message for g in greetings):
-            return {"intent": "greeting", "confidence": 0.95, "entities": {}}
-        if any(a in message for a in advices):
-            return {
-                "intent": "advice",
-                "confidence": 0.85,
-                "entities": {"topic": message},
-            }
-        return {"intent": "default", "confidence": 0.5, "entities": {}}
-
-    prompt = (
-        f"分析以下消息的意图(中文): {message}\n"
-        f'输出 JSON: {{"intent": "advice|greeting|default", '
-        f'"confidence": 0.0-1.0, "entities": {{}}}}'
-    )
-    response = await generate_text(prompt)
+    修复(EVID-16): 旧实现是 LLM_MOCK 玩具启发式(只认 greeting/advice,其余全
+    default/0.5),导致管线内所有请求路由到 best 档,三档路由从未生效。
+    异常时降级保守默认(best 档),不阻断管线。
+    """
     try:
-        return json.loads(response)
-    except json.JSONDecodeError:
+        from backend.modules.intent.routers.intent_router import get_intent_service
+
+        result = get_intent_service().intent_classifier.detect_intent(message)
+        raw = result.intent
+        intent = raw.value if hasattr(raw, "value") else str(raw)
+        return {
+            "intent": intent,
+            "confidence": float(result.confidence),
+            "entities": {},
+        }
+    except Exception:
         return {"intent": "default", "confidence": 0.5, "entities": {}}

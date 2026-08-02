@@ -157,6 +157,11 @@ async def get_intent_types():
         意图类型列表及说明
     """
     intent_types = {
+        "greeting": {
+            "name": "问候",
+            "description": "打招呼、寒暄，触发内置 greeting skill 短路径(零成本)",
+            "examples": ["你好", "早上好", "hello"],
+        },
         "knowledge_query": {
             "name": "知识查询",
             "description": "查询企业制度、政策或知识库内容",
@@ -187,8 +192,8 @@ async def get_intent_types():
         },
         "chat": {
             "name": "闲聊",
-            "description": "打招呼、寒暄等轻松对话",
-            "examples": ["你好", "在吗", "晚上好"],
+            "description": "寒暄之外的日常对话",
+            "examples": ["在吗", "你是谁", "今天天气怎么样"],
         },
     }
     
