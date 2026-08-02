@@ -7,7 +7,7 @@ import {
   agentTools,
   type AgentTool,
 } from '@/api/agent'
-import { ApiError } from '@/api/http'
+import { formatApiError } from '@/api/http'
 import { ForbiddenBanner } from '@/components/role/RoleSwitcher'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -54,11 +54,7 @@ export default function AgentPanel() {
       setStatus(s.data)
       setTools(toolsList(t.data))
     } catch (e) {
-      if (e instanceof ApiError && e.forbidden) {
-        setErr(`该角色无权限（需 ${e.needed || 'chat:write'}）`)
-      } else {
-        setErr(e instanceof Error ? e.message : String(e))
-      }
+      setErr(formatApiError(e, 'chat:write'))
     }
   }
 
@@ -86,7 +82,7 @@ export default function AgentPanel() {
       })
       setChatResult(r.data)
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e))
+      setErr(formatApiError(e, 'chat:write'))
     } finally {
       setBusy(false)
     }
@@ -99,7 +95,7 @@ export default function AgentPanel() {
       const r = await agentHistory(userId.trim() || 'fe-agent')
       setHistory(r.data)
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e))
+      setErr(formatApiError(e, 'chat:write'))
     } finally {
       setBusy(false)
     }

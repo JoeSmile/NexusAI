@@ -27,6 +27,15 @@ export class ApiError extends Error {
   }
 }
 
+/** 面板统一错误文案；403 优先展示所需权限。 */
+export function formatApiError(e: unknown, fallbackNeeded = 'permission'): string {
+  if (e instanceof ApiError && e.forbidden) {
+    return `该角色无权限（需 ${e.needed || fallbackNeeded}）`
+  }
+  if (e instanceof Error) return e.message
+  return String(e)
+}
+
 function redirectToLogin(): void {
   if (typeof window === 'undefined') return
   const path = window.location.pathname + window.location.search

@@ -42,7 +42,7 @@ export async function fetchAuditLogs(q: AuditQuery = {}) {
 }
 
 /** 下载 CSV（blob）；成功时触发浏览器保存。 */
-export async function exportAuditCsv(q: Omit<AuditQuery, 'limit' | 'offset' | 'action'> = {}) {
+export async function exportAuditCsv(q: Omit<AuditQuery, 'limit' | 'offset'> = {}) {
   const res = await apiFetch(`/api/audit/export${toQs(q)}`)
   if (!res.ok) {
     const text = await res.text().catch(() => '')

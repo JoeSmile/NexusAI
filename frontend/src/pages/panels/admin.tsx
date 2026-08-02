@@ -11,7 +11,7 @@ import {
   type LlmKeyRow,
   type PendingRequest,
 } from '@/api/admin'
-import { ApiError } from '@/api/http'
+import { formatApiError } from '@/api/http'
 import { ForbiddenBanner } from '@/components/role/RoleSwitcher'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -51,31 +51,32 @@ export default function AdminPanel() {
 
   const load = useCallback(async () => {
     setErr('')
-    try {
-      const [k, p, l] = await Promise.all([
-        listApiKeys(),
-        listPendingRequests().catch((e) => {
-          if (e instanceof ApiError && e.forbidden) throw e
-          return [] as PendingRequest[]
-        }),
-        listLlmKeys().catch((e) => {
-          if (e instanceof ApiError && e.forbidden) throw e
-          return [] as LlmKeyRow[]
-        }),
-      ])
-      setKeys(k)
-      setPending(p)
-      setLlmKeys(Array.isArray(l) ? l : [])
-    } catch (e) {
-      if (e instanceof ApiError && e.forbidden) {
-        setErr(`该角色无权限（需 ${e.needed || 'admin:*'}）`)
-        setKeys([])
-        setPending([])
-        setLlmKeys([])
-      } else {
-        setErr(e instanceof Error ? e.message : String(e))
-      }
+    const settled = await Promise.allSettled([
+      listApiKeys(),
+      listPendingRequests(),
+      listLlmKeys(),
+    ])
+    const msgs: string[] = []
+
+    if (settled[0].status === 'fulfilled') {
+      setKeys(settled[0].value)
+    } else {
+      setKeys([])
+      msgs.push(`api-keys: ${formatApiError(settled[0].reason, 'admin:*')}`)
     }
+    if (settled[1].status === 'fulfilled') {
+      setPending(settled[1].value)
+    } else {
+      setPending([])
+      msgs.push(`pending: ${formatApiError(settled[1].reason, 'admin:approve')}`)
+    }
+    if (settled[2].status === 'fulfilled') {
+      setLlmKeys(settled[2].value)
+    } else {
+      setLlmKeys([])
+      msgs.push(`llm-keys: ${formatApiError(settled[2].reason, 'admin:llm_key')}`)
+    }
+    setErr(msgs.join(' · '))
   }, [])
 
   useEffect(() => {
@@ -96,11 +97,7 @@ export default function AdminPanel() {
       setPlaintext(r.api_key)
       await load()
     } catch (e) {
-      if (e instanceof ApiError && e.forbidden) {
-        setErr(`该角色无权限（需 ${e.needed || 'admin:*'}）`)
-      } else {
-        setErr(e instanceof Error ? e.message : String(e))
-      }
+      setErr(formatApiError(e, 'admin:*'))
     } finally {
       setBusy(false)
     }
@@ -118,11 +115,12 @@ export default function AdminPanel() {
 
   const onDeactivate = async (id: number) => {
     setBusy(true)
+    setErr('')
     try {
       await deactivateApiKey(id)
       await load()
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e))
+      setErr(formatApiError(e, 'admin:*'))
     } finally {
       setBusy(false)
     }
@@ -130,11 +128,12 @@ export default function AdminPanel() {
 
   const onApprove = async (request_id: number, approved: boolean) => {
     setBusy(true)
+    setErr('')
     try {
       await approveRequest({ request_id, approved })
       await load()
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e))
+      setErr(formatApiError(e, 'admin:approve'))
     } finally {
       setBusy(false)
     }

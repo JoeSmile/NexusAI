@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
+import { formatApiError } from '@/api/http'
 import { ragAsk, ragSearch, ragStatus, type RagAskData, type RagStatusData } from '@/api/rag'
 import { ForbiddenBanner } from '@/components/role/RoleSwitcher'
 import { Badge } from '@/components/ui/badge'
@@ -31,7 +32,7 @@ export default function RagPanel() {
       const r = await ragStatus()
       setStats(r.data)
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e))
+      setErr(formatApiError(e, 'chat:write'))
     }
   }
 
@@ -57,7 +58,7 @@ export default function RagPanel() {
       setAsk(r.data)
       await loadStatus()
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e))
+      setErr(formatApiError(e, 'chat:write'))
     } finally {
       setBusy(false)
     }
@@ -70,7 +71,7 @@ export default function RagPanel() {
       const r = await ragSearch(q)
       setSearch(r.data)
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e))
+      setErr(formatApiError(e, 'chat:write'))
     } finally {
       setBusy(false)
     }

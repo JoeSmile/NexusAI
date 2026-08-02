@@ -86,6 +86,7 @@ async def export_audit_csv(
     tenant_id: str | None = Query(None),
     start: str | None = Query(None),
     end: str | None = Query(None),
+    action: str | None = Query(None, description="按操作筛选"),
     tenant: TenantContext = Depends(
         require_any_permission(["audit:export", "admin:*"])
     ),
@@ -105,6 +106,9 @@ async def export_audit_csv(
     if end:
         conditions.append("created_at <= :end")
         params["end"] = end
+    if action:
+        conditions.append("action = :action")
+        params["action"] = action
 
     sql = text(f"""
         SELECT id, tenant_id, user_id, action, trace_id,

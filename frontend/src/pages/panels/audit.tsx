@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { exportAuditCsv, fetchAuditLogs, type AuditLogRow } from '@/api/audit'
-import { ApiError } from '@/api/http'
+import { formatApiError } from '@/api/http'
 import { ForbiddenBanner } from '@/components/role/RoleSwitcher'
 import { Button } from '@/components/ui/button'
 import {
@@ -50,11 +50,7 @@ export default function AuditPanel() {
       setRows(data)
     } catch (e) {
       setRows([])
-      if (e instanceof ApiError && e.forbidden) {
-        setErr(`该角色无权限（需 ${e.needed || 'audit:read'}）`)
-      } else {
-        setErr(e instanceof Error ? e.message : String(e))
-      }
+      setErr(formatApiError(e, 'audit:read'))
     } finally {
       setBusy(false)
     }
@@ -73,13 +69,10 @@ export default function AuditPanel() {
         tenant_id: query.tenant_id,
         start: query.start,
         end: query.end,
+        action: query.action,
       })
     } catch (e) {
-      if (e instanceof ApiError && e.forbidden) {
-        setErr(`该角色无权限（需 ${e.needed || 'audit:export'}）`)
-      } else {
-        setErr(e instanceof Error ? e.message : String(e))
-      }
+      setErr(formatApiError(e, 'audit:export'))
     } finally {
       setBusy(false)
     }

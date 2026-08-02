@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { ApiError, apiFetch, apiGet } from './http'
+import { ApiError, apiFetch, apiGet, formatApiError } from './http'
 import { useAuthStore } from '@/stores/authStore'
 
 describe('api http', () => {
@@ -95,6 +95,18 @@ describe('api http', () => {
       expect(err.needed).toBe('admin:*')
       expect(err.code).toBe('AUTH_002')
     }
+  })
+
+  it('formatApiError prefers forbidden needed permission', () => {
+    const e = new ApiError({
+      status: 403,
+      code: 'AUTH_002',
+      message: 'forbidden',
+      forbidden: true,
+      needed: 'admin:*',
+    })
+    expect(formatApiError(e, 'admin:approve')).toBe('该角色无权限（需 admin:*）')
+    expect(formatApiError(new Error('boom'))).toBe('boom')
   })
 
   it('missing key redirects without calling fetch', async () => {
