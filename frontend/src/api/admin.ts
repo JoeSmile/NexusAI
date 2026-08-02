@@ -1,4 +1,4 @@
-import { apiFetch, apiGet, apiPost } from '@/api/http'
+import { ApiError, apiFetch, apiGet, apiPost } from '@/api/http'
 
 export type ApiKeyRow = {
   id: number
@@ -50,8 +50,21 @@ export async function createApiKey(body: {
 
 export async function deactivateApiKey(id: number) {
   const res = await apiFetch(`/api/admin/api-keys/${id}`, { method: 'DELETE' })
-  if (!res.ok) throw new Error(`delete_failed:${res.status}`)
-  return res.json()
+  if (!res.ok) {
+    let body: unknown
+    try {
+      body = await res.json()
+    } catch {
+      body = undefined
+    }
+    throw new ApiError({
+      status: res.status,
+      code: 'SYS_001',
+      message: `delete_failed:${res.status}`,
+      body,
+    })
+  }
+  return res.json() as Promise<{ status: string; id: number }>
 }
 
 export async function listPendingRequests() {
