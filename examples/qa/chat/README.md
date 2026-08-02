@@ -25,6 +25,8 @@ KEY=<你的 user key>            # make seed 或 admin 创建
 
 > 说明: 短路径仅对注册了 skill 的意图生效(当前内置 skill 只有 greeting);知识类问题无对应 skill,
 > 走 LLM 长路径属正常设计,不算失败。
+> **配合 LangFuse 看:** 3.2 长路径全量采样(trace `chat.pipeline`,llm_generate 的 metadata 含 path/total_cost/total_tokens/ab_variant);
+> 3.1/3.3/3.4/3.6 属短路径按 10% 采样,不一定出现。详见 [../LANGFUSE.md](../LANGFUSE.md)。
 
 ## 手动 curl(逐条)
 
