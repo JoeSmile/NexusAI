@@ -113,7 +113,7 @@ async def get_memory_summary(
     查看用户画像、工作记忆、行为日志等
     """
     try:
-        summary = agent_service.get_memory_summary(user_id)
+        summary = await agent_service.get_memory_summary(user_id)
         
         return {
             "code": 200,

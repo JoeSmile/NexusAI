@@ -110,7 +110,7 @@ class AgentService:
             "history": formatted_history
         }
     
-    def get_memory_summary(self, user_id: str) -> dict[str, Any]:
+    async def get_memory_summary(self, user_id: str) -> dict[str, Any]:
         """
         获取用户记忆摘要
         
@@ -122,14 +122,14 @@ class AgentService:
         """
         memory_hub = self.agent_core.memory_hub
         
-        # 用户画像
-        profile = memory_hub.get_user_profile(user_id)
+        # MemoryHub 方法多为 async；未 await 会把 coroutine 塞进响应导致 500(EVID-10)
+        profile = await memory_hub.get_user_profile(user_id)
         
         # 工作记忆
         working_memory = memory_hub.get_working_memory()
         
         # 行为日志
-        action_log = memory_hub.get_action_log(user_id, days=7)
+        action_log = await memory_hub.get_action_log(user_id, days=7)
         
         return {
             "user_id": user_id,

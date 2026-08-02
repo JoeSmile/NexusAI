@@ -110,7 +110,7 @@ class AgentService:
             "history": formatted_history
         }
     
-    def get_memory_summary(self, user_id: str) -> dict[str, Any]:
+    async def get_memory_summary(self, user_id: str) -> dict[str, Any]:
         """
         获取用户记忆摘要
         
@@ -122,7 +122,7 @@ class AgentService:
         """
         memory_hub = self.agent_core.memory_hub
         
-        # 用户画像
+        # 用户画像（modules 副本为 sync hub；async 以便路由统一 await，EVID-10）
         profile = memory_hub.get_user_profile(user_id)
         
         # 工作记忆
