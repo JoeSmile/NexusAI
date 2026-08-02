@@ -36,7 +36,7 @@ describe('SSE parse (30.12 core; full stream suite → 30.26)', () => {
     )
     expect(onError).toHaveBeenCalledWith('LLM_002', 'boom')
     expect(dispatchSSEData('[DONE]', { onDone })).toBe('done')
-    expect(onDone).toHaveBeenCalled()
+    expect(onDone).toHaveBeenCalledWith({ path: 'long' })
   })
 
   it('JSON short-path shape via dispatch of response is caller-side', () => {

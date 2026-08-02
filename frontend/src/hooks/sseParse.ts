@@ -11,7 +11,7 @@ export function dispatchSSEData(raw: string, h: SSEHandlers): 'done' | 'continue
   const text = raw.trim()
   if (!text) return 'continue'
   if (text === '[DONE]') {
-    h.onDone?.()
+    h.onDone?.({ path: 'long' })
     return 'done'
   }
   let obj: Record<string, unknown>
@@ -38,7 +38,7 @@ export function dispatchSSEData(raw: string, h: SSEHandlers): 'done' | 'continue
     return 'done'
   }
   if (t === 'done') {
-    h.onDone?.(obj)
+    h.onDone?.({ ...obj, path: 'long' })
     return 'done'
   }
   return 'continue'

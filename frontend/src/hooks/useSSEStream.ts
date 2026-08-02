@@ -23,7 +23,7 @@ export function useSSEStream() {
         if (ct.includes('application/json')) {
           const body = (await res.json()) as { response?: string } & Record<string, unknown>
           if (body.response) h.onToken?.(body.response)
-          h.onDone?.(body)
+          h.onDone?.({ ...body, path: 'short', contentType: 'application/json' })
           return
         }
         if (!res.body) return h.onError?.('SYS_001', 'empty_body')
