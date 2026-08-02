@@ -148,5 +148,33 @@ def select_model_for_intent(intent: str) -> ModelSpec:
     return ModelSpec(name=os.getenv("MODEL_BEST", _DEFAULT_MODEL), provider="default")
 
 
+def select_embedding_model() -> ModelSpec:
+    """选择 embedding 模型:registry 中 capability=embedding 取 cost 最低;否则 env 兜底。"""
+    reg = get_registry()
+    candidates = [
+        spec
+        for spec in reg.values()
+        if spec.enabled and spec.capability == "embedding"
+    ]
+    if candidates:
+        return min(candidates, key=lambda s: (float(s.cost_per_1k), s.name))
+
+    name = os.getenv("EMBEDDING_MODEL", "text-embedding-v3")
+    base_url = os.getenv(
+        "EMBEDDING_BASE_URL",
+        "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    )
+    return ModelSpec(
+        name=name,
+        provider="qwen",
+        base_url=base_url,
+        api_key_ref="QWEN_API_KEY",
+        capability="embedding",
+        cost_per_1k=0.0001,
+        max_tokens=0,
+        tier="cheap",
+    )
+
+
 def list_models() -> list[ModelSpec]:
     return [m for m in get_registry().values() if m.enabled]

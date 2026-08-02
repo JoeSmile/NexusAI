@@ -81,7 +81,7 @@ class VectorDBConfig:
     collection_name: str = "contextgate_memories"
     chunk_size: int = 500
     chunk_overlap: int = 50
-    embedding_model: str = "text-embedding-v1"
+    embedding_model: str = "text-embedding-v3"
 
 
 @dataclass

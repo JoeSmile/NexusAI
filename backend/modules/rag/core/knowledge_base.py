@@ -11,14 +11,12 @@ from typing import Any
 
 from backend.database import vector_ops
 from backend.logging_config import get_logger
-from config import Config
 
 from .chunking_selector import ChunkingStrategySelector
 
 # 使用兼容层统一处理 langchain 导入（无 Chroma）
 from .langchain_compat import (
     Document,
-    OpenAIEmbeddings,
     PyPDFLoader,
     RecursiveCharacterTextSplitter,
     TextLoader,
@@ -47,26 +45,9 @@ class KnowledgeBaseManager:
             chunk_overlap: 块重叠（字符数）
         """
         self.persist_directory = persist_directory
-        
-        # 启用真实的 Embedding 模型 (使用配置的 API Key)
-        api_key = Config.LLM_API_KEY
-        if api_key and OpenAIEmbeddings is not None:
-            try:
-                self.embeddings = OpenAIEmbeddings(
-                    openai_api_key=api_key,
-                    openai_api_base=Config.LLM_BASE_URL,
-                    model="text-embedding-v1", # 使用通义千问支持的文本向量模型名称
-                    check_embedding_ctx_length=False  # 关闭通义不兼容的长度检查
-                )
-                logger.info("已成功启用真实的向量嵌入模型(OpenAI Compatible Embeddings)")
-            except Exception as e:
-                logger.error(f"初始化 Embeddings 失败，回退为None: {e}")
-                self.embeddings = None
-        else:
-            self.embeddings = None
-            if not api_key:
-                logger.warning("未配置 LLM_API_KEY，降级为文本匹配模式")
-            
+        # Embedding 统一走 backend.database.embeddings.embed_text(registry + DashScope);
+        # 不再初始化未使用的 LangChain OpenAIEmbeddings(Task 28)
+
         # Chroma 已移除；检索走 pgvector knowledge_chunks
         self.vectorstore = None
         self.chroma_client_settings = None
@@ -382,11 +363,17 @@ class KnowledgeBaseManager:
                     .filter_by(tenant_id=self.tenant_id)
                     .count()
                 )
+            from backend.core.model_registry import select_embedding_model
+            from backend.database.embeddings import embedding_uses_hash_fallback
+
+            emb_name = select_embedding_model().name
+            if embedding_uses_hash_fallback():
+                emb_name = f"{emb_name}(hash)"
             return {
                 "status": "就绪",
                 "document_count": count,
                 "backend": "pgvector",
-                "embedding_model": "api-or-hash",
+                "embedding_model": emb_name,
             }
         except Exception as e:
             logger.error(f"获取统计信息失败: {e}")

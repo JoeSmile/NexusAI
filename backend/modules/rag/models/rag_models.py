@@ -114,7 +114,7 @@ class RAGConfig(BaseModel):
         "auto",
         description="分块策略: auto/recursive/structure/sentence/dialogue/small_big/parent_child"
     )
-    embedding_model: str = Field("text-embedding-v1", description="嵌入模型")
+    embedding_model: str = Field("text-embedding-v3", description="嵌入模型")
 
 
 class RAGTriggerConfig(BaseModel):
