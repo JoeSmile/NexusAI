@@ -116,7 +116,7 @@ def assign_variant(
         existing = session.execute(
             text(
                 """
-                SELECT group FROM ab_test_group_assignments
+                SELECT "group" FROM ab_test_group_assignments
                 WHERE user_id = :uid AND experiment_id = :eid
                 LIMIT 1
                 """

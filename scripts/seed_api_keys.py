@@ -42,8 +42,8 @@ def create_key(tenant_id: str, user_id: str, role: str, description: str = "") -
         session.execute(
             text(
                 """
-                INSERT INTO api_keys (tenant_id, user_id, key_hash, key_prefix, role, description, created_by)
-                VALUES (:tid, :uid, :hash, :prefix, :role, :desc, 'seed_script')
+                INSERT INTO api_keys (tenant_id, user_id, key_hash, key_prefix, role, description, created_by, is_active, created_at)
+                VALUES (:tid, :uid, :hash, :prefix, :role, :desc, 'seed_script', true, now())
                 """
             ),
             {
