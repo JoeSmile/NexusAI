@@ -61,8 +61,16 @@ class LLMHarness(Harness):
                 if hit is not None:
                     return hit
                 return mock_response(model, prompt)
-            # record / openai:真实调用(record 由 generate_text 落盘)
-            return await self._call_api(model, messages, api_key, base_url)
+            # record / openai:真实调用 + Task 27 key failover
+            return await self._call_api(
+                model,
+                messages,
+                api_key,
+                base_url,
+                tenant_id=tenant_id,
+                key_provider=str(kwargs.get("provider") or "default"),
+                max_tokens=int(kwargs.get("max_tokens", 1000)),
+            )
 
         result = await self.wrap(
             fn=_call,
@@ -206,15 +214,60 @@ class LLMHarness(Harness):
         messages: list[dict],
         api_key: str | None = None,
         base_url: str | None = None,
+        *,
+        tenant_id: str = "default",
+        key_provider: str = "default",
+        max_tokens: int = 1000,
     ) -> str:
-        from backend.pipeline.llm_helper import generate_text
+        """真实调用 OpenAI-compatible API;429/401 沿候选链切 key。"""
+        from openai import AsyncOpenAI
 
-        prompt = "\n".join(m.get("content", "") for m in messages)
-        key = api_key or os.getenv("LLM_API_KEY") or ""
-        url = base_url or os.getenv("LLM_BASE_URL") or ""
-        return await generate_text(
-            prompt,
-            model=model,
-            api_key=key,
-            base_url=url,
+        from backend.core.harness.provider import get_llm_provider, save_fixture
+        from backend.core.key_failover import call_with_key_failover
+        from backend.core.key_repository import LLMKey, LLMKeyRepository
+
+        repo = LLMKeyRepository()
+        chain = await repo.get_key_chain(
+            tenant_id or "default", key_provider or "default", limit=3
+        )
+        if not chain:
+            key = api_key or os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or ""
+            if not key:
+                raise RuntimeError("无可用 LLM API Key")
+            chain = [
+                LLMKey(
+                    id="fallback",
+                    tenant_id=tenant_id or "default",
+                    provider=key_provider or "default",
+                    base_url=base_url or os.getenv("LLM_BASE_URL") or "",
+                    api_key=key,
+                    key_version=0,
+                    is_active=True,
+                    expires_at=None,
+                )
+            ]
+
+        llm_mode = get_llm_provider()
+
+        async def _once(plain_key: str, url: str) -> str:
+            client = AsyncOpenAI(
+                api_key=plain_key,
+                base_url=url or base_url or os.getenv("LLM_BASE_URL") or None,
+            )
+            resp = await client.chat.completions.create(
+                model=model,
+                messages=messages,  # type: ignore[arg-type]
+                max_tokens=max_tokens,
+            )
+            text = (resp.choices[0].message.content or "").strip()
+            if llm_mode == "record" and text:
+                save_fixture(model, messages, text)
+            return text
+
+        return await call_with_key_failover(
+            chain,
+            _once,
+            repo=repo,
+            tenant_id=tenant_id or "default",
+            provider=key_provider or "default",
         )

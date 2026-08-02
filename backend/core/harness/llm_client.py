@@ -71,6 +71,29 @@ def _mock_or_eval_json(model: str, prompt: str) -> str:
     return mock_response(model, prompt)
 
 
+def _load_key_chain_sync(
+    tenant_id: str, key_provider: str, limit: int = 3
+) -> list:
+    """尽力同步拉取候选链;失败则返回空(由调用方回退 env)。"""
+    import asyncio
+
+    from backend.core.key_repository import LLMKeyRepository
+
+    async def _load():
+        return await LLMKeyRepository().get_key_chain(
+            tenant_id, key_provider, limit=limit
+        )
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        try:
+            return asyncio.run(_load())
+        except Exception:
+            return []
+    return []
+
+
 def complete_via_provider(
     model: str,
     messages: list[dict],
@@ -78,8 +101,11 @@ def complete_via_provider(
     temperature: float = 0.7,
     api_key: str | None = None,
     base_url: str | None = None,
+    tenant_id: str = "default",
+    key_provider: str = "default",
+    key_chain: list | None = None,
 ) -> str:
-    """按 LLM_PROVIDER 完成一次文本生成（同步）。"""
+    """按 LLM_PROVIDER 完成一次文本生成（同步）。openai/record 支持 429/401 切 key。"""
     provider = get_llm_provider()
     prompt = _messages_to_prompt(messages)
 
@@ -92,26 +118,53 @@ def complete_via_provider(
             return hit
         return _mock_or_eval_json(model, prompt)
 
-    # openai / record：无密钥必须显式失败，避免误以为在打真模型（Task 26 review）
-    key = api_key or os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or ""
-    if not key:
-        raise RuntimeError(
-            f"LLM_PROVIDER={provider} 需要配置 LLM_API_KEY（或 OPENAI_API_KEY）；"
-            "离线演示请使用 LLM_PROVIDER=mock 或 LLM_PROVIDER=replay"
-        )
-
     from openai import OpenAI
 
-    client = OpenAI(api_key=key, base_url=base_url or os.getenv("LLM_BASE_URL") or None)
-    resp = client.chat.completions.create(
-        model=model or "default",
-        messages=messages,  # type: ignore[arg-type]
-        temperature=temperature,
+    from backend.core.key_failover import call_with_key_failover_sync
+    from backend.core.key_repository import LLMKey
+
+    keys = list(key_chain) if key_chain else _load_key_chain_sync(tenant_id, key_provider)
+    if not keys:
+        key = api_key or os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or ""
+        if not key:
+            raise RuntimeError(
+                f"LLM_PROVIDER={provider} 需要配置 LLM_API_KEY（或 OPENAI_API_KEY）；"
+                "离线演示请使用 LLM_PROVIDER=mock 或 LLM_PROVIDER=replay"
+            )
+        keys = [
+            LLMKey(
+                id="fallback",
+                tenant_id=tenant_id,
+                provider=key_provider,
+                base_url=base_url or os.getenv("LLM_BASE_URL") or "",
+                api_key=key,
+                key_version=0,
+                is_active=True,
+                expires_at=None,
+            )
+        ]
+
+    def _call(plain_key: str, url: str) -> str:
+        client = OpenAI(
+            api_key=plain_key,
+            base_url=url or base_url or os.getenv("LLM_BASE_URL") or None,
+        )
+        resp = client.chat.completions.create(
+            model=model or "default",
+            messages=messages,  # type: ignore[arg-type]
+            temperature=temperature,
+        )
+        text = (resp.choices[0].message.content or "").strip()
+        if provider == "record" and text:
+            save_fixture(model, messages, text)
+        return text
+
+    return call_with_key_failover_sync(
+        keys,
+        _call,
+        tenant_id=tenant_id,
+        provider=key_provider,
     )
-    text = (resp.choices[0].message.content or "").strip()
-    if provider == "record" and text:
-        save_fixture(model, messages, text)
-    return text
 
 
 def _build_langchain_chat_model(
