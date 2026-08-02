@@ -18,7 +18,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+/lib/
 lib64/
 parts/
 sdist/
@@ -64,5 +64,5 @@ data/*
 chroma_db/
 uploads/
 
-# Local assets
-assets/
+# Local assets (repo root only; do not ignore frontend/src/assets)
+/assets/
