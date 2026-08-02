@@ -3,6 +3,7 @@ import { Navigate, Outlet, createBrowserRouter, useLocation } from 'react-router
 import { AppShell } from '@/components/layout/AppShell'
 import LoginPage from '@/pages/login'
 import AdminPanel from '@/pages/panels/admin'
+import AgentPanel from '@/pages/panels/agent'
 import AuditPanel from '@/pages/panels/audit'
 import ChatPanel from '@/pages/panels/chat'
 import PlaceholderPanel from '@/pages/panels/PlaceholderPanel'
@@ -33,7 +34,7 @@ export const router = createBrowserRouter([
           { path: 'panels/rag', element: <RagPanel /> },
           { path: 'panels/admin', element: <AdminPanel /> },
           { path: 'panels/audit', element: <AuditPanel /> },
-          { path: 'panels/agent', element: <PlaceholderPanel /> },
+          { path: 'panels/agent', element: <AgentPanel /> },
           { path: 'panels/eval', element: <PlaceholderPanel /> },
           { path: 'panels/performance', element: <PlaceholderPanel /> },
           { path: 'panels/capabilities', element: <PlaceholderPanel /> },
