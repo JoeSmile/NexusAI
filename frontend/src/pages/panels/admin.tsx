@@ -7,7 +7,7 @@ import { useAuthStore } from '@/stores/authStore'
 /** Admin 面板雏形：拉 /api/admin/api-keys 以演示 403 高亮（30.14）。 */
 export default function AdminPanel() {
   const role = useAuthStore((s) => s.activeRole)
-  const key = useAuthStore((s) => s.keys[s.activeRole])
+  const roleEpoch = useAuthStore((s) => s.roleEpoch)
   const [info, setInfo] = useState('')
   const [err, setErr] = useState('')
 
@@ -31,7 +31,7 @@ export default function AdminPanel() {
     return () => {
       cancelled = true
     }
-  }, [role, key])
+  }, [roleEpoch, role])
 
   return (
     <div className="space-y-2">

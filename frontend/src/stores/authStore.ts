@@ -22,6 +22,8 @@ const emptyKeys = (): KeysByRole => ({
 export interface AuthState {
   activeRole: RoleName
   keys: KeysByRole
+  /** 角色切换计数；面板监听此值自动刷新（不 persist） */
+  roleEpoch: number
   setKey: (role: RoleName, key: string) => void
   switchRole: (role: RoleName) => void
   clear: () => void
@@ -39,12 +41,17 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       activeRole: 'user',
       keys: emptyKeys(),
+      roleEpoch: 0,
       setKey: (role, key) =>
         set((s) => ({
           keys: { ...s.keys, [role]: key.trim() },
         })),
-      switchRole: (role) => set({ activeRole: role }),
-      clear: () => set({ activeRole: 'user', keys: emptyKeys() }),
+      switchRole: (role) =>
+        set((s) => ({
+          activeRole: role,
+          roleEpoch: s.activeRole === role ? s.roleEpoch : s.roleEpoch + 1,
+        })),
+      clear: () => set({ activeRole: 'user', keys: emptyKeys(), roleEpoch: 0 }),
       clearActiveKey: () => {
         const role = get().activeRole
         set((s) => ({ keys: { ...s.keys, [role]: '' } }))
@@ -67,6 +74,7 @@ export const useAuthStore = create<AuthState>()(
         set((s) => ({
           activeRole: role,
           keys: { ...s.keys, [role]: trimmed },
+          roleEpoch: s.roleEpoch + 1,
         }))
       },
     }),

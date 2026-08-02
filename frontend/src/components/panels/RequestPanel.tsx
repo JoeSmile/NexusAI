@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 
 import { apiFetch, ApiError } from '@/api/http'
 import { ForbiddenBanner } from '@/components/role/RoleSwitcher'
@@ -48,6 +48,7 @@ export function RequestPanel({
   renderResult,
 }: Props) {
   const role = useAuthStore((s) => s.activeRole) as RoleName
+  const roleEpoch = useAuthStore((s) => s.roleEpoch)
   const clearForbidden = useForbiddenStore((s) => s.clear)
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(fields.map((f) => [f.name, f.defaultValue || ''])),
@@ -57,27 +58,30 @@ export function RequestPanel({
   const [ms, setMs] = useState<number | null>(null)
   const [result, setResult] = useState<unknown>(null)
   const [localErr, setLocalErr] = useState('')
+  const valuesRef = useRef(values)
+  valuesRef.current = values
+  const skipEpoch = useRef(true)
 
-  const submit = async (e: FormEvent) => {
-    e.preventDefault()
+  const runRequest = async () => {
     clearForbidden()
     setLocalErr('')
     setBusy(true)
     setResult(null)
     setStatus(null)
     const t0 = performance.now()
+    const bodyValues = valuesRef.current
     try {
       let data: unknown
       let code = 200
       if (onSend) {
-        data = await onSend(values)
+        data = await onSend(bodyValues)
       } else {
         const res = await apiFetch(endpoint, {
           method,
           body:
             method === 'GET' || method === 'HEAD'
               ? undefined
-              : JSON.stringify(values),
+              : JSON.stringify(bodyValues),
         })
         code = res.status
         data = await res.json().catch(() => null)
@@ -95,6 +99,19 @@ export function RequestPanel({
       setMs(Math.round(performance.now() - t0))
       setBusy(false)
     }
+  }
+
+  useEffect(() => {
+    if (skipEpoch.current) {
+      skipEpoch.current = false
+      return
+    }
+    void runRequest()
+  }, [roleEpoch])
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault()
+    await runRequest()
   }
 
   const kind =

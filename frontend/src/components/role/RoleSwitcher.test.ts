@@ -14,6 +14,7 @@ describe('RoleSwitcher key + 403 (frame for 30.26 UI)', () => {
         auditor: '',
         super_admin: 'k-super',
       },
+      roleEpoch: 0,
     })
     useForbiddenStore.getState().clear()
     vi.unstubAllGlobals()

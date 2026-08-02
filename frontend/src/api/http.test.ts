@@ -14,6 +14,7 @@ describe('api http', () => {
         auditor: '',
         super_admin: '',
       },
+      roleEpoch: 0,
     })
     vi.unstubAllGlobals()
   })

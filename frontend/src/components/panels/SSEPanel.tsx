@@ -27,6 +27,7 @@ export function SSEPanel({
   demoText,
 }: Props) {
   const role = useAuthStore((s) => s.activeRole)
+  const roleEpoch = useAuthStore((s) => s.roleEpoch)
   const { start, abort } = useSSEStream()
   const [message, setMessage] = useState('hello')
   const [text, setText] = useState('')
@@ -35,8 +36,21 @@ export function SSEPanel({
   const [hint, setHint] = useState('空态 — 输入消息后开始流式')
   const demoAbort = useRef(false)
   const liveTimer = useRef<number | null>(null)
+  const skipEpoch = useRef(true)
 
   useEffect(() => () => abort(), [abort])
+
+  useEffect(() => {
+    if (skipEpoch.current) {
+      skipEpoch.current = false
+      return
+    }
+    demoAbort.current = true
+    abort()
+    setText('')
+    setStatus('idle')
+    setHint('角色已切换 — 请重新开始流式')
+  }, [roleEpoch, abort])
 
   const flashLive = () => {
     setLive(true)

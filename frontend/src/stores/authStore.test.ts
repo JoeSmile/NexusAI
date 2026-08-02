@@ -18,6 +18,7 @@ describe('authStore', () => {
         auditor: '',
         super_admin: '',
       },
+      roleEpoch: 0,
     })
     useAuthStore.persist.clearStorage()
   })
@@ -39,6 +40,14 @@ describe('authStore', () => {
     switchRole('auditor')
     expect(getActiveKey()).toBe('k-auditor')
     expect(useAuthStore.getState().keys.super_admin).toBe('k-super')
+  })
+
+  it('bumps roleEpoch when switching to a different role', () => {
+    const e0 = useAuthStore.getState().roleEpoch
+    useAuthStore.getState().switchRole('user')
+    expect(useAuthStore.getState().roleEpoch).toBe(e0)
+    useAuthStore.getState().switchRole('auditor')
+    expect(useAuthStore.getState().roleEpoch).toBe(e0 + 1)
   })
 
   it('persists to sessionStorage (P0: not localStorage)', async () => {
