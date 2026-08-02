@@ -1,6 +1,7 @@
 """Capability Hub API — 市场列表 + 统一 invoke（Task 30.06）。
 
 LangFuse 根 trace / SSE 组帧 / 断连中止在本层；core 只做纯分发。
+长路径：``@observe`` 包住 async generator，span 贯穿整段 SSE。
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ from backend.core.auth.models import TenantContext
 from backend.core.capability.invoke import invoke
 from backend.core.capability.models import CapabilitySpec
 from backend.core.capability.registry import get_capability_registry
-from backend.core.errors import ContextGateException
+from backend.core.errors import ContextGateException, ErrorCode
 from backend.observability.decorators import observe
 
 logger = logging.getLogger(__name__)
@@ -38,20 +39,6 @@ class InvokeRequest(BaseModel):
     max_tokens: int | None = None
     stream: bool | None = None
     extra: dict[str, Any] = Field(default_factory=dict)
-
-
-def _inject_langfuse_parent(bucket: dict[str, Any]) -> None:
-    """把当前 Langfuse 根 span id 注入 bucket（与 pipeline/router 同款）。"""
-    try:
-        from backend.observability.decorators import langfuse_context
-
-        tid = langfuse_context.get_current_trace_id()
-        oid = langfuse_context.get_current_observation_id()
-        if tid and oid:
-            bucket["_lf_trace_id"] = tid
-            bucket["_lf_parent_obs_id"] = oid
-    except Exception:
-        pass
 
 
 def _sse_data(payload: dict[str, Any]) -> str:
@@ -84,7 +71,9 @@ def _visible_to(tenant: TenantContext, spec: CapabilitySpec) -> bool:
     return tenant.has_permission(needed)
 
 
-def _wants_stream(request: Request, body_stream: bool | None, q_stream: bool | None) -> bool:
+def _wants_stream(
+    request: Request, body_stream: bool | None, q_stream: bool | None
+) -> bool:
     if q_stream is not None:
         return q_stream
     if body_stream is not None:
@@ -130,13 +119,14 @@ def _frame_to_sse(frame: dict[str, Any]) -> str:
         return _sse_data(
             {
                 "type": "error",
-                "code": (data or {}).get("code") if isinstance(data, dict) else "SYS_001",
+                "code": (data or {}).get("code")
+                if isinstance(data, dict)
+                else "SYS_001",
                 "message": (data or {}).get("message")
                 if isinstance(data, dict)
                 else str(data),
             }
         )
-    # usage / 其他：透传
     payload = {"type": ev or "event", "data": data}
     if "cost_source" in frame:
         payload["cost_source"] = frame["cost_source"]
@@ -156,7 +146,6 @@ def _schedule_audit(
     error_code: str | None = None,
     upstream: str | None = None,
 ) -> None:
-    # audit_logs 无 metadata 列：标记前缀写进 input_text（同 RAG cache_hit 约定）
     tags = f"[cost_source={cost_source}]"
     if upstream:
         tags += f"[upstream={upstream}]"
@@ -194,6 +183,26 @@ def _schedule_langfuse_flush(
         background_tasks.add_task(discard_langfuse_buffer)
 
 
+def _preflight(cap_id: str, tenant: TenantContext) -> CapabilitySpec:
+    """在返回 StreamingResponse 前暴露 CAP_/AUTH_（JSON 错误，非 SSE）。"""
+    from backend.core.capability.governance import (
+        check_cap_quota,
+        check_cap_rate_limit,
+    )
+
+    spec = get_capability_registry().get(cap_id)
+    needed = (spec.permission or "").strip() or "chat:write"
+    if not tenant.has_permission(needed):
+        raise ContextGateException(
+            ErrorCode.AUTH_INSUFFICIENT_PERMISSIONS.value,
+            "insufficient_permissions",
+            detail=needed,
+        )
+    check_cap_rate_limit(tenant.tenant_id)
+    check_cap_quota(tenant.tenant_id)
+    return spec
+
+
 @router.get("")
 @router.get("/")
 async def list_capabilities(
@@ -209,11 +218,9 @@ async def list_capabilities(
         provider=provider,
         include_disabled=include_disabled,
     )
-    # 非跨租户管理员：隐藏 disabled；跨租户可看全量（仍要有权限）
     if include_disabled and not (
         tenant.is_cross_tenant or tenant.has_permission("admin:*")
     ):
-        include_disabled = False
         specs = reg.list(kind=kind, provider=provider, include_disabled=False)
 
     items = [_spec_public(s) for s in specs if _visible_to(tenant, s)]
@@ -227,8 +234,6 @@ async def _invoke_short(
     tenant: TenantContext,
 ) -> tuple[str, str, dict[str, Any], str | None]:
     """短路径：聚合 token → (response, cost_source, done_meta, upstream)。"""
-    lf: dict[str, Any] = {}
-    _inject_langfuse_parent(lf)
     chunks: list[str] = []
     cost_source = "harness"
     done_meta: dict[str, Any] = {}
@@ -239,13 +244,89 @@ async def _invoke_short(
         if frame.get("cost_source"):
             cost_source = str(frame["cost_source"])
         data = frame.get("data")
-        if frame.get("event") == "usage" and isinstance(data, dict) and data.get("upstream"):
+        if (
+            frame.get("event") == "usage"
+            and isinstance(data, dict)
+            and data.get("upstream")
+        ):
             upstream = str(data["upstream"])
         if frame.get("event") == "done" and isinstance(data, dict):
             done_meta = data
             if data.get("upstream"):
                 upstream = str(data["upstream"])
     return "".join(chunks), cost_source, done_meta, upstream
+
+
+@observe(name="capability.invoke.streaming")
+async def _sse_event_stream(
+    *,
+    cap_id: str,
+    payload: dict[str, Any],
+    tenant: TenantContext,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    input_preview: str,
+    t0: float,
+) -> AsyncIterator[str]:
+    """长路径 SSE — observe span 保持到 generator 耗尽。"""
+    buffer = ""
+    cost_source = "harness"
+    upstream: str | None = None
+    error_code: str | None = None
+    token_iter = invoke(cap_id, payload, tenant).__aiter__()
+
+    try:
+        while True:
+            if await request.is_disconnected():
+                logger.info("capability SSE client disconnected — stop")
+                break
+            try:
+                frame = await asyncio.wait_for(token_iter.__anext__(), timeout=15.0)
+            except StopAsyncIteration:
+                break
+            except TimeoutError:
+                yield ": ping\n\n"
+                continue
+
+            if frame.get("cost_source"):
+                cost_source = str(frame["cost_source"])
+            data = frame.get("data")
+            if isinstance(data, dict) and data.get("upstream"):
+                upstream = str(data["upstream"])
+            if frame.get("event") == "token":
+                buffer += str(frame.get("data") or "")
+            yield _frame_to_sse(frame)
+            if frame.get("event") == "done":
+                break
+
+    except asyncio.CancelledError:
+        logger.info("capability SSE cancelled")
+        raise
+    except ContextGateException as e:
+        error_code = getattr(e, "code", "SYS_001")
+        yield _sse_data({"type": "error", "code": error_code, "message": str(e)})
+        yield "data: [DONE]\n\n"
+    except Exception as e:
+        logger.exception("capability SSE error: %s", e)
+        error_code = "SYS_001"
+        yield _sse_data({"type": "error", "code": "SYS_001", "message": str(e)})
+        yield "data: [DONE]\n\n"
+    finally:
+        latency = (time.perf_counter() - t0) * 1000
+        if buffer or error_code:
+            _schedule_audit(
+                background_tasks,
+                tenant=tenant,
+                request=request,
+                capability_id=cap_id,
+                cost_source=cost_source,
+                input_text=input_preview,
+                output_text=buffer,
+                latency_ms=latency,
+                error_code=error_code,
+                upstream=upstream,
+            )
+        _schedule_langfuse_flush(background_tasks, short_path=False)
 
 
 @router.post("/{cap_id}/invoke")
@@ -305,117 +386,23 @@ async def invoke_capability(
             "finish_reason": "completed",
         }
 
-    return await _invoke_streaming(
-        cap_id, payload, tenant, request, background_tasks, input_preview, t0
-    )
-
-
-@observe(name="capability.invoke.streaming")
-async def _open_stream(
-    cap_id: str, payload: dict[str, Any], tenant: TenantContext
-) -> AsyncIterator[dict[str, Any]]:
-    lf: dict[str, Any] = {}
-    _inject_langfuse_parent(lf)
-    return invoke(cap_id, payload, tenant)
-
-
-async def _invoke_streaming(
-    cap_id: str,
-    payload: dict[str, Any],
-    tenant: TenantContext,
-    request: Request,
-    background_tasks: BackgroundTasks,
-    input_preview: str,
-    t0: float,
-) -> StreamingResponse:
+    # 预检失败 → 全局异常处理器 JSON；通过后 SSE span 覆盖整段流
     try:
-        # 预检：拿 iterator；权限/配额错误在首帧前抛出 → JSON 错误
-        token_iter = (await _open_stream(cap_id, payload, tenant)).__aiter__()
-        # 拉第一帧以尽早暴露 CAP_/AUTH_ 错误（空流也 OK）
-        first: dict[str, Any] | None
-        try:
-            first = await token_iter.__anext__()
-        except StopAsyncIteration:
-            first = None
+        _preflight(cap_id, tenant)
     except ContextGateException:
         _schedule_langfuse_flush(background_tasks, short_path=False)
         raise
-    except Exception as e:
-        _schedule_langfuse_flush(background_tasks, short_path=False)
-        raise ContextGateException("SYS_001", str(e)) from e
-
-    async def event_stream() -> AsyncIterator[str]:
-        buffer = ""
-        cost_source = "harness"
-        upstream: str | None = None
-        error_code: str | None = None
-        pending = first
-
-        try:
-            while True:
-                if await request.is_disconnected():
-                    logger.info("capability SSE client disconnected — stop")
-                    break
-                try:
-                    if pending is not None:
-                        frame = pending
-                        pending = None
-                    else:
-                        frame = await asyncio.wait_for(
-                            token_iter.__anext__(), timeout=15.0
-                        )
-                except StopAsyncIteration:
-                    break
-                except TimeoutError:
-                    yield ": ping\n\n"
-                    continue
-
-                if frame.get("cost_source"):
-                    cost_source = str(frame["cost_source"])
-                data = frame.get("data")
-                if isinstance(data, dict) and data.get("upstream"):
-                    upstream = str(data["upstream"])
-                if frame.get("event") == "token":
-                    buffer += str(frame.get("data") or "")
-                yield _frame_to_sse(frame)
-                if frame.get("event") == "done":
-                    break
-
-        except asyncio.CancelledError:
-            logger.info("capability SSE cancelled")
-            raise
-        except ContextGateException as e:
-            error_code = getattr(e, "code", "SYS_001")
-            yield _sse_data(
-                {"type": "error", "code": error_code, "message": str(e)}
-            )
-            yield "data: [DONE]\n\n"
-        except Exception as e:
-            logger.exception("capability SSE error: %s", e)
-            error_code = "SYS_001"
-            yield _sse_data(
-                {"type": "error", "code": "SYS_001", "message": str(e)}
-            )
-            yield "data: [DONE]\n\n"
-        finally:
-            latency = (time.perf_counter() - t0) * 1000
-            if buffer or error_code:
-                _schedule_audit(
-                    background_tasks,
-                    tenant=tenant,
-                    request=request,
-                    capability_id=cap_id,
-                    cost_source=cost_source,
-                    input_text=input_preview,
-                    output_text=buffer,
-                    latency_ms=latency,
-                    error_code=error_code,
-                    upstream=upstream,
-                )
-            _schedule_langfuse_flush(background_tasks, short_path=False)
 
     return StreamingResponse(
-        event_stream(),
+        _sse_event_stream(
+            cap_id=cap_id,
+            payload=payload,
+            tenant=tenant,
+            request=request,
+            background_tasks=background_tasks,
+            input_preview=input_preview,
+            t0=t0,
+        ),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

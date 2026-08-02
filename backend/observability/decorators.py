@@ -57,6 +57,7 @@ def observe(*args: Any, **kwargs: Any):
     def _apply(fn: F) -> F:
         decorated = _lf_observe(**kwargs)(fn) if kwargs else _lf_observe(fn)
         is_coro = asyncio.iscoroutinefunction(fn) or inspect.iscoroutinefunction(fn)
+        is_agen = inspect.isasyncgenfunction(fn)
 
         if is_coro:
 
@@ -69,6 +70,18 @@ def observe(*args: Any, **kwargs: Any):
                 return await decorated(*a, **kw)
 
             return _async_wrapper  # type: ignore[return-value]
+
+        if is_agen:
+            # async gen: span 保持到 generator 耗尽（capability SSE 长路径）
+            @functools.wraps(fn)
+            def _agen_wrapper(*a: Any, **kw: Any) -> Any:
+                from backend.observability.sampling import tracing_enabled
+
+                if not tracing_enabled():
+                    return fn(*a, **kw)
+                return decorated(*a, **kw)
+
+            return _agen_wrapper  # type: ignore[return-value]
 
         @functools.wraps(fn)
         def _sync_wrapper(*a: Any, **kw: Any) -> Any:
