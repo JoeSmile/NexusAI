@@ -212,44 +212,175 @@ class RAGService:
             docs = docs[:search_k]
         return docs
 
-    def ask(self, question: str, search_k: int = 3) -> dict[str, Any]:
+    @staticmethod
+    def _embedding_cost_if_miss(norm_q: str) -> float:
+        """L2 未命中时的单次 embedding 调用成本预估(美元);redis 不可用或 L2 命中为 0。"""
+        from backend.core.cost_manager import _price, count_tokens
+        from backend.core.model_registry import select_embedding_model
+        from backend.modules.rag.cache import get_redis, l2_get
+
+        try:
+            if get_redis() is None:
+                return 0.0
+            spec = select_embedding_model()
+            if l2_get(spec.name, norm_q) is not None:
+                return 0.0
+            return count_tokens(norm_q) * _price(spec.name) / 1000.0
+        except Exception:
+            return 0.0
+
+    def ask(
+        self,
+        question: str,
+        search_k: int = 3,
+        *,
+        tenant_id: str = "default",
+        user_id: str = "anonymous",
+        trace_id: str = "",
+    ) -> dict[str, Any]:
         """
         向知识库提问（支持 HyDE + LLM ReRank，由 config 开关控制）
+
+        L1 答案缓存(Task 29):命中直接返回;miss 经单飞锁后算并写入。
         """
-        try:
-            logger.info(f"收到问题: {question[:50]}...")
-            source_documents = self.retrieve_documents(question, search_k=search_k)
+        import time
+        import uuid
 
-            if self.llm is None:
-                raise RuntimeError(
-                    "RAG 需要可用的 LLM（LLM_PROVIDER=mock|record|replay|openai；"
-                    "真实调用时请配置 LLM_API_KEY 与 LLM_BASE_URL）"
-                )
+        from backend.core.audit import write_audit_sync
+        from backend.modules.rag.cache import (
+            acquire_lock,
+            check_rate_limit,
+            l1_get,
+            l1_key,
+            l1_set,
+            normalize,
+            record_l1_miss,
+            release_lock,
+            wait_l1,
+        )
 
-            context = "\n\n".join(
-                d.page_content for d in source_documents if getattr(d, "page_content", None)
-            )
-            prompt = self.prompt_template.format(context=context or "（无检索结果）", question=question)
-            resp = self.llm.invoke(prompt)
-            answer = getattr(resp, "content", None) or str(resp)
+        t0 = time.perf_counter()
+        tid = tenant_id or "default"
+        uid = user_id or "anonymous"
+        tr = trace_id or str(uuid.uuid4())
+        norm_q = normalize(question)
+        lock_token = l1_key(tid, question)
 
-            sources = []
-            for doc in source_documents:
-                content = doc.page_content or ""
-                sources.append(
+        def _audit(*, cache_hit: bool, cost: float, answer: str) -> None:
+            from datetime import datetime
+
+            try:
+                write_audit_sync(
                     {
-                        "content": content[:200] + "..." if len(content) > 200 else content,
-                        "metadata": doc.metadata,
+                        "tenant_id": tid,
+                        "user_id": uid,
+                        "action": "rag.ask",
+                        "trace_id": tr,
+                        # audit 表无 cache_hit 列:写入 input 前缀供溯源
+                        "input_text": (
+                            f"cache_hit={int(cache_hit)}|{(norm_q or '')}"
+                        )[:500],
+                        "output_text": (answer or "")[:500],
+                        "model": "",
+                        "input_tokens": 0,
+                        "output_tokens": 0,
+                        "cost": 0.0 if cache_hit else cost,
+                        "latency_ms": (time.perf_counter() - t0) * 1000,
+                        "error_code": None,
+                        "ip_address": "",
+                        "user_agent": "",
+                        "created_at": datetime.utcnow(),
                     }
                 )
+            except Exception:
+                logger.debug("rag.ask 审计写入跳过", exc_info=True)
 
-            logger.info(f"回答生成成功，使用了 {len(sources)} 个知识源")
-            return {
-                "answer": answer,
-                "sources": sources,
-                "question": question,
-                "knowledge_count": len(sources),
-            }
+        try:
+            logger.info(f"收到问题: {question[:50]}...")
+
+            hit = l1_get(tid, question)
+            if hit:
+                out = {
+                    "answer": hit.get("answer", ""),
+                    "sources": hit.get("sources", []),
+                    "question": hit.get("question", question),
+                    "knowledge_count": hit.get("knowledge_count", 0),
+                    "cache_hit": True,
+                    "latency_ms": (time.perf_counter() - t0) * 1000,
+                }
+                _audit(cache_hit=True, cost=0.0, answer=out["answer"])
+                return out
+
+            record_l1_miss(tid)
+            check_rate_limit(tid, miss=True)
+
+            got_lock = acquire_lock(lock_token)
+            if not got_lock:
+                waited = wait_l1(tid, question, timeout_ms=500)
+                if waited:
+                    out = {
+                        "answer": waited.get("answer", ""),
+                        "sources": waited.get("sources", []),
+                        "question": waited.get("question", question),
+                        "knowledge_count": waited.get("knowledge_count", 0),
+                        "cache_hit": True,
+                        "latency_ms": (time.perf_counter() - t0) * 1000,
+                    }
+                    _audit(cache_hit=True, cost=0.0, answer=out["answer"])
+                    return out
+
+            try:
+                # 预估本次 embedding 成本:L2 未命中才会真调 API(Task 29 审计修正)
+                embed_cost = self._embedding_cost_if_miss(norm_q)
+
+                source_documents = self.retrieve_documents(question, search_k=search_k)
+
+                if self.llm is None:
+                    raise RuntimeError(
+                        "RAG 需要可用的 LLM（LLM_PROVIDER=mock|record|replay|openai；"
+                        "真实调用时请配置 LLM_API_KEY 与 LLM_BASE_URL）"
+                    )
+
+                context = "\n\n".join(
+                    d.page_content
+                    for d in source_documents
+                    if getattr(d, "page_content", None)
+                )
+                prompt = self.prompt_template.format(
+                    context=context or "（无检索结果）", question=question
+                )
+                resp = self.llm.invoke(prompt)
+                answer = getattr(resp, "content", None) or str(resp)
+
+                sources = []
+                for doc in source_documents:
+                    content = doc.page_content or ""
+                    sources.append(
+                        {
+                            "content": content[:200] + "..."
+                            if len(content) > 200
+                            else content,
+                            "metadata": doc.metadata,
+                        }
+                    )
+
+                result = {
+                    "answer": answer,
+                    "sources": sources,
+                    "question": question,
+                    "knowledge_count": len(sources),
+                    "cache_hit": False,
+                    "latency_ms": (time.perf_counter() - t0) * 1000,
+                }
+                l1_set(tid, question, result)
+                logger.info(f"回答生成成功，使用了 {len(sources)} 个知识源")
+                # 审计成本 = LLM 真实/估算成本 + embedding 成本(L2 命中时 embed 为 0)
+                llm_cost = float(getattr(resp, "metadata", {}).get("cost", 0.0) or 0.0)
+                _audit(cache_hit=False, cost=llm_cost + embed_cost, answer=answer)
+                return result
+            finally:
+                if got_lock:
+                    release_lock(lock_token)
 
         except Exception as e:
             logger.error(f"回答问题失败: {e}")

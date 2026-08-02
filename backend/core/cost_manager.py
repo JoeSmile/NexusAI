@@ -16,6 +16,7 @@ COST_TABLE: dict[str, float] = {
     "gpt-4o": 0.0025,
     "gpt-4o-mini": 0.00015,
     "glm-4": 0.0001,
+    "text-embedding-v3": 0.0001,
     "qwen-max": 0.002,
     "default": 0.0005,
 }

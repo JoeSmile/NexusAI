@@ -77,6 +77,13 @@ def test_rag_init_sample_uses_add_documents(monkeypatch):
 
     app = FastAPI()
     app.include_router(rag_mod.router)
+    # Task 29: RAG 端点要求 chat:write 认证——注入认证上下文(用户角色含 chat:*)
+    from backend.core.auth.api_key_auth import verify_api_key
+    from backend.core.auth.models import TenantContext
+
+    app.dependency_overrides[verify_api_key] = lambda: TenantContext(
+        "t1", "user1", "user", [], False
+    )
 
     kb = MagicMock()
     kb.get_stats.return_value = {"documents": 3, "chunks": 3}
