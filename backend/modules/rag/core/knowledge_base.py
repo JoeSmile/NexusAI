@@ -451,7 +451,9 @@ class EnterpriseKnowledgeLoader:
         ]
 
         for text in sample_texts:
-            self.kb_manager.add_document(text)
+            self.kb_manager.add_documents(
+                [Document(page_content=text.strip())]
+            )
 
     def _extract_topic(self, text: str) -> str:
         """从文本中提取主题"""
