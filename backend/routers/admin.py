@@ -59,8 +59,9 @@ async def create_api_key(
     with session_factory.Session() as session:
         sql = text("""
             INSERT INTO api_keys
-                (tenant_id, user_id, key_hash, key_prefix, role, description, created_by)
-            VALUES (:tid, :uid, :hash, :prefix, :role, :desc, :by)
+                (tenant_id, user_id, key_hash, key_prefix, role, description,
+                 created_by, is_active, created_at)
+            VALUES (:tid, :uid, :hash, :prefix, :role, :desc, :by, true, now())
             RETURNING id, created_at
         """)
         row = session.execute(
