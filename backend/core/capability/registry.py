@@ -69,6 +69,9 @@ class CapabilityRegistry:
         self._by_id: dict[str, CapabilitySpec] = {}
 
     def register(self, spec: CapabilitySpec) -> None:
+        from backend.core.capability.governance import validate_governance_declaration
+
+        validate_governance_declaration(spec)
         self._by_id[spec.id] = spec
 
     def get(self, capability_id: str, *, require_enabled: bool = True) -> CapabilitySpec:
@@ -137,6 +140,8 @@ class CapabilityRegistry:
                     nested["base_url"] = item["base_url"]
                 if item.get("api_key_ref") and "api_key_ref" not in nested:
                     nested["api_key_ref"] = item["api_key_ref"]
+                if "governance" in item and "governance" not in nested:
+                    nested["governance"] = item["governance"]
                 spec = CapabilitySpec(
                     id=str(item["id"]),
                     name=str(item.get("name") or item["id"]),
@@ -152,7 +157,8 @@ class CapabilityRegistry:
                 )
                 self.register(spec)
                 n += 1
-            except (ValueError, TypeError, KeyError) as exc:
+            except Exception as exc:
+                # 含 CAP_004 治理未声明、非法 kind 等
                 logger.warning("skip capability env item %s: %s", item.get("id"), exc)
         return n
 

@@ -168,27 +168,60 @@ async def invoke(
     user: str | None = None,  # noqa: ARG001 — 预留与路由签名对齐
 ) -> AsyncIterator[dict[str, Any]]:
     """按 capability id 分发调用，产出事件字典（非 SSE 文本）。"""
+    from backend.core.capability.governance import (
+        check_cap_quota,
+        check_cap_rate_limit,
+        guard_output_text,
+        prepare_payload_with_guards,
+        record_cap_quota_usage,
+    )
+
     registry = get_capability_registry()
     spec = registry.get(cap_id)  # CAP_001 / CAP_002
 
     _check_permission(spec, tenant)
+    check_cap_rate_limit(tenant.tenant_id)
+    check_cap_quota(tenant.tenant_id)
+
+    safe_payload = await prepare_payload_with_guards(payload)
+    collected: list[str] = []
 
     if spec.kind == CapabilityKind.MODEL:
-        async for frame in _invoke_model(spec, payload, tenant):
+        async for frame in _invoke_model(spec, safe_payload, tenant):
+            if frame.get("event") == "token":
+                collected.append(str(frame.get("data") or ""))
+            if frame.get("event") != "done":
+                yield frame
+                continue
+            # 出向护栏（整段）后 yield done
+            full = "".join(collected)
+            if full:
+                await guard_output_text(full)
+            record_cap_quota_usage(tenant.tenant_id, calls=1)
             yield frame
         return
 
     if spec.kind == CapabilityKind.EXTERNAL_APP:
-        async for frame in _invoke_external_app(spec, payload, tenant):
+        async for frame in _invoke_external_app(spec, safe_payload, tenant):
+            if frame.get("event") == "token":
+                collected.append(str(frame.get("data") or ""))
             yield frame
+        if collected:
+            await guard_output_text("".join(collected))
+        record_cap_quota_usage(tenant.tenant_id, calls=1)
         return
 
     if spec.kind == CapabilityKind.AGENT:
-        async for frame in _invoke_agent(spec, payload, tenant):
+        async for frame in _invoke_agent(spec, safe_payload, tenant):
+            if frame.get("event") == "token":
+                collected.append(str(frame.get("data") or ""))
             yield frame
+        if collected:
+            await guard_output_text("".join(collected))
+        record_cap_quota_usage(tenant.tenant_id, calls=1)
         return
 
-    # tool / workflow / datasource — 后续扩展
+    # tool / workflow / datasource — 后续扩展（保持 CAP_001，拍板 A）
     raise CapabilityNotFoundError(
         message="unsupported_kind",
         detail=f"{cap_id}:{spec.kind.value}",
