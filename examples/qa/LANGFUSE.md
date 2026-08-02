@@ -25,18 +25,19 @@
 
 | 指标 | 含义 | 当前状态(2026-08-02 实测) |
 |------|------|---------------------------|
-| Trace(`chat.pipeline`) | 一次 `/chat` 请求全链路 | 存在;延迟 0.1ms(失真,见 GAP-08) |
-| SPAN(`pipeline.*`) | 各管线节点(auth_check→…→write_memory) | 挂在 trace 下但**平铺**(parent=None,无树结构) |
-| GENERATION(`pipeline.llm_generate`) | 模型调用 | metadata 有值,usage/cost 字段为空(见 GAP-08) |
+| Trace(`chat.pipeline` / `chat.pipeline.streaming`) | 一次 `/chat` / `/chat/streaming` 请求全链路 | ✅ 存在;节点 span 全部挂载 |
+| SPAN(`pipeline.*`) | 各管线节点(auth_check→…→write_memory) | ✅ 挂 trace 下;start/end 真实(DB 可查 ms 级耗时) |
+| GENERATION(`pipeline.llm_generate`) | 模型调用 | ✅ model/tokens 落库(2026-08-02 修复 usage 更新) |
 | span.metadata.path | `long`(LLM 生成)/ `short`(skill/缓存/拦截) | ✅ 准确,最可信的路径标记 |
-| span.metadata.total_cost | 本次 LLM 成本(美元;replay 模式为估算) | ✅ 准确(与响应 total_cost 一致) |
+| span.metadata.total_cost | 本次 LLM 成本(美元;replay 模式为估算) | ✅ 准确(与响应 total_cost 一致;generation 的 cost 列需 langfuse 模型定价表,暂用 metadata 兜底) |
 | span.metadata.total_tokens | 本次 token 消耗 | ✅ 准确 |
 | span.metadata.ab_variant | A/B 实验变体(A/B/None) | ✅ 准确(experiment_hook 打标) |
-| span.usage | input/output tokens | ❌ 全 0(已知问题) |
-| span.latency | 节点耗时 | ❌ ≈0(已知问题) |
+| span.usage(prompt/completion tokens) | input/output tokens | ✅ 2026-08-02 修复(原调了不存在的 SDK 方法,静默失败) |
+| span.latency | 节点耗时 | ✅ DB 精确到 ms;⚠️ Public API 的 `latency` 字段显示 0(API 序列化问题),看 UI 或直查库 |
 
-> **实测结论:** LangFuse 里当前「可信」的是 trace 存在性、metadata(path/cost/tokens/ab_variant);
-> 「不可信」的是延迟、usage、父子树结构。真实延迟以响应体 `pipeline_latency_ms` 为准。
+> **实测结论:** 结构/时序/用量/成本(metadata)全部可用。**Public API 字段是 camelCase**(startTime/endTime/
+> parentObservationId),且 observations 的 `latency` 字段疑似不渲染——核实用 DB:
+> `docker exec contextgate-postgres-1 psql -U contextgate -d langfuse -c "SELECT name, start_time, end_time, (end_time-start_time) AS dur FROM observations WHERE trace_id='<id>';"`
 
 ## 3. 什么情况说明需要优化(从 LangFuse 看什么)
 
@@ -75,20 +76,21 @@
 3. **成本分析**: total_cost 高 → 看模型路由(registry 是否选了贵的模型)+ total_tokens(上下文窗口)
 4. **护栏分析**: blocked 频发 → 调 guardrails 模式/阈值;误伤 vs 真实攻击用 input span 的原始文本判断
 5. **链路对比**: AB 变体差异 → experiment_hook 的 ab_experiment_id/variant 分组看
-6. **结构性问题(GAP-08)**: span 树断裂/延迟失真 → 方案见下节,决策后实施
+6. **结构检查**: 用上文 DB 查询核对 span 耗时/用量;发现缺失再按 §6 已知问题排查
 
-## 6. 已知问题(2026-08-02 实测)
+## 6. 已知问题(2026-08-02 实测与修复)
 
-**GAP-08 [Important,待审核] — LangFuse span 树/延迟/用量失真:**
-- 节点 span 全部平铺(`parent_observation_id=None`),DAG 父子关系丢失,UI 看不到「树」
-- span 的 start/end_time 缺失 → latency≈0;usage 全 0;cost 未上 span(只在 metadata)
-- RAG / Agent / Eval 模块未挂 `@observe`,完全不进 LangFuse
-- 根因候选: LangGraph 内部 task 使 Langfuse SDK 的 contextvars 上下文中断;修复候选:
-  ① 官方 `langfuse-langgraph`/CallbackHandler 集成(推荐,专用支持);
-  ② 在 graph 外层手动创建 span + 显式传 trace_id 给节点;
-  ③ 至少给 rag ask 挂 `@observe` 让 RAG 进 LangFuse(成本/用量至少可见)。
-- **影响**: 10-obs 10.1/10.2 的「span 树定位」演示当前不成立,应展示 metadata 分析 + 响应延迟替代;
-  修复后再启用「树」叙事。
+**GAP-08 [已修复] — LangFuse 用量/成本未落库 + streaming 孤儿 trace:**
+- 根因 1(usage 全 0): harness 调用了 langfuse SDK 不存在的 `langfuse_context.update_current_generation`
+  (真实 API 是 `update_current_observation`),异常被 try/except 吞掉 → 用量/模型从未上 span。
+  ✅ 已修(2026-08-02,两处调用改 `update_current_observation`),generation 现带 model/prompt/completion tokens。
+- 根因 2(孤儿根 trace): `/chat/streaming` 入口无 observe 根,节点 span 各自成为根 trace。
+  ✅ 已修(新增 `chat.pipeline.streaming` 根 observe)。
+- 说明: 节点 span 在 Langfuse 数据模型里 parent 指向 trace 本身(parentObservationId 为空是正常语义,
+  线性管线在 UI 呈现为 trace 下的平铺列表,非 bug)。
+- 遗留: generation 的 cost 列依赖 langfuse 模型定价表(deepseek/qwen 未内置),成本以
+  metadata.total_cost 为准;RAG / Agent / Eval 仍未挂 observe 不进 LangFuse(如需,逐个加
+  `@observe(name="rag.ask")` 即可,会各自成为独立 trace)。
 
 > 排查脚本(Public API): `LANGFUSE_PUBLIC_KEY/SECRET_KEY/HOST` 在 config.env,
 > `curl -u <pub>:<sec> $HOST/api/public/traces?limit=5` 可看 trace 列表与 observation 树。

@@ -7,8 +7,8 @@
 
 | # | 验证点 | 操作 | 预期 |
 |---|--------|------|------|
-| 10.1 | LangFuse trace | 浏览器开 `http://localhost:3001`,发一条长路径 /chat | trace 名 `chat.pipeline` 出现;**注意 GAP-08: 当前 span 平铺无树、延迟≈0,勿按「树」验收** |
-| 10.2 | span metadata | 点开 trace 的 `pipeline.llm_generate` | metadata 含 path/total_cost/total_tokens/ab_variant(可信字段) |
+| 10.1 | LangFuse trace | 浏览器开 `http://localhost:3001`,发一条长路径 /chat | trace 名 `chat.pipeline` 出现,节点 span 全挂载;streaming 为 `chat.pipeline.streaming` |
+| 10.2 | span 明细 | 点开 trace 的 `pipeline.llm_generate` | metadata 含 path/total_cost/total_tokens/ab_variant;usage 带 model/tokens(2026-08-02 修复);耗时精确到 ms(DB) |
 | 10.3 | Prometheus | `curl localhost:8000/metrics/`(注意尾斜杠,否则 307) | 指标文本非空 |
 | 10.4 | 缓存统计 | `GET /performance/cache/stats` | total_keys/memory_usage/hit_rate 合理 |
 | 10.5 | 清缓存 | `POST /performance/cache/clear` | 计数归零 |

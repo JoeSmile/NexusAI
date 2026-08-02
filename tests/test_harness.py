@@ -21,6 +21,39 @@ async def test_harness_success():
 
 
 @pytest.mark.asyncio
+async def test_harness_complete_reports_usage_to_langfuse(monkeypatch):
+    """GAP-08 回归: usage 走 update_current_observation(update_current_generation 不存在于 SDK,曾静默失败)。"""
+    from backend.core.harness.llm import LLMHarness
+    import backend.observability.decorators as obs_decorators
+
+    calls: dict = {}
+
+    class FakeCtx:
+        def update_current_observation(self, **kw):
+            calls.update(kw)
+
+        def update_current_trace(self, **kw):
+            pass
+
+    monkeypatch.setattr(obs_decorators, "langfuse_context", FakeCtx())
+    monkeypatch.setattr("backend.core.harness.llm.get_llm_provider", lambda: "mock")
+
+    h = LLMHarness()
+    result = await h.generate(
+        model="deepseek-v4-flash",
+        messages=[{"role": "user", "content": "你好"}],
+        tenant_id="t1",
+        api_key="sk-x",
+        base_url="http://x",
+        max_tokens=100,
+    )
+    assert result.success
+    assert calls.get("model") == "deepseek-v4-flash"
+    usage = calls.get("usage") or {}
+    assert usage.get("input", 0) > 0
+
+
+@pytest.mark.asyncio
 async def test_harness_timeout():
     h = Harness("test_timeout")
 

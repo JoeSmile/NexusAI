@@ -96,7 +96,7 @@ class LLMHarness(Harness):
         try:
             from backend.observability.decorators import langfuse_context
 
-            langfuse_context.update_current_generation(
+            langfuse_context.update_current_observation(
                 model=model,
                 input=str(messages),
                 output=result.output,
@@ -199,7 +199,7 @@ class LLMHarness(Harness):
         try:
             from backend.observability.decorators import langfuse_context
 
-            langfuse_context.update_current_generation(
+            langfuse_context.update_current_observation(
                 model=model,
                 input=str(messages),
                 output=output_text,

@@ -6,6 +6,7 @@ import json
 import re
 import time
 from collections.abc import AsyncIterator
+from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -93,6 +94,7 @@ async def _run_chat_pipeline(
         },
         trace_id=getattr(request.state, "trace_id", None),
     )
+    _inject_langfuse_parent(initial)
 
     try:
         final = await compiled_graph.ainvoke(initial)
@@ -176,6 +178,27 @@ async def _run_chat_pipeline(
 
 
 
+def _inject_langfuse_parent(initial: Any) -> None:
+    """把当前 Langfuse 根 span id 注入 state,让 LangGraph 节点挂成其子 span(GAP-08)。"""
+    try:
+        from backend.observability.decorators import langfuse_context
+
+        tid = langfuse_context.get_current_trace_id()
+        oid = langfuse_context.get_current_observation_id()
+        if tid and oid:
+            initial["_lf_trace_id"] = tid
+            initial["_lf_parent_obs_id"] = oid
+    except Exception:
+        pass
+
+
+@observe(name="chat.pipeline.streaming")
+async def _ainvoke_streaming(initial: Any) -> Any:
+    """streaming 入口: 建立根 trace,避免节点 span 变孤儿根 trace(GAP-08)。"""
+    _inject_langfuse_parent(initial)
+    return await compiled_graph.ainvoke(initial)
+
+
 def _sse_data(payload: dict) -> str:
     return "data: " + json.dumps(payload, ensure_ascii=False) + "\n\n"
 
@@ -211,9 +234,10 @@ async def chat_streaming(
         trace_id=getattr(request.state, "trace_id", None),
     )
     initial["stream_mode"] = True
+    _inject_langfuse_parent(initial)
 
     try:
-        final = await compiled_graph.ainvoke(initial)
+        final = await _ainvoke_streaming(initial)
     except ContextGateException as e:
         return JSONResponse(
             status_code=400,

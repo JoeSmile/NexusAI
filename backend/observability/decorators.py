@@ -39,6 +39,12 @@ except ImportError:
         def update_current_trace(self, **kwargs: Any) -> None:
             return None
 
+        def get_current_trace_id(self) -> None:
+            return None
+
+        def get_current_observation_id(self) -> None:
+            return None
+
     _lf_context = _NoopContext()  # type: ignore[misc]
 
 
