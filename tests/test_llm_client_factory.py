@@ -84,14 +84,19 @@ def test_replay_miss_falls_back_to_mock(monkeypatch, isolated_fixtures):
 
 
 def test_openai_without_api_key_raises(monkeypatch):
-    from backend.core.harness.llm_client import complete_via_provider
+    import backend.core.harness.llm_client as llm_client
 
     monkeypatch.setenv("LLM_PROVIDER", "openai")
     monkeypatch.delenv("LLM_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(llm_client, "_load_key_chain_sync", lambda *a, **k: [])
+    # Config 可能仍有密钥,强制走空
+    monkeypatch.setattr(
+        "backend.modules.llm.harness.Config.LLM_API_KEY", "", raising=False
+    )
 
     with pytest.raises(RuntimeError, match="LLM_API_KEY"):
-        complete_via_provider(
+        llm_client.complete_via_provider(
             "m",
             [{"role": "user", "content": "hi"}],
             api_key="",
@@ -99,14 +104,18 @@ def test_openai_without_api_key_raises(monkeypatch):
 
 
 def test_record_without_api_key_raises(monkeypatch):
-    from backend.core.harness.llm_client import complete_via_provider
+    import backend.core.harness.llm_client as llm_client
 
     monkeypatch.setenv("LLM_PROVIDER", "record")
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(llm_client, "_load_key_chain_sync", lambda *a, **k: [])
+
     with pytest.raises(RuntimeError, match="LLM_API_KEY"):
-        complete_via_provider(
+        llm_client.complete_via_provider(
             "m",
             [{"role": "user", "content": "hi"}],
-            api_key=None,
+            api_key="",
         )
 
 
