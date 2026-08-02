@@ -7,6 +7,7 @@ from backend.core.capability.errors import (
     CapabilityQuotaExceededError,
     CapabilityUpstreamError,
 )
+from backend.core.capability.invoke import invoke
 from backend.core.capability.models import (
     CapabilityKind,
     CapabilityProvider,
@@ -37,6 +38,7 @@ __all__ = [
     "get_cap_quota_daily_calls",
     "get_cap_quota_daily_cost_usd",
     "get_capability_registry",
+    "invoke",
     "model_spec_to_capability",
     "reload_capability_registry",
     "resolve_credential",
