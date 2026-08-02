@@ -8,6 +8,8 @@ Agent Router - Agent路由
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from backend.core.auth.models import TenantContext
+from backend.core.auth.permissions import require_permission
 from backend.services.agent_service import AgentService, get_agent_service
 
 router = APIRouter(prefix="/agent", tags=["agent"])
@@ -32,7 +34,8 @@ class FollowupRequest(BaseModel):
 @router.post("/chat")
 async def agent_chat(
     request: MessageRequest,
-    agent_service: AgentService = Depends(get_agent_service)
+    agent_service: AgentService = Depends(get_agent_service),
+    tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
     """
     Agent聊天接口
@@ -58,7 +61,8 @@ async def agent_chat(
 
 @router.get("/status")
 async def get_agent_status(
-    agent_service: AgentService = Depends(get_agent_service)
+    agent_service: AgentService = Depends(get_agent_service),
+    tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
     """
     获取Agent状态
@@ -82,7 +86,8 @@ async def get_agent_status(
 async def get_execution_history(
     user_id: str,
     limit: int = 10,
-    agent_service: AgentService = Depends(get_agent_service)
+    agent_service: AgentService = Depends(get_agent_service),
+    tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
     """
     获取用户执行历史
@@ -105,7 +110,8 @@ async def get_execution_history(
 @router.get("/memory/{user_id}")
 async def get_memory_summary(
     user_id: str,
-    agent_service: AgentService = Depends(get_agent_service)
+    agent_service: AgentService = Depends(get_agent_service),
+    tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
     """
     获取用户记忆摘要
@@ -127,7 +133,8 @@ async def get_memory_summary(
 
 @router.get("/tools")
 async def get_available_tools(
-    agent_service: AgentService = Depends(get_agent_service)
+    agent_service: AgentService = Depends(get_agent_service),
+    tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
     """
     获取可用工具列表
@@ -150,7 +157,8 @@ async def get_available_tools(
 @router.post("/followup")
 async def plan_followup(
     request: FollowupRequest,
-    agent_service: AgentService = Depends(get_agent_service)
+    agent_service: AgentService = Depends(get_agent_service),
+    tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
     """
     规划回访任务

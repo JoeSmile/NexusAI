@@ -52,6 +52,13 @@ def test_cache_clear_redis_down_returns_503_cache_001(perf_client):
 def test_agent_memory_awaits_summary():
     app = FastAPI()
     app.include_router(agent_router)
+    # Task 29 QA: agent 端点现要求 chat:write 认证——注入认证上下文
+    from backend.core.auth.api_key_auth import verify_api_key
+    from backend.core.auth.models import TenantContext
+
+    app.dependency_overrides[verify_api_key] = lambda: TenantContext(
+        "t1", "user1", "user", [], False
+    )
 
     class _Svc:
         async def get_memory_summary(self, user_id: str):

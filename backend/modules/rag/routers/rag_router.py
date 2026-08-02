@@ -392,7 +392,7 @@ async def upload_multimodal(
         return {
             "success": True,
             "source_type": kind,
-            "message": f"{filename} 已提取并写入知识库",
+            "message": f"{safe_name} 已提取并写入知识库",
             "chunks": len(chunk_ids),
             "chunk_ids": chunk_ids,
         }

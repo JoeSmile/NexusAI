@@ -6,8 +6,10 @@
 import json
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from backend.core.auth.models import TenantContext
+from backend.core.auth.permissions import require_permission
 from backend.database import ChatMessage, DatabaseManager, ResponseEvaluation
 from backend.evaluation_engine import EvaluationEngine
 from backend.logging_config import get_logger
@@ -29,7 +31,10 @@ evaluation_engine = EvaluationEngine()
 
 
 @router.post("/evaluate", response_model=EvaluationResponse)
-async def evaluate_response(request: EvaluationRequest):
+async def evaluate_response(
+    request: EvaluationRequest,
+    tenant: TenantContext = Depends(require_permission("chat:write")),
+):
     """
     评估单个回应
     使用LLM作为裁判，从准确性、完整性、安全性三个维度评分
@@ -92,7 +97,10 @@ async def evaluate_response(request: EvaluationRequest):
 
 
 @router.post("/batch")
-async def batch_evaluate(request: BatchEvaluationRequest):
+async def batch_evaluate(
+    request: BatchEvaluationRequest,
+    tenant: TenantContext = Depends(require_permission("chat:write")),
+):
     """批量评估会话中的对话"""
     try:
         with DatabaseManager() as db:
@@ -173,7 +181,10 @@ async def batch_evaluate(request: BatchEvaluationRequest):
 
 
 @router.post("/compare-prompts")
-async def compare_prompts(request: ComparePromptsRequest):
+async def compare_prompts(
+    request: ComparePromptsRequest,
+    tenant: TenantContext = Depends(require_permission("chat:write")),
+):
     """对比不同Prompt生成的回应"""
     try:
         comparison_result = evaluation_engine.compare_prompts(
@@ -189,7 +200,11 @@ async def compare_prompts(request: ComparePromptsRequest):
 
 
 @router.get("/list", response_model=EvaluationListResponse)
-async def get_evaluations(session_id: str | None = None, limit: int = 100):
+async def get_evaluations(
+    session_id: str | None = None,
+    limit: int = 100,
+    tenant: TenantContext = Depends(require_permission("chat:write")),
+):
     """获取评估列表"""
     try:
         with DatabaseManager() as db:
@@ -229,7 +244,8 @@ async def get_evaluations(session_id: str | None = None, limit: int = 100):
 @router.get("/statistics", response_model=EvaluationStatistics)
 async def get_evaluation_statistics(
     start_date: str | None = None,
-    end_date: str | None = None
+    end_date: str | None = None,
+    tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
     """获取评估统计信息"""
     try:
@@ -247,7 +263,10 @@ async def get_evaluation_statistics(
 
 
 @router.get("/{evaluation_id}")
-async def get_evaluation_detail(evaluation_id: int):
+async def get_evaluation_detail(
+    evaluation_id: int,
+    tenant: TenantContext = Depends(require_permission("chat:write")),
+):
     """获取评估详情"""
     try:
         with DatabaseManager() as db:
@@ -296,7 +315,11 @@ async def get_evaluation_detail(evaluation_id: int):
 
 
 @router.post("/{evaluation_id}/human-verify")
-async def human_verify_evaluation(evaluation_id: int, request: HumanVerificationRequest):
+async def human_verify_evaluation(
+    evaluation_id: int,
+    request: HumanVerificationRequest,
+    tenant: TenantContext = Depends(require_permission("chat:write")),
+):
     """人工验证评估结果"""
     try:
         with DatabaseManager() as db:
@@ -337,7 +360,8 @@ async def human_verify_evaluation(evaluation_id: int, request: HumanVerification
 @router.get("/report/generate")
 async def generate_evaluation_report(
     session_id: str | None = None,
-    limit: int = 100
+    limit: int = 100,
+    tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
     """生成评估报告"""
     try:

@@ -133,7 +133,9 @@ async def list_api_keys(
         if tenant.is_cross_tenant:
             sql = text("""
                 SELECT id, key_prefix, role, tenant_id, user_id,
-                       is_active, description, created_at
+                       COALESCE(is_active, true) AS is_active,
+                       description,
+                       COALESCE(created_at, now()) AS created_at
                 FROM api_keys
                 ORDER BY created_at DESC
             """)
@@ -141,7 +143,9 @@ async def list_api_keys(
         else:
             sql = text("""
                 SELECT id, key_prefix, role, tenant_id, user_id,
-                       is_active, description, created_at
+                       COALESCE(is_active, true) AS is_active,
+                       description,
+                       COALESCE(created_at, now()) AS created_at
                 FROM api_keys WHERE tenant_id = :tid
                 ORDER BY created_at DESC
             """)
@@ -188,14 +192,25 @@ async def list_pending_requests(
     """待审批列表（权限申请 + Skill 人工介入）"""
     session_factory = get_pg_session()
     with session_factory.Session() as session:
-        sql = text("""
-            SELECT id, tenant_id, user_id, resource, resource_type,
-                   action, status, created_at, params
-            FROM approval_requests
-            WHERE tenant_id = :tid AND status = 'pending'
-            ORDER BY created_at DESC
-        """)
-        rows = session.execute(sql, {"tid": tenant.tenant_id}).fetchall()
+        if tenant.is_cross_tenant:
+            # super_admin 跨租户: 看全部租户的待审批(与 list_api_keys 一致)
+            sql = text("""
+                SELECT id, tenant_id, user_id, resource, resource_type,
+                       action, status, created_at, params
+                FROM approval_requests
+                WHERE status = 'pending'
+                ORDER BY created_at DESC
+            """)
+            rows = session.execute(sql).fetchall()
+        else:
+            sql = text("""
+                SELECT id, tenant_id, user_id, resource, resource_type,
+                       action, status, created_at, params
+                FROM approval_requests
+                WHERE tenant_id = :tid AND status = 'pending'
+                ORDER BY created_at DESC
+            """)
+            rows = session.execute(sql, {"tid": tenant.tenant_id}).fetchall()
     return [
         PendingRequest(
             id=r.id,
@@ -221,22 +236,35 @@ async def approve_request(
     session_factory = get_pg_session()
     new_status = "approved" if req.approved else "rejected"
     with session_factory.Session() as session:
-        sql = text("""
-            UPDATE approval_requests
-            SET status = :status, reviewed_by = :by,
-                reviewed_at = now(), review_reason = :reason
-            WHERE id = :id AND tenant_id = :tid
-        """)
-        result = session.execute(
-            sql,
-            {
+        if tenant.is_cross_tenant:
+            # super_admin 跨租户: 不按租户过滤(与 list_api_keys/pending-requests 一致)
+            sql = text("""
+                UPDATE approval_requests
+                SET status = :status, reviewed_by = :by,
+                    reviewed_at = now(), review_reason = :reason
+                WHERE id = :id
+            """)
+            params = {
+                "status": new_status,
+                "by": tenant.user_id,
+                "reason": req.reason,
+                "id": req.request_id,
+            }
+        else:
+            sql = text("""
+                UPDATE approval_requests
+                SET status = :status, reviewed_by = :by,
+                    reviewed_at = now(), review_reason = :reason
+                WHERE id = :id AND tenant_id = :tid
+            """)
+            params = {
                 "status": new_status,
                 "by": tenant.user_id,
                 "reason": req.reason,
                 "id": req.request_id,
                 "tid": tenant.tenant_id,
-            },
-        )
+            }
+        result = session.execute(sql, params)
         session.commit()
         if result.rowcount == 0:
             raise HTTPException(
@@ -263,10 +291,10 @@ async def request_permission(
     with session_factory.Session() as session:
         sql = text("""
             INSERT INTO approval_requests
-                (tenant_id, user_id, resource, resource_type, action, params, status)
+                (tenant_id, user_id, resource, resource_type, action, params, status, created_at)
             VALUES (
                 :tid, :uid, :res, 'permission', 'approve',
-                CAST(:params AS jsonb), 'pending'
+                CAST(:params AS jsonb), 'pending', now()
             )
             RETURNING id
         """)
