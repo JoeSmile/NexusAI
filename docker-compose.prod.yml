@@ -4,6 +4,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./backend/database/init_pgvector.sql:/docker-entrypoint-initdb.d/init_pgvector.sql
+      - ./backend/database/init_langfuse_db.sql:/docker-entrypoint-initdb.d/init_langfuse_db.sql
     environment:
       POSTGRES_DB: contextgate
       POSTGRES_USER: contextgate
@@ -37,21 +38,6 @@ services:
       timeout: 10s
       retries: 3
 
-  langfuse-db-init:
-    image: pgvector/pgvector:pg16
-    volumes:
-      - ./backend/database/ensure_langfuse_db.sh:/ensure_langfuse_db.sh:ro
-    environment:
-      POSTGRES_HOST: postgres
-      POSTGRES_USER: contextgate
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: contextgate
-    entrypoint: ["/bin/sh", "/ensure_langfuse_db.sh"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: "no"
-
   langfuse:
     image: ghcr.io/langfuse/langfuse:2
     ports: ["3001:3000"]
@@ -74,8 +60,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      langfuse-db-init:
-        condition: service_completed_successfully
     restart: always
 
   nginx:
