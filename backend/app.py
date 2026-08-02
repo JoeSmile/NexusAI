@@ -211,6 +211,12 @@ def create_app() -> FastAPI:
             "router",
             label="流式聊天",
         ),
+        "capabilities": _lazy_include(
+            app,
+            "backend.routers.capability",
+            "router",
+            label="Capability Hub",
+        ),
     }
     app.state.feature_flags = features
 
@@ -235,6 +241,8 @@ def create_app() -> FastAPI:
             feature_list.append("Agent智能核心")
         if features.get("intent"):
             feature_list.append("意图识别系统")
+        if features.get("capabilities"):
+            feature_list.append("Capability Hub")
 
         return {
             "name": "ContextGate",
