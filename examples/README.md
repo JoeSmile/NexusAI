@@ -102,7 +102,7 @@ make run         # uvicorn :8000
    # 先设 LLM_KEY_MASTER_KEY(64 hex),再调管理端点
    curl -X POST http://localhost:8000/api/admin/llm-keys \
      -H "X-API-Key: <管理key>" -H "Content-Type: application/json" \
-     -d '{"provider":"zhipu","api_key":"sk-xxx","model":"glm-5.1"}'
+     -d '{"key_alias":"zhipu-prod","api_key_plaintext":"sk-xxx","provider":"zhipu","base_url":""}'
    ```
 
 3. **验证**:打开 `/playground/intent.html`,输入企业问题(如"如何查询公司的信息安全管理制度?"),确认返回:
