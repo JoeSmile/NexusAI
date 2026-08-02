@@ -210,6 +210,23 @@ class LlmApiKey(Base):
     )
 
 
+class Capability(Base):
+    """Capability Registry 持久化（Task 30.02 / alembic 005）。"""
+
+    __tablename__ = "capabilities"
+    id = Column(String, primary_key=True)
+    tenant_id = Column(String, nullable=False, default="*", index=True)
+    name = Column(String, nullable=False)
+    kind = Column(String, nullable=False, index=True)
+    provider = Column(String, nullable=False)
+    spec = Column(JSON, nullable=False, default=dict)
+    status = Column(String, nullable=False, default="enabled")
+    cost_model = Column(JSON, nullable=False, default=dict)
+    permission = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class KnowledgeChunk(Base):
     """RAG 知识块 — 替代 Chroma knowledge collection"""
 

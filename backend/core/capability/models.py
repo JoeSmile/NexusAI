@@ -25,7 +25,9 @@ class CapabilityProvider(StrEnum):
 
 
 class CapabilityStatus(StrEnum):
-    ACTIVE = "active"
+    """与 capabilities.status 列一致（005 migration 默认 enabled）。"""
+
+    ENABLED = "enabled"
     DISABLED = "disabled"
 
 
@@ -38,9 +40,10 @@ class CapabilitySpec:
     kind: CapabilityKind
     provider: CapabilityProvider
     spec: dict[str, Any] = field(default_factory=dict)
-    status: CapabilityStatus = CapabilityStatus.ACTIVE
+    status: CapabilityStatus = CapabilityStatus.ENABLED
     cost_model: dict[str, Any] = field(default_factory=dict)
     permission: str = ""
+    tenant_id: str = "*"
 
     def __post_init__(self) -> None:
         if isinstance(self.kind, str):

@@ -13,6 +13,12 @@ from backend.core.capability.models import (
     CapabilitySpec,
     CapabilityStatus,
 )
+from backend.core.capability.registry import (
+    CapabilityRegistry,
+    get_capability_registry,
+    model_spec_to_capability,
+    reload_capability_registry,
+)
 
 __all__ = [
     "CapabilityDisabledError",
@@ -21,7 +27,11 @@ __all__ = [
     "CapabilityNotFoundError",
     "CapabilityProvider",
     "CapabilityQuotaExceededError",
+    "CapabilityRegistry",
     "CapabilitySpec",
     "CapabilityStatus",
     "CapabilityUpstreamError",
+    "get_capability_registry",
+    "model_spec_to_capability",
+    "reload_capability_registry",
 ]
