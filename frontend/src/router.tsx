@@ -5,6 +5,7 @@ import LoginPage from '@/pages/login'
 import AdminPanel from '@/pages/panels/admin'
 import ChatPanel from '@/pages/panels/chat'
 import PlaceholderPanel from '@/pages/panels/PlaceholderPanel'
+import RagPanel from '@/pages/panels/rag'
 import { useAuthStore } from '@/stores/authStore'
 
 function RequireAuth() {
@@ -28,7 +29,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <Navigate to="/panels/chat" replace /> },
           { path: 'panels/chat', element: <ChatPanel /> },
-          { path: 'panels/rag', element: <PlaceholderPanel /> },
+          { path: 'panels/rag', element: <RagPanel /> },
           { path: 'panels/admin', element: <AdminPanel /> },
           { path: 'panels/audit', element: <PlaceholderPanel /> },
           { path: 'panels/agent', element: <PlaceholderPanel /> },
