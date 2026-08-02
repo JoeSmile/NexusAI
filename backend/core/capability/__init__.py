@@ -15,9 +15,12 @@ from backend.core.capability.models import (
 )
 from backend.core.capability.registry import (
     CapabilityRegistry,
+    get_cap_quota_daily_calls,
+    get_cap_quota_daily_cost_usd,
     get_capability_registry,
     model_spec_to_capability,
     reload_capability_registry,
+    resolve_credential,
 )
 
 __all__ = [
@@ -31,7 +34,10 @@ __all__ = [
     "CapabilitySpec",
     "CapabilityStatus",
     "CapabilityUpstreamError",
+    "get_cap_quota_daily_calls",
+    "get_cap_quota_daily_cost_usd",
     "get_capability_registry",
     "model_spec_to_capability",
     "reload_capability_registry",
+    "resolve_credential",
 ]

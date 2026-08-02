@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 import os
+from functools import lru_cache
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -91,6 +91,11 @@ class Settings(BaseSettings):
     model_registry_json: str = ""
     langfuse_sample_short_path: float = 0.1
     langfuse_sample_long_path: float = 1.0
+
+    # Capability Hub (Task 30.03)
+    capability_registry_json: str = "[]"
+    cap_quota_daily_calls: int = 1000
+    cap_quota_daily_cost_usd: float = 10.0
 
     @model_validator(mode="after")
     def _resolve_fallbacks(self) -> Settings:

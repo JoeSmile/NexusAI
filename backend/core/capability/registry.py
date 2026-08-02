@@ -105,8 +105,18 @@ class CapabilityRegistry:
 
     def load_from_env(self, raw: str | None = None) -> int:
         """从 CAPABILITY_REGISTRY_JSON 加载；返回写入条数。"""
-        text = (raw if raw is not None else os.getenv("CAPABILITY_REGISTRY_JSON", "")).strip()
-        if not text:
+        if raw is None:
+            text = os.getenv("CAPABILITY_REGISTRY_JSON", "").strip()
+            if not text:
+                try:
+                    from config import get_settings
+
+                    text = (get_settings().capability_registry_json or "").strip()
+                except Exception:
+                    text = ""
+        else:
+            text = raw.strip()
+        if not text or text == "[]":
             return 0
         try:
             items = json.loads(text)
@@ -121,6 +131,12 @@ class CapabilityRegistry:
             if not isinstance(item, dict) or "id" not in item or "kind" not in item:
                 continue
             try:
+                nested = dict(item.get("spec") or {})
+                # 顶层 base_url / api_key_ref 写入 spec（config 示例扁平写法）
+                if item.get("base_url") and "base_url" not in nested:
+                    nested["base_url"] = item["base_url"]
+                if item.get("api_key_ref") and "api_key_ref" not in nested:
+                    nested["api_key_ref"] = item["api_key_ref"]
                 spec = CapabilitySpec(
                     id=str(item["id"]),
                     name=str(item.get("name") or item["id"]),
@@ -128,7 +144,7 @@ class CapabilityRegistry:
                     provider=CapabilityProvider(
                         str(item.get("provider", "contextgate"))
                     ),
-                    spec=dict(item.get("spec") or {}),
+                    spec=nested,
                     status=CapabilityStatus(str(item.get("status", "enabled"))),
                     cost_model=dict(item.get("cost_model") or {}),
                     permission=str(item.get("permission") or ""),
@@ -212,3 +228,67 @@ def get_capability_registry(*, reload: bool = False) -> CapabilityRegistry:
 
 def reload_capability_registry() -> CapabilityRegistry:
     return get_capability_registry(reload=True)
+
+
+def resolve_credential(
+    api_key_ref: str,
+    *,
+    tenant_id: str = "*",
+) -> str:
+    """解析能力凭证：KeyManager 加密库优先，env 明文兜底。
+
+    ``api_key_ref`` 通常是 env 名（如 ``DIFY_API_KEY``），也可对应
+    ``llm_api_keys.key_alias``。无 master key / 无 DB 行时退回 ``os.getenv``。
+    """
+    ref = (api_key_ref or "").strip()
+    if not ref:
+        return ""
+
+    # 1) KeyManager + llm_api_keys（按 key_alias）
+    try:
+        from sqlalchemy import text
+
+        from backend.core.key_manager import KeyManager
+        from backend.database.pgvector_session import get_pg_session
+
+        km = KeyManager()
+        pg = get_pg_session()
+        with pg.get_session() as session:
+            row = session.execute(
+                text(
+                    """
+                    SELECT encrypted_key FROM llm_api_keys
+                    WHERE key_alias = :alias AND is_active = true
+                      AND (tenant_id = :tid OR :tid = '*' OR tenant_id = '*')
+                    ORDER BY CASE WHEN tenant_id = :tid THEN 0 ELSE 1 END,
+                             key_version DESC
+                    LIMIT 1
+                    """
+                ),
+                {"alias": ref, "tid": tenant_id},
+            ).fetchone()
+            if row and row[0]:
+                return km.decrypt(str(row[0]))
+    except Exception as exc:
+        logger.debug("resolve_credential KeyManager path skipped: %s", exc)
+
+    # 2) env 明文兜底
+    return os.getenv(ref, "") or ""
+
+
+def get_cap_quota_daily_calls() -> int:
+    try:
+        from config import get_settings
+
+        return int(get_settings().cap_quota_daily_calls)
+    except Exception:
+        return int(os.getenv("CAP_QUOTA_DAILY_CALLS", "1000") or 1000)
+
+
+def get_cap_quota_daily_cost_usd() -> float:
+    try:
+        from config import get_settings
+
+        return float(get_settings().cap_quota_daily_cost_usd)
+    except Exception:
+        return float(os.getenv("CAP_QUOTA_DAILY_COST_USD", "10.0") or 10.0)
