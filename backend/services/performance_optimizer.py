@@ -282,6 +282,37 @@ class CacheManager:
             logger.warning("chat epoch bump 失败(降级): %s", e)
             return 0
 
+    async def bump_all_tenant_epochs(self) -> int:
+        """运维清全站 chat 缓存：发现所有相关租户并 INCR 各自 epoch。"""
+        tids: set[str] = {"default"}
+        r = await self._opt._ensure_redis()
+        if r is not None:
+            try:
+                for match in ("chat:epoch:*", "chat:v:*"):
+                    cursor = 0
+                    while True:
+                        cursor, keys = await r.scan(
+                            cursor=cursor, match=match, count=200
+                        )
+                        for raw in keys or []:
+                            key = raw.decode() if isinstance(raw, bytes) else str(raw)
+                            if key.startswith("chat:epoch:"):
+                                tid = key[len("chat:epoch:") :]
+                                if tid:
+                                    tids.add(tid)
+                            elif key.startswith("chat:v:"):
+                                # chat:v:<epoch>:<tenant>:<logical...>
+                                parts = key.split(":")
+                                if len(parts) >= 5 and parts[3]:
+                                    tids.add(parts[3])
+                        if cursor == 0:
+                            break
+            except Exception as e:
+                logger.warning("scan chat epochs 失败(仍 bump default): %s", e)
+        for tid in sorted(tids):
+            await self.bump_epoch(tid)
+        return len(tids)
+
     async def get_or_set(
         self,
         key: str,
@@ -342,9 +373,9 @@ class CacheManager:
         return value
 
     async def invalidate_pattern(self, pattern: str) -> None:
-        """SCAN 匹配删除；``*`` / chat 通配 → bump 默认租户 epoch。"""
+        """SCAN 匹配删除；``*`` / chat 通配 → bump **全部**已知租户 epoch（1A）。"""
         if not pattern or pattern in ("*", "chat:*", "chat:v:*"):
-            await self.bump_epoch("default")
+            await self.bump_all_tenant_epochs()
             return
         r = await self._opt._ensure_redis()
         if r is None:

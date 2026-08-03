@@ -134,10 +134,12 @@ async def test_single_flight_only_one_compute(cm: CacheManager) -> None:
 
 
 @pytest.mark.asyncio
-async def test_invalidate_star_bumps_epoch(cm: CacheManager) -> None:
+async def test_invalidate_star_bumps_all_tenant_epochs(cm: CacheManager) -> None:
     async def compute():
         return {"a": 1}
 
     await cm.get_or_set("k", compute, tenant_id="default")
+    await cm.get_or_set("k", compute, tenant_id="t-other")
     await cm.invalidate_pattern("*")
     assert await cm.get_epoch("default") >= 1
+    assert await cm.get_epoch("t-other") >= 1
