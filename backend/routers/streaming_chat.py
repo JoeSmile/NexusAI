@@ -11,15 +11,20 @@ import json
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 
+from backend.core.auth.permissions import require_permission
 from backend.logging_config import get_logger
 from backend.services.optimized_chat_service import optimized_chat_service
 
 logger = get_logger(__name__)
 
-router = APIRouter(prefix="/streaming", tags=["流式聊天"])
+router = APIRouter(
+    prefix="/streaming",
+    tags=["流式聊天"],
+    dependencies=[Depends(require_permission("chat:write"))],
+)
 
 _DEP_TRUE = "true"
 

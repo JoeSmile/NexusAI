@@ -17,9 +17,18 @@ from backend.services.agent_service import get_agent_service
 
 @pytest.fixture
 def perf_client(monkeypatch):
+    from backend.core.auth.api_key_auth import verify_api_key
+    from backend.core.auth.models import TenantContext
+
     app = FastAPI()
     app.include_router(perf_router)
-    return TestClient(app), monkeypatch
+    # 路由现要求 chat:write；清缓存另需 tenant_admin
+    app.dependency_overrides[verify_api_key] = lambda: TenantContext(
+        "t1", "admin1", "tenant_admin", [], False
+    )
+    client = TestClient(app)
+    yield client, monkeypatch
+    app.dependency_overrides.clear()
 
 
 def test_cache_stats_redis_down_returns_503_cache_001(perf_client):

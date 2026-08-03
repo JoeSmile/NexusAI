@@ -10,6 +10,9 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from backend.core.auth.models import TenantContext
+from backend.core.auth.permissions import require_permission
+from backend.core.auth.scope import assert_user_access
 from backend.database import UserPersonalization, get_db
 from backend.models import (
     PersonalizationUpdateRequest,
@@ -26,7 +29,8 @@ logger = logging.getLogger(__name__)
 # 创建路由器
 router = APIRouter(
     prefix="/api/personalization",
-    tags=["personalization"]
+    tags=["personalization"],
+    dependencies=[Depends(require_permission("chat:write"))],
 )
 
 
@@ -87,7 +91,11 @@ async def get_template_detail(template_id: str):
 
 
 @router.get("/config/{user_id}")
-async def get_user_config(user_id: str, db: Session = Depends(get_db)):
+async def get_user_config(
+    user_id: str,
+    db: Session = Depends(get_db),
+    tenant: TenantContext = Depends(require_permission("chat:write")),
+):
     """
     获取用户的个性化配置
     
@@ -102,6 +110,7 @@ async def get_user_config(user_id: str, db: Session = Depends(get_db)):
     GET /api/personalization/config/user_123
     ```
     """
+    user_id = assert_user_access(tenant, user_id)
     try:
         config_db = db.query(UserPersonalization).filter(
             UserPersonalization.user_id == user_id
@@ -180,7 +189,8 @@ async def get_user_config(user_id: str, db: Session = Depends(get_db)):
 async def create_or_update_config(
     user_id: str,
     update_data: PersonalizationUpdateRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
     """
     创建或更新用户的个性化配置
@@ -202,6 +212,7 @@ async def create_or_update_config(
     **返回**:
     更新后的完整配置
     """
+    user_id = assert_user_access(tenant, user_id)
     try:
         # 查找现有配置
         config_db = db.query(UserPersonalization).filter(
@@ -279,7 +290,8 @@ async def create_or_update_config(
 async def apply_template(
     user_id: str,
     template_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
     """
     应用角色模板到用户配置
@@ -296,6 +308,7 @@ async def apply_template(
     **返回**:
     应用模板后的完整配置
     """
+    user_id = assert_user_access(tenant, user_id)
     try:
         # 获取模板
         template = get_role_template(template_id)
@@ -324,7 +337,11 @@ async def apply_template(
 
 
 @router.delete("/config/{user_id}")
-async def delete_user_config(user_id: str, db: Session = Depends(get_db)):
+async def delete_user_config(
+    user_id: str,
+    db: Session = Depends(get_db),
+    tenant: TenantContext = Depends(require_permission("chat:write")),
+):
     """
     删除用户的个性化配置（重置为默认）
     
@@ -334,6 +351,7 @@ async def delete_user_config(user_id: str, db: Session = Depends(get_db)):
     **返回**:
     删除结果
     """
+    user_id = assert_user_access(tenant, user_id)
     try:
         config_db = db.query(UserPersonalization).filter(
             UserPersonalization.user_id == user_id
@@ -362,7 +380,8 @@ async def delete_user_config(user_id: str, db: Session = Depends(get_db)):
 async def preview_prompt(
     user_id: str,
     context: str = "用户说：请帮我分析这份数据...",
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
     """
     预览根据当前配置生成的Prompt
@@ -381,9 +400,10 @@ async def preview_prompt(
     GET /api/personalization/preview/user_123?context=请帮我总结这份报告
     ```
     """
+    user_id = assert_user_access(tenant, user_id)
     try:
         # 获取用户配置
-        config_response = await get_user_config(user_id, db)
+        config_response = await get_user_config(user_id, db, tenant)
         config = config_response["config"]
         
         # 创建Prompt组合器
@@ -408,7 +428,8 @@ async def preview_prompt(
 async def record_feedback(
     user_id: str,
     feedback_type: str,  # positive/negative
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
     """
     记录用户对个性化配置的反馈
@@ -422,6 +443,7 @@ async def record_feedback(
     **返回**:
     更新后的统计信息
     """
+    user_id = assert_user_access(tenant, user_id)
     try:
         config_db = db.query(UserPersonalization).filter(
             UserPersonalization.user_id == user_id

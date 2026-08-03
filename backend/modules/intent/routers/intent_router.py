@@ -8,6 +8,8 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from backend.core.auth.permissions import require_permission
+
 from ..models.intent_models import IntentRequest, IntentResult, IntentType
 from ..services.intent_service import IntentService
 
@@ -18,6 +20,7 @@ router = APIRouter(
     prefix="/intent",
     tags=["intent", "意图识别"],
     responses={404: {"description": "Not found"}},
+    dependencies=[Depends(require_permission("chat:write"))],
 )
 
 # 全局意图服务实例

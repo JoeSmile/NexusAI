@@ -3,8 +3,11 @@
 反馈相关路由
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from backend.core.auth.models import TenantContext
+from backend.core.auth.permissions import require_permission
+from backend.core.auth.scope import require_tenant_admin
 from backend.database import DatabaseManager
 from backend.logging_config import get_logger
 from backend.models import (
@@ -14,18 +17,25 @@ from backend.models import (
     FeedbackStatistics,
 )
 
-router = APIRouter(prefix="/feedback", tags=["feedback"])
+router = APIRouter(
+    prefix="/feedback",
+    tags=["feedback"],
+    dependencies=[Depends(require_permission("chat:write"))],
+)
 logger = get_logger(__name__)
 
 
 @router.post("/", response_model=FeedbackResponse)
-async def submit_feedback(request: FeedbackRequest):
+async def submit_feedback(
+    request: FeedbackRequest,
+    tenant: TenantContext = Depends(require_permission("chat:write")),
+):
     """提交用户反馈"""
     try:
         with DatabaseManager() as db:
             feedback = db.save_feedback(
                 session_id=request.session_id,
-                user_id=request.user_id or "anonymous",
+                user_id=request.user_id or tenant.user_id,
                 message_id=request.message_id,
                 feedback_type=request.feedback_type,
                 rating=request.rating,
@@ -47,8 +57,11 @@ async def submit_feedback(request: FeedbackRequest):
 
 
 @router.get("/statistics", response_model=FeedbackStatistics)
-async def get_feedback_statistics():
-    """获取反馈统计信息"""
+async def get_feedback_statistics(
+    tenant: TenantContext = Depends(require_permission("chat:write")),
+):
+    """获取反馈统计信息（admin）"""
+    require_tenant_admin(tenant)
     try:
         with DatabaseManager() as db:
             stats = db.get_feedback_statistics()
@@ -59,8 +72,13 @@ async def get_feedback_statistics():
 
 
 @router.get("/list", response_model=FeedbackListResponse)
-async def get_feedback_list(feedback_type: str | None = None, limit: int = 100):
-    """获取反馈列表"""
+async def get_feedback_list(
+    feedback_type: str | None = None,
+    limit: int = 100,
+    tenant: TenantContext = Depends(require_permission("chat:write")),
+):
+    """获取反馈列表（admin）"""
+    require_tenant_admin(tenant)
     try:
         with DatabaseManager() as db:
             feedbacks = db.get_all_feedback(feedback_type=feedback_type, limit=limit)
@@ -117,8 +135,12 @@ async def get_session_feedback(session_id: str):
 
 
 @router.put("/{feedback_id}/resolve")
-async def resolve_feedback(feedback_id: int):
-    """标记反馈已解决"""
+async def resolve_feedback(
+    feedback_id: int,
+    tenant: TenantContext = Depends(require_permission("chat:write")),
+):
+    """标记反馈已解决（admin）"""
+    require_tenant_admin(tenant)
     try:
         with DatabaseManager() as db:
             feedback = db.mark_feedback_resolved(feedback_id)

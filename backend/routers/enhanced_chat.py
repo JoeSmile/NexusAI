@@ -10,13 +10,20 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 
+from backend.core.auth.models import TenantContext
+from backend.core.auth.permissions import require_permission
+from backend.core.auth.scope import assert_user_access
 from backend.logging_config import get_logger
 from backend.models import ChatRequest, ChatResponse
 from backend.services.enhanced_chat_service import EnhancedChatService
 
-router = APIRouter(prefix="/enhanced-chat", tags=["增强版聊天"])
+router = APIRouter(
+    prefix="/enhanced-chat",
+    tags=["增强版聊天"],
+    dependencies=[Depends(require_permission("chat:write"))],
+)
 logger = get_logger(__name__)
 
 enhanced_chat_service = EnhancedChatService(
@@ -66,11 +73,15 @@ async def get_session_history(
 
 @router.get("/users/{user_id}/sessions", deprecated=True)
 async def get_user_sessions(
-    user_id: str, response: Response, limit: int = 50
+    user_id: str,
+    response: Response,
+    limit: int = 50,
+    tenant: TenantContext = Depends(require_permission("chat:write")),
 ) -> Any:
     """用户会话列表（deprecated；无 1:1 主入口——见模块 docstring）。"""
+    uid = assert_user_access(tenant, user_id)
     try:
-        sessions = await enhanced_chat_service.get_user_sessions(user_id, limit)
+        sessions = await enhanced_chat_service.get_user_sessions(uid, limit)
         _stamp(response, "/memory/users/{user_id}/statistics")
         return sessions
     except Exception as e:
@@ -97,10 +108,15 @@ async def delete_session(session_id: str, response: Response) -> dict[str, str]:
 
 
 @router.get("/users/{user_id}/profile", deprecated=True)
-async def get_user_profile(user_id: str, response: Response) -> Any:
+async def get_user_profile(
+    user_id: str,
+    response: Response,
+    tenant: TenantContext = Depends(require_permission("chat:write")),
+) -> Any:
     """用户画像（deprecated → ``GET /memory/users/{uid}/profile``）。"""
+    uid = assert_user_access(tenant, user_id)
     try:
-        profile = await enhanced_chat_service.get_user_profile(user_id)
+        profile = await enhanced_chat_service.get_user_profile(uid)
         _stamp(response, "/memory/users/{user_id}/profile")
         return profile
     except Exception as e:
@@ -110,13 +126,17 @@ async def get_user_profile(user_id: str, response: Response) -> Any:
 
 @router.get("/users/{user_id}/memories", deprecated=True)
 async def get_user_memories(
-    user_id: str, response: Response, limit: int = 10
+    user_id: str,
+    response: Response,
+    limit: int = 10,
+    tenant: TenantContext = Depends(require_permission("chat:write")),
 ) -> dict[str, Any]:
     """用户记忆（deprecated → ``GET /memory/users/{uid}/memories``）。"""
+    uid = assert_user_access(tenant, user_id)
     try:
-        memories = await enhanced_chat_service.get_user_memories(user_id, limit)
+        memories = await enhanced_chat_service.get_user_memories(uid, limit)
         _stamp(response, "/memory/users/{user_id}/memories")
-        return {"user_id": user_id, "memories": memories, "total": len(memories)}
+        return {"user_id": uid, "memories": memories, "total": len(memories)}
     except Exception as e:
         logger.error(f"获取用户记忆错误: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e

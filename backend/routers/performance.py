@@ -9,16 +9,23 @@ import time
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from backend.core.auth.models import TenantContext
+from backend.core.auth.permissions import require_permission
+from backend.core.auth.scope import require_tenant_admin
 from backend.logging_config import get_logger
 from backend.services.optimized_chat_service import optimized_chat_service
 from backend.services.performance_optimizer import cache_manager, performance_optimizer
 
 logger = get_logger(__name__)
 
-# 创建路由器
-router = APIRouter(prefix="/performance", tags=["性能监控"])
+# 创建路由器（读指标需登录；清缓存/改配置另需 admin）
+router = APIRouter(
+    prefix="/performance",
+    tags=["性能监控"],
+    dependencies=[Depends(require_permission("chat:write"))],
+)
 
 
 @router.get("/metrics")
@@ -114,9 +121,12 @@ async def get_cache_stats():
 
 
 @router.post("/cache/clear")
-async def clear_cache(pattern: str | None = None):
+async def clear_cache(
+    pattern: str | None = None,
+    tenant: TenantContext = Depends(require_permission("chat:write")),
+):
     """
-    清除缓存
+    清除缓存（仅 tenant_admin / super_admin）
     
     Args:
         pattern: 缓存键模式，如果为空则清除所有缓存
@@ -124,6 +134,7 @@ async def clear_cache(pattern: str | None = None):
     Returns:
         清除结果
     """
+    require_tenant_admin(tenant)
     try:
         if pattern:
             await cache_manager.invalidate_pattern(pattern)
@@ -135,6 +146,7 @@ async def clear_cache(pattern: str | None = None):
         return {
             "status": "success",
             "message": message,
+            "tenant_id": tenant.tenant_id,
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
@@ -195,9 +207,12 @@ async def get_optimization_config():
 
 
 @router.post("/optimization/config")
-async def update_optimization_config(config: dict[str, Any]):
+async def update_optimization_config(
+    config: dict[str, Any],
+    tenant: TenantContext = Depends(require_permission("chat:write")),
+):
     """
-    更新优化配置
+    更新优化配置（仅 tenant_admin / super_admin）
     
     Args:
         config: 新的配置参数
@@ -205,6 +220,7 @@ async def update_optimization_config(config: dict[str, Any]):
     Returns:
         更新结果
     """
+    require_tenant_admin(tenant)
     try:
         # 更新配置
         if "cache_enabled" in config:

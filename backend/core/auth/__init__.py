@@ -7,16 +7,20 @@ from backend.core.auth.permissions import (
     require_any_permission,
     require_permission,
 )
+from backend.core.auth.scope import assert_user_access, can_access_user, require_tenant_admin
 from backend.core.auth.signature_auth import SignatureMiddleware, sign_request
 
 __all__ = [
     "ROLES",
     "SignatureMiddleware",
     "TenantContext",
+    "assert_user_access",
+    "can_access_user",
     "cross_tenant_only",
     "optional_api_key",
     "require_any_permission",
     "require_permission",
+    "require_tenant_admin",
     "sign_request",
     "verify_api_key",
 ]
