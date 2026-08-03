@@ -217,6 +217,12 @@ def create_app() -> FastAPI:
             "router",
             label="Capability Hub",
         ),
+        "agents": _lazy_include(
+            app,
+            "backend.routers.agents",
+            "router",
+            label="Agent 市场",
+        ),
     }
     app.state.feature_flags = features
 

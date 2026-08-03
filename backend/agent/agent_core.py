@@ -280,11 +280,13 @@ class AgentCore:
         user_input: str,
         user_id: str,
         conversation_id: str | None = None,
+        capabilities: list[str] | None = None,  # noqa: ARG002 — Hub 门面注入预留
     ) -> dict[str, Any]:
         """
         处理用户输入 — Runtime 版
 
-        对外接口与旧版完全兼容，内部使用 ConversationRuntime.process_turn()
+        对外接口与旧版完全兼容，内部使用 ConversationRuntime.process_turn()。
+        ``capabilities`` 由 Capability Hub Agent 门面透传（Task 30.24），当前可选忽略。
         """
         interaction_id = str(uuid.uuid4())
         start_time = datetime.now()

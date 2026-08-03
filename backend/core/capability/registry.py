@@ -69,9 +69,11 @@ class CapabilityRegistry:
         self._by_id: dict[str, CapabilitySpec] = {}
 
     def register(self, spec: CapabilitySpec) -> None:
+        from backend.core.capability.agents import validate_agent_spec
         from backend.core.capability.governance import validate_governance_declaration
 
         validate_governance_declaration(spec)
+        validate_agent_spec(spec)
         self._by_id[spec.id] = spec
 
     def get(self, capability_id: str, *, require_enabled: bool = True) -> CapabilitySpec:

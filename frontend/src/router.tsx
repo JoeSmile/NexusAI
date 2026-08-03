@@ -9,7 +9,6 @@ import ChatPanel from '@/pages/panels/chat'
 import EvalPanel from '@/pages/panels/eval'
 import CapabilitiesPanel from '@/pages/panels/capabilities'
 import PerformancePanel from '@/pages/panels/performance'
-import PlaceholderPanel from '@/pages/panels/PlaceholderPanel'
 import RagPanel from '@/pages/panels/rag'
 import { useAuthStore } from '@/stores/authStore'
 

@@ -1,7 +1,12 @@
 """
 Agent Router - Agent路由
 
-提供Agent相关的API端点
+提供Agent相关的API端点。
+
+.. deprecated::
+    Task 30.24 起能力化调用请走 ``POST /api/capabilities/{id}/invoke``
+    与 ``GET /api/agents``。本路由保留兼容；实现仍为 ``backend/agent`` V2 Runtime。
+    ``backend/modules/agent/`` 为未挂载孤儿副本，勿引用。
 """
 
 
