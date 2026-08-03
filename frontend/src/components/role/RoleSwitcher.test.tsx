@@ -70,4 +70,19 @@ describe('RoleSwitcher UI', () => {
     )
     expect(screen.queryByRole('alert')).toBeNull()
   })
+
+  it('switchRole causes next apiGet to send the new X-API-Key', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ([]),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    useAuthStore.getState().switchRole('super_admin')
+    await apiGet('/api/admin/api-keys')
+    const headers = fetchMock.mock.calls[0][1].headers as Headers
+    expect(headers.get('X-API-Key')).toBe('k-super')
+    expect(useAuthStore.getState().activeRole).toBe('super_admin')
+  })
 })

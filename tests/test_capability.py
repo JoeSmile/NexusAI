@@ -335,14 +335,3 @@ async def test_model_invoke_skips_invoke_layer_record_consumption(
         ):
             pass
     assert rec.call_count == 0
-
-
-def test_agent_self_ref_and_depth_covered_in_agents_suite() -> None:
-    """30.27 AC：Agent 自引用/深度 — 实现于 tests/test_capability_agents.py。"""
-    from tests.test_capability_agents import (
-        test_agent_depth_limit,
-        test_self_reference_rejected_on_register,
-    )
-
-    assert callable(test_self_reference_rejected_on_register)
-    assert callable(test_agent_depth_limit)
