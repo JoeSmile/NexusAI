@@ -110,8 +110,12 @@ async def get_feedback_list(
 
 
 @router.get("/session/{session_id}")
-async def get_session_feedback(session_id: str):
-    """获取特定会话的反馈"""
+async def get_session_feedback(
+    session_id: str,
+    tenant: TenantContext = Depends(require_permission("chat:write")),
+):
+    """获取特定会话的反馈（tenant_admin / super_admin）。"""
+    require_tenant_admin(tenant)
     try:
         with DatabaseManager() as db:
             feedbacks = db.get_feedback_by_session(session_id)

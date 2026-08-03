@@ -80,11 +80,15 @@ def test_agent_memory_awaits_summary():
 
     app.dependency_overrides[get_agent_service] = lambda: _Svc()
     client = TestClient(app)
-    r = client.get("/agent/memory/alice")
+    # 普通 user 仅可查本人（2B / assert_user_access）
+    r = client.get("/agent/memory/user1")
     assert r.status_code == 200
     data = r.json()
     assert data["code"] == 200
-    assert data["data"]["user_id"] == "alice"
+    assert data["data"]["user_id"] == "user1"
+    deny = client.get("/agent/memory/alice")
+    assert deny.status_code == 403
+    assert deny.json()["detail"]["code"] == "AUTH_004"
     app.dependency_overrides.clear()
 
 

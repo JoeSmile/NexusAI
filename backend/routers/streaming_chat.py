@@ -11,9 +11,10 @@ import json
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, WebSocket
 from fastapi.responses import JSONResponse, StreamingResponse
 
+from backend.core.auth.api_key_auth import verify_api_key
 from backend.core.auth.permissions import require_permission
 from backend.logging_config import get_logger
 from backend.services.optimized_chat_service import optimized_chat_service
@@ -196,9 +197,37 @@ async def test_streaming():
     )
 
 
+async def _authenticate_websocket(websocket: WebSocket):
+    """握手鉴权（1A）：X-API-Key header；失败则 close 1008，不 accept。"""
+    api_key = websocket.headers.get("x-api-key")
+    if not api_key:
+        await websocket.close(code=1008)
+        raise HTTPException(
+            status_code=401,
+            detail={"code": "AUTH_001", "message": "missing_api_key"},
+        )
+    try:
+        tenant = await verify_api_key(api_key=api_key)
+    except HTTPException:
+        await websocket.close(code=1008)
+        raise
+    if not tenant.has_permission("chat:write"):
+        await websocket.close(code=1008)
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "AUTH_002", "message": "insufficient_permissions"},
+        )
+    return tenant
+
+
 @router.websocket("/ws")
-async def websocket_chat(websocket):
+async def websocket_chat(websocket: WebSocket):
     """WebSocket 流式聊天（旁路保留；主入口请用 SSE ``/chat/streaming``）。"""
+    try:
+        await _authenticate_websocket(websocket)
+    except HTTPException:
+        return
+
     try:
         await websocket.accept()
 

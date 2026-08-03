@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from backend.core.auth.models import TenantContext
 from backend.core.auth.permissions import require_permission
+from backend.core.auth.scope import assert_user_access, resolve_acting_user_id
 from backend.services.agent_service import AgentService, get_agent_service
 
 router = APIRouter(prefix="/agent", tags=["agent"])
@@ -24,14 +25,14 @@ router = APIRouter(prefix="/agent", tags=["agent"])
 
 class MessageRequest(BaseModel):
     """消息请求"""
-    user_id: str
+    user_id: str = ""
     message: str
     conversation_id: str | None = None
 
 
 class FollowupRequest(BaseModel):
     """回访请求"""
-    user_id: str
+    user_id: str = ""
 
 
 # ==================== API端点 ====================
@@ -45,11 +46,13 @@ async def agent_chat(
     """
     Agent聊天接口
     
-    使用Agent模式处理用户消息，提供智能规划和工具调用
+    使用Agent模式处理用户消息，提供智能规划和工具调用。
+    body.user_id 默认=调用者；仅 admin 可覆写为他人（2B）。
     """
     try:
+        uid = resolve_acting_user_id(tenant, request.user_id)
         result = await agent_service.process_message(
-            user_id=request.user_id or tenant.user_id,
+            user_id=uid,
             message=request.message,
             conversation_id=request.conversation_id,
             tenant_id=tenant.tenant_id,
@@ -61,6 +64,8 @@ async def agent_chat(
             "data": result
         }
     
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -98,8 +103,9 @@ async def get_execution_history(
     """
     获取用户执行历史
     
-    查看用户与Agent的交互记录
+    查看用户与Agent的交互记录；非 admin 仅可查本人。
     """
+    assert_user_access(tenant, user_id)
     try:
         history = agent_service.get_execution_history(user_id, limit)
         
@@ -122,8 +128,9 @@ async def get_memory_summary(
     """
     获取用户记忆摘要
     
-    查看用户画像、工作记忆、行为日志等
+    查看用户画像、工作记忆、行为日志等；非 admin 仅可查本人。
     """
+    assert_user_access(tenant, user_id)
     try:
         summary = await agent_service.get_memory_summary(user_id)
         
@@ -169,10 +176,11 @@ async def plan_followup(
     """
     规划回访任务
     
-    为用户创建回访计划
+    为用户创建回访计划；body.user_id 仅 admin 可覆写（2B）。
     """
     try:
-        followup = await agent_service.schedule_followup(request.user_id)
+        uid = resolve_acting_user_id(tenant, request.user_id)
+        followup = await agent_service.schedule_followup(uid)
         
         if followup:
             return {
@@ -187,6 +195,8 @@ async def plan_followup(
                 "data": None
             }
     
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

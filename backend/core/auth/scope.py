@@ -47,3 +47,23 @@ def require_tenant_admin(tenant: TenantContext) -> TenantContext:
             },
         )
     return tenant
+
+
+def resolve_acting_user_id(
+    tenant: TenantContext, requested_user_id: str | None
+) -> str:
+    """解析操作对象 user_id：默认调用者；仅 admin 可覆写（不含 auditor）。"""
+    requested = (requested_user_id or "").strip()
+    if not requested or requested == tenant.user_id:
+        return tenant.user_id
+    # 覆写他人：tenant_admin / super_admin / admin:*（auditor 虽跨租户只读，不可代写）
+    if tenant.role in ("tenant_admin", "super_admin") or tenant.has_permission("admin:*"):
+        return requested
+    raise HTTPException(
+        status_code=403,
+        detail={
+            "code": "AUTH_004",
+            "message": "user_scope_denied",
+            "hint": "only_admin_may_override_user_id",
+        },
+    )
