@@ -175,6 +175,76 @@ def test_rule_based_session_summary() -> None:
     assert "助手末回" in text
 
 
+def test_list_session_messages_head_tail_skips_middle() -> None:
+    """长会话只取头尾，近况来自末条而非中间。"""
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock, patch
+
+    from backend.core.memory_service import (
+        UnifiedMemoryService,
+        rule_based_session_summary,
+    )
+
+    # 60 条：头 2 + 尾 2，中间应被跳过
+    rows = [
+        SimpleNamespace(
+            id=i,
+            role="user" if i % 2 == 0 else "assistant",
+            content=f"m{i}",
+            created_at=i,
+        )
+        for i in range(60)
+    ]
+
+    class _Sess:
+        def __init__(self) -> None:
+            self._order_calls = 0
+
+        def query(self, model):  # noqa: ANN001
+            q = MagicMock()
+            filt = MagicMock()
+            q.filter_by.return_value = filt
+            filt.count.return_value = 60
+
+            def order_by(_col):  # noqa: ANN001
+                chain = MagicMock()
+                idx = self._order_calls
+                self._order_calls += 1
+
+                def _limit(n: int):
+                    lim = MagicMock()
+                    if idx == 0:
+                        lim.all.return_value = rows[:n]
+                    else:
+                        lim.all.return_value = list(reversed(rows[-n:]))
+                    return lim
+
+                chain.limit.side_effect = _limit
+                return chain
+
+            filt.order_by.side_effect = order_by
+            return q
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    svc = UnifiedMemoryService(tenant_id="t1")
+    with patch(
+        "backend.core.memory_service.get_pg_session",
+        return_value=MagicMock(Session=lambda: _Sess()),
+    ):
+        out = svc.list_session_messages_head_tail(
+            user_id="u1", session_id="s1", head_k=2, tail_k=2
+        )
+    assert [m["content"] for m in out] == ["m0", "m1", "m58", "m59"]
+    summary = rule_based_session_summary(out)
+    assert "开场" in summary and "m0" in summary
+    assert "近况" in summary and ("m58" in summary or "m59" in summary)
+
+
 @pytest.mark.asyncio
 async def test_maybe_cold_summarize_triggers_on_threshold() -> None:
     from types import SimpleNamespace

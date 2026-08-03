@@ -35,6 +35,8 @@ _DEFAULT_HOT_LIMIT = 5
 _DEFAULT_MEMORY_BUDGET_RATIO = 0.30
 _DEFAULT_CONTEXT_TOKENS = 8192
 _DEFAULT_COLD_MIN_MESSAGES = 10  # ≈5 轮对话
+_DEFAULT_COLD_HEAD_K = 25
+_DEFAULT_COLD_TAIL_K = 25
 
 
 def _cold_min_messages() -> int:
@@ -217,6 +219,55 @@ class UnifiedMemoryService:
             )
         return [{"role": r.role, "content": r.content} for r in rows]
 
+    def list_session_messages_head_tail(
+        self,
+        *,
+        user_id: str,
+        session_id: str,
+        head_k: int = _DEFAULT_COLD_HEAD_K,
+        tail_k: int = _DEFAULT_COLD_TAIL_K,
+    ) -> list[dict[str, Any]]:
+        """首尾取样：开场 head_k + 近况 tail_k（中间省略，对齐 32.63 首尾+关键句）。"""
+        head_k = max(1, int(head_k))
+        tail_k = max(1, int(tail_k))
+        session_factory = get_pg_session()
+        with session_factory.Session() as session:
+
+            def _base():
+                return session.query(ChatMessage).filter_by(
+                    tenant_id=self.tenant_id,
+                    user_id=user_id,
+                    session_id=session_id,
+                )
+
+            total = _base().count()
+            if total <= 0:
+                return []
+            if total <= head_k + tail_k:
+                rows = _base().order_by(ChatMessage.created_at.asc()).limit(total).all()
+                return [{"role": r.role, "content": r.content} for r in rows]
+
+            head_rows = (
+                _base().order_by(ChatMessage.created_at.asc()).limit(head_k).all()
+            )
+            tail_rows = list(
+                reversed(
+                    _base()
+                    .order_by(ChatMessage.created_at.desc())
+                    .limit(tail_k)
+                    .all()
+                )
+            )
+            seen: set[Any] = {getattr(r, "id", id(r)) for r in head_rows}
+            merged = list(head_rows)
+            for r in tail_rows:
+                rid = getattr(r, "id", id(r))
+                if rid in seen:
+                    continue
+                merged.append(r)
+                seen.add(rid)
+            return [{"role": r.role, "content": r.content} for r in merged]
+
     async def maybe_cold_summarize(
         self,
         *,
@@ -227,6 +278,7 @@ class UnifiedMemoryService:
         """会话消息数达阈值且为阈值整数倍时，写入规则 cold 摘要。
 
         阈值默认 ``COLD_SUMMARY_MIN_MESSAGES``（10）。LLM 摘要留给配置项（本轮不做）。
+        消息取样：头 K + 尾 K（默认各 25），避免长会话丢「近况」。
         """
         if not session_id or not user_id:
             return None
@@ -239,8 +291,8 @@ class UnifiedMemoryService:
         if count < threshold or (count % threshold) != 0:
             return None
         try:
-            messages = self.list_session_messages(
-                user_id=user_id, session_id=session_id, limit=max(threshold * 2, 50)
+            messages = self.list_session_messages_head_tail(
+                user_id=user_id, session_id=session_id
             )
             summary = rule_based_session_summary(messages)
             if not summary:
