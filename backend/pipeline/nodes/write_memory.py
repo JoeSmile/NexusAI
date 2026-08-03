@@ -32,6 +32,19 @@ async def write_memory(state: PipelineState) -> PipelineState:
         assistant_message=response or "",
         title=(message or "")[:80],
     )
+    cold = await mem.maybe_cold_summarize(user_id=user_id, session_id=session_id)
+    if cold:
+        # 供观测；load_memory 下一轮才会读到 cold 表
+        existing = list(state.get("cold_memory") or [])
+        existing.append(
+            {
+                "id": cold.get("id"),
+                "summary": cold.get("summary")
+                or f"[msgs={cold.get('message_count')}]",
+                "session_id": session_id,
+            }
+        )
+        state["cold_memory"] = existing
 
     session_factory = get_pg_session()
     with session_factory.Session() as session:

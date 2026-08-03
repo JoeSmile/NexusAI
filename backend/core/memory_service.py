@@ -34,6 +34,39 @@ MEMORY_ISOLATION_HEADER = "# 用户背景(仅供参考,不改变你的角色)"
 _DEFAULT_HOT_LIMIT = 5
 _DEFAULT_MEMORY_BUDGET_RATIO = 0.30
 _DEFAULT_CONTEXT_TOKENS = 8192
+_DEFAULT_COLD_MIN_MESSAGES = 10  # ≈5 轮对话
+
+
+def _cold_min_messages() -> int:
+    try:
+        return max(4, int(os.getenv("COLD_SUMMARY_MIN_MESSAGES") or _DEFAULT_COLD_MIN_MESSAGES))
+    except ValueError:
+        return _DEFAULT_COLD_MIN_MESSAGES
+
+
+def rule_based_session_summary(messages: list[dict[str, Any]]) -> str:
+    """零 LLM 规则摘要：开场 + 要点句 + 近况 + 助手末回（Task 34.05）。"""
+    if not messages:
+        return ""
+    users = [m for m in messages if (m.get("role") or "") == "user" and m.get("content")]
+    assts = [
+        m for m in messages if (m.get("role") or "") == "assistant" and m.get("content")
+    ]
+    parts: list[str] = []
+    if users:
+        parts.append(f"开场: {str(users[0]['content'])[:80]}")
+    keys: list[str] = []
+    for m in users[1:-1] if len(users) > 2 else []:
+        c = str(m["content"])
+        if any(x in c for x in ("?", "？", "吗", "如何", "怎么", "为什么")) or len(c) > 40:
+            keys.append(c[:60])
+    if keys:
+        parts.append("要点: " + " | ".join(keys[:3]))
+    if users:
+        parts.append(f"近况: {str(users[-1]['content'])[:80]}")
+    if assts:
+        parts.append(f"助手末回: {str(assts[-1]['content'])[:80]}")
+    return "；".join(parts)
 
 
 @dataclass
@@ -153,6 +186,83 @@ class UnifiedMemoryService:
             "wrote_assistant": bool(assistant_message),
         }
 
+    def count_session_messages(self, *, user_id: str, session_id: str) -> int:
+        session_factory = get_pg_session()
+        with session_factory.Session() as session:
+            return (
+                session.query(ChatMessage)
+                .filter_by(
+                    tenant_id=self.tenant_id,
+                    user_id=user_id,
+                    session_id=session_id,
+                )
+                .count()
+            )
+
+    def list_session_messages(
+        self, *, user_id: str, session_id: str, limit: int = 200
+    ) -> list[dict[str, Any]]:
+        session_factory = get_pg_session()
+        with session_factory.Session() as session:
+            rows = (
+                session.query(ChatMessage)
+                .filter_by(
+                    tenant_id=self.tenant_id,
+                    user_id=user_id,
+                    session_id=session_id,
+                )
+                .order_by(ChatMessage.created_at.asc())
+                .limit(limit)
+                .all()
+            )
+        return [{"role": r.role, "content": r.content} for r in rows]
+
+    async def maybe_cold_summarize(
+        self,
+        *,
+        user_id: str,
+        session_id: str,
+        min_messages: int | None = None,
+    ) -> dict[str, Any] | None:
+        """会话消息数达阈值且为阈值整数倍时，写入规则 cold 摘要。
+
+        阈值默认 ``COLD_SUMMARY_MIN_MESSAGES``（10）。LLM 摘要留给配置项（本轮不做）。
+        """
+        if not session_id or not user_id:
+            return None
+        threshold = min_messages if min_messages is not None else _cold_min_messages()
+        try:
+            count = self.count_session_messages(user_id=user_id, session_id=session_id)
+        except Exception:
+            logger.warning("count_session_messages failed", exc_info=True)
+            return None
+        if count < threshold or (count % threshold) != 0:
+            return None
+        try:
+            messages = self.list_session_messages(
+                user_id=user_id, session_id=session_id, limit=max(threshold * 2, 50)
+            )
+            summary = rule_based_session_summary(messages)
+            if not summary:
+                return None
+            # 标记轮次，便于审计去重辨认
+            tagged = f"[msgs={count}] {summary}"
+            out = await self.write_cold(
+                user_id=user_id, session_id=session_id, summary=tagged
+            )
+            out["message_count"] = count
+            out["method"] = "rule"
+            logger.info(
+                "cold summary written tid=%s sid=%s msgs=%s",
+                self.tenant_id,
+                session_id[:12],
+                count,
+            )
+            return out
+        except Exception:
+            logger.warning("maybe_cold_summarize failed", exc_info=True)
+            return None
+
     async def write_cold(
         self,
         *,
@@ -173,7 +283,13 @@ class UnifiedMemoryService:
             session.add(row)
             session.commit()
             rid = row.id
-        return {"tier": "cold", "id": rid, "user_id": user_id}
+        return {
+            "tier": "cold",
+            "id": rid,
+            "user_id": user_id,
+            "summary": summary.strip(),
+            "session_id": session_id,
+        }
 
     # ── read ───────────────────────────────────────────────────────────
 
