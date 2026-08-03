@@ -135,17 +135,8 @@ async def _invoke_agent(
     payload: dict[str, Any],
     tenant: TenantContext,
 ) -> AsyncIterator[dict[str, Any]]:
-    """占位：Agent 门面在 30.24。"""
-    try:
-        from backend.core.capability import agents as agent_runtime  # type: ignore[attr-defined]
-    except ImportError:
-        agent_runtime = None
-
-    if agent_runtime is None or not hasattr(agent_runtime, "invoke_agent"):
-        raise CapabilityUpstreamError(
-            message="agent_runtime_not_ready",
-            detail="await_30.24",
-        )
+    """Agent 门面分发（``backend.core.capability.agents``）。"""
+    from backend.core.capability import agents as agent_runtime
 
     cost = 0.0
     tokens = 0
