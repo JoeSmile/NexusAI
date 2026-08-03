@@ -14,7 +14,6 @@ from backend.modules.rag import RAGService
 from .config import get_config
 from .exceptions import ConfigurationError
 from .interfaces import (
-    ICacheService,
     IChatEngine,
     IContextService,
     IDatabaseService,
@@ -108,29 +107,6 @@ class DatabaseServiceFactory(ServiceFactory):
     
     def get_service_type(self) -> type[IDatabaseService]:
         return IDatabaseService
-
-
-class CacheServiceFactory(ServiceFactory):
-    """缓存服务工厂"""
-    
-    def create_service(self, *args, **kwargs) -> ICacheService:
-        """创建缓存服务实例"""
-        try:
-            from ..cache_service import CacheService  # type: ignore
-            return CacheService(*args, **kwargs)
-        except ImportError:
-            # 如果没有Redis缓存，尝试使用内存缓存
-            try:
-                from .utils.memory_cache import MemoryCacheService  # type: ignore
-                return MemoryCacheService(*args, **kwargs)
-            except ImportError:
-                raise ConfigurationError(
-                    "无法导入缓存服务: CacheService 和 MemoryCacheService 都不可用。"
-                    "请确保 cache_service.py 或 core/utils/memory_cache.py 存在。"
-                )
-    
-    def get_service_type(self) -> type[ICacheService]:
-        return ICacheService
 
 
 class LoggerFactory(ServiceFactory):
@@ -260,7 +236,6 @@ class ApplicationContext:
         """注册默认服务工厂"""
         # 注册各种服务工厂
         self._registry.register_factory(ILogger, LoggerFactory(), singleton=True)
-        self._registry.register_factory(ICacheService, CacheServiceFactory(), singleton=True)
         self._registry.register_factory(IDatabaseService, DatabaseServiceFactory(), singleton=True)
         self._registry.register_factory(IValidationService, ValidationServiceFactory(), singleton=True)
         
@@ -274,7 +249,6 @@ class ApplicationContext:
         try:
             # 预加载关键的单例服务
             self._registry.get_service(ILogger)
-            self._registry.get_service(ICacheService)
             self._registry.get_service(IDatabaseService)
         except Exception as e:
             # 记录错误但不阻止初始化
@@ -359,11 +333,6 @@ def get_database_service() -> IDatabaseService:
     return get_service(IDatabaseService)
 
 
-def get_cache_service() -> ICacheService:
-    """获取缓存服务"""
-    return get_service(ICacheService)
-
-
 def get_logger(name: str = __name__) -> ILogger:
     """获取日志服务"""
     return get_service(ILogger)
@@ -381,11 +350,9 @@ if __name__ == "__main__":
     
     # 获取服务
     logger = get_logger("test")
-    cache = get_cache_service()
     db = get_database_service()
     
     print(f"Logger: {logger}")
-    print(f"Cache: {cache}")
     print(f"Database: {db}")
     
     # 关闭上下文

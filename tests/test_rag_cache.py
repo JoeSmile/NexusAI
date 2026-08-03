@@ -70,8 +70,6 @@ def fake_redis(monkeypatch):
     rag_cache.reset_redis_for_tests()
     fr = FakeRedis()
     monkeypatch.setenv("RAG_CACHE_ENABLED", "true")
-    monkeypatch.setattr(rag_cache, "_redis", fr)
-    monkeypatch.setattr(rag_cache, "_redis_failed", False)
 
     def _get():
         return fr
@@ -249,8 +247,6 @@ def test_rate_limit_miss(fake_redis, monkeypatch):
 def test_redis_down_silent_degrade(monkeypatch):
     rag_cache.reset_redis_for_tests()
     monkeypatch.setenv("RAG_CACHE_ENABLED", "true")
-    monkeypatch.setattr(rag_cache, "_redis_failed", True)
-    monkeypatch.setattr(rag_cache, "_redis", None)
     monkeypatch.setattr(rag_cache, "get_redis", lambda: None)
     monkeypatch.setattr(
         "backend.core.audit.write_audit_sync", lambda *a, **k: None

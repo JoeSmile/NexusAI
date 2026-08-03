@@ -22,10 +22,6 @@ EMBED_CACHE_DIM = 768
 L1_MAX_AGE_SEC = 4 * 3600
 CACHE_VERSION = 1
 
-_redis = None
-_redis_failed = False
-
-# 进程内简易计数(status 展示;redis 为权威)
 _stats = {"l1_hit": 0, "l1_miss": 0, "l2_hit": 0, "l2_miss": 0}
 
 
@@ -83,43 +79,19 @@ def contains_pii(text: str) -> bool:
 
 def get_redis():
     """惰性同步 redis 客户端;失败返回 None(静默降级)。"""
-    global _redis, _redis_failed
     if not rag_cache_enabled():
         return None
-    if _redis_failed:
-        return None
-    if _redis is not None:
-        return _redis
-    try:
-        import redis
+    from backend.core.redis_tools import get_sync_redis
 
-        url = os.getenv("REDIS_URL") or "redis://localhost:6379"
-        try:
-            from config import Config
-
-            cfg_url = Config.REDIS_URL
-            if cfg_url:
-                url = cfg_url
-        except Exception:
-            pass
-        client = redis.Redis.from_url(
-            url, decode_responses=False, socket_connect_timeout=0.5
-        )
-        client.ping()
-        _redis = client
-        return _redis
-    except Exception as e:
-        logger.warning("RAG cache Redis 不可用(降级): %s", e)
-        _redis_failed = True
-        _redis = None
-        return None
+    return get_sync_redis(decode_responses=False)
 
 
 def reset_redis_for_tests() -> None:
     """测试用:重置惰性连接与失败标志。"""
-    global _redis, _redis_failed, _stats
-    _redis = None
-    _redis_failed = False
+    global _stats
+    from backend.core.redis_tools import reset_redis_clients_for_tests
+
+    reset_redis_clients_for_tests()
     _stats = {"l1_hit": 0, "l1_miss": 0, "l2_hit": 0, "l2_miss": 0}
 
 

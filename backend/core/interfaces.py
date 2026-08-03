@@ -225,30 +225,6 @@ class IDatabaseService(ABC):
         """执行事务"""
 
 
-class ICacheService(ABC):
-    """缓存服务接口"""
-    
-    @abstractmethod
-    async def get(self, key: str) -> Any | None:
-        """获取缓存"""
-    
-    @abstractmethod
-    async def set(self, key: str, value: Any, ttl: int | None = None) -> bool:
-        """设置缓存"""
-    
-    @abstractmethod
-    async def delete(self, key: str) -> bool:
-        """删除缓存"""
-    
-    @abstractmethod
-    async def clear(self, pattern: str | None = None) -> int:
-        """清空缓存"""
-    
-    @abstractmethod
-    async def exists(self, key: str) -> bool:
-        """检查键是否存在"""
-
-
 class ILogger(ABC):
     """日志服务接口"""
     

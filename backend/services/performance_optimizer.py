@@ -20,41 +20,28 @@ logger = get_logger(__name__)
 
 
 class PerformanceOptimizer:
-    """使用 redis.asyncio 的性能优化器（惰性连接，失败降级）。"""
+    """使用 redis.asyncio 的性能优化器（惰性连接，失败降级；Task 35 经 redis_tools）。"""
 
-    def __init__(self, redis_url: str = "redis://localhost:6379"):
-        self._redis_url = redis_url
+    def __init__(self, redis_url: str | None = None):
+        from backend.core.redis_tools import resolve_redis_url
+
+        self._redis_url = redis_url or resolve_redis_url()
         self._redis = None
-        self._lock = asyncio.Lock()
         self.thread_pool = ThreadPoolExecutor(max_workers=10)
         self.cache_ttl = 3600
 
     async def _ensure_redis(self):
         if self._redis is not None:
             return self._redis
-        async with self._lock:
-            if self._redis is not None:
-                return self._redis
-            try:
-                from redis.asyncio import from_url as async_redis_from_url
+        from backend.core.redis_tools import get_async_redis
 
-                self._redis = async_redis_from_url(
-                    self._redis_url,
-                    decode_responses=True,
-                    max_connections=50,
-                )
-            except Exception as e:
-                logger.warning("Redis 初始化失败（缓存降级）: %s", e)
-                self._redis = None
+        # 共享进程级 async 客户端；URL 已由 redis_tools 解析
+        self._redis = await get_async_redis(decode_responses=True)
         return self._redis
 
     async def close(self) -> None:
-        if self._redis is not None:
-            try:
-                await self._redis.aclose()
-            except Exception:
-                pass
-            self._redis = None
+        # 共享客户端由 redis_tools 管理；实例侧仅清引用
+        self._redis = None
 
     async def get(self, key: str) -> str | None:
         r = await self._ensure_redis()
