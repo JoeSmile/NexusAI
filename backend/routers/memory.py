@@ -4,9 +4,11 @@
 """
 
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from backend.core.auth.api_key_auth import verify_api_key
+from backend.core.auth.models import TenantContext
 from backend.logging_config import get_logger
 from backend.services.context_service import ContextService
 from backend.services.memory_service import MemoryService
@@ -21,6 +23,20 @@ context_service = ContextService(memory_service=memory_service)
 
 class MemoryImportanceUpdate(BaseModel):
     importance: float = Field(..., ge=0.0, le=1.0)
+
+
+def _require_memory_admin(tenant: TenantContext) -> TenantContext:
+    """遗忘权等破坏性操作：仅 tenant_admin / super_admin。"""
+    if tenant.role not in ("tenant_admin", "super_admin"):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "AUTH_002",
+                "message": "insufficient_permissions",
+                "hint": "forget_requires_tenant_admin_or_super_admin",
+            },
+        )
+    return tenant
 
 
 @router.get("/users/{user_id}/memories")
@@ -138,11 +154,20 @@ async def delete_memory(user_id: str, memory_id: str):
 
 
 @router.delete("/users/{user_id}/memories")
-async def forget_user_memories(user_id: str):
-    """被遗忘权：删除用户全部 warm/cold 记忆，并脱敏 chat_messages（不可删审计行）。"""
+async def forget_user_memories(
+    user_id: str,
+    tenant: TenantContext = Depends(verify_api_key),
+):
+    """被遗忘权：删 warm/cold + 脱敏 chat_messages。仅 tenant_admin / super_admin，作用域为调用方租户。"""
+    _require_memory_admin(tenant)
     try:
-        result = await memory_service.forget_user(user_id)
-        return {"message": "用户记忆已清除", **result}
+        scoped = MemoryService(tenant_id=tenant.tenant_id)
+        result = await scoped.forget_user(user_id)
+        return {
+            "message": "用户记忆已清除",
+            "tenant_id": tenant.tenant_id,
+            **result,
+        }
     except Exception as e:
         logger.error(f"遗忘权清除失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -178,7 +203,7 @@ async def update_memory_importance(
 @router.get("/users/{user_id}/statistics")
 async def get_memory_statistics(user_id: str):
     """
-    获取用户记忆统计信息
+    获取记忆统计信息
     
     Args:
         user_id: 用户ID
@@ -235,4 +260,3 @@ async def update_user_profile(user_id: str, updates: dict):
     except Exception as e:
         logger.error(f"更新用户画像失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-

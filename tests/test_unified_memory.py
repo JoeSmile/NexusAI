@@ -390,4 +390,32 @@ def test_prompt_composer_clamps_relaxed_style() -> None:
     assert MEMORY_ISOLATION_HEADER in text
     assert "轻松随意" not in text
     assert "热情活泼" not in text
-    assert "不使用emoji" in text
+    assert "可以适当使用emoji" in text
+
+
+def test_require_memory_admin_roles() -> None:
+    from fastapi import HTTPException
+
+    from backend.core.auth.models import TenantContext
+    from backend.routers.memory import _require_memory_admin
+
+    admin = TenantContext(
+        tenant_id="t1",
+        user_id="a1",
+        role="tenant_admin",
+        extra_permissions=[],
+        is_cross_tenant=False,
+    )
+    assert _require_memory_admin(admin).role == "tenant_admin"
+    user = TenantContext(
+        tenant_id="t1",
+        user_id="u1",
+        role="user",
+        extra_permissions=[],
+        is_cross_tenant=False,
+    )
+    try:
+        _require_memory_admin(user)
+        raise AssertionError("expected 403")
+    except HTTPException as e:
+        assert e.status_code == 403

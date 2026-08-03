@@ -123,9 +123,11 @@ class PromptComposer:
         prompt += f"\n回复长度保持{length_map.get(response_length, '适中')}。"
 
         # 租户风格只允许「收敛」：抬高正式度下限、压低活泼/幽默（34.06 / 32.63）
+        # emoji 仍可由配置开启（Important 3B）
         formality = max(float(formality), 0.5)
         enthusiasm = min(float(enthusiasm), 0.5)
         humor_level = min(float(humor_level), 0.3)
+        use_emoji = bool(self.config.get("use_emoji", False))
 
         if formality > 0.7:
             prompt += "\n保持专业正式的语言风格。"
@@ -142,7 +144,10 @@ class PromptComposer:
         else:
             prompt += "\n保持严肃认真，避免轻率的玩笑。"
 
-        prompt += "\n不使用emoji，保持纯文字表达。"
+        if use_emoji:
+            prompt += "\n可以适当使用emoji来增强表达。"
+        else:
+            prompt += "\n不使用emoji，保持纯文字表达。"
 
         return prompt
     
