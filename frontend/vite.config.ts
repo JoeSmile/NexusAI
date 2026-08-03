@@ -27,6 +27,7 @@ export default defineConfig({
       '/agent': backend,
       '/memory': backend,
       '/performance': backend,
+      '/evaluation': backend,
       '/health': backend, // 登录验证用,无 /api 前缀
       '/playground': backend,
       // SPA 占用 `/`；环境徽章经此后端根 JSON（30.13）
