@@ -39,10 +39,11 @@ export default function CapabilitiesPanel() {
   const role = useAuthStore((s) => s.activeRole)
   const roleEpoch = useAuthStore((s) => s.roleEpoch)
   const [items, setItems] = useState<CapabilityItem[]>([])
-  const [kind, setKind] = useState('')
+  const [kind, setKind] = useState('') // 空=全部；可选 agent 看嵌套演示
   const [includeDisabled, setIncludeDisabled] = useState(false)
   const [err, setErr] = useState('')
   const skip = useRef(true)
+  const agentCount = items.filter((i) => i.kind === 'agent').length
 
   const load = async () => {
     setErr('')
@@ -75,7 +76,7 @@ export default function CapabilitiesPanel() {
       <div>
         <h1 className="text-xl font-semibold">Capabilities</h1>
         <p className="text-muted-foreground text-xs">
-          GET /api/capabilities — 按角色可见性过滤（后端）
+          GET /api/capabilities — 含 kind=agent（seed 后可见演示 Agent）
         </p>
       </div>
       <ForbiddenBanner />
@@ -91,6 +92,7 @@ export default function CapabilitiesPanel() {
             <CardTitle className="text-sm font-semibold">能力列表</CardTitle>
             <CardDescription className="text-xs">
               当前角色 <code>{role}</code> · 共 {items.length} 条
+              {agentCount ? ` · agent ${agentCount}` : ''}
             </CardDescription>
           </div>
           <Button type="button" size="sm" variant="outline" onClick={() => void load()}>

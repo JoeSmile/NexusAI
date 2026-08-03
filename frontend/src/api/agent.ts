@@ -12,6 +12,26 @@ export type AgentTool = {
   [k: string]: unknown
 }
 
+export type HubAgent = {
+  id: string
+  name: string
+  kind: string
+  provider: string
+  status: string
+  capabilities?: string[]
+  role?: string
+  memory?: boolean
+}
+
+export async function listHubAgents() {
+  return apiGet<{ items: HubAgent[]; total: number }>('/api/agents')
+}
+
+/** Capability Hub 流式 invoke（嵌套链走此通道）。 */
+export function hubAgentInvokeUrl(agentId: string) {
+  return `/api/capabilities/${encodeURIComponent(agentId)}/invoke?stream=true`
+}
+
 export async function agentStatus() {
   return apiGet<AgentEnvelope<Record<string, unknown>>>('/agent/status')
 }
