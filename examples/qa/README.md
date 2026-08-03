@@ -18,6 +18,7 @@
 | 10-obs — 可观测 | LangFuse/Prometheus | README(10.1-10.8) | `10-obs/obs_qa.sh`(部分) |
 | 11-sec — 安全专项 | — | README(11.1-11.7) | `11-sec/security_qa.sh`(11.7 手动) |
 | 12-demo — Demo 剧本 | 全链路 | README(8 步) | — |
+| journeys — 角色旅程 | 4 角色 | 4 份任务驱动剧本(分角色验证可用性) | 见各剧本 |
 
 > **LangFuse 配合 QA 查看指南: [LANGFUSE.md](LANGFUSE.md)** —— 哪些 QA 能配合看、指标含义、
 > 何时要优化、error 含义、深入排查路径(含 GAP-08 已知问题)。
