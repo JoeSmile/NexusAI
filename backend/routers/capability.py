@@ -2,6 +2,9 @@
 
 LangFuse 根 trace / SSE 组帧 / 断连中止在本层；core 只做纯分发。
 长路径：``@observe`` 包住 async generator，span 贯穿整段 SSE。
+
+鉴权例外（见 AGENTS.md）: ``Depends(verify_api_key)`` + 每能力
+``spec.permission`` / 租户可见性，不用固定 ``@require_permission``。
 """
 
 from __future__ import annotations
@@ -64,11 +67,9 @@ def _spec_public(spec: CapabilitySpec) -> dict[str, Any]:
 
 
 def _visible_to(tenant: TenantContext, spec: CapabilitySpec) -> bool:
-    if spec.tenant_id not in ("*", "", tenant.tenant_id):
-        if not tenant.is_cross_tenant:
-            return False
-    needed = (spec.permission or "").strip() or "chat:write"
-    return tenant.has_permission(needed)
+    from backend.core.capability.invoke import capability_visible_to
+
+    return capability_visible_to(spec, tenant)
 
 
 def _wants_stream(
@@ -189,15 +190,10 @@ def _preflight(cap_id: str, tenant: TenantContext) -> CapabilitySpec:
         check_cap_quota,
         check_cap_rate_limit,
     )
+    from backend.core.capability.invoke import _check_permission
 
     spec = get_capability_registry().get(cap_id)
-    needed = (spec.permission or "").strip() or "chat:write"
-    if not tenant.has_permission(needed):
-        raise ContextGateException(
-            ErrorCode.AUTH_INSUFFICIENT_PERMISSIONS.value,
-            "insufficient_permissions",
-            detail=needed,
-        )
+    _check_permission(spec, tenant)
     check_cap_rate_limit(tenant.tenant_id)
     check_cap_quota(tenant.tenant_id)
     return spec

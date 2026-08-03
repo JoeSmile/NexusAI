@@ -9,8 +9,7 @@ Agent Router - Agent路由
     MCP 协议在 ``backend.modules.agent.protocol``（Task 31 已删孤儿实现树）。
 """
 
-
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 
 from backend.core.auth.models import TenantContext
@@ -19,6 +18,21 @@ from backend.core.auth.scope import assert_user_access, resolve_acting_user_id
 from backend.services.agent_service import AgentService, get_agent_service
 
 router = APIRouter(prefix="/agent", tags=["agent"])
+
+_SUCCESSOR = "/api/capabilities/{id}/invoke"
+_DEP_TRUE = "true"
+
+
+def _dep_headers() -> dict[str, str]:
+    return {
+        "Deprecation": _DEP_TRUE,
+        "Link": f'<{_SUCCESSOR}>; rel="successor-version"',
+    }
+
+
+def _stamp(response: Response) -> None:
+    for k, v in _dep_headers().items():
+        response.headers[k] = v
 
 
 # ==================== 请求模型 ====================
@@ -37,18 +51,15 @@ class FollowupRequest(BaseModel):
 
 # ==================== API端点 ====================
 
-@router.post("/chat")
+@router.post("/chat", deprecated=True)
 async def agent_chat(
     request: MessageRequest,
+    response: Response,
     agent_service: AgentService = Depends(get_agent_service),
     tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
-    """
-    Agent聊天接口
-    
-    使用Agent模式处理用户消息，提供智能规划和工具调用。
-    body.user_id 默认=调用者；仅 admin 可覆写为他人（2B）。
-    """
+    """Agent聊天（deprecated → ``POST /api/capabilities/{id}/invoke``）。"""
+    _stamp(response)
     try:
         uid = resolve_acting_user_id(tenant, request.user_id)
         result = await agent_service.process_message(
@@ -57,131 +68,121 @@ async def agent_chat(
             conversation_id=request.conversation_id,
             tenant_id=tenant.tenant_id,
         )
-        
+
         return {
             "code": 200 if result["success"] else 500,
             "message": "success" if result["success"] else "error",
             "data": result
         }
-    
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/status")
+@router.get("/status", deprecated=True)
 async def get_agent_status(
+    response: Response,
     agent_service: AgentService = Depends(get_agent_service),
     tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
-    """
-    获取Agent状态
-    
-    返回Agent各模块的运行状态和统计信息
-    """
+    """Agent状态（deprecated → ``GET /api/agents``）。"""
+    _stamp(response)
     try:
         status = agent_service.get_agent_status()
-        
+
         return {
             "code": 200,
             "message": "success",
             "data": status
         }
-    
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/history/{user_id}")
+@router.get("/history/{user_id}", deprecated=True)
 async def get_execution_history(
     user_id: str,
+    response: Response,
     limit: int = 10,
     agent_service: AgentService = Depends(get_agent_service),
     tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
-    """
-    获取用户执行历史
-    
-    查看用户与Agent的交互记录；非 admin 仅可查本人。
-    """
+    """执行历史（deprecated；非 admin 仅可查本人）。"""
+    _stamp(response)
     assert_user_access(tenant, user_id)
     try:
         history = agent_service.get_execution_history(user_id, limit)
-        
+
         return {
             "code": 200,
             "message": "success",
             "data": history
         }
-    
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/memory/{user_id}")
+@router.get("/memory/{user_id}", deprecated=True)
 async def get_memory_summary(
     user_id: str,
+    response: Response,
     agent_service: AgentService = Depends(get_agent_service),
     tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
-    """
-    获取用户记忆摘要
-    
-    查看用户画像、工作记忆、行为日志等；非 admin 仅可查本人。
-    """
+    """记忆摘要（deprecated → ``/memory/...``；非 admin 仅可查本人）。"""
+    _stamp(response)
     assert_user_access(tenant, user_id)
     try:
         summary = await agent_service.get_memory_summary(user_id)
-        
+
         return {
             "code": 200,
             "message": "success",
             "data": summary
         }
-    
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/tools")
+@router.get("/tools", deprecated=True)
 async def get_available_tools(
+    response: Response,
     agent_service: AgentService = Depends(get_agent_service),
     tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
-    """
-    获取可用工具列表
-    
-    查看Agent可以调用的所有工具
-    """
+    """可用工具列表（deprecated → ``GET /api/agents`` / capabilities）。"""
+    _stamp(response)
     try:
         tools = agent_service.get_available_tools()
-        
+
         return {
             "code": 200,
             "message": "success",
             "data": tools
         }
-    
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/followup")
+@router.post("/followup", deprecated=True)
 async def plan_followup(
     request: FollowupRequest,
+    response: Response,
     agent_service: AgentService = Depends(get_agent_service),
     tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
-    """
-    规划回访任务
-    
-    为用户创建回访计划；body.user_id 仅 admin 可覆写（2B）。
-    """
+    """回访规划（deprecated；body.user_id 仅 admin 可覆写）。"""
+    _stamp(response)
     try:
         uid = resolve_acting_user_id(tenant, request.user_id)
         followup = await agent_service.schedule_followup(uid)
-        
+
         if followup:
             return {
                 "code": 200,
@@ -194,27 +195,23 @@ async def plan_followup(
                 "message": "暂无回访需求",
                 "data": None
             }
-    
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/health")
-async def health_check():
-    """
-    健康检查
-    
-    检查Agent服务是否正常运行
-    """
+@router.get("/health", deprecated=True)
+async def health_check(response: Response):
+    """健康检查（deprecated → ``GET /health``）。"""
+    _stamp(response)
     return {
         "code": 200,
         "message": "Agent服务运行正常",
         "data": {
             "status": "healthy",
-            "version": "1.0.0"
+            "version": "1.0.0",
+            "deprecated": True,
         }
     }
-
-

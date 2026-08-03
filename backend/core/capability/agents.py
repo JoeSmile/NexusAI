@@ -2,6 +2,11 @@
 
 真实 Runtime 在 ``backend/agent/``（经 ``routers/agent.py`` 挂载）。
 ``backend.modules.agent`` 仅保留 ``protocol``（MCP）；Task 31 已删除孤儿实现树。
+
+深度 0 双路径（拍板 C，保留）:
+- **嵌套链**: 按 ``capabilities`` 顺序展开子能力（审计/流式 call_chain）。
+- **回复正文**: 以 ``AgentService.process_message`` 为准；仅当其失败/空时
+  回退到嵌套链 token 拼接。嵌套链成本/审计仍记账，不代表最终回复源。
 """
 
 from __future__ import annotations
@@ -222,7 +227,11 @@ async def invoke_agent(
     _chain: list[str] | None = None,
     _trace_id: str | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
-    """门面入口：嵌套能力链 + AgentService.process_message + 分片流式。"""
+    """门面入口：嵌套能力链 + AgentService.process_message + 分片流式。
+
+    深度 0: AgentService 拥有最终 reply；嵌套链负责可见 call_chain / 审计，
+    仅在 AgentService 无有效回复时回退嵌套文本（见模块 docstring）。
+    """
     if spec.kind != CapabilityKind.AGENT:
         raise CapabilityUpstreamError(
             message="not_an_agent",
@@ -234,6 +243,9 @@ async def invoke_agent(
             detail=f"{spec.id}:max={MAX_AGENT_DEPTH}",
         )
 
+    from backend.core.capability.invoke import _check_permission
+
+    _check_permission(spec, tenant)
     validate_agent_spec(spec)
     agent = agent_spec_from_capability(spec)
     message = _message_from_payload(payload)
@@ -291,7 +303,7 @@ async def invoke_agent(
                 if frame.get("event") != "done":
                     yield frame
 
-    # 仅顶层门面调用 AgentService；子 Agent 只负责嵌套链
+    # 顶层：AgentService 拥有 reply；嵌套链已跑完（审计/call_chain）
     reply = ""
     if _depth == 0:
         try:

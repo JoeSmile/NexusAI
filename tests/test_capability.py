@@ -156,6 +156,41 @@ async def test_invoke_model_stream_and_auth(
         )
 
 
+@pytest.mark.asyncio
+async def test_invoke_rejects_foreign_tenant_cap(
+    tenant_user: TenantContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """跨租户 private capability：list 不可见，invoke 亦应 CAP_001。"""
+    from backend.core.capability.errors import CapabilityNotFoundError
+
+    monkeypatch.setenv("LLM_PROVIDER", "mock")
+    reg = CapabilityRegistry()
+    reg.register(
+        CapabilitySpec(
+            id="model:other-tenant",
+            name="other",
+            kind=CapabilityKind.MODEL,
+            provider=CapabilityProvider.SELF_HOSTED,
+            permission="chat:write",
+            tenant_id="t-other",
+            spec={"max_tokens": 32},
+        )
+    )
+    with (
+        patch(
+            "backend.core.capability.invoke.get_capability_registry",
+            return_value=reg,
+        ),
+        patch("backend.core.capability.governance._redis", return_value=None),
+    ):
+        with pytest.raises(CapabilityNotFoundError) as ei:
+            async for _ in invoke(
+                "model:other-tenant", {"message": "hi"}, tenant_user
+            ):
+                pass
+        assert ei.value.code == ErrorCode.CAP_NOT_FOUND.value
+
+
 def test_build_dify_request_shape(tenant_user: TenantContext) -> None:
     from backend.core.capability.connectors.external_app import build_dify_request
 

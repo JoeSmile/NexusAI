@@ -55,7 +55,26 @@ def _messages_from_payload(payload: dict[str, Any]) -> list[dict[str, str]]:
     return []
 
 
+def capability_visible_to(spec: CapabilitySpec, tenant: TenantContext) -> bool:
+    """租户可见性：与 list 过滤一致（* / 空 / 本租户；跨租户角色放行）。"""
+    if spec.tenant_id not in ("*", "", tenant.tenant_id):
+        if not tenant.is_cross_tenant:
+            return False
+    needed = (spec.permission or "").strip() or "chat:write"
+    return tenant.has_permission(needed)
+
+
 def _check_permission(spec: CapabilitySpec, tenant: TenantContext) -> None:
+    """invoke / preflight 闸门。
+
+    跨租户 private → CAP_001（与 list 隐藏对齐，避免探测存在性）。
+    本租户可见但缺 permission → AUTH_002（与既有鉴权语义一致）。
+    """
+    if spec.tenant_id not in ("*", "", tenant.tenant_id) and not tenant.is_cross_tenant:
+        raise CapabilityNotFoundError(
+            message="capability_not_found",
+            detail=spec.id,
+        )
     needed = (spec.permission or "").strip() or "chat:write"
     if not tenant.has_permission(needed):
         raise ContextGateException(

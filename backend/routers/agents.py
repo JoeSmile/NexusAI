@@ -1,4 +1,7 @@
-"""Agent 市场列表 — GET /api/agents（Task 30.24）。"""
+"""Agent 市场列表 — GET /api/agents（Task 30.24）。
+
+鉴权同 Capability Hub：``verify_api_key`` + ``_visible_to``（见 AGENTS.md 例外）。
+"""
 
 from __future__ import annotations
 
