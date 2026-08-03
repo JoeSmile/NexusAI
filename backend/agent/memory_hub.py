@@ -18,6 +18,8 @@ Memory Hub — 六层记忆中枢
   - 后台蒸馏：每轮结束后将 L2 活动日志浓缩到 L3/L4，无 LLM 调用，幂等
   - 系统 Prompt 自动注入：L3/L4/L5 摘要自动注入每轮 system prompt
   - 门控开关：全部功能通过 ModuleToggles 门控，默认关闭，可逐层灰度
+  - Task 34.04：L3/L4/L5 为 PersistentScopedStore（真源 user_memories）；
+    L1/L2/L6 仍为进程内；``MEMORY_HUB_PERSIST=false`` 可关持久化
 """
 
 from __future__ import annotations
@@ -35,6 +37,7 @@ from backend.agent.activity_distiller import (
 )
 from backend.agent.memory_store import (
     InMemoryStore,
+    PersistentScopedStore,
 )
 
 # 惰性导入：MemoryManager / Database 允许在缺依赖时降级
@@ -103,16 +106,18 @@ class MemoryHub:
         user_id: str = "",
         session_id: str = "",
         agent_type: str = "contextgate",
+        tenant_id: str = "default",
         memory_manager: MemoryManager | None = None,
         toggles: ModuleToggles | None = None,
     ):
         self._user_id = user_id
         self._session_id = session_id
         self._agent_type = agent_type
+        self._tenant_id = tenant_id or "default"
         self._memory_manager = memory_manager  # 保留向量检索能力
         self._toggles = toggles or ModuleToggles()
 
-        # 六层 Store 实例（惰性初始化）
+        # 六层 Store 实例（惰性初始化）；L3/L4/L5 为 PersistentScopedStore
         self._stores: dict[str, InMemoryStore] = {}
 
         # L6 当轮上下文（虚拟层，不持久化）
@@ -148,29 +153,35 @@ class MemoryHub:
             description="工作区级活动日志",
         )
 
-        # L3 用户级 — 长期偏好
+        # L3 用户级 — 长期偏好（持久化视图）
         if self._user_id:
-            self._stores["user"] = InMemoryStore(
+            self._stores["user"] = PersistentScopedStore(
                 store_id=f"user_{self._user_id}",
                 scope="user",
                 target_id=self._user_id,
+                tenant_id=self._tenant_id,
+                user_id=self._user_id,
                 description="用户级记忆：偏好、兴趣、话题",
             )
 
-        # L4 Agent 实例级 — Agent 学习模式
-        self._stores["agent_instance"] = InMemoryStore(
+        # L4 Agent 实例级 — Agent 学习模式（持久化视图）
+        self._stores["agent_instance"] = PersistentScopedStore(
             store_id=f"agent_{self._agent_type}_{self._user_id}",
             scope="agent_instance",
             target_id=self._agent_type,
+            tenant_id=self._tenant_id,
+            user_id=self._user_id,
             description="Agent 实例级记忆：交互模式",
         )
 
-        # L5 会话级 — 当次对话工作记忆
+        # L5 会话级 — 当次对话工作记忆（持久化视图）
         if self._session_id:
-            self._stores["session"] = InMemoryStore(
+            self._stores["session"] = PersistentScopedStore(
                 store_id=f"session_{self._session_id}",
                 scope="session",
                 target_id=self._session_id,
+                tenant_id=self._tenant_id,
+                user_id=self._user_id,
                 description="会话级工作记忆：当前话题、用户状态",
             )
 
@@ -618,21 +629,42 @@ class MemoryHub:
     # ── 兼容旧接口 ────────────────────────────────────────────────────
 
     def encode(self, data: dict[str, Any]) -> dict[str, Any]:
-        """兼容旧接口：编码记忆。
-
-        旧代码调用 memory_hub.encode({...})，现在映射到语义检索 + L3 写入。
-        """
+        """兼容旧接口：编码记忆并写入 L3 持久化视图。"""
         content = data.get("content", "")
         user_id = data.get("user_id", self._user_id)
         role = data.get("role", "user")
+        path = str(data.get("path") or f"episodic/{int(time.time())}")
 
-        # 简化处理：直接返回结构化记忆
+        store = self.user_store
+        if store is not None and content:
+            # 同步路径：直接填缓存 + persist（避免 encode 变成 async）
+            import hashlib as _hashlib
+
+            from backend.agent.memory_store import MemoryEntry
+
+            sha256 = _hashlib.sha256(str(content).encode()).hexdigest()
+            existing = store._entries.get(path)
+            entry = MemoryEntry(
+                id=existing.id if existing else store._next_id(),
+                store_id=store.store_id,
+                path=path,
+                content=str(content),
+                content_sha256=sha256,
+                version=(existing.version + 1) if existing else 1,
+                updated_at=time.time(),
+                metadata={"role": role, "user_id": user_id},
+            )
+            store._entries[path] = entry
+            if isinstance(store, PersistentScopedStore):
+                store._persist_value(path, str(content))
+
         return {
             "memory_type": "episodic",
             "content": content,
             "importance": 0.5,
             "user_id": user_id,
             "role": role,
+            "path": path,
         }
 
     def retrieve(
@@ -642,39 +674,55 @@ class MemoryHub:
         context: dict[str, Any] | None = None,
         top_k: int = 5,
     ) -> list[dict[str, Any]]:
-        """兼容旧接口：检索记忆（同步版本，优先使用 semantic_search）"""
-        import asyncio
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # 如果已在 async 上下文中，无法直接 await
-                # 回退到 InMemoryStore 的同步搜索
-                results = []
-                for scope_name in ["user", "agent_instance", "session"]:
-                    store = self._stores.get(scope_name)
-                    if store:
-                        try:
-                            asyncio.ensure_future(store.search(query))
-                        except RuntimeError:
-                            continue
-                return results[:top_k]
-            else:
-                return loop.run_until_complete(self.semantic_search(query, top_k))
-        except RuntimeError:
-            # 没有事件循环，使用 InMemoryStore 同步搜索
-            results = []
-            for scope_name in ["user", "agent_instance", "session"]:
-                store = self._stores.get(scope_name)
-                if store:
-                    for _path, entry in store._entries.items():
-                        if entry.content and query.lower() in entry.content.lower():
-                            results.append({
-                                "content": entry.content,
-                                "timestamp": entry.updated_at,
-                                "importance": 0.5,
-                                "path": entry.path,
-                            })
+        """兼容旧接口：优先本地 store 子串匹配，再回落 UnifiedMemory warm。"""
+        _ = context
+        uid = user_id or self._user_id
+        results: list[dict[str, Any]] = []
+        q = (query or "").lower()
+        for scope_name in ("user", "agent_instance", "session"):
+            store = self._stores.get(scope_name)
+            if not store:
+                continue
+            for path, entry in store._entries.items():
+                if entry.content and q and q in entry.content.lower():
+                    results.append(
+                        {
+                            "content": entry.content,
+                            "timestamp": entry.updated_at,
+                            "importance": 0.5,
+                            "path": path,
+                            "scope": scope_name,
+                        }
+                    )
+        if results:
             return results[:top_k]
+
+        # 冷启动：从统一层 warm 扫一遍（同步）
+        try:
+            from backend.database.pgvector_session import UserMemory, get_pg_session
+
+            session_factory = get_pg_session()
+            with session_factory.Session() as session:
+                rows = (
+                    session.query(UserMemory)
+                    .filter_by(tenant_id=self._tenant_id, user_id=uid)
+                    .limit(50)
+                    .all()
+                )
+            for r in rows:
+                if r.value and q and q in r.value.lower():
+                    results.append(
+                        {
+                            "content": r.value,
+                            "timestamp": None,
+                            "importance": float(r.confidence or 0.5),
+                            "path": r.key,
+                            "scope": "warm",
+                        }
+                    )
+        except Exception as e:
+            logger.debug("retrieve warm fallback skipped: %s", e)
+        return results[:top_k]
 
     def get_working_memory(self) -> dict[str, Any]:
         """兼容旧接口：获取工作记忆"""
@@ -696,49 +744,23 @@ class MemoryHub:
     # ── 内部辅助方法 ────────────────────────────────────────────────────
 
     async def _load_persistent_data(self) -> None:
-        """从数据库加载已有记忆数据到 L3/L4 Store"""
+        """从 ``user_memories`` hydrate L3/L4/L5（Task 34.04）。"""
         if not self._user_id:
             return
-
-        try:
-            if get_db is None or ChatMessage is None:
-                return
-            # 从数据库加载最近消息，重建 L3 偏好
-            db = next(get_db())
-            from datetime import datetime, timedelta
-
-            since = datetime.now() - timedelta(days=30)
-            messages = db.query(ChatMessage).filter(
-                ChatMessage.user_id == self._user_id,
-                ChatMessage.created_at >= since,
-            ).order_by(ChatMessage.created_at.desc()).limit(100).all()
-
-            if messages and self.user_store:
-                # 重建话题偏好
-                import json
-                topics = []
-                seen = set()
-                for msg in messages:
-                    if msg.content and msg.role == "user":
-                        topic = msg.content[:50]
-                        if topic not in seen:
-                            seen.add(topic)
-                            topics.append({
-                                "topic": topic,
-                                "freq": 1,
-                                "last_seen": msg.created_at.timestamp() if msg.created_at else time.time(),
-                            })
-                if topics:
-                    await self.user_store.write(
-                        PREFS_TOPICS_PATH,
-                        json.dumps(topics[:20], ensure_ascii=False, sort_keys=True, separators=(",", ":")),
-                    )
-
-        except Exception as e:
-            logger.warning("加载持久化记忆数据失败: %s", e)
-        finally:
-            if "db_generator" in locals():
-                db_generator.close()
+        for scope_name in ("user", "agent_instance", "session"):
+            store = self._stores.get(scope_name)
+            if isinstance(store, PersistentScopedStore):
+                try:
+                    n = await store.hydrate()
+                    if n:
+                        logger.info(
+                            "MemoryHub hydrated scope=%s entries=%s user=%s",
+                            scope_name,
+                            n,
+                            self._user_id[:8],
+                        )
+                except Exception as e:
+                    logger.warning("hydrate %s failed: %s", scope_name, e)
 
     async def _sync_to_vector_store(self, path: str, content: str) -> None:
         """同步写入到向量数据库（用于语义检索）"""
@@ -763,7 +785,7 @@ class MemoryHub:
 
 # ── 隔离注册表 ───────────────────────────────────────────────────────────────
 
-_memory_hub_registry: dict[tuple[str, str, str], MemoryHub] = {}
+_memory_hub_registry: dict[tuple[str, str, str, str], MemoryHub] = {}
 _memory_hub_registry_lock = threading.RLock()
 
 
@@ -771,21 +793,28 @@ def get_memory_hub(
     user_id: str = "",
     session_id: str = "",
     agent_type: str = "contextgate",
+    tenant_id: str = "default",
 ) -> MemoryHub:
-    """Return a MemoryHub isolated by user, session, and agent type.
+    """Return a MemoryHub isolated by tenant/user/session/agent.
 
     This function is synchronous for compatibility with Agent constructors.
     Call ``await hub.initialize()`` where persistent state must be loaded before
     the first turn.
     """
-    key = (user_id or "", session_id or "", agent_type or "contextgate")
+    key = (
+        tenant_id or "default",
+        user_id or "",
+        session_id or "",
+        agent_type or "contextgate",
+    )
     with _memory_hub_registry_lock:
         hub = _memory_hub_registry.get(key)
         if hub is None:
             hub = MemoryHub(
-                user_id=key[0],
-                session_id=key[1],
-                agent_type=key[2],
+                user_id=key[1],
+                session_id=key[2],
+                agent_type=key[3],
+                tenant_id=key[0],
             )
             _memory_hub_registry[key] = hub
         return hub
@@ -795,9 +824,10 @@ async def get_memory_hub_async(
     user_id: str = "",
     session_id: str = "",
     agent_type: str = "contextgate",
+    tenant_id: str = "default",
 ) -> MemoryHub:
     """Return an isolated hub after loading its persistent state."""
-    hub = get_memory_hub(user_id, session_id, agent_type)
+    hub = get_memory_hub(user_id, session_id, agent_type, tenant_id=tenant_id)
     await hub.initialize()
     return hub
 
@@ -806,18 +836,26 @@ def reset_memory_hub(
     user_id: str | None = None,
     session_id: str | None = None,
     agent_type: str | None = None,
+    tenant_id: str | None = None,
 ) -> None:
     """Reset matching hubs, or the complete registry when no filter is given."""
     with _memory_hub_registry_lock:
-        if user_id is None and session_id is None and agent_type is None:
+        if (
+            user_id is None
+            and session_id is None
+            and agent_type is None
+            and tenant_id is None
+        ):
             _memory_hub_registry.clear()
             return
 
         keys = [
-            key for key in _memory_hub_registry
-            if (user_id is None or key[0] == user_id)
-            and (session_id is None or key[1] == session_id)
-            and (agent_type is None or key[2] == agent_type)
+            key
+            for key in _memory_hub_registry
+            if (tenant_id is None or key[0] == tenant_id)
+            and (user_id is None or key[1] == user_id)
+            and (session_id is None or key[2] == session_id)
+            and (agent_type is None or key[3] == agent_type)
         ]
         for key in keys:
             _memory_hub_registry.pop(key, None)

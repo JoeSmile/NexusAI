@@ -181,3 +181,109 @@ class InMemoryStore:
 
         lines.append("可使用 memory_* 工具读写条目。")
         return "\n".join(lines)
+
+
+def hub_warm_key(scope: Scope, path: str) -> str:
+    """``user_memories.key``：``hub:<scope>:<path>``（path 保留 ``/``）。"""
+    return f"hub:{scope}:{path}"[:200]
+
+
+def hub_path_from_warm_key(scope: Scope, key: str) -> str | None:
+    prefix = f"hub:{scope}:"
+    if not key.startswith(prefix):
+        return None
+    return key[len(prefix) :]
+
+
+class PersistentScopedStore(InMemoryStore):
+    """L3/L4/L5 视图：本地缓存 + ``user_memories`` 真源（Task 34.04）。
+
+    ``MEMORY_HUB_PERSIST=false`` 时退化为纯内存（测试用）。
+    """
+
+    def __init__(
+        self,
+        store_id: str,
+        scope: Scope,
+        target_id: str,
+        *,
+        tenant_id: str = "default",
+        user_id: str = "",
+        description: str = "",
+        persist: bool | None = None,
+    ):
+        super().__init__(store_id, scope, target_id, description=description)
+        self._tenant_id = tenant_id or "default"
+        self._user_id = user_id or ""
+        if persist is None:
+            import os
+
+            flag = (os.getenv("MEMORY_HUB_PERSIST") or "true").strip().lower()
+            persist = flag not in ("0", "false", "no", "off")
+        self._persist = bool(persist) and bool(self._user_id)
+
+    def _persist_value(self, path: str, content: str | None) -> None:
+        if not self._persist:
+            return
+        try:
+            from backend.database.vector_ops import store_user_memory
+
+            # 软删：写空串占位，hydrate 时跳过
+            store_user_memory(
+                tenant_id=self._tenant_id,
+                user_id=self._user_id,
+                key=hub_warm_key(self._scope, path),
+                value=content if content is not None else "",
+                confidence=0.5,
+                source=f"memory_hub:{self._scope}",
+            )
+        except Exception as e:
+            logger.warning("PersistentScopedStore persist failed: %s", e)
+
+    async def write(self, path: str, content: str) -> MemoryEntry:
+        entry = await super().write(path, content)
+        self._persist_value(path, content)
+        return entry
+
+    async def delete(self, path: str) -> None:
+        await super().delete(path)
+        self._persist_value(path, None)
+
+    async def hydrate(self) -> int:
+        """从 ``user_memories`` 加载本 scope 条目到本地缓存。返回条数。"""
+        if not self._persist:
+            return 0
+        try:
+            from backend.core.memory_service import get_unified_memory_service
+
+            ums = get_unified_memory_service(self._tenant_id)
+            bundle = await ums.read(
+                user_id=self._user_id,
+                hot_limit=0,
+                include_warm=True,
+                include_cold=False,
+            )
+        except Exception as e:
+            logger.warning("PersistentScopedStore hydrate failed: %s", e)
+            return 0
+
+        n = 0
+        for key, value in (bundle.warm or {}).items():
+            path = hub_path_from_warm_key(self._scope, key)
+            if not path or value == "":
+                continue
+            # 直接填本地缓存，避免再写回 DB
+            sha256 = hashlib.sha256(value.encode()).hexdigest()
+            existing = self._entries.get(path)
+            self._entries[path] = MemoryEntry(
+                id=existing.id if existing else self._next_id(),
+                store_id=self._store_id,
+                path=path,
+                content=value,
+                content_sha256=sha256,
+                version=(existing.version if existing else 1),
+                updated_at=time.time(),
+                metadata=existing.metadata if existing else {},
+            )
+            n += 1
+        return n
