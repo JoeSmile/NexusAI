@@ -123,13 +123,23 @@ async def _stream_chunks(text: str, *, chunk_size: int = 8) -> AsyncIterator[str
         yield text[i : i + chunk_size]
 
 
-def _is_leaf_stub(spec: CapabilitySpec) -> bool:
-    """仅 ``spec.leaf=true``（或环境强制）走演示 stub。"""
-    raw = spec.spec if isinstance(spec.spec, dict) else {}
-    if raw.get("leaf") is True:
-        return True
-    flag = (os.getenv("CAPABILITY_AGENT_LEAF_STUB") or "").strip().lower()
+def _leaf_stub_mode_enabled() -> bool:
+    """``LEAF_STUB_MODE``（或旧名 ``CAPABILITY_AGENT_LEAF_STUB``）为真时启用演示 stub。"""
+    flag = (
+        os.getenv("LEAF_STUB_MODE") or os.getenv("CAPABILITY_AGENT_LEAF_STUB") or ""
+    ).strip().lower()
     return flag in ("1", "true", "yes", "on")
+
+
+def _is_leaf_stub(spec: CapabilitySpec) -> bool:
+    """仅当 stub 模式开启且 ``spec.leaf=true`` 时走演示 stub（Task 30b）。
+
+    默认走真实 ``invoke()``；``leaf`` 仅作降级标记，不再单独触发 stub。
+    """
+    if not _leaf_stub_mode_enabled():
+        return False
+    raw = spec.spec if isinstance(spec.spec, dict) else {}
+    return raw.get("leaf") is True
 
 
 def _should_chain_audit(spec: CapabilitySpec) -> bool:

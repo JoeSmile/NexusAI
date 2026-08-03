@@ -15,6 +15,7 @@ from sqlalchemy import text
 from backend.database.pgvector_session import get_pg_session
 
 # 叶子 + 嵌套 Agent（vendor-risk → contract-query → rag-ask）
+# leaf=true：仅 LEAF_STUB_MODE=true 时降级 stub；默认经 executor 走真实 invoke（Task 30b）
 SEED_CAPS: list[dict] = [
     {
         "id": "rag-ask",
@@ -23,7 +24,11 @@ SEED_CAPS: list[dict] = [
         "provider": "contextgate",
         "permission": "chat:write",
         "tenant_id": "*",
-        "spec": {"governance": True, "leaf": True},
+        "spec": {
+            "governance": True,
+            "leaf": True,
+            "executor": "rag",
+        },
         "cost_model": {"cost_per_1k": 0.01},
     },
     {
@@ -33,7 +38,12 @@ SEED_CAPS: list[dict] = [
         "provider": "contextgate",
         "permission": "chat:write",
         "tenant_id": "*",
-        "spec": {"governance": True, "leaf": True, "chain_audit": False},
+        "spec": {
+            "governance": True,
+            "leaf": True,
+            "chain_audit": False,
+            "executor": "model",
+        },
         "cost_model": {"cost_per_1k": 0.01},
     },
     {

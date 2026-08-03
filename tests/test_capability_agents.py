@@ -57,7 +57,10 @@ def test_self_reference_rejected_on_register() -> None:
 
 
 @pytest.mark.asyncio
-async def test_vendor_risk_call_chain_and_audits(tenant: TenantContext) -> None:
+async def test_vendor_risk_call_chain_and_audits(
+    tenant: TenantContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("LEAF_STUB_MODE", "true")
     reg = CapabilityRegistry()
     for spec in (
         _leaf("rag-ask"),
@@ -163,7 +166,10 @@ async def test_non_leaf_child_uses_real_invoke(tenant: TenantContext) -> None:
 
 
 @pytest.mark.asyncio
-async def test_agent_depth_limit(tenant: TenantContext) -> None:
+async def test_agent_depth_limit(
+    tenant: TenantContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("LEAF_STUB_MODE", "true")
     reg = CapabilityRegistry()
     # a0 → a1 → a2 → a3（第 4 层应拒绝）
     reg.register(_leaf("rag-ask"))

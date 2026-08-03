@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -303,6 +303,148 @@ async def test_unsupported_kind_raises_cap_001(tenant_user: TenantContext) -> No
                 pass
     assert ei.value.code == ErrorCode.CAP_NOT_FOUND.value
     assert "unsupported_kind" in ei.value.message
+
+
+@pytest.mark.asyncio
+async def test_tool_executor_model_streams(
+    tenant_user: TenantContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """kind=tool + executor=model → harness 真路径（非 stub 文案）。"""
+    monkeypatch.setenv("LLM_PROVIDER", "mock")
+    monkeypatch.delenv("LEAF_STUB_MODE", raising=False)
+    reg = CapabilityRegistry()
+    reg.register(
+        CapabilitySpec(
+            id="contextgate-chat",
+            name="ContextGate Chat",
+            kind=CapabilityKind.TOOL,
+            provider=CapabilityProvider.CONTEXTGATE,
+            permission="chat:write",
+            spec={"governance": True, "leaf": True, "executor": "model"},
+        )
+    )
+    with (
+        patch(
+            "backend.core.capability.invoke.get_capability_registry",
+            return_value=reg,
+        ),
+        patch("backend.core.capability.governance._redis", return_value=None),
+    ):
+        frames: list[dict] = []
+        async for f in invoke(
+            "contextgate-chat", {"message": "hello tool"}, tenant_user
+        ):
+            frames.append(f)
+    tokens = "".join(
+        str(f.get("data") or "") for f in frames if f.get("event") == "token"
+    )
+    assert "[contextgate-chat] processed:" not in tokens
+    assert any(f.get("event") == "done" for f in frames)
+
+
+@pytest.mark.asyncio
+async def test_tool_executor_rag_uses_rag_service(
+    tenant_user: TenantContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("LEAF_STUB_MODE", raising=False)
+    reg = CapabilityRegistry()
+    reg.register(
+        CapabilitySpec(
+            id="rag-ask",
+            name="RAG Ask",
+            kind=CapabilityKind.TOOL,
+            provider=CapabilityProvider.CONTEXTGATE,
+            permission="chat:write",
+            spec={"governance": True, "leaf": True, "executor": "rag"},
+        )
+    )
+
+    class _FakeRag:
+        def ask(self, **_kwargs):
+            return {
+                "answer": "real-rag-answer-about-vendor",
+                "knowledge_count": 2,
+                "cache_hit": False,
+                "cost": 0.0,
+            }
+
+    with (
+        patch(
+            "backend.core.capability.invoke.get_capability_registry",
+            return_value=reg,
+        ),
+        patch("backend.core.capability.governance._redis", return_value=None),
+        patch(
+            "backend.modules.rag.routers.rag_router.get_rag_service",
+            return_value=_FakeRag(),
+        ),
+    ):
+        frames: list[dict] = []
+        async for f in invoke("rag-ask", {"message": "供应商风险"}, tenant_user):
+            frames.append(f)
+    tokens = "".join(
+        str(f.get("data") or "") for f in frames if f.get("event") == "token"
+    )
+    assert "real-rag-answer-about-vendor" in tokens
+    assert "[rag-ask] processed:" not in tokens
+
+
+@pytest.mark.asyncio
+async def test_leaf_stub_mode_still_stubs(
+    tenant_user: TenantContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """LEAF_STUB_MODE=true + leaf → 演示 stub（agents 子路径）。"""
+    from backend.core.capability.agents import invoke_agent
+
+    monkeypatch.setenv("LEAF_STUB_MODE", "true")
+    reg = CapabilityRegistry()
+    leaf = CapabilitySpec(
+        id="rag-ask",
+        name="RAG Ask",
+        kind=CapabilityKind.TOOL,
+        provider=CapabilityProvider.CONTEXTGATE,
+        permission="chat:write",
+        spec={"governance": True, "leaf": True, "executor": "rag"},
+    )
+    agent = CapabilitySpec(
+        id="wrap-rag",
+        name="wrap",
+        kind=CapabilityKind.AGENT,
+        provider=CapabilityProvider.CONTEXTGATE,
+        permission="chat:write",
+        spec={"governance": True, "capabilities": ["rag-ask"]},
+    )
+    reg.register(leaf)
+    reg.register(agent)
+
+    with (
+        patch(
+            "backend.core.capability.registry.get_capability_registry",
+            return_value=reg,
+        ),
+        patch("backend.core.audit.write_audit_sync"),
+        patch(
+            "backend.services.agent_service.get_agent_service",
+            return_value=type(
+                "S",
+                (),
+                {
+                    "process_message": AsyncMock(
+                        return_value={"success": True, "data": {"response": "wrap"}}
+                    )
+                },
+            )(),
+        ),
+    ):
+        frames: list[dict] = []
+        async for f in invoke_agent(
+            agent, {"message": "stub me"}, tenant_user
+        ):
+            frames.append(f)
+    tokens = "".join(
+        str(f.get("data") or "") for f in frames if f.get("event") == "token"
+    )
+    assert "[rag-ask] processed:" in tokens
 
 
 @pytest.mark.asyncio
