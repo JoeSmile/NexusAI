@@ -15,9 +15,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import bcrypt
 from sqlalchemy import text
 
+from backend.core.auth.password import hash_password
 from backend.database.pgvector_session import get_pg_session
 
 # 测试账号统一密码(Task 38 拍板:方便测试)
@@ -84,7 +84,7 @@ def seed_users(entries: list[dict]) -> None:
     user_id = username = 身份标识(memory_hub 按 user_id 查画像,兼容);
     已存在 → 刷新密码/角色/租户(保证重跑后密码仍为 123456);不存在 → 插入。
     """
-    password_hash = bcrypt.hashpw(TEST_PASSWORD.encode(), bcrypt.gensalt(rounds=12)).decode()
+    password_hash = hash_password(TEST_PASSWORD)
     session_factory = get_pg_session()
     with session_factory.Session() as session:
         for e in entries:

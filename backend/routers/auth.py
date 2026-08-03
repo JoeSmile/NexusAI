@@ -64,17 +64,20 @@ def _normalize_username(username: str) -> str:
 
 
 def _app_env() -> str:
-    return (os.getenv("APP_ENV") or "dev").strip().lower()
+    # 未设置时按 prod 处理(注册闸门 fail-closed);显式 APP_ENV=dev|test|demo 才开放注册。
+    raw = (os.getenv("APP_ENV") or "").strip().lower()
+    return raw or "prod"
 
 
-def _fail_key(username: str) -> str:
-    return f"auth:fail:{username}"
+def _fail_key(username: str, *, kind: str = "fail") -> str:
+    """kind=fail → 登录失败;kind=reg → 注册尝试(防爆破/枚举)。"""
+    return f"auth:{kind}:{username}"
 
 
-def _fail_incr(username: str) -> int:
-    """失败计数 +1,返回当前窗口内累计次数。Redis 优先,失败降级进程内 dict。"""
+def _fail_incr(username: str, *, kind: str = "fail") -> int:
+    """失败/尝试计数 +1,返回当前窗口内累计次数。Redis 优先,失败降级进程内 dict。"""
     r = get_sync_redis(decode_responses=True)
-    key = _fail_key(username)
+    key = _fail_key(username, kind=kind)
     if r is not None:
         try:
             pipe = r.pipeline()
@@ -84,26 +87,26 @@ def _fail_incr(username: str) -> int:
             return int(count_raw)
         except Exception as e:
             logger.warning("auth fail-counter redis error, fallback: %s", e)
-    # 降级:进程内 dict
+    # 降级:进程内 dict(用完整 redis key 做本地槽位,避免 login/reg 互相污染)
     now = time.monotonic()
-    rec = _fail_fallback.get(username)
+    rec = _fail_fallback.get(key)
     if rec is None or (now - rec[1]) > _FAIL_WINDOW_SEC:
         rec = [0.0, now]
     rec[0] += 1
-    _fail_fallback[username] = rec
+    _fail_fallback[key] = rec
     return int(rec[0])
 
 
-def _fail_count(username: str) -> int:
+def _fail_count(username: str, *, kind: str = "fail") -> int:
     r = get_sync_redis(decode_responses=True)
-    key = _fail_key(username)
+    key = _fail_key(username, kind=kind)
     if r is not None:
         try:
             raw = r.get(key)
             return int(raw) if raw else 0
         except Exception:
             return 0
-    rec = _fail_fallback.get(username)
+    rec = _fail_fallback.get(key)
     if rec is None:
         return 0
     now = time.monotonic()
@@ -112,16 +115,16 @@ def _fail_count(username: str) -> int:
     return int(rec[0])
 
 
-def _fail_clear(username: str) -> None:
+def _fail_clear(username: str, *, kind: str = "fail") -> None:
     r = get_sync_redis(decode_responses=True)
-    key = _fail_key(username)
+    key = _fail_key(username, kind=kind)
     if r is not None:
         try:
             r.delete(key)
             return
         except Exception:
             pass
-    _fail_fallback.pop(username, None)
+    _fail_fallback.pop(key, None)
 
 
 def _mint_key() -> tuple[str, str, str]:
@@ -196,6 +199,12 @@ async def register(req: RegisterRequest, background_tasks: BackgroundTasks):
             status_code=422,
             detail={"code": "AUTH_011", "message": "username_required"},
         )
+    # 注册防爆破:同 username 5 次/5 分钟(含重名探测)
+    if _fail_count(username, kind="reg") >= _FAIL_MAX:
+        raise HTTPException(
+            status_code=429,
+            detail={"code": "AUTH_016", "message": "too_many_attempts"},
+        )
     if len(req.password) < 8:
         raise HTTPException(
             status_code=422,
@@ -221,6 +230,12 @@ async def register(req: RegisterRequest, background_tasks: BackgroundTasks):
                 {"u": username},
             ).fetchone()
             if existing is not None:
+                count = _fail_incr(username, kind="reg")
+                if count >= _FAIL_MAX:
+                    raise HTTPException(
+                        status_code=429,
+                        detail={"code": "AUTH_016", "message": "too_many_attempts"},
+                    )
                 raise HTTPException(
                     status_code=409,
                     detail={"code": "AUTH_014", "message": "username_taken"},
@@ -256,6 +271,12 @@ async def register(req: RegisterRequest, background_tasks: BackgroundTasks):
     except HTTPException:
         raise
     except IntegrityError as e:
+        count = _fail_incr(username, kind="reg")
+        if count >= _FAIL_MAX:
+            raise HTTPException(
+                status_code=429,
+                detail={"code": "AUTH_016", "message": "too_many_attempts"},
+            ) from e
         raise HTTPException(
             status_code=409,
             detail={"code": "AUTH_014", "message": "username_taken"},
@@ -266,6 +287,8 @@ async def register(req: RegisterRequest, background_tasks: BackgroundTasks):
             status_code=500,
             detail={"code": "AUTH_015", "message": "register_failed"},
         ) from e
+
+    _fail_clear(username, kind="reg")
 
     log_audit(
         background_tasks,
@@ -284,7 +307,7 @@ async def register(req: RegisterRequest, background_tasks: BackgroundTasks):
 
 @router.post("/login", response_model=AuthResponse)
 async def login(req: LoginRequest, background_tasks: BackgroundTasks):
-    """账号密码登录 → 校验 bcrypt,成功下发新 cg_ key(轮换旧 active key)。"""
+    """账号密码登录 → 校验 bcrypt,成功轮换并下发新 cg_ key。"""
     username = _normalize_username(req.username)
     if not username:
         raise HTTPException(

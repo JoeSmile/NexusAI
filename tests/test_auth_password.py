@@ -115,6 +115,29 @@ def test_register_duplicate_username_returns_409(auth_client) -> None:
     assert r.json()["detail"]["code"] == "AUTH_014"
 
 
+def test_register_probe_five_times_returns_429(auth_client) -> None:
+    """同 username 重名探测 5 次 → 429。"""
+    auth_client._session.execute.return_value.fetchone.return_value = SimpleNamespace(  # type: ignore[attr-defined]
+        id=1
+    )
+    statuses = []
+    for _ in range(5):
+        r = auth_client.post(
+            "/api/auth/register",
+            json={"username": "taken", "password": "password123"},
+        )
+        statuses.append(r.status_code)
+    assert statuses[:4] == [409, 409, 409, 409]
+    assert statuses[4] == 429
+    assert (
+        auth_client.post(
+            "/api/auth/register",
+            json={"username": "taken", "password": "password123"},
+        ).status_code
+        == 429
+    )
+
+
 def test_register_short_password_returns_422(auth_client) -> None:
     r = auth_client.post(
         "/api/auth/register",
@@ -126,15 +149,22 @@ def test_register_short_password_returns_422(auth_client) -> None:
 
 def test_register_prod_env_returns_403(auth_client, monkeypatch) -> None:
     monkeypatch.setenv("APP_ENV", "prod")
-    try:
-        r = auth_client.post(
-            "/api/auth/register",
-            json={"username": "dave", "password": "password123"},
-        )
-        assert r.status_code == 403
-        assert r.json()["detail"]["code"] == "AUTH_010"
-    finally:
-        monkeypatch.delenv("APP_ENV", raising=False)
+    r = auth_client.post(
+        "/api/auth/register",
+        json={"username": "dave", "password": "password123"},
+    )
+    assert r.status_code == 403
+    assert r.json()["detail"]["code"] == "AUTH_010"
+
+
+def test_register_unset_app_env_fail_closed(auth_client, monkeypatch) -> None:
+    monkeypatch.delenv("APP_ENV", raising=False)
+    r = auth_client.post(
+        "/api/auth/register",
+        json={"username": "eve", "password": "password123"},
+    )
+    assert r.status_code == 403
+    assert r.json()["detail"]["code"] == "AUTH_010"
 
 
 # ── login ──────────────────────────────────────────────────────
