@@ -1,18 +1,30 @@
-"""
-Agent模块
-智能代理相关功能
+"""Agent 包：仅保留 protocol（MCP）。
+
+Agent 运行时实现见 ``backend.agent``（经 ``backend.services.agent_service`` /
+``backend.routers.agent`` 挂载为 ``/agent/*``）。本包不再导出 AgentCore /
+AgentService / 路由副本（Task 31 已删除孤儿树）。
 """
 
-from .core.agent.agent_core import AgentCore
-from .models.agent_models import AgentAction, AgentRequest, AgentResponse
-from .routers.agent_router import router as agent_router
-from .services.agent_service import AgentService
+from backend.modules.agent.protocol import (
+    MCPContext,
+    MCPLogger,
+    MCPMessage,
+    MCPMessageType,
+    MCPProtocol,
+    MCPToolCall,
+    MCPToolResponse,
+    create_mcp_protocol_with_context,
+    get_mcp_logger,
+)
 
 __all__ = [
-    "AgentAction",
-    "AgentCore",
-    "AgentRequest",
-    "AgentResponse",
-    "AgentService",
-    "agent_router"
+    "MCPContext",
+    "MCPLogger",
+    "MCPMessage",
+    "MCPMessageType",
+    "MCPProtocol",
+    "MCPToolCall",
+    "MCPToolResponse",
+    "create_mcp_protocol_with_context",
+    "get_mcp_logger",
 ]
