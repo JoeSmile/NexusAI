@@ -303,6 +303,7 @@ async def invoke_agent(
                 message=message,
                 conversation_id=str(payload.get("conversation_id") or "") or None,
                 capabilities=list(agent.capabilities),
+                tenant_id=tenant.tenant_id,
             )
             if result.get("success"):
                 data = result.get("data") or {}

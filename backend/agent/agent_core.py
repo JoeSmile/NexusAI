@@ -281,16 +281,19 @@ class AgentCore:
         user_id: str,
         conversation_id: str | None = None,
         capabilities: list[str] | None = None,
+        tenant_id: str = "default",
     ) -> dict[str, Any]:
         """
         处理用户输入 — Runtime 版
 
         对外接口与旧版完全兼容，内部使用 ConversationRuntime.process_turn()。
         ``capabilities`` 由 Capability Hub Agent 门面注入 turn context（Task 30.24）。
+        ``tenant_id`` 透传 MemoryHub 持久化隔离（Task 34 Important A）。
         """
         interaction_id = str(uuid.uuid4())
         start_time = datetime.now()
         caps = list(capabilities or [])
+        tid = tenant_id or "default"
 
         async with self._process_lock:
             if self._use_runtime:
@@ -301,6 +304,7 @@ class AgentCore:
                     interaction_id=interaction_id,
                     start_time=start_time,
                     capabilities=caps,
+                    tenant_id=tid,
                 )
             else:
                 # 回退到旧模式
@@ -311,6 +315,7 @@ class AgentCore:
                     interaction_id=interaction_id,
                     start_time=start_time,
                     capabilities=caps,
+                    tenant_id=tid,
                 )
 
     async def _process_with_runtime(
@@ -321,11 +326,13 @@ class AgentCore:
         interaction_id: str,
         start_time: datetime,
         capabilities: list[str] | None = None,
+        tenant_id: str = "default",
     ) -> dict[str, Any]:
         """使用 ConversationRuntime 处理"""
         caps = list(capabilities or [])
+        tid = tenant_id or "default"
         try:
-            runtime_key = (user_id, conversation_id or "")
+            runtime_key = (tid, user_id, conversation_id or "")
             # 1. 构建或复用 Runtime
             if self._runtime is None or self._runtime_key != runtime_key:
                 from .memory_hub import get_memory_hub_async
@@ -333,6 +340,7 @@ class AgentCore:
                 self.memory_hub = await get_memory_hub_async(
                     user_id=user_id,
                     session_id=conversation_id or "",
+                    tenant_id=tid,
                 )
                 self._runtime = self._build_runtime(user_id, conversation_id)
                 self._runtime_key = runtime_key
@@ -394,6 +402,7 @@ class AgentCore:
                 interaction_id=interaction_id,
                 start_time=start_time,
                 capabilities=caps,
+                tenant_id=tid,
             )
 
     def _inject_legacy_deps(self):
@@ -417,6 +426,7 @@ class AgentCore:
         interaction_id: str,
         start_time: datetime,
         capabilities: list[str] | None = None,
+        tenant_id: str = "default",
     ) -> dict[str, Any]:
         """
         旧模式处理 — 7 阶段线性 Workflow（向后兼容回退）
@@ -424,12 +434,14 @@ class AgentCore:
         当 Runtime 初始化失败或被禁用时使用。
         """
         caps = list(capabilities or [])
+        tid = tenant_id or "default"
         try:
             from .memory_hub import get_memory_hub_async
 
             self.memory_hub = await get_memory_hub_async(
                 user_id=user_id,
                 session_id=conversation_id or "",
+                tenant_id=tid,
             )
             if self.memory_hub is not None:
                 self.memory_hub.set_turn_context(
@@ -538,13 +550,19 @@ class AgentCore:
         user_input: str,
         user_id: str,
         conversation_id: str | None = None,
+        tenant_id: str = "default",
     ):
         """
         MCP 协议处理（兼容旧接口）
 
         Runtime 模式不再使用 MCP，此方法转为调用 process() 并包装为兼容格式。
         """
-        result = await self.process(user_input, user_id, conversation_id)
+        result = await self.process(
+            user_input,
+            user_id,
+            conversation_id,
+            tenant_id=tenant_id,
+        )
 
         # 尝试返回 MCP 消息格式
         try:

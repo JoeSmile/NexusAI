@@ -31,6 +31,7 @@ class AgentService:
         message: str,
         conversation_id: str | None = None,
         capabilities: list[str] | None = None,
+        tenant_id: str = "default",
     ) -> dict[str, Any]:
         """
         处理用户消息（Agent模式）
@@ -40,17 +41,19 @@ class AgentService:
             message: 用户消息
             conversation_id: 对话ID
             capabilities: 可选能力 id 列表（Capability Hub 门面注入，Task 30.24）
+            tenant_id: 租户 ID（MemoryHub 持久化隔离，Task 34.04 Important A）
             
         Returns:
             处理结果
         """
         try:
-            # 使用Agent Core处理（capabilities 透传；Core 可忽略）
+            # 使用Agent Core处理（capabilities / tenant 透传）
             result = await self.agent_core.process(
                 user_input=message,
                 user_id=user_id,
                 conversation_id=conversation_id,
                 capabilities=capabilities,
+                tenant_id=tenant_id,
             )
             
             return {

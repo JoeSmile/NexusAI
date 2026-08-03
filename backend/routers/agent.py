@@ -49,9 +49,10 @@ async def agent_chat(
     """
     try:
         result = await agent_service.process_message(
-            user_id=request.user_id,
+            user_id=request.user_id or tenant.user_id,
             message=request.message,
-            conversation_id=request.conversation_id
+            conversation_id=request.conversation_id,
+            tenant_id=tenant.tenant_id,
         )
         
         return {

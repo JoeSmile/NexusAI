@@ -107,3 +107,61 @@ def test_get_memory_hub_isolates_by_tenant() -> None:
     assert a is not b
     assert a._tenant_id == "t1"
     assert b._tenant_id == "t2"
+
+
+@pytest.mark.asyncio
+async def test_agent_core_passes_tenant_to_hub() -> None:
+    from datetime import datetime
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from backend.agent.agent_core import AgentCore
+
+    captured: dict = {}
+
+    async def fake_hub(**kwargs):
+        captured.clear()
+        captured.update(kwargs)
+        hub = MagicMock()
+        hub.set_turn_context = MagicMock()
+        hub.get_user_profile = AsyncMock(return_value={})
+        hub.retrieve = MagicMock(return_value=[])
+        hub.encode = MagicMock(return_value={})
+        hub.get_working_memory = MagicMock(return_value={})
+        hub.get_action_log = AsyncMock(return_value=[])
+        return hub
+
+    core = AgentCore.__new__(AgentCore)
+    core._use_runtime = True
+    core._process_lock = __import__("asyncio").Lock()
+    core._runtime = None
+    core._runtime_key = None
+    core.memory_hub = None
+    core._execution_history = []
+    core._inject_legacy_deps = MagicMock()
+    turn = MagicMock(
+        response="ok",
+        skill_results={},
+        iterations=1,
+        success=True,
+    )
+    core._build_runtime = MagicMock(
+        return_value=MagicMock(
+            start=AsyncMock(),
+            process_turn=AsyncMock(return_value=turn),
+        )
+    )
+
+    with patch(
+        "backend.agent.memory_hub.get_memory_hub_async",
+        side_effect=fake_hub,
+    ):
+        await core._process_with_runtime(
+            user_input="hi",
+            user_id="u1",
+            conversation_id="s1",
+            interaction_id="i1",
+            start_time=datetime.utcnow(),
+            tenant_id="tenant-x",
+        )
+    assert captured.get("tenant_id") == "tenant-x"
+    assert captured.get("user_id") == "u1"
