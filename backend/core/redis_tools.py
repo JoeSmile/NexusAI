@@ -110,5 +110,36 @@ def reset_redis_clients_for_tests() -> None:
 
 
 def cache_key(domain: str, name: str, tenant: str, key: str) -> str:
-    """统一前缀: ``<域>:<名>:<租户>:<键>``（如 ``rag:l1:t1:hash``）。"""
-    return f"{domain}:{name}:{tenant}:{key}"
+    """统一前缀: ``<域>:<名>:<租户>:<键>``（如 ``rag:l1:t1:abc``）。"""
+    return f"{domain}:{name}:{tenant or 'default'}:{key}"
+
+
+# 域前缀约定（详表见 docs/CACHE_KEYS.md）
+CACHE_KEY_DOMAINS: dict[str, str] = {
+    "rag": "RAG 答案/向量 (rag:a / rag:e / rag:epoch / rag:lock)",
+    "chat": "对话与 PerformanceOptimizer (chat:v / chat:epoch / chat:lock)",
+    "ctx": "能力/上下文缓存 (预留)",
+    "rl": "限流桶 (rl:cap / rl:rag / …)",
+    "mem": "记忆热缓存 (预留，与 Task 34 呼应)",
+}
+
+
+async def async_acquire_lock(
+    redis: Any | None, lock_key: str, *, ttl: int = 10
+) -> bool:
+    """单飞锁 SET NX EX；无 redis 时当作已拿到锁（直接回源）。"""
+    if redis is None:
+        return True
+    try:
+        return bool(await redis.set(lock_key, "1", nx=True, ex=ttl))
+    except Exception:
+        return True
+
+
+async def async_release_lock(redis: Any | None, lock_key: str) -> None:
+    if redis is None:
+        return
+    try:
+        await redis.delete(lock_key)
+    except Exception:
+        pass

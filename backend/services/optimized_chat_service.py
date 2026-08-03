@@ -164,8 +164,8 @@ class OptimizedChatService:
                                     processing_result: dict[str, Any]) -> str:
         """构建优化的Prompt"""
         try:
-            # 使用缓存管理器
-            cache_key = f"prompt:{hash(user_input)}"
+            # 使用缓存管理器（逻辑键；epoch/单飞由 CacheManager 注入）
+            cache_key = f"prompt:default:{hash(user_input)}"
             
             async def compute_prompt():
                 return self._construct_prompt(

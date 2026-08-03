@@ -525,6 +525,12 @@ class UnifiedMemoryService:
             cold_n,
             msg_n,
         )
+        try:
+            from backend.services.performance_optimizer import cache_manager
+
+            await cache_manager.bump_epoch(self.tenant_id)
+        except Exception:
+            logger.debug("chat cache epoch bump skipped", exc_info=True)
         return {
             "user_id": user_id,
             "deleted_warm": int(warm_n or 0),

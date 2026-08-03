@@ -80,9 +80,10 @@ class PerformanceOptimizer:
         except Exception:
             return False
 
-    def cache_key(self, prefix: str, content: str) -> str:
+    def cache_key(self, prefix: str, content: str, tenant_id: str = "default") -> str:
+        """逻辑键（不含 epoch）；CacheManager 写入 ``chat:v:<ep>:<tenant>:<逻辑键>``。"""
         content_hash = hashlib.md5(content.encode()).hexdigest()
-        return f"{prefix}:{content_hash}"
+        return f"{prefix}:{tenant_id or 'default'}:{content_hash}"
 
     async def parallel_processing(
         self,
@@ -92,20 +93,13 @@ class PerformanceOptimizer:
     ) -> dict[str, Any]:
         start_time = time.time()
         loop = asyncio.get_running_loop()
+        cm = CacheManager(self)
 
-        async def get_or_compute(cache_key: str, sync_fn: Callable[[], Any]):
-            cached = await self.get(cache_key)
-            if cached is not None:
-                try:
-                    return json.loads(cached)
-                except json.JSONDecodeError:
-                    pass
-            result = await loop.run_in_executor(self.thread_pool, sync_fn)
-            try:
-                await self.set(cache_key, json.dumps(result))
-            except Exception:
-                pass
-            return result
+        async def get_or_compute(logical_key: str, sync_fn: Callable[[], Any]):
+            async def compute():
+                return await loop.run_in_executor(self.thread_pool, sync_fn)
+
+            return await cm.get_or_set(logical_key, compute)
 
         safety_result, memory_result = await asyncio.gather(
             get_or_compute(
@@ -249,29 +243,120 @@ class StreamingResponseHandler:
 
 
 class CacheManager:
-    """异步缓存管理器 — 委托 PerformanceOptimizer。"""
+    """异步缓存管理器 — 单飞锁 + epoch 失效 + 滑动 TTL（Task 35.04 / RAG 模板）。"""
 
     def __init__(self, optimizer: PerformanceOptimizer):
         self._opt = optimizer
         self.default_ttl = 3600
+        self._lock_ttl = 10
+        self._wait_timeout_s = 0.5
 
-    async def get_or_set(self, key: str, compute_func, ttl: int | None = None) -> Any:
+    def _epoch_redis_key(self, tenant_id: str) -> str:
+        return f"chat:epoch:{tenant_id or 'default'}"
+
+    def _value_key(self, logical_key: str, tenant_id: str, epoch: int) -> str:
+        return f"chat:v:{epoch}:{tenant_id or 'default'}:{logical_key}"
+
+    def _lock_key(self, value_key: str) -> str:
+        digest = hashlib.md5(value_key.encode()).hexdigest()[:16]
+        return f"chat:lock:{digest}"
+
+    async def get_epoch(self, tenant_id: str = "default") -> int:
+        r = await self._opt._ensure_redis()
+        if r is None:
+            return 0
+        try:
+            v = await r.get(self._epoch_redis_key(tenant_id))
+            return int(v) if v else 0
+        except Exception:
+            return 0
+
+    async def bump_epoch(self, tenant_id: str = "default") -> int:
+        """写路径批量失效：INCR epoch，旧 chat:v:* 键不再被读取。"""
+        r = await self._opt._ensure_redis()
+        if r is None:
+            return 0
+        try:
+            return int(await r.incr(self._epoch_redis_key(tenant_id)))
+        except Exception as e:
+            logger.warning("chat epoch bump 失败(降级): %s", e)
+            return 0
+
+    async def get_or_set(
+        self,
+        key: str,
+        compute_func,
+        ttl: int | None = None,
+        *,
+        tenant_id: str = "default",
+    ) -> Any:
+        from backend.core.redis_tools import async_acquire_lock, async_release_lock
+
         ttl = ttl or self.default_ttl
-        cached = await self._opt.get(key)
-        if cached:
-            return json.loads(cached)
+        tid = tenant_id or "default"
+        epoch = await self.get_epoch(tid)
+        full_key = self._value_key(key, tid, epoch)
+
+        cached = await self._get_json(full_key, ttl=ttl)
+        if cached is not None:
+            return cached
+
+        r = await self._opt._ensure_redis()
+        lock_key = self._lock_key(full_key)
+        got_lock = await async_acquire_lock(r, lock_key, ttl=self._lock_ttl)
+        if got_lock:
+            try:
+                cached = await self._get_json(full_key, ttl=ttl)
+                if cached is not None:
+                    return cached
+                result = await compute_func()
+                await self._opt.set(full_key, json.dumps(result), ttl=ttl)
+                return result
+            finally:
+                await async_release_lock(r, lock_key)
+
+        deadline = time.time() + self._wait_timeout_s
+        while time.time() < deadline:
+            await asyncio.sleep(0.05)
+            cached = await self._get_json(full_key, ttl=ttl)
+            if cached is not None:
+                return cached
         result = await compute_func()
-        await self._opt.set(key, json.dumps(result), ttl=ttl)
+        await self._opt.set(full_key, json.dumps(result), ttl=ttl)
         return result
 
+    async def _get_json(self, full_key: str, *, ttl: int) -> Any | None:
+        raw = await self._opt.get(full_key)
+        if raw is None:
+            return None
+        try:
+            value = json.loads(raw)
+        except json.JSONDecodeError:
+            return None
+        r = await self._opt._ensure_redis()
+        if r is not None:
+            try:
+                await r.expire(full_key, ttl)
+            except Exception:
+                pass
+        return value
+
     async def invalidate_pattern(self, pattern: str) -> None:
+        """SCAN 匹配删除；``*`` / chat 通配 → bump 默认租户 epoch。"""
+        if not pattern or pattern in ("*", "chat:*", "chat:v:*"):
+            await self.bump_epoch("default")
+            return
         r = await self._opt._ensure_redis()
         if r is None:
             return
         try:
-            keys = await r.keys(pattern)
-            if keys:
-                await r.delete(*keys)
+            cursor = 0
+            while True:
+                cursor, keys = await r.scan(cursor=cursor, match=pattern, count=200)
+                if keys:
+                    await r.delete(*keys)
+                if cursor == 0:
+                    break
         except Exception as e:
             logger.warning("invalidate_pattern 失败: %s", e)
 
@@ -279,15 +364,20 @@ class CacheManager:
         r = await self._opt._ensure_redis()
         if r is None:
             return {"total_keys": 0, "memory_usage": "0B", "hit_rate": 0.0}
-        info = await r.info()
-        hits = info.get("keyspace_hits", 0)
-        misses = info.get("keyspace_misses", 0)
-        total = hits + misses
-        return {
-            "total_keys": await r.dbsize(),
-            "memory_usage": info.get("used_memory_human", "0B"),
-            "hit_rate": (hits / total * 100) if total > 0 else 0.0,
-        }
+        try:
+            info = await r.info()
+            hits = info.get("keyspace_hits", 0)
+            misses = info.get("keyspace_misses", 0)
+            total = hits + misses
+            return {
+                "total_keys": await r.dbsize(),
+                "memory_usage": info.get("used_memory_human", "0B"),
+                "hit_rate": (hits / total * 100) if total else 0.0,
+                "chat_epoch_default": await self.get_epoch("default"),
+            }
+        except Exception as e:
+            logger.warning("get_cache_stats 失败: %s", e)
+            return {"total_keys": 0, "memory_usage": "0B", "hit_rate": 0.0}
 
 
 performance_optimizer = PerformanceOptimizer()
