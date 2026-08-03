@@ -65,6 +65,19 @@ curl -X POST http://localhost:8000/chat \
 - Admin: `/playground/admin.html`  
 - SSE: `/playground/streaming.html` → `POST /chat/streaming`（空闲约 15s `: ping`；断开即中止；**暂不支持 `Last-Event-ID` 断点续传**）
 
+### 测试前端（Task 30，推荐 QA 主入口）
+
+```bash
+uv run python scripts/seed_api_keys.py
+uv run python scripts/seed_capabilities.py   # Agent 嵌套演示可选
+uv run uvicorn backend.app:app --reload --port 8000
+cd frontend && npm install && npm run dev    # http://localhost:5173
+```
+
+在登录页填入 4 角色 Key → 右上角切换角色 → 对照 [`examples/qa/journeys/`](examples/qa/journeys/) 走面板。  
+详细步骤与面板说明见 [`frontend/README.md`](frontend/README.md)。  
+`examples/*.html` 仍保留（playground 挂载不动）；新 QA 优先用测试 FE。
+
 ## Features
 
 | Feature | Status | Description |
