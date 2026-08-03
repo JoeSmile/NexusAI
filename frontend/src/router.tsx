@@ -7,6 +7,7 @@ import AgentPanel from '@/pages/panels/agent'
 import AuditPanel from '@/pages/panels/audit'
 import ChatPanel from '@/pages/panels/chat'
 import EvalPanel from '@/pages/panels/eval'
+import PerformancePanel from '@/pages/panels/performance'
 import PlaceholderPanel from '@/pages/panels/PlaceholderPanel'
 import RagPanel from '@/pages/panels/rag'
 import { useAuthStore } from '@/stores/authStore'
@@ -37,7 +38,7 @@ export const router = createBrowserRouter([
           { path: 'panels/audit', element: <AuditPanel /> },
           { path: 'panels/agent', element: <AgentPanel /> },
           { path: 'panels/eval', element: <EvalPanel /> },
-          { path: 'panels/performance', element: <PlaceholderPanel /> },
+          { path: 'panels/performance', element: <PerformancePanel /> },
           { path: 'panels/capabilities', element: <PlaceholderPanel /> },
         ],
       },
