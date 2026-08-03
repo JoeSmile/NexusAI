@@ -219,7 +219,10 @@ class ResponseEvaluation(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 class UserProfileDB(Base):
-    """用户画像表 - 存储用户的基本信息和特征"""
+    """用户画像表 — **已废弃**(Task 34.01)。画像请写入 ``user_memories`` key=profile:v1。
+
+    表保留兼容存量；业务代码禁止新读写。
+    """
     __tablename__ = "user_profiles"
     
     id = Column(Integer, primary_key=True, index=True)
@@ -246,7 +249,10 @@ class UserProfileDB(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 class MemoryItem(Base):
-    """记忆条目表 - 存储结构化的用户记忆（配合向量数据库使用）"""
+    """记忆条目表 — **已废弃**(Task 34.01)。真源为 pgvector ``user_memories``。
+
+    表保留兼容存量；业务代码禁止新读写。
+    """
     __tablename__ = "memory_items"
     
     id = Column(Integer, primary_key=True, index=True)

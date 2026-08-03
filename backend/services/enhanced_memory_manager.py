@@ -12,7 +12,6 @@ import json
 from datetime import datetime
 from typing import Any
 
-from backend.database import DatabaseManager, MemoryItem
 from backend.database.vector_ops import add_chat_turn, search_user_memories
 
 
@@ -310,28 +309,12 @@ class EnhancedMemoryManager:
                 source=memory.get("extraction_method", "extracted"),
             )
             memory_id = str(mid) if mid is not None else memory_key
-            
-            # 同步到关系数据库
-            with DatabaseManager() as db:
-                memory_item = MemoryItem(
-                    memory_id=memory_id,
-                    user_id=user_id,
-                    session_id=session_id,
-                    content=memory.get("content", ""),
-                    summary=memory.get("summary", ""),
-                    memory_type=memory.get("type", "other"),
-                    importance=memory.get("importance", 0.5),
-                    extraction_method=memory.get("extraction_method", "unknown"),
-                    keywords=json.dumps(memory.get("keywords", []), ensure_ascii=False)
-                )
-                db.db.add(memory_item)
-                db.db.commit()
-            
-            # 返回完整记忆数据
+
+            # Task 34.01: 不再双写僵尸表 memory_items；真源 = user_memories
             memory["id"] = memory_id
             memory["user_id"] = user_id
             memory["session_id"] = session_id
-            
+
             return memory
             
         except Exception as e:
@@ -412,61 +395,36 @@ class EnhancedMemoryManager:
             return []
     
     async def _update_access_stats(self, memory_ids: list[str]):
-        """更新记忆的访问统计"""
+        """访问统计：memory_items 已停用；保留钩子供 34.x 统一层接入。"""
+        return
+
+    async def get_important_memories(
+        self,
+        user_id: str,
+        limit: int = 10,
+        min_importance: float = 0.6,
+    ) -> list[dict[str, Any]]:
+        """获取用户最重要的记忆（``user_memories`` / MemoryService）。"""
         try:
-            with DatabaseManager() as db:
-                for memory_id in memory_ids:
-                    memory_item = db.db.query(MemoryItem).filter(
-                        MemoryItem.memory_id == memory_id
-                    ).first()
-                    
-                    if memory_item:
-                        memory_item.access_count += 1
-                        memory_item.last_accessed = datetime.utcnow()
-                
-                db.db.commit()
-        except Exception as e:
-            print(f"更新访问统计失败: {e}")
-    
-    async def get_important_memories(self, 
-                                    user_id: str, 
-                                    limit: int = 10,
-                                    min_importance: float = 0.6) -> list[dict[str, Any]]:
-        """
-        获取用户最重要的记忆
-        
-        Args:
-            user_id: 用户ID
-            limit: 返回数量
-            min_importance: 最小重要性阈值
-            
-        Returns:
-            重要记忆列表
-        """
-        try:
-            with DatabaseManager() as db:
-                memories = db.db.query(MemoryItem).filter(
-                    MemoryItem.user_id == user_id,
-                    MemoryItem.is_active,
-                    MemoryItem.importance >= min_importance
-                ).order_by(
-                    MemoryItem.importance.desc(),
-                    MemoryItem.access_count.desc()
-                ).limit(limit).all()
-                
-                return [
-                    {
-                        "id": m.memory_id,
-                        "content": m.content,
-                        "summary": m.summary,
-                        "type": m.memory_type,
-                        "importance": m.importance,
-                        "access_count": m.access_count,
-                        "created_at": m.created_at.isoformat() if m.created_at else None,
-                        "last_accessed": m.last_accessed.isoformat() if m.last_accessed else None
-                    }
-                    for m in memories
-                ]
+            from backend.services.memory_service import MemoryService
+
+            svc = MemoryService(tenant_id=self.tenant_id)
+            rows = await svc.get_important_memories(user_id, limit=limit * 2)
+            out = [
+                {
+                    "id": r["id"],
+                    "content": r.get("content") or r.get("value") or "",
+                    "summary": r.get("value") or "",
+                    "type": r.get("type") or "other",
+                    "importance": float(r.get("importance") or 0),
+                    "access_count": 0,
+                    "created_at": r.get("updated_at"),
+                    "last_accessed": None,
+                }
+                for r in rows
+                if float(r.get("importance") or 0) >= min_importance
+            ]
+            return out[:limit]
         except Exception as e:
             print(f"获取重要记忆失败: {e}")
             return []
