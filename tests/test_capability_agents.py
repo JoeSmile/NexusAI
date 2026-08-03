@@ -37,14 +37,14 @@ def _agent(cap_id: str, caps: list[str]) -> CapabilitySpec:
     )
 
 
-def _leaf(cap_id: str) -> CapabilitySpec:
+def _leaf(cap_id: str, *, chain_audit: bool = True) -> CapabilitySpec:
     return CapabilitySpec(
         id=cap_id,
         name=cap_id,
         kind=CapabilityKind.TOOL,
         provider=CapabilityProvider.CONTEXTGATE,
         permission="chat:write",
-        spec={"governance": True, "leaf": True},
+        spec={"governance": True, "leaf": True, "chain_audit": chain_audit},
     )
 
 
@@ -61,7 +61,7 @@ async def test_vendor_risk_call_chain_and_audits(tenant: TenantContext) -> None:
     reg = CapabilityRegistry()
     for spec in (
         _leaf("rag-ask"),
-        _leaf("contextgate-chat"),
+        _leaf("contextgate-chat", chain_audit=False),
         _agent("contract-query-agent", ["rag-ask", "contextgate-chat"]),
         _agent("vendor-risk-agent", ["contract-query-agent", "contextgate-chat"]),
     ):
@@ -110,6 +110,56 @@ async def test_vendor_risk_call_chain_and_audits(tenant: TenantContext) -> None:
         "contract-query-agent",
         "rag-ask",
     ]
+
+
+@pytest.mark.asyncio
+async def test_non_leaf_child_uses_real_invoke(tenant: TenantContext) -> None:
+    """无 leaf 标记时走 invoke()，不合成 stub 文案。"""
+    reg = CapabilityRegistry()
+    model = CapabilitySpec(
+        id="model:mock-local",
+        name="mock-local",
+        kind=CapabilityKind.MODEL,
+        provider=CapabilityProvider.SELF_HOSTED,
+        permission="chat:write",
+        spec={"max_tokens": 16},
+    )
+    reg.register(model)
+    reg.register(_agent("wrap-model", ["model:mock-local"]))
+
+    with (
+        patch(
+            "backend.core.capability.registry.get_capability_registry",
+            return_value=reg,
+        ),
+        patch("backend.core.capability.governance._redis", return_value=None),
+        patch("backend.core.audit.write_audit_sync"),
+        patch(
+            "backend.services.agent_service.get_agent_service",
+            return_value=type(
+                "S",
+                (),
+                {
+                    "process_message": AsyncMock(
+                        return_value={"success": True, "data": {"response": "wrap"}}
+                    )
+                },
+            )(),
+        ),
+    ):
+        import os
+
+        os.environ["LLM_PROVIDER"] = "mock"
+        frames: list[dict] = []
+        async for f in invoke_agent(
+            reg.get("wrap-model"), {"message": "hello model"}, tenant
+        ):
+            frames.append(f)
+    tokens = "".join(
+        str(f.get("data") or "") for f in frames if f.get("event") == "token"
+    )
+    assert "[model:mock-local] processed:" not in tokens
+    assert any(f.get("event") == "done" for f in frames)
 
 
 @pytest.mark.asyncio

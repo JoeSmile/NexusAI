@@ -32,6 +32,9 @@ export function formatApiError(e: unknown, fallbackNeeded = 'permission'): strin
   if (e instanceof ApiError && e.forbidden) {
     return `该角色无权限（需 ${e.needed || fallbackNeeded}）`
   }
+  if (e instanceof ApiError) {
+    return `[${e.code}] ${e.message}`
+  }
   if (e instanceof Error) return e.message
   return String(e)
 }

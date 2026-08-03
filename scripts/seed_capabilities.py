@@ -33,7 +33,7 @@ SEED_CAPS: list[dict] = [
         "provider": "contextgate",
         "permission": "chat:write",
         "tenant_id": "*",
-        "spec": {"governance": True, "leaf": True},
+        "spec": {"governance": True, "leaf": True, "chain_audit": False},
         "cost_model": {"cost_per_1k": 0.01},
     },
     {

@@ -10,7 +10,7 @@ import {
   type AgentTool,
   type HubAgent,
 } from '@/api/agent'
-import { formatApiError } from '@/api/http'
+import { ApiError, formatApiError } from '@/api/http'
 import { ForbiddenBanner } from '@/components/role/RoleSwitcher'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -130,7 +130,18 @@ export default function AgentPanel() {
           setBusy(false)
         },
         onError: (code, m) => {
-          setErr(`[${code}] ${m}`)
+          setErr(
+            formatApiError(
+              new ApiError({
+                status: code === 'AUTH_002' ? 403 : 400,
+                code,
+                message: m,
+                forbidden: code === 'AUTH_002',
+                needed: code === 'AUTH_002' ? m || 'chat:write' : undefined,
+              }),
+              'chat:write',
+            ),
+          )
           setBusy(false)
         },
       },

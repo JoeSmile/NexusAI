@@ -280,16 +280,17 @@ class AgentCore:
         user_input: str,
         user_id: str,
         conversation_id: str | None = None,
-        capabilities: list[str] | None = None,  # noqa: ARG002 — Hub 门面注入预留
+        capabilities: list[str] | None = None,
     ) -> dict[str, Any]:
         """
         处理用户输入 — Runtime 版
 
         对外接口与旧版完全兼容，内部使用 ConversationRuntime.process_turn()。
-        ``capabilities`` 由 Capability Hub Agent 门面透传（Task 30.24），当前可选忽略。
+        ``capabilities`` 由 Capability Hub Agent 门面注入 turn context（Task 30.24）。
         """
         interaction_id = str(uuid.uuid4())
         start_time = datetime.now()
+        caps = list(capabilities or [])
 
         async with self._process_lock:
             if self._use_runtime:
@@ -299,6 +300,7 @@ class AgentCore:
                     conversation_id=conversation_id,
                     interaction_id=interaction_id,
                     start_time=start_time,
+                    capabilities=caps,
                 )
             else:
                 # 回退到旧模式
@@ -308,6 +310,7 @@ class AgentCore:
                     conversation_id=conversation_id,
                     interaction_id=interaction_id,
                     start_time=start_time,
+                    capabilities=caps,
                 )
 
     async def _process_with_runtime(
@@ -317,8 +320,10 @@ class AgentCore:
         conversation_id: str | None,
         interaction_id: str,
         start_time: datetime,
+        capabilities: list[str] | None = None,
     ) -> dict[str, Any]:
         """使用 ConversationRuntime 处理"""
+        caps = list(capabilities or [])
         try:
             runtime_key = (user_id, conversation_id or "")
             # 1. 构建或复用 Runtime
@@ -333,8 +338,13 @@ class AgentCore:
                 self._runtime_key = runtime_key
                 await self._runtime.start()
 
-            # 2. 注入旧系统依赖到 Skill
+            # 2. 注入旧系统依赖到 Skill + Hub 能力列表进 turn context
             self._inject_legacy_deps()
+            if self.memory_hub is not None:
+                self.memory_hub.set_turn_context(
+                    capabilities=caps,
+                    capability_ids=caps,
+                )
 
             # 3. 调用 process_turn
             result = await self._runtime.process_turn(user_input=user_input)
@@ -355,6 +365,7 @@ class AgentCore:
                 "response_time": response_time,
                 "mode": "runtime",
                 "iterations": result.iterations,
+                "capabilities": caps,
             }
             self._execution_history.append(execution_record)
 
@@ -368,6 +379,7 @@ class AgentCore:
                 "followup_scheduled": False,
                 "response_time": response_time,
                 "iterations": result.iterations,
+                "capabilities": caps,
             }
 
         except Exception as e:
@@ -381,6 +393,7 @@ class AgentCore:
                 conversation_id=conversation_id,
                 interaction_id=interaction_id,
                 start_time=start_time,
+                capabilities=caps,
             )
 
     def _inject_legacy_deps(self):
@@ -403,12 +416,14 @@ class AgentCore:
         conversation_id: str | None,
         interaction_id: str,
         start_time: datetime,
+        capabilities: list[str] | None = None,
     ) -> dict[str, Any]:
         """
         旧模式处理 — 7 阶段线性 Workflow（向后兼容回退）
 
         当 Runtime 初始化失败或被禁用时使用。
         """
+        caps = list(capabilities or [])
         try:
             from .memory_hub import get_memory_hub_async
 
@@ -416,6 +431,11 @@ class AgentCore:
                 user_id=user_id,
                 session_id=conversation_id or "",
             )
+            if self.memory_hub is not None:
+                self.memory_hub.set_turn_context(
+                    capabilities=caps,
+                    capability_ids=caps,
+                )
             # ===== 阶段1: 感知层 =====
             perception = await self._perceive(user_input, user_id)
 
@@ -497,6 +517,7 @@ class AgentCore:
                 "evaluation": evaluation,
                 "followup_scheduled": followup is not None,
                 "response_time": response_time,
+                "capabilities": caps,
             }
 
         except Exception as e:
@@ -507,6 +528,7 @@ class AgentCore:
                 "response": "抱歉，我遇到了一些问题。能再说一遍吗？",
                 "error": str(e),
                 "response_time": (datetime.now() - start_time).total_seconds(),
+                "capabilities": caps,
             }
 
     # ── MCP 兼容接口 ─────────────────────────────────────────

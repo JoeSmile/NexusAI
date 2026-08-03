@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 import uuid
 from collections.abc import AsyncIterator
@@ -122,23 +123,34 @@ async def _stream_chunks(text: str, *, chunk_size: int = 8) -> AsyncIterator[str
         yield text[i : i + chunk_size]
 
 
-def _audit_leaf(cap_id: str) -> bool:
-    """演示链：rag-ask 记审计；contextgate-chat 等辅助叶跳过，保证三条主链。"""
-    return cap_id != "contextgate-chat"
+def _is_leaf_stub(spec: CapabilitySpec) -> bool:
+    """仅 ``spec.leaf=true``（或环境强制）走演示 stub。"""
+    raw = spec.spec if isinstance(spec.spec, dict) else {}
+    if raw.get("leaf") is True:
+        return True
+    flag = (os.getenv("CAPABILITY_AGENT_LEAF_STUB") or "").strip().lower()
+    return flag in ("1", "true", "yes", "on")
 
 
-async def _invoke_leaf(
+def _should_chain_audit(spec: CapabilitySpec) -> bool:
+    """``spec.chain_audit=false`` 时不写入 agent.invoke 主链审计（如 contextgate-chat）。"""
+    raw = spec.spec if isinstance(spec.spec, dict) else {}
+    return raw.get("chain_audit", True) is not False
+
+
+async def _invoke_leaf_stub(
     cap_id: str,
     payload: dict[str, Any],
     tenant: TenantContext,
     *,
     trace_id: str,
+    do_audit: bool,
 ) -> AsyncIterator[dict[str, Any]]:
-    """叶子能力：可选审计 + 短文本流（演示链用；不走 unsupported tool 分发）。"""
+    """叶子 stub：可选审计 + 短文本流（``spec.leaf`` 演示链）。"""
     t0 = time.perf_counter()
     message = _message_from_payload(payload)
     text = f"[{cap_id}] processed: {message[:120]}"
-    if _audit_leaf(cap_id):
+    if do_audit:
         _audit_agent_invoke(
             capability_id=cap_id,
             tenant=tenant,
@@ -156,6 +168,39 @@ async def _invoke_leaf(
         "data": {"cost": 0.001, "tokens": max(1, len(text) // 4), "upstream": cap_id},
         "cost_source": "invoke",
     }
+
+
+async def _invoke_child_capability(
+    child: CapabilitySpec,
+    payload: dict[str, Any],
+    tenant: TenantContext,
+    *,
+    trace_id: str,
+) -> AsyncIterator[dict[str, Any]]:
+    """非 agent 子能力：leaf stub 或真实 ``invoke()``。"""
+    if _is_leaf_stub(child):
+        async for frame in _invoke_leaf_stub(
+            child.id,
+            payload,
+            tenant,
+            trace_id=trace_id,
+            do_audit=_should_chain_audit(child),
+        ):
+            yield frame
+        return
+
+    # 真实分发（model / external_app 等）；避免再包一层 agent 审计双计
+    from backend.core.capability.invoke import invoke
+
+    if _should_chain_audit(child):
+        _audit_agent_invoke(
+            capability_id=child.id,
+            tenant=tenant,
+            input_text=_message_from_payload(payload),
+            trace_id=trace_id,
+        )
+    async for frame in invoke(child.id, payload, tenant):
+        yield frame
 
 
 async def invoke_agent(
@@ -226,10 +271,10 @@ async def invoke_agent(
                     continue
                 yield frame
         else:
-            if _audit_leaf(cap_id) and cap_id not in chain:
-                chain.append(cap_id)
-            async for frame in _invoke_leaf(
-                cap_id, payload, tenant, trace_id=trace_id
+            if _should_chain_audit(child) and child.id not in chain:
+                chain.append(child.id)
+            async for frame in _invoke_child_capability(
+                child, payload, tenant, trace_id=trace_id
             ):
                 if frame.get("event") == "token":
                     nested_text_parts.append(str(frame.get("data") or ""))
