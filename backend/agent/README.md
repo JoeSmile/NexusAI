@@ -1,5 +1,16 @@
 # Agent模块使用指南
 
+## 唯一实现入口
+
+Agent 运行时只在本目录（`backend.agent`）。经 `backend.services.agent_service` →
+`backend.routers.agent` 挂载为 `/agent/*`。MCP 协议类型在
+`backend.modules.agent.protocol`（Task 31 已删除 `modules/agent` 下的孤儿副本）。
+
+```python
+from backend.agent import get_agent_core, AgentCore
+from backend.modules.agent.protocol.mcp import MCPContext
+```
+
 ## 概述
 
 Agent模块提供完整的智能Agent功能，包括记忆管理、任务规划、工具调用和反思优化。

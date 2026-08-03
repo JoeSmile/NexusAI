@@ -143,7 +143,6 @@ ignore = [
 "scripts/**" = ["E402", "B", "F401", "UP035"]
 "backend/tests/**" = ["F401", "F811", "UP035"]
 # Message/Conversation ORM 已移除，遗留 agent hub 待后续退役
-"backend/modules/agent/core/agent/memory_hub.py" = ["F821", "E722"]
 "backend/agent/memory_hub.py" = ["F821"]
 
 [tool.mypy]

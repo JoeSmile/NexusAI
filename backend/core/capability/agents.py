@@ -1,7 +1,7 @@
 """Agent 门面 — 包装 AgentService，支持嵌套能力链（Task 30.24）。
 
 真实 Runtime 在 ``backend/agent/``（经 ``routers/agent.py`` 挂载）。
-``backend/modules/agent/`` 为未挂载孤儿副本，本模块不 import、不包装。
+``backend.modules.agent`` 仅保留 ``protocol``（MCP）；Task 31 已删除孤儿实现树。
 """
 
 from __future__ import annotations

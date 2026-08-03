@@ -6,7 +6,7 @@ Agent Router - Agent路由
 .. deprecated::
     Task 30.24 起能力化调用请走 ``POST /api/capabilities/{id}/invoke``
     与 ``GET /api/agents``。本路由保留兼容；实现仍为 ``backend/agent`` V2 Runtime。
-    ``backend/modules/agent/`` 为未挂载孤儿副本，勿引用。
+    MCP 协议在 ``backend.modules.agent.protocol``（Task 31 已删孤儿实现树）。
 """
 
 
