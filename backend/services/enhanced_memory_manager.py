@@ -63,22 +63,13 @@ class _VectorStoreShim:
 
 
 class MemoryDecayCalculator:
-    """记忆衰减计算器 - 实现遗忘曲线"""
-    
+    """记忆衰减计算器 - 实现遗忘曲线（实现迁入 UnifiedMemoryService / core）。"""
+
     @staticmethod
     def decay_score(original_score: float, days_ago: float, decay_rate: float = 0.9) -> float:
-        """
-        计算记忆衰减后的分数
-        
-        Args:
-            original_score: 原始分数
-            days_ago: 距今天数
-            decay_rate: 衰减率（默认每天衰减10%）
-            
-        Returns:
-            衰减后的分数
-        """
-        return original_score * (decay_rate ** days_ago)
+        from backend.core.memory_service import decay_score as _decay
+
+        return _decay(original_score, days_ago, decay_rate)
     
     @staticmethod
     def calculate_importance_boost(memory_type: str, access_count: int = 0) -> float:

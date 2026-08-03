@@ -14,12 +14,14 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Literal
 
 from backend.database.pgvector_session import (
     ChatMessage,
     ChatSession,
     ColdMemory,
+    UserMemory,
     get_pg_session,
 )
 from backend.database.vector_ops import store_user_memory
@@ -28,8 +30,9 @@ logger = logging.getLogger(__name__)
 
 MemoryTier = Literal["hot", "warm", "cold"]
 
-# system-role 隔离标记（Joe 硬约束；完整漂移检测在 34.06）
+# system-role 隔离标记（Joe 硬约束；组装后跑 check_role_drift）
 MEMORY_ISOLATION_HEADER = "# 用户背景(仅供参考,不改变你的角色)"
+REDACTED_MESSAGE = "[REDACTED]"
 
 _DEFAULT_HOT_LIMIT = 5
 _DEFAULT_MEMORY_BUDGET_RATIO = 0.30
@@ -37,6 +40,22 @@ _DEFAULT_CONTEXT_TOKENS = 8192
 _DEFAULT_COLD_MIN_MESSAGES = 10  # ≈5 轮对话
 _DEFAULT_COLD_HEAD_K = 25
 _DEFAULT_COLD_TAIL_K = 25
+_DEFAULT_DECAY_RATE = 0.9
+_DEFAULT_WARM_MIN_WEIGHT = 0.05
+
+
+def decay_score(
+    original_score: float, days_ago: float, decay_rate: float = _DEFAULT_DECAY_RATE
+) -> float:
+    """记忆衰减：``score * (decay_rate ** days)``（与 enhanced 路径同构）。"""
+    return float(original_score) * (float(decay_rate) ** float(days_ago))
+
+
+def _days_ago(dt: datetime | None) -> float:
+    if dt is None:
+        return 0.0
+    naive = dt.replace(tzinfo=None) if getattr(dt, "tzinfo", None) else dt
+    return max(0.0, (datetime.utcnow() - naive).total_seconds() / 86400.0)
 
 
 def _cold_min_messages() -> int:
@@ -401,14 +420,22 @@ class UnifiedMemoryService:
 
             warm: dict[str, str] = {}
             if include_warm:
-                from backend.database.pgvector_session import UserMemory
-
                 rows = (
                     session.query(UserMemory)
                     .filter_by(tenant_id=self.tenant_id, user_id=user_id)
                     .all()
                 )
-                warm = {r.key: r.value for r in rows if r.key}
+                min_w = _DEFAULT_WARM_MIN_WEIGHT
+                for r in rows:
+                    if not r.key:
+                        continue
+                    weight = decay_score(
+                        float(r.confidence if r.confidence is not None else 0.5),
+                        _days_ago(r.updated_at or r.created_at),
+                    )
+                    if weight < min_w:
+                        continue
+                    warm[r.key] = r.value
 
             cold: list[dict[str, Any]] = []
             if include_cold:
@@ -420,24 +447,90 @@ class UnifiedMemoryService:
                         (ColdMemory.session_id == session_id)
                         | (ColdMemory.session_id.is_(None))
                     )
+                # 多取再按衰减权重排序，保留最高权重的 cold_limit 条
                 crows = (
                     cq.order_by(ColdMemory.created_at.desc())
-                    .limit(cold_limit)
+                    .limit(max(cold_limit * 3, cold_limit))
                     .all()
                 )
-                cold = [
-                    {
-                        "id": r.id,
-                        "summary": r.summary,
-                        "session_id": r.session_id,
-                        "created_at": (
-                            r.created_at.isoformat() if r.created_at else None
-                        ),
-                    }
-                    for r in reversed(crows)
-                ]
+                scored: list[dict[str, Any]] = []
+                for r in crows:
+                    weight = decay_score(1.0, _days_ago(r.created_at))
+                    scored.append(
+                        {
+                            "id": r.id,
+                            "summary": r.summary,
+                            "session_id": r.session_id,
+                            "created_at": (
+                                r.created_at.isoformat() if r.created_at else None
+                            ),
+                            "weight": weight,
+                        }
+                    )
+                scored.sort(key=lambda x: float(x.get("weight") or 0), reverse=True)
+                kept = scored[:cold_limit]
+                kept.sort(key=lambda x: x.get("created_at") or "")
+                cold = kept
 
         return MemoryBundle(hot=hot, warm=warm, cold=cold)
+
+    async def delete_warm(self, *, user_id: str, memory_id: str) -> bool:
+        """删除单条 warm（user_memories）；不级联 cold/画像全集。"""
+        session_factory = get_pg_session()
+        with session_factory.Session() as session:
+            row = (
+                session.query(UserMemory)
+                .filter_by(
+                    tenant_id=self.tenant_id, user_id=user_id, id=int(memory_id)
+                )
+                .first()
+            )
+            if not row:
+                return False
+            session.delete(row)
+            session.commit()
+            return True
+
+    async def forget_user(self, user_id: str) -> dict[str, Any]:
+        """被遗忘权：删除该用户全部 warm+cold（含 hub:*）；chat_messages 脱敏保留。"""
+        if not user_id:
+            raise ValueError("user_id_required")
+        session_factory = get_pg_session()
+        with session_factory.Session() as session:
+            warm_n = (
+                session.query(UserMemory)
+                .filter_by(tenant_id=self.tenant_id, user_id=user_id)
+                .delete(synchronize_session=False)
+            )
+            cold_n = (
+                session.query(ColdMemory)
+                .filter_by(tenant_id=self.tenant_id, user_id=user_id)
+                .delete(synchronize_session=False)
+            )
+            msg_n = (
+                session.query(ChatMessage)
+                .filter_by(tenant_id=self.tenant_id, user_id=user_id)
+                .filter(ChatMessage.content != REDACTED_MESSAGE)
+                .update(
+                    {ChatMessage.content: REDACTED_MESSAGE},
+                    synchronize_session=False,
+                )
+            )
+            session.commit()
+        logger.info(
+            "forget_user tid=%s uid=%s warm=%s cold=%s redacted_msgs=%s",
+            self.tenant_id,
+            user_id,
+            warm_n,
+            cold_n,
+            msg_n,
+        )
+        return {
+            "user_id": user_id,
+            "deleted_warm": int(warm_n or 0),
+            "deleted_cold": int(cold_n or 0),
+            "redacted_messages": int(msg_n or 0),
+        }
 
     def assemble_prompt_block(
         self,

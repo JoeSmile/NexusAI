@@ -105,16 +105,15 @@ class PromptComposer:
         tone = self.config.get("tone", "专业")
         style = self.config.get("style", "简洁")
         response_length = self.config.get("response_length", "medium")
-        use_emoji = self.config.get("use_emoji", False)
-        
+
         # 数值化参数
         formality = self.config.get("formality", 0.7)
         enthusiasm = self.config.get("enthusiasm", 0.5)
         humor_level = self.config.get("humor_level", 0.0)
-        
+
         # 基础风格描述
         prompt = f"请使用{tone}的语气，语言风格偏向{style}。"
-        
+
         # 回复长度
         length_map = {
             "short": "简短（1-2句话）",
@@ -122,61 +121,56 @@ class PromptComposer:
             "long": "详细（4-6句话）"
         }
         prompt += f"\n回复长度保持{length_map.get(response_length, '适中')}。"
-        
-        # 正式程度
-        if formality < 0.3:
-            prompt += "\n语言轻松随意，像朋友聊天。"
-        elif formality > 0.7:
+
+        # 租户风格只允许「收敛」：抬高正式度下限、压低活泼/幽默（34.06 / 32.63）
+        formality = max(float(formality), 0.5)
+        enthusiasm = min(float(enthusiasm), 0.5)
+        humor_level = min(float(humor_level), 0.3)
+
+        if formality > 0.7:
             prompt += "\n保持专业正式的语言风格。"
         else:
             prompt += "\n语言亲切自然，专业但不刻板。"
-        
-        # 活泼度
-        if enthusiasm > 0.7:
-            prompt += "\n表达要热情活泼，充满能量和鼓励。"
-        elif enthusiasm < 0.3:
+
+        if enthusiasm < 0.3:
             prompt += "\n保持冷静克制，语气平和稳定。"
-        
-        # 幽默程度
-        if humor_level > 0.5:
-            prompt += "\n适当使用幽默和轻松的表达方式。"
+        else:
+            prompt += "\n语气平稳得体，避免过度热情或活泼。"
+
+        if humor_level > 0.2:
+            prompt += "\n可极少量缓和语气，但仍以严肃认真为主。"
         else:
             prompt += "\n保持严肃认真，避免轻率的玩笑。"
-        
-        # Emoji使用
-        if use_emoji:
-            prompt += "\n可以适当使用emoji来增强表达。"
-        else:
-            prompt += "\n不使用emoji，保持纯文字表达。"
-        
+
+        prompt += "\n不使用emoji，保持纯文字表达。"
+
         return prompt
     
 
     def _build_memory_prompt(self) -> str:
-        """构建记忆与偏好Prompt"""
-        prompt_parts = []
-        
-        # 偏好话题
+        """构建记忆与偏好 Prompt（带 system-role 隔离标记，Task 34.06）。"""
+        from backend.core.memory_service import MEMORY_ISOLATION_HEADER
+
+        prompt_parts = [MEMORY_ISOLATION_HEADER]
+
         preferred = self.config.get("preferred_topics", [])
         if preferred:
             topics_str = "、".join(preferred)
             prompt_parts.append(f"用户偏好话题：{topics_str}")
-        
-        # 避免话题
+
         avoided = self.config.get("avoided_topics", [])
         if avoided:
             topics_str = "、".join(avoided)
             prompt_parts.append(f"应避免的话题：{topics_str}")
-        
-        # 沟通偏好
+
         comm_prefs = self.config.get("communication_preferences", {})
         if comm_prefs:
             prefs_str = "\n".join([f"- {k}: {v}" for k, v in comm_prefs.items()])
             prompt_parts.append(f"沟通偏好：\n{prefs_str}")
-        
-        if not prompt_parts:
-            return "暂无特定用户偏好记录。"
-        
+
+        if len(prompt_parts) == 1:
+            prompt_parts.append("暂无特定用户偏好记录。")
+
         return "\n\n".join(prompt_parts)
     
     def _build_safety_prompt(self) -> str:

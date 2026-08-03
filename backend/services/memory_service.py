@@ -90,18 +90,17 @@ class MemoryService:
         ]
 
     async def delete_memory(self, user_id: str, memory_id: str) -> bool:
-        session_factory = get_pg_session()
-        with session_factory.Session() as session:
-            row = (
-                session.query(UserMemory)
-                .filter_by(tenant_id=self.tenant_id, user_id=user_id, id=int(memory_id))
-                .first()
-            )
-            if not row:
-                return False
-            session.delete(row)
-            session.commit()
-            return True
+        from backend.core.memory_service import get_unified_memory_service
+
+        return await get_unified_memory_service(self.tenant_id).delete_warm(
+            user_id=user_id, memory_id=memory_id
+        )
+
+    async def forget_user(self, user_id: str) -> dict[str, Any]:
+        """被遗忘权：删 warm+cold，脱敏 chat_messages。"""
+        from backend.core.memory_service import get_unified_memory_service
+
+        return await get_unified_memory_service(self.tenant_id).forget_user(user_id)
 
     async def update_memory_importance(
         self, user_id: str, memory_id: str, new_importance: float

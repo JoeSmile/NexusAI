@@ -137,6 +137,17 @@ async def delete_memory(user_id: str, memory_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.delete("/users/{user_id}/memories")
+async def forget_user_memories(user_id: str):
+    """被遗忘权：删除用户全部 warm/cold 记忆，并脱敏 chat_messages（不可删审计行）。"""
+    try:
+        result = await memory_service.forget_user(user_id)
+        return {"message": "用户记忆已清除", **result}
+    except Exception as e:
+        logger.error(f"遗忘权清除失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.patch("/users/{user_id}/memories/{memory_id}/importance")
 async def update_memory_importance(
     user_id: str,

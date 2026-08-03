@@ -302,3 +302,92 @@ async def test_maybe_cold_summarize_triggers_on_threshold() -> None:
     assert out["method"] == "rule"
     assert "[msgs=10]" in (out.get("summary") or "")
     assert skip is None
+
+
+def test_decay_score_matches_enhanced_curve() -> None:
+    from backend.core.memory_service import decay_score
+
+    assert decay_score(1.0, 0) == 1.0
+    assert abs(decay_score(1.0, 1) - 0.9) < 1e-9
+    assert abs(decay_score(1.0, 2) - 0.81) < 1e-9
+
+
+@pytest.mark.asyncio
+async def test_forget_user_clears_warm_cold_and_redacts() -> None:
+    from unittest.mock import MagicMock, patch
+
+    from backend.core.memory_service import REDACTED_MESSAGE, UnifiedMemoryService
+
+    class _Sess:
+        def __init__(self) -> None:
+            self.committed = False
+
+        def query(self, model):  # noqa: ANN001
+            q = MagicMock()
+            name = getattr(model, "__name__", "")
+            filt = MagicMock()
+            q.filter_by.return_value = filt
+            if name == "UserMemory":
+                filt.delete.return_value = 2
+            elif name == "ColdMemory":
+                filt.delete.return_value = 1
+            elif name == "ChatMessage":
+                filt.filter.return_value.update.return_value = 3
+            return q
+
+        def commit(self) -> None:
+            self.committed = True
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    sess = _Sess()
+    svc = UnifiedMemoryService(tenant_id="t1")
+    with patch(
+        "backend.core.memory_service.get_pg_session",
+        return_value=MagicMock(Session=lambda: sess),
+    ):
+        out = await svc.forget_user("u1")
+    assert out["deleted_warm"] == 2
+    assert out["deleted_cold"] == 1
+    assert out["redacted_messages"] == 3
+    assert sess.committed
+    assert REDACTED_MESSAGE == "[REDACTED]"
+
+
+@pytest.mark.asyncio
+async def test_build_context_strips_memory_on_role_drift() -> None:
+    from backend.core.memory_service import MEMORY_ISOLATION_HEADER
+    from backend.pipeline.nodes.build_context import build_context
+    from backend.pipeline.state import make_initial_state
+
+    state = make_initial_state("t1", "u1", "s1", "你好")
+    state["warm_memory"] = {"note": "家人们快来直播间"}
+    state["hot_memory"] = []
+    state["cold_memory"] = []
+    out = await build_context(state)
+    assert MEMORY_ISOLATION_HEADER in out["raw_input"]
+    assert "家人们" not in out["raw_input"]
+    assert "user: 你好" in out["raw_input"]
+
+
+def test_prompt_composer_clamps_relaxed_style() -> None:
+    from backend.core.memory_service import MEMORY_ISOLATION_HEADER
+    from backend.services.prompt_composer import PromptComposer
+
+    text = PromptComposer(
+        {
+            "formality": 0.1,
+            "enthusiasm": 0.95,
+            "humor_level": 0.9,
+            "use_emoji": True,
+            "preferred_topics": ["合规"],
+        }
+    ).compose()
+    assert MEMORY_ISOLATION_HEADER in text
+    assert "轻松随意" not in text
+    assert "热情活泼" not in text
+    assert "不使用emoji" in text
