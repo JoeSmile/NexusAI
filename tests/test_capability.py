@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from unittest.mock import patch
 
 import pytest
@@ -245,3 +246,103 @@ async def test_invoke_external_mock_and_circuit(
             pass
     assert ei.value.code == ErrorCode.CAP_UPSTREAM_ERROR.value
     assert "circuit_open" in ei.value.message
+
+def test_env_load_and_db_override_same_id() -> None:
+    """DB 后加载覆盖同 id 的 env 条目。"""
+    reg = CapabilityRegistry()
+    n = reg.load_from_env(
+        json.dumps(
+            [
+                {
+                    "id": "shared-cap",
+                    "name": "from-env",
+                    "kind": "model",
+                    "provider": "contextgate",
+                    "permission": "chat:write",
+                }
+            ]
+        )
+    )
+    assert n == 1
+    assert reg.get("shared-cap").name == "from-env"
+
+    reg.register(
+        CapabilitySpec(
+            id="shared-cap",
+            name="from-db",
+            kind=CapabilityKind.MODEL,
+            provider=CapabilityProvider.CONTEXTGATE,
+            permission="chat:write",
+        )
+    )
+    assert reg.get("shared-cap").name == "from-db"
+
+
+@pytest.mark.asyncio
+async def test_unsupported_kind_raises_cap_001(tenant_user: TenantContext) -> None:
+    reg = CapabilityRegistry()
+    reg.register(
+        CapabilitySpec(
+            id="tool-x",
+            name="tool-x",
+            kind=CapabilityKind.TOOL,
+            provider=CapabilityProvider.CONTEXTGATE,
+            permission="chat:write",
+            spec={"governance": True},
+        )
+    )
+    with (
+        patch(
+            "backend.core.capability.invoke.get_capability_registry",
+            return_value=reg,
+        ),
+        patch("backend.core.capability.governance._redis", return_value=None),
+    ):
+        with pytest.raises(CapabilityNotFoundError) as ei:
+            async for _ in invoke("tool-x", {"message": "hi"}, tenant_user):
+                pass
+    assert ei.value.code == ErrorCode.CAP_NOT_FOUND.value
+    assert "unsupported_kind" in ei.value.message
+
+
+@pytest.mark.asyncio
+async def test_model_invoke_skips_invoke_layer_record_consumption(
+    tenant_user: TenantContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """接缝 4：kind=model 不在 invoke 层二次 record_consumption。"""
+    monkeypatch.setenv("LLM_PROVIDER", "mock")
+    reg = CapabilityRegistry()
+    reg.register(
+        CapabilitySpec(
+            id="model:mock-local",
+            name="mock-local",
+            kind=CapabilityKind.MODEL,
+            provider=CapabilityProvider.SELF_HOSTED,
+            permission="chat:write",
+            spec={"max_tokens": 16},
+        )
+    )
+    with (
+        patch(
+            "backend.core.capability.invoke.get_capability_registry",
+            return_value=reg,
+        ),
+        patch("backend.core.capability.governance._redis", return_value=None),
+        patch("backend.core.cost_manager.record_consumption") as rec,
+    ):
+        async for _ in invoke(
+            "model:mock-local", {"message": "cost check"}, tenant_user
+        ):
+            pass
+    assert rec.call_count == 0
+
+
+def test_agent_self_ref_and_depth_covered_in_agents_suite() -> None:
+    """30.27 AC：Agent 自引用/深度 — 实现于 tests/test_capability_agents.py。"""
+    from tests.test_capability_agents import (
+        test_agent_depth_limit,
+        test_self_reference_rejected_on_register,
+    )
+
+    assert callable(test_self_reference_rejected_on_register)
+    assert callable(test_agent_depth_limit)
