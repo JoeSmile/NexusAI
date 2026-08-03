@@ -1,6 +1,7 @@
 """Shared Redis helpers — lazy connect + silent degrade (Task 35 / 32.64).
 
 契约: redis 不可用时返回 None / 跳过，调用方不得因缓存抛 500。
+失败后 RETRY_AFTER_SEC 秒允许重试（Task 36），避免永久降级。
 """
 
 from __future__ import annotations
@@ -8,14 +9,17 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import time
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
+RETRY_AFTER_SEC = 30.0
+
 _sync_clients: dict[bool, Any] = {}
-_sync_failed: dict[bool, bool] = {}
+_sync_failed: dict[bool, float] = {}  # slot -> monotonic 失败时间戳
 _async_clients: dict[bool, Any] = {}
-_async_failed: dict[bool, bool] = {}
+_async_failed: dict[bool, float] = {}
 _async_lock: asyncio.Lock | None = None
 
 
@@ -32,9 +36,14 @@ def resolve_redis_url(default: str = "redis://localhost:6379") -> str:
     return url
 
 
+def _should_retry(failed: dict[bool, float], slot: bool) -> bool:
+    ts = failed.get(slot)
+    return ts is None or (time.monotonic() - ts) > RETRY_AFTER_SEC
+
+
 def get_sync_redis(*, decode_responses: bool = False) -> Any | None:
-    """惰性同步客户端；按 decode_responses 分槽；失败后本槽不再重试（直至 reset）。"""
-    if _sync_failed.get(decode_responses):
+    """惰性同步客户端；按 decode_responses 分槽；失败后 TTL 内不再重试。"""
+    if not _should_retry(_sync_failed, decode_responses):
         return None
     if decode_responses in _sync_clients:
         return _sync_clients[decode_responses]
@@ -48,10 +57,11 @@ def get_sync_redis(*, decode_responses: bool = False) -> Any | None:
         )
         client.ping()
         _sync_clients[decode_responses] = client
+        _sync_failed.pop(decode_responses, None)
         return client
     except Exception as e:
         logger.warning("Redis sync 不可用(降级): %s", e)
-        _sync_failed[decode_responses] = True
+        _sync_failed[decode_responses] = time.monotonic()
         return None
 
 
@@ -63,13 +73,13 @@ def _async_lock_get() -> asyncio.Lock:
 
 
 async def get_async_redis(*, decode_responses: bool = True) -> Any | None:
-    """惰性 async 客户端；按 decode_responses 分槽；失败返回 None。"""
-    if _async_failed.get(decode_responses):
+    """惰性 async 客户端；按 decode_responses 分槽；失败后 TTL 内返回 None。"""
+    if not _should_retry(_async_failed, decode_responses):
         return None
     if decode_responses in _async_clients:
         return _async_clients[decode_responses]
     async with _async_lock_get():
-        if _async_failed.get(decode_responses):
+        if not _should_retry(_async_failed, decode_responses):
             return None
         if decode_responses in _async_clients:
             return _async_clients[decode_responses]
@@ -83,27 +93,40 @@ async def get_async_redis(*, decode_responses: bool = True) -> Any | None:
             )
             await client.ping()
             _async_clients[decode_responses] = client
+            _async_failed.pop(decode_responses, None)
             return client
         except Exception as e:
             logger.warning("Redis async 不可用(降级): %s", e)
-            _async_failed[decode_responses] = True
+            _async_failed[decode_responses] = time.monotonic()
             return None
 
 
 async def close_async_redis() -> None:
+    """关闭共享 async 客户端并清失败标志（app lifespan shutdown）。"""
     for client in list(_async_clients.values()):
         try:
             await client.aclose()
         except Exception:
             pass
     _async_clients.clear()
+    _async_failed.clear()
+
+
+def close_sync_redis() -> None:
+    """关闭共享同步客户端并清失败标志（热更新/测试用；进程退出可不调）。"""
+    for client in list(_sync_clients.values()):
+        try:
+            client.close()
+        except Exception:
+            pass
+    _sync_clients.clear()
+    _sync_failed.clear()
 
 
 def reset_redis_clients_for_tests() -> None:
     """测试用：重置惰性连接与失败标志。"""
     global _async_lock
-    _sync_clients.clear()
-    _sync_failed.clear()
+    close_sync_redis()
     _async_clients.clear()
     _async_failed.clear()
     _async_lock = None

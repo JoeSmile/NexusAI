@@ -87,6 +87,12 @@ async def lifespan(app: FastAPI):
         await performance_optimizer.close()
     except Exception:
         pass
+    try:
+        from backend.core.redis_tools import close_async_redis
+
+        await close_async_redis()
+    except Exception:
+        pass
 
 
 def _lazy_include(
