@@ -1,4 +1,4 @@
-"""写回记忆 + 缓存 + 审计"""
+"""写回记忆 + 缓存 + 审计（对话写入经 UnifiedMemoryService，Task 34.03）。"""
 
 from __future__ import annotations
 
@@ -8,12 +8,8 @@ from datetime import datetime, timedelta
 
 from sqlalchemy import text
 
-from backend.database.pgvector_session import (
-    CacheEntry,
-    ChatMessage,
-    ChatSession,
-    get_pg_session,
-)
+from backend.core.memory_service import get_unified_memory_service
+from backend.database.pgvector_session import CacheEntry, get_pg_session
 from backend.observability.decorators import observe
 from backend.pipeline.state import PipelineState
 
@@ -28,40 +24,17 @@ async def write_memory(state: PipelineState) -> PipelineState:
     response = state["response"]
     trace_id = state["trace_id"]
 
+    mem = get_unified_memory_service(tenant_id=tenant_id)
+    await mem.write_turn(
+        user_id=user_id,
+        session_id=session_id,
+        user_message=message or "",
+        assistant_message=response or "",
+        title=(message or "")[:80],
+    )
+
     session_factory = get_pg_session()
     with session_factory.Session() as session:
-        existing = (
-            session.query(ChatSession).filter_by(session_id=session_id).first()
-        )
-        if not existing:
-            session.add(
-                ChatSession(
-                    session_id=session_id,
-                    tenant_id=tenant_id,
-                    user_id=user_id,
-                    title=(message or "")[:80],
-                )
-            )
-            session.flush()
-        session.add(
-            ChatMessage(
-                tenant_id=tenant_id,
-                session_id=session_id,
-                user_id=user_id,
-                role="user",
-                content=message,
-                                            )
-        )
-        session.add(
-            ChatMessage(
-                tenant_id=tenant_id,
-                session_id=session_id,
-                user_id=user_id,
-                role="assistant",
-                content=response,
-            )
-        )
-
         mock = os.getenv("LLM_MOCK", "true").lower() == "true"
         if mock and response:
             query_hash = hashlib.sha256(message.encode()).hexdigest()[:16]

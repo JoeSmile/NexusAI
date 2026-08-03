@@ -25,6 +25,7 @@ class PipelineState(TypedDict):
     # ── 记忆 ──
     hot_memory: list[dict]
     warm_memory: dict[str, str]
+    cold_memory: list[dict]
 
     # ── 分析结果 ──
     intent: str | None
@@ -99,6 +100,7 @@ def make_initial_state(
         "raw_input": message,
         "hot_memory": [],
         "warm_memory": {},
+        "cold_memory": [],
         "intent": None,
         "intent_confidence": 0.0,
         "entities": {},
