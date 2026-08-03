@@ -114,7 +114,7 @@ def cache_key(domain: str, name: str, tenant: str, key: str) -> str:
     return f"{domain}:{name}:{tenant or 'default'}:{key}"
 
 
-# 域前缀约定（详表见 docs/CACHE_KEYS.md）
+# 域前缀约定（详表见 docs/CACHE.md）
 CACHE_KEY_DOMAINS: dict[str, str] = {
     "rag": "RAG 答案/向量 (rag:a / rag:e / rag:epoch / rag:lock)",
     "chat": "对话与 PerformanceOptimizer (chat:v / chat:epoch / chat:lock)",
