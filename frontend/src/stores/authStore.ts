@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
+import { loginAccount } from '@/api/auth'
 import type { RoleName } from '@/types/api'
 
 export const ROLES: RoleName[] = [
@@ -34,6 +35,11 @@ export interface AuthState {
    * 生产演进 TODO: httpOnly 会话 cookie，前端只存「已认证」标记。
    */
   loginWithKey: (role: RoleName, key: string) => Promise<void>
+  /**
+   * 账号密码登录：POST /api/auth/login 成功后写入对应角色槽位并切换。
+   * 失败抛 ApiError（401/429 等），由调用方翻译为中文文案。
+   */
+  loginWithPassword: (username: string, password: string) => Promise<RoleName>
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -76,6 +82,19 @@ export const useAuthStore = create<AuthState>()(
           keys: { ...s.keys, [role]: trimmed },
           roleEpoch: s.roleEpoch + 1,
         }))
+      },
+      loginWithPassword: async (username, password) => {
+        const resp = await loginAccount({
+          username: username.trim(),
+          password,
+        })
+        const role = resp.role as RoleName
+        set((s) => ({
+          activeRole: role,
+          keys: { ...s.keys, [role]: resp.api_key },
+          roleEpoch: s.roleEpoch + 1,
+        }))
+        return role
       },
     }),
     {

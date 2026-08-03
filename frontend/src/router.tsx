@@ -2,6 +2,7 @@ import { Navigate, Outlet, createBrowserRouter, useLocation } from 'react-router
 
 import { AppShell } from '@/components/layout/AppShell'
 import LoginPage from '@/pages/login'
+import RegisterPage from '@/pages/register'
 import AdminPanel from '@/pages/panels/admin'
 import AgentPanel from '@/pages/panels/agent'
 import AuditPanel from '@/pages/panels/audit'
@@ -24,6 +25,7 @@ function RequireAuth() {
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
+  { path: '/register', element: <RegisterPage /> },
   {
     element: <RequireAuth />,
     children: [

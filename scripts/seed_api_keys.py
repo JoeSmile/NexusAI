@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""创建初始 API Key — 开发环境使用"""
+"""创建/轮换开发 API Key + 测试账号 — 可重复运行。
+
+每次运行都会为每个槽位生成**新的** cg_ key 并打印明文:
+- 同槽位已存在 active key → 先停用(轮换),再插入新 key;
+- 因此重复 seed 不会 SKIPPED,每次跑完都有一套可用 key。
+同时 upsert 同名测试账号(users 表,密码统一 bcrypt("123456")),供密码登录使用。
+明文 key 仍只存 stdout(数据库只存 SHA256 哈希,丢了不可恢复)。
+"""
 
 import hashlib
 import os
@@ -8,9 +15,13 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import bcrypt
 from sqlalchemy import text
 
 from backend.database.pgvector_session import get_pg_session
+
+# 测试账号统一密码(Task 38 拍板:方便测试)
+TEST_PASSWORD = "123456"
 
 KEYS_TO_CREATE = [
     {"tenant_id": "acme", "user_id": "alice", "role": "user", "description": "Acme 租户用户 Alice"},
@@ -28,16 +39,22 @@ def create_key(tenant_id: str, user_id: str, role: str, description: str = "") -
 
     session_factory = get_pg_session()
     with session_factory.Session() as session:
-        # 按 user+tenant+role 去重，避免重复 seed
+        # 同槽位已有 active key → 轮换:停用旧的,再插入新的(保证每次 seed 都有新 key 可用)
         existing = session.execute(
             text(
                 "SELECT id FROM api_keys WHERE tenant_id=:tid AND user_id=:uid AND role=:role AND is_active=true LIMIT 1"
             ),
             {"tid": tenant_id, "uid": user_id, "role": role},
         ).fetchone()
+        status = "CREATED"
         if existing:
-            print(f"{'  [SKIPPED]':12s} {role:15s} {tenant_id:10s} {user_id:10s} (already exists)")
-            return ""
+            session.execute(
+                text(
+                    "UPDATE api_keys SET is_active=false, expires_at=now() WHERE id=:id"
+                ),
+                {"id": existing[0]},
+            )
+            status = "ROTATED"
 
         session.execute(
             text(
@@ -57,8 +74,46 @@ def create_key(tenant_id: str, user_id: str, role: str, description: str = "") -
         )
         session.commit()
 
-    print(f"{'  [CREATED]':12s} {role:15s} {tenant_id:10s} {user_id:10s} {raw_key}")
+    print(f"  [{status:7s}] {role:15s} {tenant_id:10s} {user_id:10s} {raw_key}")
     return raw_key
+
+
+def seed_users(entries: list[dict]) -> None:
+    """upsert 测试账号(users 表),密码统一 bcrypt(TEST_PASSWORD)。
+
+    user_id = username = 身份标识(memory_hub 按 user_id 查画像,兼容);
+    已存在 → 刷新密码/角色/租户(保证重跑后密码仍为 123456);不存在 → 插入。
+    """
+    password_hash = bcrypt.hashpw(TEST_PASSWORD.encode(), bcrypt.gensalt(rounds=12)).decode()
+    session_factory = get_pg_session()
+    with session_factory.Session() as session:
+        for e in entries:
+            session.execute(
+                text(
+                    """
+                    INSERT INTO users (user_id, username, password_hash, display_name, tenant_id, role, is_active, created_at, updated_at)
+                    VALUES (:uid, :username, :hash, :display, :tid, :role, true, now(), now())
+                    ON CONFLICT (user_id) DO UPDATE SET
+                        username      = EXCLUDED.username,
+                        password_hash = EXCLUDED.password_hash,
+                        display_name  = EXCLUDED.display_name,
+                        tenant_id     = EXCLUDED.tenant_id,
+                        role          = EXCLUDED.role,
+                        is_active     = true,
+                        updated_at    = now()
+                    """
+                ),
+                {
+                    "uid": e["user_id"],
+                    "username": e["user_id"],
+                    "hash": password_hash,
+                    "display": e["description"],
+                    "tid": e["tenant_id"],
+                    "role": e["role"],
+                },
+            )
+        session.commit()
+    print(f"  ✅ 测试账号已同步 ({len(entries)} 个,密码统一 {TEST_PASSWORD})")
 
 
 def main():
@@ -75,11 +130,13 @@ def main():
             keys[f"{k['role']}:{k['user_id']}"] = raw
 
     print("-" * 70)
+    seed_users(KEYS_TO_CREATE)
+    print("-" * 70)
     if keys:
-        print("\n🔑 保存以下 Key（仅显示一次）：\n")
+        print("\n🔑 本次运行生成的 Key(重复 seed 会轮换出新 key,旧 key 自动停用):\n")
         for role, key in keys.items():
             print(f"  {role:20s}: {key}")
-        print("\n⚠️  这些 Key 不会再次显示！请立即保存到安全位置。")
+        print("\n⚠️  明文只显示在 stdout,数据库仅存 SHA256 哈希——请立即保存到安全位置。")
     print("=" * 70)
 
 

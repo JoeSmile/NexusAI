@@ -21,8 +21,7 @@ from sqlalchemy import (
     Text,
     create_engine,
 )
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 
 def _project_root() -> str:
@@ -128,12 +127,17 @@ def __getattr__(name: str):
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 class User(Base):
-    """用户表"""
+    """用户表 — user_id 兼容 memory_hub;username 为登录名;password_hash 为 bcrypt 密文(Task 38)。"""
+
     __tablename__ = "users"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String(100), unique=True, index=True)
-    username = Column(String(100))
+    username = Column(String(100), unique=True, index=True)
+    password_hash = Column(String(128), default="")
+    display_name = Column(String(100), default="")
+    tenant_id = Column(String(50), default="acme", index=True)
+    role = Column(String(32), default="user")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     is_active = Column(Boolean, default=True)
