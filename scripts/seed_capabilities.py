@@ -33,7 +33,7 @@ SEED_CAPS: list[dict] = [
     },
     {
         "id": "contextgate-chat",
-        "name": "ContextGate Chat",
+        "name": "NexusAI Chat",
         "kind": "tool",
         "provider": "contextgate",
         "permission": "chat:write",
@@ -136,7 +136,7 @@ def upsert_capability(row: dict) -> str:
 
 def main() -> None:
     print("=" * 70)
-    print("  ContextGate — Seed Capabilities / Agents (30.24)")
+    print("  NexusAI — Seed Capabilities / Agents (30.24)")
     print("=" * 70)
     for row in SEED_CAPS:
         status = upsert_capability(row)

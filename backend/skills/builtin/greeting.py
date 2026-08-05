@@ -14,6 +14,6 @@ class GreetingSkill(BaseSkill):
 
     async def _do_execute(self, entities: dict) -> SkillResult:
         return SkillResult(
-            output="你好！我是 ContextGate，有什么可以帮你的？",
+            output="你好！我是 NexusAI，有什么可以帮你的？",
             latency_ms=1.0,
         )

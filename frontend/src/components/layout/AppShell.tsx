@@ -64,7 +64,7 @@ export function AppShell() {
   return (
     <div className="flex min-h-svh flex-col bg-background">
       <header className="flex h-12 items-center gap-3 border-b border-border bg-card px-4">
-        <div className="text-sm font-semibold text-foreground">ContextGate</div>
+        <div className="text-sm font-semibold text-foreground">NexusAI</div>
         <Badge className={cn('rounded-full text-xs', envBadgeClass(env))}>
           {env}
         </Badge>

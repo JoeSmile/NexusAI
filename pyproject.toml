@@ -1,7 +1,7 @@
 [project]
-name = "context-gate"
+name = "nexus-ai"
 version = "3.0.0"
-description = "The Intelligent Gateway for LLM Context Management"
+description = "The Governance Hub for Enterprise AI — 企业 AI 中台"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "Apache-2.0"}
@@ -152,7 +152,7 @@ ignore_missing_imports = true
 warn_return_any = false
 warn_unused_configs = false
 follow_imports = "silent"
-# 存量类型债务巨大（删 plugins 后暴露 ~760）。门禁严查 ContextGate 主路径。
+# 存量类型债务巨大(删 plugins 后暴露 ~760)。门禁严查 NexusAI 主路径。
 files = [
   "backend/pipeline",
   "backend/skills",

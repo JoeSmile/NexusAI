@@ -39,3 +39,14 @@ export async function ragSearch(query: string, k = 5) {
 export async function ragStatus() {
   return apiGet<{ success: boolean; data: RagStatusData }>('/api/rag/status')
 }
+
+/** POST /api/rag/upload/pdf — multipart FormData field name = file */
+export async function ragUploadPdf(file: File) {
+  const fd = new FormData()
+  fd.append('file', file)
+  return apiPost<{
+    success: boolean
+    message: string
+    data: RagStatusData
+  }>('/api/rag/upload/pdf', fd)
+}

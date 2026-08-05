@@ -26,7 +26,7 @@ from backend.core.auth.models import TenantContext
 from backend.core.capability.invoke import invoke
 from backend.core.capability.models import CapabilitySpec
 from backend.core.capability.registry import get_capability_registry
-from backend.core.errors import ContextGateException, ErrorCode
+from backend.core.errors import ContextGateException
 from backend.observability.decorators import observe
 
 logger = logging.getLogger(__name__)

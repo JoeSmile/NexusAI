@@ -271,10 +271,10 @@ async def upload_pdf(
         tmp_path = tmp_file.name
     
     try:
-        # 加载PDF到知识库
+        # 加载PDF到知识库(扫描件/无文本层 → 抛 RAG_002,不静默成功)
         kb_manager = get_kb_manager()
         loader = EnterpriseKnowledgeLoader(kb_manager)
-        loader.load_from_pdf(tmp_path)
+        pages = loader.load_from_pdf(tmp_path)
         bump_epoch(tid)
         
         # 获取统计信息
@@ -282,8 +282,9 @@ async def upload_pdf(
         
         return {
             "success": True,
-            "message": f"PDF文档 {file.filename} 已成功添加到知识库",
-            "data": stats
+            "message": f"PDF文档 {file.filename} 已成功添加到知识库({pages} 页有文本)",
+            "data": stats,
+            "pages_extracted": pages,
         }
     finally:
         # 清理临时文件
@@ -327,13 +328,13 @@ async def upload_multimodal(
         if kind == "pdf":
             kb_manager = get_kb_manager()
             loader = EnterpriseKnowledgeLoader(kb_manager)
-            loader.load_from_pdf(tmp_path)
+            pages = loader.load_from_pdf(tmp_path)
             bump_epoch(tenant_id)
             return {
                 "success": True,
                 "source_type": "pdf",
-                "message": f"PDF {filename} 已入库",
-                "chunks": 0,
+                "message": f"PDF {filename} 已入库({pages} 页有文本)",
+                "chunks": pages,
             }
 
         if kind == "text":

@@ -72,9 +72,9 @@ services:
       NEXTAUTH_URL: http://localhost:3001
       TELEMETRY_ENABLED: "false"
       LANGFUSE_INIT_ORG_ID: contextgate-org
-      LANGFUSE_INIT_ORG_NAME: ContextGate
+      LANGFUSE_INIT_ORG_NAME: NexusAI
       LANGFUSE_INIT_PROJECT_ID: contextgate-project
-      LANGFUSE_INIT_PROJECT_NAME: ContextGate Local
+      LANGFUSE_INIT_PROJECT_NAME: NexusAI Local
       LANGFUSE_INIT_PROJECT_PUBLIC_KEY: pk-lf-local-contextgate
       LANGFUSE_INIT_PROJECT_SECRET_KEY: sk-lf-local-contextgate
       LANGFUSE_INIT_USER_EMAIL: admin@contextgate.local

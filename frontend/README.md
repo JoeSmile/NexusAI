@@ -1,4 +1,4 @@
-# ContextGate 测试前端（Task 30）
+# NexusAI 测试前端（Task 30）
 
 Vite + React 19 测试控制台：同一界面填入 **4 角色 API Key**，用右上角角色切换器切换，对照 `examples/qa/journeys/` 剧本做联调。**不是**产品 FE（产品形态见 30.29）。
 
@@ -16,7 +16,7 @@ uv run python scripts/seed_capabilities.py         # Agent 嵌套演示（可选
 uv run uvicorn backend.app:app --reload --port 8000
 
 # 终端 2 — 测试 FE
-cd frontend && npm install && npm run dev
+cd frontend && pnpm install && pnpm run dev
 # → http://localhost:5173
 ```
 
@@ -53,7 +53,7 @@ cd frontend && npm install && npm run dev
 
 ```bash
 cd frontend
-npm run test    # vitest
-npm run build   # tsc + vite build
-npm run dev
+pnpm run test    # vitest
+pnpm run build   # tsc + vite build
+pnpm run dev
 ```

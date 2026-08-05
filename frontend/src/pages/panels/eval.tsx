@@ -34,9 +34,9 @@ import { useAuthStore } from '@/stores/authStore'
 
 export default function EvalPanel() {
   const roleEpoch = useAuthStore((s) => s.roleEpoch)
-  const [userMsg, setUserMsg] = useState('什么是 ContextGate？')
+  const [userMsg, setUserMsg] = useState('什么是 NexusAI？')
   const [botMsg, setBotMsg] = useState(
-    'ContextGate 是企业级 LLM 前置处理网关，提供认证、护栏与路由。',
+    'NexusAI 是企业级 LLM 前置处理网关，提供认证、护栏与路由。',
   )
   const [last, setLast] = useState<EvalResult | null>(null)
   const [rows, setRows] = useState<EvalItem[]>([])

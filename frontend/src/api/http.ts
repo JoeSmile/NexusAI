@@ -107,7 +107,12 @@ export async function apiFetch(
     headers.set('X-API-Key', key)
   }
 
-  if (rest.body && !headers.has('Content-Type')) {
+  // FormData 须由浏览器自带 multipart boundary;勿强制 JSON Content-Type
+  if (
+    rest.body &&
+    !(rest.body instanceof FormData) &&
+    !headers.has('Content-Type')
+  ) {
     headers.set('Content-Type', 'application/json')
   }
 
@@ -192,10 +197,16 @@ export async function apiPost<T>(
   body?: unknown,
   init?: ApiFetchInit,
 ): Promise<T> {
+  const payload =
+    body === undefined
+      ? undefined
+      : body instanceof FormData
+        ? body
+        : JSON.stringify(body)
   const res = await apiFetch(path, {
     ...init,
     method: 'POST',
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: payload,
   })
   return readJson<T>(res)
 }

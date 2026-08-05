@@ -63,7 +63,7 @@ export function SSEPanel({
     setText('')
     setStatus('pending')
     setHint('演示打字机…')
-    const src = demoText || 'ContextGate SSE demo stream.'
+    const src = demoText || 'NexusAI SSE demo stream.'
     for (const ch of src) {
       if (demoAbort.current) {
         setStatus('warning')

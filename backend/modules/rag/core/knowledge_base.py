@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from backend.core.errors import ContextGateException, ErrorCode
 from backend.database import vector_ops
 from backend.logging_config import get_logger
 
@@ -449,24 +450,41 @@ class EnterpriseKnowledgeLoader:
                 return line
         return "未知主题"
     
-    def load_from_pdf(self, pdf_path: str) -> None:
+    def load_from_pdf(self, pdf_path: str) -> int:
         """
-        从PDF文件加载知识
-        
-        Args:
-            pdf_path: PDF文件路径
+        从PDF文件加载知识;返回提取到文本的页数。
+
+        扫描件/无文本层 PDF(整份提取为空)→ 抛 ContextGateException(RAG_002),
+        不再静默返回"上传成功";空页(图片页)自动跳过。
         """
         try:
             logger.info(f"从PDF加载知识: {pdf_path}")
-            
+
             # 加载PDF
             documents = self.kb_manager.load_pdf_documents(pdf_path)
-            
+
+            # 过滤空页(扫描件/图片页无文本层)
+            non_empty = [d for d in documents if (d.page_content or "").strip()]
+            if not non_empty:
+                raise ContextGateException(
+                    ErrorCode.RAG_EMPTY_EXTRACT.value,
+                    "未提取到文本:扫描件或无文本层 PDF。请逐页导出为图片后走 /api/rag/upload 的 image 分支"
+                    "(需 uv sync --extra multimodal),或上传带文本层的 PDF",
+                )
+            if len(non_empty) < len(documents):
+                logger.warning(
+                    "PDF %s: %d/%d 页无文本(扫描页?),已跳过空页",
+                    pdf_path, len(documents) - len(non_empty), len(documents),
+                )
+
             # 添加到知识库
-            self.kb_manager.add_documents(documents)
-            
-            logger.info(f"成功从PDF加载知识: {pdf_path}")
-            
+            self.kb_manager.add_documents(non_empty)
+
+            logger.info(f"成功从PDF加载知识: {pdf_path}({len(non_empty)} 页有文本)")
+            return len(non_empty)
+
+        except ContextGateException:
+            raise
         except Exception as e:
             logger.error(f"从PDF加载知识失败: {e}")
             raise

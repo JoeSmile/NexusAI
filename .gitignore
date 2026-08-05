@@ -66,3 +66,4 @@ uploads/
 
 # Local assets (repo root only; do not ignore frontend/src/assets)
 /assets/
+.superpowers

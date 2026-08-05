@@ -118,7 +118,7 @@ def seed_users(entries: list[dict]) -> None:
 
 def main():
     print("=" * 70)
-    print("  ContextGate — Seed API Keys")
+    print("  NexusAI — Seed API Keys")
     print("=" * 70)
     print(f"\n{'Status':12s} {'Role':15s} {'Tenant':10s} {'User':10s} {'API Key'}")
     print("-" * 70)

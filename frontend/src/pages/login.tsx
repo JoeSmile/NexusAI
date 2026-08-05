@@ -86,7 +86,7 @@ export default function LoginPage() {
     <div className="flex min-h-svh items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md shadow-[var(--shadow-overlay)]">
         <CardHeader>
-          <CardTitle className="text-xl font-semibold">ContextGate</CardTitle>
+          <CardTitle className="text-xl font-semibold">NexusAI</CardTitle>
           <CardDescription className="text-muted-foreground text-xs">
             测试 FE 登录 — 密码登录 / Key 登录
           </CardDescription>

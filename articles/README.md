@@ -1,4 +1,4 @@
-# ContextGate 技术文章规划
+# NexusAI 技术文章规划
 
 > 一边写代码，一边沉淀文章。每个 Phaes 完成一批。
 
@@ -50,7 +50,7 @@
 | # | 标题 | 核心内容 | 对应 Task |
 |---|------|---------|-----------|
 | 15 | **uv 迁移实战：从 pip 到 uv 的平滑过渡** | pyproject.toml 单源管理、uv sync/lock/run 工作流、GitHub Actions 中的 uv setup 配置、Docker multi-stage 构建 | 14, 15 |
-| 16 | **为什么你的 LLM 网关不需要 BFF 层** | BFF 的适用场景（多端协议适配）、LLM 场景的瓶颈分析（SSE 统一的可行性）、ContextGate 作为自包含网关的设计 | 02 |
+| 16 | **为什么你的 LLM 网关不需要 BFF 层** | BFF 的适用场景（多端协议适配）、LLM 场景的瓶颈分析（SSE 统一的可行性）、NexusAI 作为自包含网关的设计 | 02 |
 
 ### 架构
 

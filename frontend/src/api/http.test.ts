@@ -132,4 +132,25 @@ describe('api http', () => {
       expect.stringMatching(/^\/login\?next=/),
     )
   })
+
+  it('FormData body skips JSON Content-Type and stringify', async () => {
+    const { apiPost } = await import('./http')
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ success: true }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const fd = new FormData()
+    fd.append('file', new Blob(['%PDF'], { type: 'application/pdf' }), 'a.pdf')
+    await apiPost('/api/rag/upload/pdf', fd)
+
+    expect(fetchMock).toHaveBeenCalled()
+    const init = fetchMock.mock.calls[0][1] as RequestInit
+    expect(init.body).toBe(fd)
+    const headers = init.headers as Headers
+    expect(headers.get('Content-Type')).toBeNull()
+    expect(headers.get('X-API-Key')).toBe('test-key')
+  })
 })

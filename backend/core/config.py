@@ -120,7 +120,7 @@ class SecurityConfig:
 @dataclass
 class APIConfig:
     """API配置"""
-    title: str = "ContextGate API"
+    title: str = "NexusAI API"
     description: str = "The Intelligent Gateway for LLM Context Management"
     version: str = "1.0.0"
     docs_url: str = "/docs"
