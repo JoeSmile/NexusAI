@@ -1,12 +1,27 @@
 # 04a — 深挖 A：认证 · RBAC · 作用域
 
-> 面试目标：一条请求从 Header 到 `TenantContext` 到权限串到「能不能碰别人的 user_id」讲清楚；说清三条入口如何共用钥匙；诚实讲密码登录只是「取 key 的门」。  
+> 面试目标：讲清 **现状** Header→TenantContext→权限串；并主动对比 **目标双轨**（JWT∥machine Key）与 **组织 B**。  
 > 锚点：`api_key_auth.py` · `models.py` · `permissions.py` · `scope.py` · `signature_auth.py` · `routers/auth.py` · `password.py`  
-> 对照：B/C/D 入口都挂在这套身份上 → [05b](05b-pipeline-nodes.md) / [07c](07c-harness-cost-shortpath.md) / [09d](09d-rag-capability.md)
+> **目标叙事：** [02](02-runtime-split.md) · [03](03-org-security.md) · [pilot-b §9/§11](../docs/superpowers/specs/2026-08-05-enterprise-pilot-b-gaps-design.md)  
+> 对照管线/Hub：[05b](05b-pipeline-nodes.md) / [09d](09d-rag-capability.md)
 
 ---
 
-## 0. 总览图
+## 0. 现状 vs 目标（先背这张表）
+
+| | **现状（代码）** | **目标（已签核）** |
+|--|------------------|-------------------|
+| 人 | 密码登录发 `cg_`，FE 当会话 | 登录发 **JWT**；`verify_session` |
+| 机 | 同一套 `X-API-Key` | 仅 `credential_type=machine` 的 Key |
+| 上下文 | `TenantContext`：tenant/user/role/extra | + `credential_kind` / 强化 `acting_user_id` / OrgScope |
+| 组织 | 无部门 | 部门树 + 业务角色（§11） |
+| 密码定位 | 「取 key 的门」 | 「取会话 JWT 的门」 |
+
+下文 §1–§8 以 **现状代码** 为准；演进见文末 §10。
+
+---
+
+## 0b. 总览图（现状）
 
 ```text
 ┌─ 可选：HMAC 签名中间件（X-CG-*，防重放）─────────────────┐
@@ -148,8 +163,10 @@ auditor 能不能调 `/chat`？默认角色包无 `chat:write` → 403，除非 
 | 审计 | `auth.register` / `auth.login` |
 | 下游 | FE 把 key 放进原有槽位；面板仍全部 `X-API-Key` |
 
-**面试纠正话术：**  
-「我们没有把整站改成 JWT。密码只是测试/人机友好的取 key 通道，授权真相仍是 api_keys + RBAC。」
+**面试纠正话术（现状）：**  
+「当前密码只换同一套 cg_ key，尚未上 JWT——这是已知债；目标是人 JWT / 机 Key 分轨（pilot-b §9）。」
+
+**目标话术：** 密码/SSO → JWT 会话；机器集成单独发 machine key；不再把长期 key 塞给浏览器。
 
 ---
 
@@ -166,16 +183,18 @@ auditor 能不能调 `/chat`？默认角色包无 `chat:write` → 403，除非 
 
 ---
 
-## 8) 三条产品入口如何共用身份
+## 8) 三条产品入口如何共用身份（现状）
 
 ```text
-/chat          → require_permission("chat:write") → TenantContext → pipeline state.user_context
-/api/rag/ask   → _rag_guard（基于 TenantContext）→ ask(..., tenant_id, user_id)
-/api/capabilities/* → verify_api_key → 动态 permission / 可见性
+/chat          → require_permission("chat:write") → TenantContext → pipeline
+/api/rag/ask   → TenantContext → RAG
+/api/capabilities/* → verify_api_key → 动态 permission
 ```
 
-租户隔离字段：`tenant_id` 贯穿 cache key、memory、LLM key 链、审计。  
-跨租户：只有 `is_cross_tenant` 角色看全租户审计等；写他人资源仍受 `resolve_acting_user_id` 约束（auditor 只读）。
+**目标：** Chat/工作台走人会话；capability 单次 invoke 可机调；**多节点编排走 Runner**（[06](06-workflow-runner.md)），不再默认知「一切进 /chat」。
+
+租户隔离字段：`tenant_id` 贯穿 cache、memory、key 链、审计。  
+目标另加 **OrgScope**（部门子树）——见 [03](03-org-security.md)。
 
 ---
 
@@ -192,48 +211,43 @@ auditor 能不能调 `/chat`？默认角色包无 `chat:write` → 403，除非 
 3. `chat:*` 能覆盖 `chat:write` 吗？→ 能（通配）  
 4. user 改别人 session？→ AUTH_004  
 5. Hub 为何不用 require_permission？→ 动态权限（D）  
-6. 密码和 key 关系？→ 密码换 key，不是平行会话体系  
-7. 签名解决什么？→ 防篡改 + 防重放  
+6. 密码和 key 关系？→ **现状** 密码换 key；**目标** 密码换 JWT，机单独 Key  
+7. 签名解决什么？→ 防篡改 + 防重放（偏机机）  
+8. 为何还要业务角色？→ 平台角色不够表达「部门经理批本部门」（[03](03-org-security.md)）
 
 ### 求职者 60 秒
 
-> 认证是 X-API-Key 哈希查库得到租户上下文；四角色给默认权限，应用级权限表可加挂，通配符 `resource:*`。  
-> 路由用 Depends 做固定权限；能力市场按条目鉴权。  
-> 另有 user 作用域防 IDOR，以及可选 HMAC 签名。  
-> 最近补了账号密码登录，只为签发同一套 cg_ key，治理面不分裂。
+> **现状：** X-API-Key 哈希查库得 TenantContext；四角色 + extra 加挂；Depends 与 Hub 动态权。  
+> **目标：** 人 JWT / 机 Key；组织树 + 业务角色 + OrgScope；挂起等批先过 S1–S4。  
+> 密码登录今天只换 key——这是演进起点，不是终局。
 
 ---
 
-## 10) 还能怎么更好（Auth 域）
+## 10) 还能怎么更好（Auth 域 · 对齐签核）
 
 | 优先级 | 点 | 方向 |
 |--------|----|------|
-| P0 | Key 轮换/泄露应急 | 已有登录轮换；补管理面一键吊销 + 审计 |
-| P1 | 权限模型文档化 | 矩阵表进 SECURITY.md（角色 × API） |
-| P1 | 签名 Nonce 持久化 | 多实例下内存 NonceCache 不够，需 Redis |
-| P2 | SSO / OIDC | 国企常见；仍应映射到内部 TenantContext+key 或等价会话 |
-| P2 | 细粒度 kb/rag permission | user 默认无 kb:*，产品化时挂载策略要清晰 |
+| **P0** | 人机凭证拆分 | JWT + machine-only Key；§9 M1–M6 |
+| **P0** | 组织 B + OrgScope | 部门树、业务角色；所有过滤单一门面 |
+| **P0** | S1–S4 | 挂起前必须满足；否则只失败不申请 |
+| P1 | Key 吊销 / 轮换管理面 | 审计完整 |
+| P1 | 签名 Nonce Redis | 多实例 |
+| P2 | SSO / OIDC | 映射到 JWT + TenantContext |
+| P2 | 细粒度 kb 权限 | 产品化挂载策略 |
 
 ---
 
 ## 11) 自测
 
-1. 默写四角色 × 跨租户 × 各 2 个权限串  
-2. 画出 verify → require_permission → attach 的 Depends 链  
-3. auditor 能否 `resolve_acting_user_id` 覆写他人？→ 不能  
-4. 注册成功后 FE 下一步用什么调 `/chat`？→ 返回的 cg_ key  
-
-```bash
-sed -n '32,71p' backend/core/auth/api_key_auth.py
-sed -n '12,78p' backend/core/auth/models.py
-sed -n '16,37p' backend/core/auth/permissions.py
-sed -n '10,70p' backend/core/auth/scope.py
-```
+1. 默写四平台角色 × 跨租户  
+2. 画出 **现状** verify_api_key 链，再说目标 verify_session  
+3. auditor 能否覆写他人 user_id？→ 不能  
+4. 注册成功后 **今天** FE 用什么调 API？→ cg_ key；**目标**？→ JWT  
 
 ---
 
 ## 12) 衔接
 
-- B/C/D 已写完；A 是共用地基  
-- 建议串讲顺序：**A → B → C**，穿插 **D** 讲 Hub 例外  
-- Demo：四角色 key 各打一枪（chat / audit / 跨租户拒绝）
+- 目标运行时 → [02](02-runtime-split.md) · 组织安全 → [03](03-org-security.md)  
+- 串讲：**02/03 → A(本篇现状) → 06 Runner → 05b Chat**  
+- Demo：四角色各打一枪；能讲清「这是现状单钥匙」加分

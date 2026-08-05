@@ -1,9 +1,9 @@
 # 12o — 可观测：LangFuse · Prometheus · 审计（含怎么看指标）
 
-> 面试目标：说清「三本账」各看什么；现场能按 `trace_id` 定位；能念 Prometheus 指标名与标签。  
-> 锚点：`observability/*` · `core/metrics.py` · `pipeline/router.py` · `app.py` `/metrics`  
-> 实测手册：[`examples/qa/LANGFUSE.md`](../examples/qa/LANGFUSE.md) · MANUAL_TEST §10  
-> 串讲：接在 A→B→C 之后——「请求可认证、可分流、可计量，还要可回放。」
+> 面试目标：说清「三本账」；按 `trace_id` / 目标态 `run_id` 定位。  
+> 锚点：`observability/*` · `core/metrics.py` · `pipeline/router.py` · `/metrics`  
+> 实测：[`examples/qa/LANGFUSE.md`](../examples/qa/LANGFUSE.md)  
+> 串讲：接在运行时分流与 Runner 之后——「可认证、可分流、可计量、可回放、可审计」。
 
 ---
 
@@ -192,6 +192,18 @@ sum(rate(contextgate_cost_total[5m])) by (tenant, model)
 **操作：** 切 **auditor**（或 super_admin）→ Audit 面板按 action/时间过滤；导出 CSV。  
 **面试：** 「观测解决工程定位；审计解决合规举证——角色上 auditor 跨租户只读。」
 
+### 3.1 目标态审计字段（Runner / 凭证拆分后）
+
+| 字段 | 用途 |
+|------|------|
+| `run_id` / `node_id` | Workflow 运行与挂起续跑 |
+| `acting_user_id` | 谁点的（人） |
+| `credential_kind` | human_session / machine_key / delegation |
+| `org` / 主部门 | OrgScope 举证 |
+| `connector_key_id` | 出站用了哪把连接器密钥（不含明文） |
+
+金线：跑链 → 挂起批过 → auditor 导出能看见上表。设计见 pilot-b §9/§10/§12。
+
 ---
 
 ## 4) 端到端排查剧本（30 秒定位）
@@ -277,5 +289,6 @@ open http://localhost:3001
 
 ## 9) 衔接
 
-- 总图 [00](00-interview-map.md) · A/B/C/D 深挖  
-- 细节与已知坑以 [`examples/qa/LANGFUSE.md`](../examples/qa/LANGFUSE.md) 为准（更新更勤）
+- 总图 [00](00-interview-map.md) · 分流 [02](02-runtime-split.md) · Runner [06](06-workflow-runner.md)  
+- 认证 [04a](04a-auth-rbac.md) · Chat [05b](05b-pipeline-nodes.md) · Hub [09d](09d-rag-capability.md)  
+- 细节与已知坑：[`examples/qa/LANGFUSE.md`](../examples/qa/LANGFUSE.md)

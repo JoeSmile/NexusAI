@@ -1,39 +1,53 @@
 # 09d — 深挖 D：RAG 与 Capability Hub
 
-> 面试目标：分清三条调用面（Chat 管线 / RAG 直问 / Capability invoke），说清权限例外与缓存差异，不把 Hub 讲成「第二个 LangGraph」。  
-> 锚点：`modules/rag/**` · `core/capability/**` · `routers/capability.py` · `rag_router.py`  
-> 对照：管线见 [05b](05b-pipeline-nodes.md)；花钱出口见 [07c](07c-harness-cost-shortpath.md)
+> 面试目标：分清 Chat 管线 / RAG 直问 / Capability invoke；说清权限例外与缓存差异。  
+> **目标定位：** Hub 能力 = Workflow Runner 的 **节点类型**；单次 invoke 仍可用于机调；多步编排见 [06](06-workflow-runner.md)。  
+> 锚点：`modules/rag/**` · `core/capability/**` · `routers/capability.py`  
+> 分流 → [02](02-runtime-split.md)；Chat DAG → [05b](05b-pipeline-nodes.md)；Harness → [07c](07c-harness-cost-shortpath.md)
 
 ---
 
 ## 0. 先定边界（最重要）
 
-| 调用面 | 入口 | 干什么 | 是不是治理主链 |
-|--------|------|--------|----------------|
-| **Chat 管线** | `POST /chat` | 通用对话 DAG（记忆/缓存/护栏/短长路径） | ✅ 主叙事 |
-| **RAG 直问** | `POST /api/rag/ask` | 知识库检索 + 生成答案 | 侧翼垂直能力 |
-| **Capability Hub** | `GET/POST /api/capabilities…` | 能力市场：注册表 + 统一 invoke | 编排/产品化入口 |
+| 调用面 | 入口 | 干什么 | 叙事位置 |
+|--------|------|--------|----------|
+| **Chat 管线** | `POST /chat` | 人侧模糊对话 DAG | 治理主链之一（仅人） |
+| **Workflow Runner** | 工作台/机 run（🎯） | 确定动作多节点执行 | **确定动作主执行面** |
+| **RAG 直问** | `POST /api/rag/ask` | 知识库检索 + 生成 | 侧翼；也可作 Runner 节点 |
+| **Capability Hub** | `/api/capabilities…` | 注册表 + 单次 invoke | 目录 + Runner 节点实现 |
 
-**一句话定位：**  
-Chat = 治理网关；RAG = 知识问答产品能力；Capability = 把 model/rag/agent/tool/外部应用收成「可列表、可鉴权、可调用」的目录。  
-Hub **可以调用** RAG（`executor=rag` → 同源 `RAGService.ask`），但 **不是** 把整条 Chat DAG 再跑一遍。
+**一句话：**  
+Chat = 模糊对话治理；Runner = 确定动作编排执行；Hub = 可鉴权能力目录（被 Runner 调用）；RAG = 知识能力（直问或挂进 Hub/Runner）。
 
 ```text
-                    ┌── POST /chat ──────────► LangGraph pipeline ──► LLMHarness
-Client ─ API Key ──┤
-                    ├── POST /api/rag/ask ───► RAGService.ask ──► 检索+LLM（自有 cache）
-                    └── POST /api/capabilities/{id}/invoke
+人 JWT ─┬─ /chat ──────────────► Chat DAG ──► LLMHarness
+        └─ 工作台运行 ──┐
+机 Key ── run API ──────┤
+                        ▼
+                 Workflow Runner（🎯）
+                        │
+                        ▼
+              capability invoke（✅ 已有单次）
+                 ├ model / tool / rag / agent / external
+                 └ 二次鉴权 + OrgScope（🎯）
+```
+
+**现状客户端**仍多走 API Key；单次 invoke 分发（已落地）：
+
+```text
+Client ─ API Key ──┬── POST /chat ──────────► LangGraph pipeline
+                   ├── POST /api/rag/ask ───► RAGService.ask
+                   └── POST /api/capabilities/{id}/invoke
                               │
                               ▼
                          invoke() 分发
-                         ├ kind=model  → LLMHarness.stream
-                         ├ kind=tool + executor=rag → RAGService.ask（同源）
-                         ├ kind=tool + executor=model → Harness
+                         ├ kind=model  → LLMHarness
+                         ├ kind=tool + executor=rag → RAGService.ask
                          ├ kind=agent → agent 路径
                          └ kind=external_app → 连接器
 ```
 
----
+Hub **可以调用** RAG，但 **不是** 把整条 Chat DAG 再跑一遍；也 **不是** 已完成的多节点 Runner。
 
 ## 1) RAG — 面试卡片
 

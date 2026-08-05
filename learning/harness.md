@@ -1,6 +1,12 @@
+# Harness 速记（附录）
+
+> 完整面试稿以 **[07c-harness-cost-shortpath.md](07c-harness-cost-shortpath.md)** 为准。  
+> 本文是压缩笔记；规则不变：**禁绕过 harness 直调 LLM**。
+
+---
+
 【一句话本质】
-    harness = 所有 LLM 调用的唯一出口,把"调模型"从裸调用升级为:模式路由(mock/record/replay/openai)+ 断路器 + 重试 + 超时 + 预算预检 + 成本记账 + LangFuse 观测 + key failover 的一体化 wrapper。规则:禁绕过
-    harness 直读 LLM_API_KEY(EVID-08),RAG/Agent/Eval 旁路也必须走 get_llm_client()。
+    harness = 所有 LLM 调用的唯一出口：模式路由(mock/record/replay/openai)+ 断路器 + 重试 + 超时 + 预算预检 + 成本记账 + LangFuse + key failover。RAG/Agent/Eval 旁路也必须走 get_llm_client()。
 
     【四模式(provider.py:1-30,路由在 get_llm_provider)】
     - mock:确定性伪响应(回显 prompt 后 180 字符,provider.py:67-70),零成本零外部依赖,单测可断言

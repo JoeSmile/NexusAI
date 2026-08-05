@@ -1,7 +1,9 @@
 # 07c — 深挖 C：短路径 · 成本 · LLMHarness
 
-> 面试目标：讲清「钱在哪一步花、何时可以 $0、统一出口多了什么」。
-> 锚点文件：`model_router.py` · `llm_generate.py` · `harness/llm.py` · `cost_manager.py` · `model_registry.py` · `skills/registry.py` · `key_repository.py` / `key_failover.py`
+> 面试目标：讲清「钱在哪一步花、何时可以 $0、统一出口多了什么」。  
+> **范围：** Chat DAG 内 short/long（[05b](05b-pipeline-nodes.md)）。Runner 节点若调 LLM，**同样必须走 Harness**，禁裸 SDK。  
+> 锚点：`model_router.py` · `llm_generate.py` · `harness/llm.py` · `cost_manager.py` · …  
+> 速记附录：[harness.md](harness.md)
 
 ---
 

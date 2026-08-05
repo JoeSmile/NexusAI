@@ -1,12 +1,13 @@
-# 05b — 深挖 B：Pipeline 全节点与条件边
+# 05b — 深挖 B：Chat Pipeline 全节点与条件边
 
-> 面试目标：白板默画 DAG、说清每个条件边「为什么在这」、早退路径花不花钱。  
-> 锚点：`backend/pipeline/graph.py` · `router.py` · `state.py` · `nodes/*` · `langgraph_compat.py`  
-> 关联：短路径/Harness 细节见 [07c](07c-harness-cost-shortpath.md)；早预处理演进见 Task 39。
+> 面试目标：白板默画 **Chat DAG**、说清条件边与早退成本。  
+> **范围：** 仅 **人侧模糊需求** 的 `/chat` 管线。机器执行与工作台「运行」走 [Workflow Runner](06-workflow-runner.md)，**不要**画进本图。  
+> 锚点：`backend/pipeline/graph.py` · `router.py` · `state.py` · `nodes/*`  
+> 分流总览 → [02](02-runtime-split.md)；短路径/Harness → [07c](07c-harness-cost-shortpath.md)；Task 39 早预处理。
 
 ---
 
-## 0. 总图（与代码一致）
+## 0. 总图（与代码一致 · Chat only）
 
 ```text
 HTTP POST /chat

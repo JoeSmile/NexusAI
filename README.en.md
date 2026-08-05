@@ -1,127 +1,147 @@
 # NexusAI
 
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)]()
-[![License](https://img.shields.io/badge/license-Apache%202.0-green)]()
-[![CI](https://github.com/joe/context-gate/actions/workflows/ci.yml/badge.svg)]()
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
+[![CI](https://github.com/JoeSmile/NexusAI/actions/workflows/ci.yml/badge.svg)](https://github.com/JoeSmile/NexusAI/actions/workflows/ci.yml)
 
-> **The Governance Hub for Enterprise AI**
+**The Governance Hub for Enterprise AI.**
 
-Every enterprise has a business middle platform and a data middle platform — what's missing is an AI middle platform. NexusAI fills that gap: **a unified entry point to enterprise AI capabilities, with capabilities orchestrated by IT, data connected from internal OA/RAG, and a governance layer as the safety net.**
+Enterprises already have business and data platforms. What’s missing is an **AI governance layer**. NexusAI is a unified gateway for access, capability orchestration, internal data (RAG and planned OA), and compliance — apps may run on Dify or custom stacks; **calls and data should pass through governance**.
 
-[简体中文](README.md) | [English](README.en.md)
+[简体中文](README.md) · [English](README.en.md)
 
-## Positioning
+---
 
-- **Governance is the selling point, not a feature.** Audit, budget, permissions, compliance — answering the enterprise's one question: "would you dare hand your data to it?"
-- **Not an agent orchestration platform.** Dify/Coze build application orchestration; NexusAI does governance — apps can run on Dify, but data must pass through NexusAI.
-- **Not another middle platform.** Enterprises already have business/data middle platforms; NexusAI adds an AI governance layer on top of them.
+## Why NexusAI
 
-The full derivation of the positioning and five-layer architecture is in [`docs/strategy/AI_MIDDLE_PLATFORM.md`](docs/strategy/AI_MIDDLE_PLATFORM.md) (decision made 2026-08-05).
+| We build | We don’t |
+|----------|----------|
+| Auth, multi-tenant RBAC, audit, guardrails, key & cost controls | Another general-purpose agent drag-and-drop studio |
+| Chat pipeline + Capability Hub + RAG, privatizable | A replacement for existing business/data platforms |
+| Swappable models (OpenAI-compatible + mock/record/replay) | Lock-in to a single cloud LLM |
 
-## Architecture (Five Layers)
+Full positioning: [`docs/strategy/AI_MIDDLE_PLATFORM.md`](docs/strategy/AI_MIDDLE_PLATFORM.md).
 
+## Features
+
+| Area | Status | Notes |
+|------|--------|--------|
+| Chat governance pipeline (LangGraph) | ✅ | Auth → memory → rate limit → cache → guardrails → intent → dual path |
+| Dual path routing | ✅ | High-confidence intent → skill ($0); else → `LLMHarness` |
+| Capability Hub | ✅ | Registry + invoke; per-capability permission |
+| RAG (pgvector) | ✅ | Upload / ask / retrieve; L1/L2 cache |
+| RBAC (4 roles) | ✅ | `super_admin` · `auditor` · `tenant_admin` · `user` |
+| Audit trail | ✅ | `audit_logs` + export |
+| Guardrails | ✅ | Injection · PII · output checks · circuit breaker |
+| Observability | ✅ | LangFuse · Prometheus `/metrics` |
+| LLM key governance | ✅ | Encrypted keys · failover · harness providers |
+| Password login (test FE) | ✅ | Issues `cg_` API keys |
+| Workbench / OA connectors | ⏳ | Planned |
+| Self-serve workflow canvas | ⏸ | V2 — out of current scope |
+
+## Architecture
+
+```text
+Access          Chat · API (X-API-Key / HMAC) · Capability invoke · (workbench planned)
+Orchestration   Capability registry / chains · LangGraph chat DAG · short/long path
+Data            RAG / pgvector · (OA & finance planned)
+Governance      RBAC · audit · guardrails · rate limit · budget hooks
+Cross-cutting   LangFuse · Prometheus · model registry · LLMHarness · Redis cache
 ```
-Access Layer       chat (intent detection) / workbench buttons (direct invoke) / API (X-API-Key + HMAC)
-Orchestration Layer  capability registry → capability chains (IT-orchestrated) → LangGraph DAG → dual path (skill direct $0 / LLM)
-Data Connection Layer OA / RAG knowledge base / finance systems (tenant + role + row-level isolation, data stays in-domain)
-Governance Layer    RBAC 4 roles / full audit / budget quotas / safety guardrails / approval flows
-Cross-cutting Layer LangFuse observability / model routing + harness / cache / AES-256-GCM key governance
-```
 
-The technical core is a LangGraph directed acyclic graph (pipeline nodes):
+Chat pipeline (simplified):
 
-```
+```text
 auth_check → load_memory → rate_limiter → cache_check
-  ├─ hit → END
-  └─ miss → guardrails_input → analyze_parallel → build_context
+  ├─ hit  → END
+  └─ miss → guardrails_input → analyze → build_context
             → model_router
-              ├─ short path → execute skill → END (50ms, $0)
-              └─ long path → llm_generate → guardrails_output
-                            → write_memory + audit → END (1-5s)
+                 ├─ short: skill → END
+                 └─ long:  llm_generate → guardrails_out → write_memory → END
 ```
+
+Deep-dives for interviews: [`learning/`](learning/README.md).
+
+## Requirements
+
+- Python **3.11+** and [uv](https://github.com/astral-sh/uv)
+- Docker (PostgreSQL + pgvector; optional LangFuse / Redis)
+- Node.js 18+ (optional test frontend)
 
 ## Quick Start
 
 ```bash
-# 1. Start infrastructure (PostgreSQL + pgvector)
+# 1. Infrastructure
 docker compose -f docker-compose.local.yml up -d
 
-# 2. Install dependencies
+# 2. Dependencies
 uv sync
 
-# 3. Initialize data
+# 3. Seed (prints fresh cg_ keys once to stdout)
 uv run python scripts/seed_api_keys.py
 uv run python scripts/seed_pgvector.py
 
-# 4. Start the API
-uv run uvicorn backend.app:app --reload
+# 4. API
+uv run uvicorn backend.app:app --reload --port 8000
 
-# 5. Test
-curl -X POST http://localhost:8000/chat \
-  -H "X-API-Key: <your-api-key>" \
+# 5. Smoke
+curl -s http://localhost:8000/health
+curl -s -X POST http://localhost:8000/chat \
+  -H "X-API-Key: <paste-key-from-seed>" \
   -H "Content-Type: application/json" \
-  -d '{"message": "你好", "session_id": "test", "user_id": "alice"}'
+  -d '{"message":"hello","session_id":"demo","user_id":"alice"}'
 ```
 
-### Test Frontend (Task 30, recommended QA entry)
+OpenAPI: `http://localhost:8000/docs` · Metrics: `http://localhost:8000/metrics`
+
+### Test frontend
 
 ```bash
 uv run python scripts/seed_api_keys.py
-uv run python scripts/seed_capabilities.py   # capability chain demo (optional)
+uv run python scripts/seed_capabilities.py
 uv run uvicorn backend.app:app --reload --port 8000
-cd frontend && npm install && npm run dev    # http://localhost:5173
+cd frontend && npm install && npm run dev   # http://localhost:5173
 ```
 
-The login page supports **password register/login** (Task 38) and Key login (4 role slots, for QA role switching).
-Switch roles from the top-right corner → walk the panels against [`examples/qa/journeys/`](examples/qa/journeys/).
-Detailed steps and panel docs: [`frontend/README.md`](frontend/README.md).
+Password login and API-key role slots are supported. See [`frontend/README.md`](frontend/README.md) and [`examples/qa/journeys/`](examples/qa/journeys/).
 
-## Feature Matrix
+Copy `config.env.example` → `config.env` for LangFuse / LLM settings.
 
-| Capability | Status | Notes |
-|------|------|------|
-| Unified entry: chat / button / API | 🚧 Partial | chat→capability-chain bridge in progress (chat currently goes intent→skill, capability chains use invoke; the two paths are not yet connected) |
-| Capability orchestration: registry + chains | ✅ | Capability catalog + permission binding; chained orchestration (rag-ask → contract-query → vendor-risk) |
-| Dual-path execution | ✅ | Intent confidence ≥0.85 → direct skill (50ms, $0), otherwise LLM pipeline |
-| RAG knowledge base | ✅ | pgvector + upload / Q&A / retrieval / semantic recall |
-| RBAC 4 roles | ✅ | super_admin / tenant_admin / auditor / user |
-| Full audit | ✅ | audit_logs + compliance export (redacted) |
-| Budget quotas | ✅ | Task 32: per-call / daily / monthly three-window limits + approval dual ledgers |
-| Safety guardrails | ✅ | injection detection + PII redaction + output review + circuit breaker |
-| Data connectors (OA / finance) | ⏳ Planned | phase 1: import + scheduled sync |
-| Workbench button page | ⏳ Planned | button → direct invoke, one-click execution for business users |
+## Project layout
 
-## Comparison
+```text
+backend/       FastAPI, pipeline, auth/harness, modules (rag/intent/llm)
+frontend/      Vite test console
+scripts/       Seed & helpers
+examples/qa/   Manual QA
+learning/      Module deep-dives
+docs/          Architecture, deploy, strategy, manual tests
+tasks/         Active design notes
+```
 
-|   | NexusAI | Dify | FastGPT |
-|---|------------|------|---------|
-| Positioning | Enterprise AI middle platform (governance + data) | AI app orchestration platform | Knowledge base Q&A |
-| Tenant isolation | ✅ row-level + audit | ✅ | ❌ |
-| Audit | ✅ full + export | ❌ | ❌ |
-| Signed auth | ✅ HMAC-SHA256 | ❌ | ❌ |
-| API key governance | ✅ AES-256-GCM | ❌ | ❌ |
-| Safety guardrails | ✅ injection+PII+output | ⚠️ basic | ❌ |
-| Observability | ✅ LangFuse | ✅ | ⚠️ |
-| Enterprise data (OA/RAG) connectivity | ✅ RAG built-in, OA planned | ⚠️ | ❌ |
+## Documentation
 
-## Phases
+| Doc | Description |
+|-----|-------------|
+| [AI middle platform](docs/strategy/AI_MIDDLE_PLATFORM.md) | Positioning |
+| [Strategy index](docs/strategy/README.md) | Moat / GTM notes |
+| [Architecture](docs/ARCHITECTURE.md) | Tech architecture |
+| [Cache](docs/CACHE.md) | Cache semantics |
+| [Deployment](docs/DEPLOYMENT.md) | Deploy |
+| [Manual test](docs/MANUAL_TEST.md) | Acceptance |
+| [Roadmap](docs/ROADMAP.md) | Roadmap |
+| [LangFuse QA](examples/qa/LANGFUSE.md) | Reading traces |
+| [Competitive notes](docs/COMPETITIVE_ANALYSIS.md) | Landscape |
+| [Windows setup](docs/WINDOWS_SETUP.md) | Windows |
 
-- **First battle (now):** no self-service workflow orchestration. IT configures capability chains; business users invoke via chat or workbench buttons.
-- **V2 goal:** self-service orchestration (templates + form-first, drag-and-drop canvas later), approval nodes (reconciliation/procurement flows need leader sign-off), blueprint scenarios (accounting reconciliation).
+## Contributing
 
-## Docs
-
-- [Strategy](docs/strategy/README.md) — moat / survival rate / job-hunting playbook
-- [AI Middle Platform Positioning](docs/strategy/AI_MIDDLE_PLATFORM.md) — one-line positioning + five-layer architecture (decided 2026-08-05)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Compliance](docs/COMPLIANCE.md)
-- [Security Policy](docs/SECURITY.md)
-- [Security Audit](docs/SECURITY_AUDIT.md)
-- [Deployment](docs/DEPLOYMENT.md)
-- [Roadmap](docs/ROADMAP.md)
-- [Contributing](CONTRIBUTING.md)
-- [Code of Conduct](docs/CODE_OF_CONDUCT.md)
+See [CONTRIBUTING.md](CONTRIBUTING.md): branch → lint/tests → Conventional Commits with `Signed-off-by:`.
 
 ## License
 
-Apache 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE)
+Apache License 2.0 — [LICENSE](LICENSE) · [NOTICE](NOTICE).
+
+## Acknowledgments
+
+Aimed at private / on-prem enterprise AI governance (tenancy, audit, residency). Stack: FastAPI, LangGraph, PostgreSQL/pgvector, LangFuse, Prometheus.
