@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 
 from backend.core.fallback import get_fallback
 from backend.core.harness import LLMHarness
+from backend.core.prompt_service import get_prompt, resolve_prompt_label, sanitize_prompt_content
 from backend.observability.decorators import enrich_span, observe
 from backend.pipeline.state import PipelineState
 
@@ -24,8 +26,36 @@ async def llm_generate(state: PipelineState) -> PipelineState:
     messages: list[dict[str, str]] = []
     ab_cfg = state.get("ab_variant_config") or {}
     system_prompt = ab_cfg.get("system_prompt")
-    if system_prompt and isinstance(system_prompt, str):
-        messages.append({"role": "system", "content": system_prompt})
+    ab_safe = (
+        sanitize_prompt_content(system_prompt)
+        if system_prompt and isinstance(system_prompt, str)
+        else None
+    )
+    if ab_safe is not None:
+        content = ab_safe
+        prompt_meta: dict[str, str | None] = {
+            "prompt_name": "ab_variant",
+            "prompt_version": str(state.get("ab_variant") or "override"),
+            "prompt_label": "ab",
+            "prompt_source": "ab",
+        }
+    else:
+        # Task 41 Slice 1: LangFuse → 内置默认；同步 SDK 丢线程池，避免堵 event loop
+        # resolve_prompt_label：默认 production；LANGFUSE_PROMPT_AB=1 时按用户粘性分桶
+        label = resolve_prompt_label(
+            user_id=state.get("user_id"),
+            tenant_id=tenant_id,
+            prompt_name="chat.system",
+        )
+        pr = await asyncio.to_thread(get_prompt, "chat.system", label)
+        content = pr.content
+        prompt_meta = {
+            "prompt_name": pr.name,
+            "prompt_version": str(pr.version) if pr.version is not None else None,
+            "prompt_label": pr.label,
+            "prompt_source": pr.source,
+        }
+    messages.append({"role": "system", "content": content})
     messages.append({"role": "user", "content": message})
 
     max_tokens = 1000
@@ -83,6 +113,7 @@ async def llm_generate(state: PipelineState) -> PipelineState:
             "total_tokens": state.get("total_tokens"),
             "total_cost": state.get("total_cost"),
             "ab_variant": state.get("ab_variant"),
+            **prompt_meta,  # 扁平:prompt_name/prompt_version/prompt_label/prompt_source
         },
     )
     return state

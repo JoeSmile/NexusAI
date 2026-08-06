@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 from datetime import datetime, timedelta
 
@@ -12,6 +13,8 @@ from backend.core.memory_service import get_unified_memory_service
 from backend.database.pgvector_session import CacheEntry, get_pg_session
 from backend.observability.decorators import observe
 from backend.pipeline.state import PipelineState
+
+logger = logging.getLogger(__name__)
 
 
 @observe(name="pipeline.write_memory")
@@ -45,6 +48,30 @@ async def write_memory(state: PipelineState) -> PipelineState:
             }
         )
         state["cold_memory"] = existing
+
+    # Task 41 Slice 2: 零 LLM 规则抽取 → warm 记忆（失败静默，不阻塞管线）
+    try:
+        from backend.core.memory.extractor import get_extractor, min_confidence
+
+        extractor = get_extractor()
+        candidates = await extractor.extract(
+            user_message=message or "",
+            assistant_message=response or "",
+        )
+        threshold = min_confidence()
+        for c in candidates:
+            if c.confidence < threshold:
+                continue
+            await mem.write(
+                "warm",
+                user_id=user_id,
+                key=c.key,
+                value=c.value,
+                confidence=c.confidence,
+                source=c.source,
+            )
+    except Exception as exc:  # 抽取是增强路径，永不因它 500
+        logger.warning("memory extraction skipped: %s", exc)
 
     session_factory = get_pg_session()
     with session_factory.Session() as session:
