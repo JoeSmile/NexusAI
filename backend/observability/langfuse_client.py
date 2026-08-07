@@ -1,4 +1,4 @@
-"""LangFuse 客户端 — 可观测性 SDK"""
+"""LangFuse 客户端 — SDK v4（OTel-native）。"""
 
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ from typing import Any
 _lf: Any | None = None
 _init_attempted = False
 
-# 保证即便未经过 app.py 也能读到 config.env
 try:
     from dotenv import load_dotenv
 
@@ -27,8 +26,16 @@ def langfuse_enabled() -> bool:
     """默认开启；设 LANGFUSE_ENABLED=0 可显式关闭。"""
     if "LANGFUSE_ENABLED" in os.environ:
         return _truthy("LANGFUSE_ENABLED")
-    # 有 public key 即视为启用（含本地 init key）
     return bool(os.getenv("LANGFUSE_PUBLIC_KEY", "").strip())
+
+
+def _base_url() -> str:
+    # SDK v4 官方名 LANGFUSE_BASE_URL；兼容旧 LANGFUSE_HOST
+    return (
+        os.getenv("LANGFUSE_BASE_URL")
+        or os.getenv("LANGFUSE_HOST")
+        or "http://localhost:3001"
+    ).rstrip("/")
 
 
 def get_langfuse():
@@ -43,11 +50,14 @@ def get_langfuse():
     if not langfuse_enabled():
         return None
 
-    host = os.getenv("LANGFUSE_HOST", "http://localhost:3001").rstrip("/")
     public_key = os.getenv("LANGFUSE_PUBLIC_KEY", "").strip()
     secret_key = os.getenv("LANGFUSE_SECRET_KEY", "").strip()
     if not public_key or not secret_key:
         return None
+
+    # 同步给 SDK 默认读取的 BASE_URL
+    os.environ.setdefault("LANGFUSE_BASE_URL", _base_url())
+    os.environ.setdefault("LANGFUSE_HOST", _base_url())
 
     try:
         from langfuse import Langfuse
@@ -55,7 +65,8 @@ def get_langfuse():
         _lf = Langfuse(
             public_key=public_key,
             secret_key=secret_key,
-            host=host,
+            base_url=_base_url(),
+            host=_base_url(),
         )
         return _lf
     except Exception:
@@ -83,16 +94,13 @@ def discard_langfuse_buffer() -> None:
     if client is None:
         return
     try:
-        tm = getattr(client, "task_manager", None) or getattr(
-            client, "_task_manager", None
-        )
-        if tm is not None and hasattr(tm, "shutdown"):
-            tm.shutdown(flush=False)
+        # v4: shutdown 停止导出；flush=False 尽量不发送
+        if hasattr(client, "shutdown"):
+            client.shutdown()
             return
     except Exception:
         pass
     try:
-        # 无 shutdown(flush=False) 时至少释放引用，避免显式 flush
         del client
     except Exception:
         pass

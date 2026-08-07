@@ -10,7 +10,6 @@ services:
     volumes:
       - pgvector_data:/var/lib/postgresql/data
       - ./backend/database/init_pgvector.sql:/docker-entrypoint-initdb.d/init_pgvector.sql
-      - ./backend/database/init_langfuse_db.sql:/docker-entrypoint-initdb.d/init_langfuse_db.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U contextgate -d contextgate"]
       interval: 5s
@@ -34,7 +33,8 @@ services:
       DATABASE_URL: postgresql://contextgate:contextgate_local@postgres:5432/contextgate
       LLM_MOCK: "true"
       LANGFUSE_ENABLED: "true"
-      LANGFUSE_HOST: http://langfuse:3000
+      LANGFUSE_HOST: http://langfuse-web:3000
+      LANGFUSE_BASE_URL: http://langfuse-web:3000
       LANGFUSE_PUBLIC_KEY: pk-lf-local-contextgate
       LANGFUSE_SECRET_KEY: sk-lf-local-contextgate
     volumes:
@@ -43,7 +43,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      langfuse:
+      langfuse-web:
         condition: service_started
     command:
       [
@@ -59,18 +59,146 @@ services:
     networks:
       - contextgate_local
 
-  # langfuse 库由 postgres 的 docker-entrypoint-initdb.d 创建(init_langfuse_db.sql,仅首次建卷时执行)
-  langfuse:
-    image: ghcr.io/langfuse/langfuse:2
-    ports:
-      - "3001:3000"
+  # ── Langfuse OSS v4（官方完整栈；与业务 PG/Redis 隔离）──
+  # 扩展说明见 docs/superpowers/specs/2026-08-07-langfuse-v4-upgrade-design.md §5
+  langfuse-postgres:
+    image: docker.io/postgres:17
     environment:
-      DATABASE_URL: postgresql://contextgate:***@postgres:5432/langfuse
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: langfuse_local
+      POSTGRES_DB: langfuse
+      TZ: UTC
+      PGTZ: UTC
+    volumes:
+      - langfuse_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse -d langfuse"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - contextgate_local
+
+  langfuse-redis:
+    image: docker.io/redis:7
+    command: >
+      --requirepass langfuse_redis_local
+      --maxmemory-policy noeviction
+    volumes:
+      - langfuse_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "langfuse_redis_local", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - contextgate_local
+
+  langfuse-clickhouse:
+    image: docker.io/clickhouse/clickhouse-server:25.12
+    user: "101:101"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: clickhouse_local
+    volumes:
+      - langfuse_clickhouse_data:/var/lib/clickhouse
+      - langfuse_clickhouse_logs:/var/log/clickhouse-server
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - contextgate_local
+
+  langfuse-minio:
+    image: cgr.dev/chainguard/minio
+    entrypoint: sh
+    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: miniosecret_local
+    ports:
+      - "9090:9000"
+    volumes:
+      - langfuse_minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - contextgate_local
+
+  langfuse-worker:
+    image: docker.io/langfuse/langfuse-worker:4
+    depends_on:
+      langfuse-postgres:
+        condition: service_healthy
+      langfuse-redis:
+        condition: service_healthy
+      langfuse-clickhouse:
+        condition: service_healthy
+      langfuse-minio:
+        condition: service_healthy
+    environment: &langfuse-env
+      DATABASE_URL: postgresql://langfuse:langfuse_local@langfuse-postgres:5432/langfuse
+      NEXTAUTH_URL: http://localhost:3001
       NEXTAUTH_SECRET: contextgate-langfuse-dev-secret
       SALT: contextgate-langfuse-dev-salt
       ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
-      NEXTAUTH_URL: http://localhost:3001
       TELEMETRY_ENABLED: "false"
+      CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000
+      CLICKHOUSE_URL: http://langfuse-clickhouse:8123
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: clickhouse_local
+      CLICKHOUSE_CLUSTER_ENABLED: "false"
+      REDIS_HOST: langfuse-redis
+      REDIS_PORT: "6379"
+      REDIS_AUTH: langfuse_redis_local
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: miniosecret_local
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+      LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
+      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: miniosecret_local
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+    restart: unless-stopped
+    networks:
+      - contextgate_local
+
+  langfuse-web:
+    image: docker.io/langfuse/langfuse:4
+    ports:
+      - "3001:3000"
+    depends_on:
+      langfuse-postgres:
+        condition: service_healthy
+      langfuse-redis:
+        condition: service_healthy
+      langfuse-clickhouse:
+        condition: service_healthy
+      langfuse-minio:
+        condition: service_healthy
+      langfuse-worker:
+        condition: service_started
+    environment:
+      <<: *langfuse-env
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://localhost:9090
       LANGFUSE_INIT_ORG_ID: contextgate-org
       LANGFUSE_INIT_ORG_NAME: NexusAI
       LANGFUSE_INIT_PROJECT_ID: contextgate-project
@@ -80,14 +208,12 @@ services:
       LANGFUSE_INIT_USER_EMAIL: admin@contextgate.local
       LANGFUSE_INIT_USER_NAME: admin
       LANGFUSE_INIT_USER_PASSWORD: contextgate
-    depends_on:
-      postgres:
-        condition: service_healthy
     restart: unless-stopped
     networks:
       - contextgate_local
 
   # Redis Stack 缓存(本地开发用;含 RedisJSON/Search/TimeSeries 模块 + RedisInsight)
+  # 与 langfuse-redis 隔离（官方队列 Redis 要求 noeviction）
   redis:
     image: redis/redis-stack:7.4.0-v1
     ports:
@@ -107,6 +233,11 @@ services:
 volumes:
   pgvector_data:
   redis_data:
+  langfuse_pg_data:
+  langfuse_redis_data:
+  langfuse_clickhouse_data:
+  langfuse_clickhouse_logs:
+  langfuse_minio_data:
 
 networks:
   contextgate_local:

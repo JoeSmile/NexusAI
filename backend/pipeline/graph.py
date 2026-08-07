@@ -48,8 +48,11 @@ def _lf_node(name: str, fn: Any) -> Any:
             from backend.observability.sampling import tracing_enabled
 
             if tracing_enabled():
-                kwargs["langfuse_parent_trace_id"] = tid
+                # SDK v4: langfuse_trace_id + langfuse_parent_observation_id
+                kwargs["langfuse_trace_id"] = tid
                 kwargs["langfuse_parent_observation_id"] = oid
+                # 兼容旧调用名（若装饰器仍识别则无害）
+                kwargs["langfuse_parent_trace_id"] = tid
         r = fn(clean, *args, **kwargs)
         result = await r if inspect.isawaitable(r) else r
         if isinstance(result, dict) and tid and oid:

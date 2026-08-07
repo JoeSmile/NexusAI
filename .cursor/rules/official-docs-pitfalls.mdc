@@ -1,0 +1,17 @@
+---
+description: When using official docs, docker compose, or upgrading third-party stacks — always explain scaling limits and documentation pitfalls
+alwaysApply: true
+---
+
+# Official docs pitfalls & scaling honesty
+
+Whenever the work involves **official documentation**, **vendor docker-compose**, **SDK/server upgrades**, or **“just bump the image tag”** style changes — for this repo and as a standing habit in any project — you MUST:
+
+1. **Say what the starter topology is for** (dev / small load) vs what breaks under real traffic.
+2. **Call out version traps** (e.g. “v3+” ≠ latest; server major ≠ SDK major; EOL/Deprecated matrices).
+3. **List concrete pitfalls** from official docs or release notes (env renames, incompatible Redis policies, OTel span flood, delayed ingestion below min SDK patch, APIs deprecated on new data models, init-seed only-on-first-boot, etc.).
+4. **Separate Phase 1 (make it work) from Phase 2 (scale)** — horizontal/vertical growth per component, not “copy the whole compose N times” unless that is actually correct.
+5. **Prefer primary sources** with links (upgrade guides, compatibility matrices, official compose) over blog paraphrases.
+6. **Do not silently assume** one shared Redis/Postgres/volume for product + observability/analytics sidecars when vendors document isolation requirements.
+
+Keep this concise in chat; put the durable write-up in the design/plan doc when one exists.

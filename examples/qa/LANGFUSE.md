@@ -1,8 +1,24 @@
 # LangFuse 配合 QA 查看指南
 
-> 服务: `http://localhost:3001`(容器 contextgate-langfuse-1;独立库,由 postgres initdb.d 建)
-> 本文档基于 2026-08-02 实测(经 Langfuse Public API 核验),写明「哪些 QA 能配合看、指标怎么读、
-> 何时要优化、error 怎么解、再深入怎么查」。
+> 服务: `http://localhost:3001`（容器 `langfuse-web`；**OSS v4** 完整栈：web+worker+ClickHouse+MinIO+专用 PG/Redis）  
+> 升级设计 / 扩展 / 官方坑: [`docs/superpowers/specs/2026-08-07-langfuse-v4-upgrade-design.md`](../../docs/superpowers/specs/2026-08-07-langfuse-v4-upgrade-design.md)  
+> 本地从 v2 升级：**wipe 旧卷**后 `docker compose -f docker-compose.local.yml up -d`。
+
+## 0. 版本与启动
+
+| 项 | 值 |
+|----|-----|
+| Server | `langfuse/langfuse:4` + `langfuse-worker:4` |
+| Python SDK | `langfuse>=4.7,<5`（当前锁 4.14.x） |
+| UI | http://localhost:3001 |
+| 账号 | `admin@contextgate.local` / `contextgate` |
+| Key | `pk-lf-local-contextgate` / `sk-lf-local-contextgate` |
+
+应用侧请同时设 `LANGFUSE_HOST` 与 `LANGFUSE_BASE_URL`（宿主机 `http://localhost:3001`；compose 内网 `http://langfuse-web:3000`）。
+
+---
+
+（以下章节结构沿用既有 QA 说明；Public API 字段在 v4 上部分旧 traces 端点 Deprecated，排障优先用 UI 或 Observations v2。）
 
 ## 1. 哪些 QA 可以配合 LangFuse 看
 
