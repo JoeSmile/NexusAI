@@ -2,7 +2,9 @@ import { apiPost } from '@/api/http'
 import type { RoleName } from '@/types/api'
 
 export type AuthResponse = {
-  api_key: string
+  access_token: string
+  token_type: string
+  expires_in: number
   role: RoleName
   tenant_id: string
   user_id: string

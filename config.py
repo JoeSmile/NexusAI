@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     langchain_endpoint: str = ""
 
     database_url: str = (
-        "postgresql://contextgate:contextgate_local@localhost:5432/contextgate"
+        "postgresql://nexusai:nexusai_local@localhost:5432/nexusai"
     )
 
     default_model: str = ""
@@ -96,6 +96,10 @@ class Settings(BaseSettings):
     capability_registry_json: str = "[]"
     cap_quota_daily_calls: int = 1000
     cap_quota_daily_cost_usd: float = 10.0
+
+    # Wave A — human JWT session (do not reuse SECRET_KEY / LLM keys)
+    jwt_secret: str = ""
+    jwt_ttl_seconds: int = 3600
 
     @model_validator(mode="after")
     def _resolve_fallbacks(self) -> Settings:

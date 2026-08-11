@@ -1,0 +1,51 @@
+---
+description: Loop Engineering execution rules for NexusAI tasks — read task docs first, act-observe-reason until verification passes, stop and ask on ambiguity/security/permission, never guess
+alwaysApply: true
+---
+
+# Loop Engineering 执行规则（NexusAI）
+
+> 全文真源：`tasks/40/CURSOR_WORKFLOW.md`（以手册为准；本文件仅摘要）。
+> 硬规则优先级：**安全 + 明确方案 > 进度**；不确定 = 停下来问，不猜。
+
+## 会话起点
+
+- 每个功能 Wave 一个新会话（允许 Wave 内 checkpoint 续作）。开头先读：
+  1. 当前 **Wave 任务文档**（执行真源）`tasks/40/WaveX-*.md`
+  2. 主文档 `tasks/40-pilot-b-chain-a.md`
+  3. 原 W 文档（若有）— 仅补 Wave 未写明的契约；冲突以 Wave「规则（写死）」为准，禁止因原 W 重开拍板
+- 按切片顺序执行；每切片跑验证，绿了再下一个。
+
+## Loop 循环
+
+```
+读任务切片 → 写代码 → 跑验证命令 → 绿? → 下一个切片
+                          └─ 红 → 修复(最多 3 轮) → 再跑
+                                     └─ 3 轮还红 → 停下汇报
+```
+
+- **一轮** = 同一失败现象的一次：假设 → 改代码 → 重跑同一验证命令。
+- 验证失败先读错误找根因，**不盲目重试**；修根因不修症状。
+
+## 卡住必须停下提问（禁止猜测 / 绕路 / "先做再说"）
+
+| # | 触发条件 | 动作 |
+|---|----------|------|
+| 1 | 同一问题修复 **超过 3 轮** 未通过验证 | 停下列：做了什么 / 错误 / 尝试过 / 怀疑 |
+| 2 | 涉及**权限判定、密钥、数据删除、生产环境**、安全争议 | 停下确认，不擅自决定 |
+| 3 | **需求歧义**：plan 不清、前后矛盾、依赖缺失、验收标准无法判断 | 停下问清，列 A/B/C + 推荐 |
+| 4 | 任务文档与原 W 文档**冲突** | 停下，以 Wave「规则（写死）」为准并指出冲突 |
+
+## 开放项与完成
+
+- 文档出现"选 1~2 条 / 待定 / 建议"等开放表述 → **先问**，不自行拍板。
+- 已拍板（「规则（写死）」/「非目标」）→ 严格执行，不重开讨论。
+- Done 标准**全部勾选**才算完成；缺一条 = 未完成，不许提前交付。
+- Commit：验证绿可前进；**实际 commit 仅 Wave Done 或用户明示**；Conventional + `Signed-off-by: Joe`。
+- Code review：auth/安全 Important 立即停；风格类 Important 可攒到 Wave Done。
+
+## NexusAI 特化红线
+
+- `verify_api_key`：**禁止** machine-only / 按 type 拒绝（L1）；**允许**脚手架赋值（L2）。login/register **禁止**再建 api_keys。
+- 审计 params 不进明文；敏感值不写日志。
+- 本轮不做 CI/CD 改动、不做跨 Wave 顺手重构。

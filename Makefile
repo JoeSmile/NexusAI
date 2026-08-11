@@ -12,7 +12,7 @@ define require_uv
 endef
 
 help:
-	@echo "ContextGate — 常用命令"
+	@echo "NexusAI — 常用命令"
 	@echo ""
 	@echo "  make sync / install  安装依赖 (uv sync)"
 	@echo "  make lock            更新 uv.lock"
@@ -54,31 +54,31 @@ down docker-down:
 db-init:
 	$(require_uv)
 	cd $(ROOT_DIR) && \
-		DATABASE_URL=$${DATABASE_URL:-postgresql://contextgate:contextgate_local@localhost:5432/contextgate} \
+		DATABASE_URL=$${DATABASE_URL:-postgresql://nexusai:nexusai_local@localhost:5432/nexusai} \
 		uv run --no-sync alembic upgrade head
 
 run:
 	$(require_uv)
 	cd $(ROOT_DIR) && \
 		APP_ENV=$${APP_ENV:-dev} \
-		DATABASE_URL=$${DATABASE_URL:-postgresql://contextgate:contextgate_local@localhost:5432/contextgate} \
-		uv run --no-sync uvicorn backend.app:app --reload --host 0.0.0.0 --port 8000
+		DATABASE_URL=$${DATABASE_URL:-postgresql://nexusai:nexusai_local@localhost:5432/nexusai} \
+		uv run --no-sync python -m uvicorn backend.app:app --reload --host 0.0.0.0 --port 8000
 
 demo:
 	$(require_uv)
 	cd $(ROOT_DIR) && \
 		APP_ENV=demo \
-		uv run --no-sync uvicorn backend.app:app --host 0.0.0.0 --port 8000
+		uv run --no-sync python -m uvicorn backend.app:app --host 0.0.0.0 --port 8000
 
 seed:
 	$(require_uv)
 	cd $(ROOT_DIR) && \
 		APP_ENV=$${APP_ENV:-dev} \
-		DATABASE_URL=$${DATABASE_URL:-postgresql://contextgate:contextgate_local@localhost:5432/contextgate} \
+		DATABASE_URL=$${DATABASE_URL:-postgresql://nexusai:nexusai_local@localhost:5432/nexusai} \
 		uv run --no-sync python scripts/seed_api_keys.py
 	cd $(ROOT_DIR) && \
 		APP_ENV=$${APP_ENV:-dev} \
-		DATABASE_URL=$${DATABASE_URL:-postgresql://contextgate:contextgate_local@localhost:5432/contextgate} \
+		DATABASE_URL=$${DATABASE_URL:-postgresql://nexusai:nexusai_local@localhost:5432/nexusai} \
 		uv run --no-sync python scripts/seed_pgvector.py
 
 lint:
@@ -98,7 +98,7 @@ test:
 	cd $(ROOT_DIR) && \
 		APP_ENV=test \
 		LLM_PROVIDER=replay \
-		DATABASE_URL=$${DATABASE_URL:-postgresql://contextgate:contextgate_local@localhost:5432/contextgate} \
+		DATABASE_URL=$${DATABASE_URL:-postgresql://nexusai:nexusai_local@localhost:5432/nexusai} \
 		uv run --no-sync pytest tests/ -v
 
 check: lint typecheck

@@ -8,7 +8,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from backend.core.auth.api_key_auth import verify_api_key
+from backend.core.auth.dual_auth import verify_human_or_legacy_key
 from backend.core.auth.models import TenantContext
 from backend.core.capability.models import (
     CapabilityKind,
@@ -16,7 +16,7 @@ from backend.core.capability.models import (
     CapabilitySpec,
 )
 from backend.core.capability.registry import CapabilityRegistry
-from backend.core.errors import ContextGateException, contextgate_exception_handler
+from backend.core.errors import NexusAIException, nexusai_exception_handler
 from backend.routers.capability import router
 
 
@@ -48,7 +48,7 @@ def cap_reg() -> CapabilityRegistry:
             id="admin-only",
             name="admin-only",
             kind=CapabilityKind.MODEL,
-            provider=CapabilityProvider.CONTEXTGATE,
+            provider=CapabilityProvider.NEXUSAI,
             permission="admin:*",
             spec={"max_tokens": 8},
         )
@@ -58,13 +58,13 @@ def cap_reg() -> CapabilityRegistry:
 
 def _client(tenant: TenantContext, reg: CapabilityRegistry) -> TestClient:
     app = FastAPI()
-    app.add_exception_handler(ContextGateException, contextgate_exception_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(NexusAIException, nexusai_exception_handler)  # type: ignore[arg-type]
     app.include_router(router)
 
     async def _auth() -> TenantContext:
         return tenant
 
-    app.dependency_overrides[verify_api_key] = _auth
+    app.dependency_overrides[verify_human_or_legacy_key] = _auth
     return TestClient(app)
 
 

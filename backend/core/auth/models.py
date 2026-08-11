@@ -65,6 +65,10 @@ class TenantContext:
     role: str
     extra_permissions: list[str]
     is_cross_tenant: bool
+    # Wave A scaffold — transitional kind "api_key"; 2B → machine_key
+    credential_kind: str = "api_key"
+    key_id: str | None = None
+    acting_user_id: str | None = None
 
     def has_permission(self, permission: str) -> bool:
         """权限检查 — 支持通配符 `admin:*` / `chat:*`（角色与 extra 均生效）"""

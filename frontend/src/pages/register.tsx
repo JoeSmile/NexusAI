@@ -41,8 +41,6 @@ function registerErrorMessage(e: unknown): string {
 
 export default function RegisterPage() {
   const navigate = useNavigate()
-  const setKey = useAuthStore((s) => s.setKey)
-  const switchRole = useAuthStore((s) => s.switchRole)
 
   // 仅 dev/test/demo 才允许选角色；prod 强制 user
   const roleSelectable = useMemo(
@@ -84,10 +82,12 @@ export default function RegisterPage() {
         display_name: displayName.trim() || undefined,
         role: finalRole,
       })
-      // 注册成功 → 自动登录:写入对应槽位并切换（以服务端返回 role 为准）
       const loggedInRole = resp.role
-      setKey(loggedInRole, resp.api_key)
-      switchRole(loggedInRole)
+      useAuthStore.setState((s) => ({
+        activeRole: loggedInRole,
+        accessToken: resp.access_token,
+        roleEpoch: s.roleEpoch + 1,
+      }))
       navigate('/panels/chat', { replace: true })
     } catch (err) {
       setError(registerErrorMessage(err))

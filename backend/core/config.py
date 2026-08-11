@@ -26,9 +26,9 @@ class DatabaseConfig:
     """数据库配置 — PostgreSQL + pgvector"""
     host: str = "localhost"
     port: int = 5432
-    username: str = "contextgate"
-    password: str = "contextgate_local"
-    database: str = "contextgate"
+    username: str = "nexusai"
+    password: str = "nexusai_local"
+    database: str = "nexusai"
     pool_size: int = 10
     max_overflow: int = 20
     pool_timeout: int = 30
@@ -78,7 +78,7 @@ class VectorDBConfig:
     """向量数据库配置 — pgvector"""
     backend: str = "pgvector"
     dimension: int = 1536
-    collection_name: str = "contextgate_memories"
+    collection_name: str = "nexusai_memories"
     chunk_size: int = 500
     chunk_overlap: int = 50
     embedding_model: str = "text-embedding-v3"
@@ -99,7 +99,7 @@ class LoggingConfig:
     """日志配置"""
     level: str = "INFO"
     format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    file_path: str = "./logs/contextgate.log"
+    file_path: str = "./logs/nexusai.log"
     max_file_size: int = 10 * 1024 * 1024  # 10MB
     backup_count: int = 5
     enable_console: bool = True
@@ -115,6 +115,9 @@ class SecurityConfig:
     cors_origins: list = field(default_factory=lambda: ["*"])
     rate_limit_enabled: bool = True
     max_requests_per_minute: int = 60
+    # Wave A — human JWT (separate from secret_key)
+    jwt_secret: str = ""
+    jwt_ttl_seconds: int = 3600
 
 
 @dataclass
@@ -186,6 +189,10 @@ class Config:
         
         # 安全配置
         self.security.secret_key = os.getenv("SECRET_KEY", self.security.secret_key)
+        self.security.jwt_secret = os.getenv("JWT_SECRET", self.security.jwt_secret)
+        self.security.jwt_ttl_seconds = int(
+            os.getenv("JWT_TTL_SECONDS", self.security.jwt_ttl_seconds)
+        )
         
         # 日志配置
         self.logging.level = os.getenv("LOG_LEVEL", self.logging.level)

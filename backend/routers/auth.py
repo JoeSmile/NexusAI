@@ -1,17 +1,15 @@
-"""账号认证路由 — 注册 / 登录 (Task 38.01)。
+"""账号认证路由 — 注册 / 登录 (Task 38 → Wave A JWT)。
 
-无全局 auth Depends:这两个端点自身校验用户名密码,登录成功后下发 cg_ API Key。
+无全局 auth Depends:这两个端点自身校验用户名密码。
+登录/注册成功后下发 JWT access_token（禁止再建 api_keys）。
 失败计数走 Redis(降级到进程内 dict),5 次/5 分钟触发 429。
 """
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import os
-import secrets
 import time
-from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
@@ -19,6 +17,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from backend.core.audit import log_audit
+from backend.core.auth.jwt_session import issue_access_token, jwt_ttl_seconds
 from backend.core.auth.password import hash_password, verify_password
 from backend.core.redis_tools import get_sync_redis
 from backend.database.pgvector_session import get_pg_session
@@ -52,7 +51,9 @@ class LoginRequest(BaseModel):
 
 
 class AuthResponse(BaseModel):
-    api_key: str  # 明文,仅此一次返回
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
     role: str
     tenant_id: str
     user_id: str
@@ -127,66 +128,22 @@ def _fail_clear(username: str, *, kind: str = "fail") -> None:
     _fail_fallback.pop(key, None)
 
 
-def _mint_key() -> tuple[str, str, str]:
-    """生成 cg_ key:返回 (raw_key, key_hash, key_prefix)。"""
-    raw_key = f"cg_{secrets.token_hex(16)}"
-    key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
-    key_prefix = raw_key[:8]
-    return raw_key, key_hash, key_prefix
-
-
-def _insert_api_key(
-    session,
-    *,
-    tenant_id: str,
-    user_id: str,
-    role: str,
-    created_by: str,
-    description: str = "",
-) -> str:
-    """插入新 active key;返回明文。"""
-    raw_key, key_hash, key_prefix = _mint_key()
-    session.execute(
-        text(
-            """
-            INSERT INTO api_keys
-                (tenant_id, user_id, key_hash, key_prefix, role,
-                 description, created_by, is_active, created_at)
-            VALUES (:tid, :uid, :hash, :prefix, :role,
-                    :desc, :by, true, now())
-            """
-        ),
-        {
-            "tid": tenant_id,
-            "uid": user_id,
-            "hash": key_hash,
-            "prefix": key_prefix,
-            "role": role,
-            "desc": description,
-            "by": created_by,
-        },
-    )
-    return raw_key
-
-
-def _rotate_user_keys(session, *, tenant_id: str, user_id: str, role: str) -> None:
-    """停用该 (tenant, user, role) 槽位下的 active key(轮换)。"""
-    session.execute(
-        text(
-            """
-            UPDATE api_keys SET is_active = false, expires_at = now()
-            WHERE tenant_id = :tid AND user_id = :uid AND role = :role
-                  AND is_active = true
-            """
-        ),
-        {"tid": tenant_id, "uid": user_id, "role": role},
+def _token_response(*, user_id: str, tenant_id: str, role: str) -> AuthResponse:
+    token = issue_access_token(sub=user_id, tid=tenant_id, role=role)
+    return AuthResponse(
+        access_token=token,
+        token_type="bearer",
+        expires_in=jwt_ttl_seconds(),
+        role=role,
+        tenant_id=tenant_id,
+        user_id=user_id,
     )
 
 
 # ── Routes ─────────────────────────────────────
 @router.post("/register", response_model=AuthResponse)
 async def register(req: RegisterRequest, background_tasks: BackgroundTasks):
-    """注册新账号 → 创建 users 行 + api_keys 行,返回明文 key(仅一次)。"""
+    """注册新账号 → 创建 users 行，返回 JWT（禁止 INSERT api_keys）。"""
     if _app_env() not in _REGISTER_ALLOWED_ENVS:
         raise HTTPException(
             status_code=403,
@@ -199,7 +156,6 @@ async def register(req: RegisterRequest, background_tasks: BackgroundTasks):
             status_code=422,
             detail={"code": "AUTH_011", "message": "username_required"},
         )
-    # 注册防爆破:同 username 5 次/5 分钟(含重名探测)
     if _fail_count(username, kind="reg") >= _FAIL_MAX:
         raise HTTPException(
             status_code=429,
@@ -219,10 +175,9 @@ async def register(req: RegisterRequest, background_tasks: BackgroundTasks):
     display_name = (req.display_name or username).strip() or username
     password_hash = hash_password(req.password)
     tenant_id = _DEFAULT_TENANT
-    user_id = username  # seed 兼容:user_id == username
+    user_id = username
 
     session_factory = get_pg_session()
-    raw_key = ""
     try:
         with session_factory.Session() as session:
             existing = session.execute(
@@ -259,14 +214,6 @@ async def register(req: RegisterRequest, background_tasks: BackgroundTasks):
                     "role": req.role,
                 },
             )
-            raw_key = _insert_api_key(
-                session,
-                tenant_id=tenant_id,
-                user_id=user_id,
-                role=req.role,
-                created_by="register",
-                description=f"register:{username}",
-            )
             session.commit()
     except HTTPException:
         raise
@@ -298,16 +245,15 @@ async def register(req: RegisterRequest, background_tasks: BackgroundTasks):
         trace_id="",
         input_text=username,
         output_text="",
+        credential_kind="human_session",
     )
 
-    return AuthResponse(
-        api_key=raw_key, role=req.role, tenant_id=tenant_id, user_id=user_id
-    )
+    return _token_response(user_id=user_id, tenant_id=tenant_id, role=req.role)
 
 
 @router.post("/login", response_model=AuthResponse)
 async def login(req: LoginRequest, background_tasks: BackgroundTasks):
-    """账号密码登录 → 校验 bcrypt,成功轮换并下发新 cg_ key。"""
+    """账号密码登录 → 校验 bcrypt，返回 JWT（禁止 INSERT/轮换 api_keys）。"""
     username = _normalize_username(req.username)
     if not username:
         raise HTTPException(
@@ -315,7 +261,6 @@ async def login(req: LoginRequest, background_tasks: BackgroundTasks):
             detail={"code": "AUTH_001", "message": "invalid_credentials"},
         )
 
-    # 失败计数预检:已超阈值直接 429
     if _fail_count(username) >= _FAIL_MAX:
         raise HTTPException(
             status_code=429,
@@ -362,28 +307,6 @@ async def login(req: LoginRequest, background_tasks: BackgroundTasks):
     tenant_id = row.tenant_id or _DEFAULT_TENANT
     role = row.role or "user"
 
-    raw_key = ""
-    try:
-        with session_factory.Session() as session:
-            _rotate_user_keys(
-                session, tenant_id=tenant_id, user_id=user_id, role=role
-            )
-            raw_key = _insert_api_key(
-                session,
-                tenant_id=tenant_id,
-                user_id=user_id,
-                role=role,
-                created_by="login",
-                description=f"login:{username}@{datetime.utcnow().isoformat()}",
-            )
-            session.commit()
-    except Exception as e:
-        logger.exception("login key issue failed")
-        raise HTTPException(
-            status_code=500,
-            detail={"code": "AUTH_017", "message": "login_failed"},
-        ) from e
-
     _fail_clear(username)
 
     log_audit(
@@ -394,8 +317,7 @@ async def login(req: LoginRequest, background_tasks: BackgroundTasks):
         trace_id="",
         input_text=username,
         output_text="",
+        credential_kind="human_session",
     )
 
-    return AuthResponse(
-        api_key=raw_key, role=role, tenant_id=tenant_id, user_id=user_id
-    )
+    return _token_response(user_id=user_id, tenant_id=tenant_id, role=role)

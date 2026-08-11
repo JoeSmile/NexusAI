@@ -3,8 +3,9 @@
 LangFuse 根 trace / SSE 组帧 / 断连中止在本层；core 只做纯分发。
 长路径：``@observe`` 包住 async generator，span 贯穿整段 SSE。
 
-鉴权例外（见 AGENTS.md）: ``Depends(verify_api_key)`` + 每能力
+鉴权例外（见 AGENTS.md）: ``Depends(verify_human_or_legacy_key)`` + 每能力
 ``spec.permission`` / 租户可见性，不用固定 ``@require_permission``。
+Wave A: dual 接受 Bearer 或 X-API-Key（不收紧 machine-only）。
 """
 
 from __future__ import annotations
@@ -21,17 +22,18 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from backend.core.audit import log_audit
-from backend.core.auth.api_key_auth import verify_api_key
+from backend.core.auth.dual_auth import verify_human_or_legacy_key
 from backend.core.auth.models import TenantContext
 from backend.core.capability.invoke import invoke
 from backend.core.capability.models import CapabilitySpec
 from backend.core.capability.registry import get_capability_registry
-from backend.core.errors import ContextGateException
+from backend.core.errors import NexusAIException
 from backend.observability.decorators import observe
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/capabilities", tags=["capabilities"])
+
 
 
 class InvokeRequest(BaseModel):
@@ -205,7 +207,7 @@ async def list_capabilities(
     kind: str | None = Query(None),
     provider: str | None = Query(None),
     include_disabled: bool = Query(False),
-    tenant: TenantContext = Depends(verify_api_key),
+    tenant: TenantContext = Depends(verify_human_or_legacy_key),
 ):
     """能力市场列表 — 按角色权限 + 租户范围过滤可见性。"""
     reg = get_capability_registry()
@@ -298,7 +300,7 @@ async def _sse_event_stream(
     except asyncio.CancelledError:
         logger.info("capability SSE cancelled")
         raise
-    except ContextGateException as e:
+    except NexusAIException as e:
         error_code = getattr(e, "code", "SYS_001")
         yield _sse_data({"type": "error", "code": error_code, "message": str(e)})
         yield "data: [DONE]\n\n"
@@ -332,7 +334,7 @@ async def invoke_capability(
     body: InvokeRequest,
     background_tasks: BackgroundTasks,
     stream: bool | None = Query(None),
-    tenant: TenantContext = Depends(verify_api_key),
+    tenant: TenantContext = Depends(verify_human_or_legacy_key),
 ):
     """
     统一 invoke：长路径 SSE（复用 /chat/streaming 事件格式）+ 短路径 JSON。
@@ -353,12 +355,12 @@ async def invoke_capability(
             text, cost_source, done_meta, upstream = await _invoke_short(
                 cap_id, payload, tenant
             )
-        except ContextGateException:
+        except NexusAIException:
             _schedule_langfuse_flush(background_tasks, short_path=True)
             raise
         except Exception as e:
             _schedule_langfuse_flush(background_tasks, short_path=True)
-            raise ContextGateException("SYS_001", str(e)) from e
+            raise NexusAIException("SYS_001", str(e)) from e
 
         latency = (time.perf_counter() - t0) * 1000
         _schedule_audit(
@@ -385,7 +387,7 @@ async def invoke_capability(
     # 预检失败 → 全局异常处理器 JSON；通过后 SSE span 覆盖整段流
     try:
         _preflight(cap_id, tenant)
-    except ContextGateException:
+    except NexusAIException:
         _schedule_langfuse_flush(background_tasks, short_path=False)
         raise
 

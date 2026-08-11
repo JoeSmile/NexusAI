@@ -29,6 +29,10 @@ def log_audit(
     error_code: str | None = None,
     ip_address: str = "",
     user_agent: str = "",
+    credential_kind: str | None = None,
+    key_id: str | None = None,
+    run_id: str | None = None,
+    node_id: str | None = None,
 ) -> None:
     """发起异步审计写入（不阻塞当前请求）"""
     background_tasks.add_task(
@@ -48,6 +52,10 @@ def log_audit(
             "error_code": error_code,
             "ip_address": ip_address,
             "user_agent": user_agent,
+            "credential_kind": credential_kind,
+            "key_id": key_id,
+            "run_id": run_id,
+            "node_id": node_id,
             "created_at": datetime.utcnow(),
         },
     )
@@ -61,6 +69,14 @@ def write_audit_sync(record: dict) -> None:
 def _write_audit(record: dict) -> None:
     """写入 audit_logs 表（供 BackgroundTasks 或 sync 调用）"""
     try:
+        # Defaults so callers that omit Wave A fields still work
+        record = {
+            "credential_kind": None,
+            "key_id": None,
+            "run_id": None,
+            "node_id": None,
+            **record,
+        }
         session_factory = get_pg_session()
         with session_factory.Session() as session:
             sql = text("""
@@ -68,12 +84,16 @@ def _write_audit(record: dict) -> None:
                     (tenant_id, user_id, action, trace_id,
                      input_text, output_text, model,
                      input_tokens, output_tokens, cost, latency_ms,
-                     error_code, ip_address, user_agent, created_at)
+                     error_code, ip_address, user_agent,
+                     credential_kind, key_id, run_id, node_id,
+                     created_at)
                 VALUES
                     (:tenant_id, :user_id, :action, :trace_id,
                      :input_text, :output_text, :model,
                      :input_tokens, :output_tokens, :cost, :latency_ms,
-                     :error_code, :ip_address, :user_agent, :created_at)
+                     :error_code, :ip_address, :user_agent,
+                     :credential_kind, :key_id, :run_id, :node_id,
+                     :created_at)
             """)
             session.execute(sql, record)
             session.commit()

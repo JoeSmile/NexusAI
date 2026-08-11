@@ -37,6 +37,16 @@ class TestPasswordUtil:
 @pytest.fixture
 def auth_client(monkeypatch):
     """FastAPI + auth router + 桩 session + 内存降级失败计数。"""
+    monkeypatch.setenv("APP_ENV", "dev")
+    monkeypatch.setenv("JWT_SECRET", "test-jwt-secret-wave-a-min-32-bytes!!")
+    monkeypatch.setenv("JWT_TTL_SECONDS", "3600")
+    try:
+        from config import get_settings
+
+        get_settings.cache_clear()
+    except Exception:
+        pass
+
     app = FastAPI()
     app.include_router(router)  # router 已带 /api/auth 前缀
 
@@ -57,6 +67,12 @@ def auth_client(monkeypatch):
     yield client
 
     auth_mod._fail_fallback.clear()
+    try:
+        from config import get_settings
+
+        get_settings.cache_clear()
+    except Exception:
+        pass
 
 
 def _capture_insert_params(session: MagicMock) -> dict[str, dict[str, Any]]:
@@ -76,14 +92,17 @@ def _capture_insert_params(session: MagicMock) -> dict[str, dict[str, Any]]:
 
 
 # ── register ───────────────────────────────────────────────────
-def test_register_success_returns_cg_key_and_bcrypt_hash(auth_client) -> None:
+def test_register_success_returns_jwt_no_api_key(auth_client) -> None:
     r = auth_client.post(
         "/api/auth/register",
         json={"username": "alice", "password": "password123", "role": "user"},
     )
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["api_key"].startswith("cg_")
+    assert "api_key" not in body
+    assert body["token_type"] == "bearer"
+    assert body["access_token"]
+    assert body["expires_in"] > 0
     assert body["role"] == "user"
     assert body["tenant_id"] == "acme"
     assert body["user_id"] == "alice"
@@ -91,10 +110,7 @@ def test_register_success_returns_cg_key_and_bcrypt_hash(auth_client) -> None:
     inserts = _capture_insert_params(auth_client._session)  # type: ignore[attr-defined]
     assert "users" in inserts
     assert inserts["users"]["ph"].startswith("$2")  # bcrypt 密文落库
-    assert "api_keys" in inserts
-    assert inserts["api_keys"]["hash"].startswith(
-        "sha256$"
-    ) or len(inserts["api_keys"]["hash"]) == 64  # sha256 hex
+    assert "api_keys" not in inserts
 
 
 def test_register_duplicate_username_returns_409(auth_client) -> None:
@@ -209,7 +225,7 @@ def test_login_five_failures_triggers_429(auth_client) -> None:
     assert r.json()["detail"]["code"] == "AUTH_016"
 
 
-def test_login_success_returns_new_key(auth_client) -> None:
+def test_login_success_returns_jwt_no_api_key(auth_client) -> None:
     real_hash = pw_mod.hash_password("correct-password")
     auth_client._session.execute.return_value.fetchone.return_value = _stub_user_row(  # type: ignore[attr-defined]
         real_hash
@@ -220,9 +236,13 @@ def test_login_success_returns_new_key(auth_client) -> None:
     )
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["api_key"].startswith("cg_")
+    assert "api_key" not in body
+    assert body["token_type"] == "bearer"
+    assert body["access_token"]
     assert body["role"] == "user"
     assert body["tenant_id"] == "acme"
+    inserts = _capture_insert_params(auth_client._session)  # type: ignore[attr-defined]
+    assert "api_keys" not in inserts
 
 
 def test_login_unknown_user_returns_401(auth_client) -> None:

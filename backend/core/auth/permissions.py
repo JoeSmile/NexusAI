@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import Depends, HTTPException, Request
 
-from backend.core.auth.api_key_auth import verify_api_key
+from backend.core.auth.dual_auth import verify_human_or_legacy_key
 from backend.core.auth.models import TenantContext
 
 
@@ -25,7 +25,7 @@ def require_permission(permission: str):
 
     async def _check(
         request: Request,
-        tenant: TenantContext = Depends(verify_api_key),
+        tenant: TenantContext = Depends(verify_human_or_legacy_key),
     ) -> TenantContext:
         if not tenant.has_permission(permission):
             raise HTTPException(
@@ -42,7 +42,7 @@ def cross_tenant_only():
 
     async def _check(
         request: Request,
-        tenant: TenantContext = Depends(verify_api_key),
+        tenant: TenantContext = Depends(verify_human_or_legacy_key),
     ) -> TenantContext:
         if not tenant.is_cross_tenant:
             raise HTTPException(
@@ -59,7 +59,7 @@ def require_any_permission(permissions: list[str]):
 
     async def _check(
         request: Request,
-        tenant: TenantContext = Depends(verify_api_key),
+        tenant: TenantContext = Depends(verify_human_or_legacy_key),
     ) -> TenantContext:
         for perm in permissions:
             if tenant.has_permission(perm):

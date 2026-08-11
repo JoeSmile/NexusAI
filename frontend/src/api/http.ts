@@ -95,16 +95,24 @@ export async function apiFetch(
   const headers = new Headers(initHeaders)
 
   if (!skipAuth) {
-    const key = useAuthStore.getState().getActiveKey()
-    if (!key) {
+    const token = useAuthStore.getState().getAccessToken()
+    const key = (() => {
+      const { activeRole, keys } = useAuthStore.getState()
+      return keys[activeRole] || ''
+    })()
+    if (!token && !key) {
       redirectToLogin()
       throw new ApiError({
         status: 401,
         code: 'AUTH_001',
-        message: 'missing_api_key',
+        message: 'missing_credentials',
       })
     }
-    headers.set('X-API-Key', key)
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`)
+    } else {
+      headers.set('X-API-Key', key)
+    }
   }
 
   // FormData 须由浏览器自带 multipart boundary;勿强制 JSON Content-Type
@@ -119,7 +127,7 @@ export async function apiFetch(
   const res = await fetch(path, { ...rest, headers })
 
   if (res.status === 401 && !skipAuth) {
-    useAuthStore.getState().clearActiveKey()
+    useAuthStore.getState().clear()
     redirectToLogin()
     let body: unknown
     try {

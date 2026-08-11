@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 export function RoleSwitcher() {
   const activeRole = useAuthStore((s) => s.activeRole)
   const keys = useAuthStore((s) => s.keys)
+  const accessToken = useAuthStore((s) => s.accessToken)
   const switchRole = useAuthStore((s) => s.switchRole)
   const clearForbidden = useForbiddenStore((s) => s.clear)
 
@@ -40,7 +41,7 @@ export function RoleSwitcher() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         {ROLES.map((role) => {
-          const configured = Boolean(keys[role])
+          const configured = Boolean(accessToken) || Boolean(keys[role])
           return (
             <DropdownMenuItem
               key={role}

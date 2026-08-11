@@ -46,7 +46,7 @@ async def verify_api_key(
     session_factory = get_pg_session()
     with session_factory.Session() as session:
         sql = text("""
-            SELECT ak.tenant_id, ak.user_id, ak.role,
+            SELECT ak.id, ak.tenant_id, ak.user_id, ak.role,
                    COALESCE(uap.permissions, '[]'::json) AS extra_permissions
             FROM api_keys ak
             LEFT JOIN user_app_perms uap
@@ -62,12 +62,16 @@ async def verify_api_key(
             detail={"code": "AUTH_001", "message": "invalid_api_key"},
         )
 
+    # L2 scaffold only — do NOT reject by credential_type (L1 / Wave 2B)
     return TenantContext(
         tenant_id=row.tenant_id,
         user_id=row.user_id,
         role=row.role,
         extra_permissions=_parse_permissions(row.extra_permissions),
         is_cross_tenant=row.role in ("super_admin", "auditor"),
+        credential_kind="api_key",
+        key_id=str(row.id) if row.id is not None else None,
+        acting_user_id=row.user_id,
     )
 
 
