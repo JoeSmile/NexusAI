@@ -8,7 +8,7 @@ LOG_DIR="$PROJECT_ROOT/log"
 mkdir -p "$LOG_DIR"
 
 echo "=========================================="
-echo "ContextGate 服务启动"
+echo "NexusAI 服务启动"
 echo "=========================================="
 
 cd "$PROJECT_ROOT"

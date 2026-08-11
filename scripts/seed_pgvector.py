@@ -211,7 +211,7 @@ def seed_llm_keys() -> None:
 
 def main() -> None:
     print("=" * 60)
-    print("  ContextGate — Seed pgvector Data")
+    print("  NexusAI — Seed pgvector Data")
     print("=" * 60)
     seed_data()
     seed_llm_keys()

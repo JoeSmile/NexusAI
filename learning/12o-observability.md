@@ -33,7 +33,7 @@ LangFuse = 单次手术录像；Prometheus = 病房仪表盘；Audit = 病历归
 ```bash
 # 常见：compose 已起 langfuse，宿主机映射 3001
 open http://localhost:3001
-# 本地 init 账号见 config.env.example（如 admin@contextgate.local）
+# 本地 init 账号见 config.env.example（如 admin@nexusai.local）
 # 需 LANGFUSE_PUBLIC_KEY / SECRET_KEY / HOST；LANGFUSE_ENABLED 可关
 ```
 
@@ -82,7 +82,7 @@ UI 里 parentObservationId 为空、呈平铺列表可以是正常语义，看 s
 - observations 的 `latency` 字段可能显示 0 → 用 UI 或直查 langfuse DB：
 
 ```bash
-docker exec contextgate-postgres-1 psql -U contextgate -d langfuse -c \
+docker exec nexusai-postgres-1 psql -U nexusai -d langfuse -c \
   "SELECT name, start_time, end_time, (end_time-start_time) AS dur
    FROM observations WHERE trace_id='<id>';"
 ```
@@ -117,7 +117,7 @@ curl -u "$LANGFUSE_PUBLIC_KEY:$LANGFUSE_SECRET_KEY" \
 ```bash
 # 进程内挂载（app.py）
 curl -s http://localhost:8000/metrics | head
-# scrape：monitoring/prometheus.yml → job contextgate → :8000/metrics
+# scrape：monitoring/prometheus.yml → job nexusai → :8000/metrics
 ```
 
 中间件 `MetricsMiddleware`：每个 HTTP 请求记 latency + `requests_total`（租户来自 `request.state.tenant_context`）。
@@ -126,23 +126,23 @@ curl -s http://localhost:8000/metrics | head
 
 | 指标 | 类型 | Labels | 谁在 incr |
 |------|------|--------|-----------|
-| `contextgate_request_duration_ms` | Histogram | method, endpoint, status | Middleware；Harness.wrap 也 observe |
-| `contextgate_requests_total` | Counter | tenant, status | Middleware |
-| `contextgate_tokens_total` | Counter | tenant, model | `record_consumption`（Harness） |
-| `contextgate_cost_total` | Counter | tenant, model | 同上 |
-| `contextgate_cache_hits_total` | Counter | tenant, cache_type | `cache_check`（exact/template） |
-| `contextgate_cache_misses_total` | Counter | tenant, cache_type | cache miss |
-| `contextgate_guardrails_blocked_total` | Counter | tenant, guard | injection/pii 等 |
-| `contextgate_errors_total` | Counter | tenant, error_code | Harness 超时等 |
+| `nexusai_request_duration_ms` | Histogram | method, endpoint, status | Middleware；Harness.wrap 也 observe |
+| `nexusai_requests_total` | Counter | tenant, status | Middleware |
+| `nexusai_tokens_total` | Counter | tenant, model | `record_consumption`（Harness） |
+| `nexusai_cost_total` | Counter | tenant, model | 同上 |
+| `nexusai_cache_hits_total` | Counter | tenant, cache_type | `cache_check`（exact/template） |
+| `nexusai_cache_misses_total` | Counter | tenant, cache_type | cache miss |
+| `nexusai_guardrails_blocked_total` | Counter | tenant, guard | injection/pii 等 |
+| `nexusai_errors_total` | Counter | tenant, error_code | Harness 超时等 |
 
 ### 2.3 现场怎么「读」
 
 ```bash
 # 1) 命中率粗算（按租户过滤可 grep）
-curl -s localhost:8000/metrics | grep contextgate_cache_
+curl -s localhost:8000/metrics | grep nexusai_cache_
 
 # 2) 成本/token 是否在涨（打几轮 long path 后再 curl）
-curl -s localhost:8000/metrics | grep -E 'contextgate_(cost|tokens)_total'
+curl -s localhost:8000/metrics | grep -E 'nexusai_(cost|tokens)_total'
 
 # 3) 护栏是否误伤
 curl -s localhost:8000/metrics | grep guardrails_blocked
@@ -155,15 +155,15 @@ curl -s localhost:8000/metrics | grep request_duration_ms
 
 ```promql
 # 请求速率
-sum(rate(contextgate_requests_total[5m])) by (tenant, status)
+sum(rate(nexusai_requests_total[5m])) by (tenant, status)
 
 # 缓存命中率（需 hits+misses 都有）
-sum(rate(contextgate_cache_hits_total[5m]))
+sum(rate(nexusai_cache_hits_total[5m]))
 /
-(sum(rate(contextgate_cache_hits_total[5m])) + sum(rate(contextgate_cache_misses_total[5m])))
+(sum(rate(nexusai_cache_hits_total[5m])) + sum(rate(nexusai_cache_misses_total[5m])))
 
 # 租户成本增速
-sum(rate(contextgate_cost_total[5m])) by (tenant, model)
+sum(rate(nexusai_cost_total[5m])) by (tenant, model)
 ```
 
 ### 2.4 与 FE Performance 面板
@@ -175,7 +175,7 @@ sum(rate(contextgate_cost_total[5m])) by (tenant, model)
 
 - Counter **只增不减**；重启进程归零——看 rate 不看裸瞬时值做长期报表  
 - Chat exact 命中差时，`cache_hits` 可能长期接近 0（对应 Task 39）  
-- RAG L1/L2 另有 status/redis 统计，**不完全**等同 `contextgate_cache_*`（管线 exact/template）
+- RAG L1/L2 另有 status/redis 统计，**不完全**等同 `nexusai_cache_*`（管线 exact/template）
 
 ---
 
@@ -272,7 +272,7 @@ sum(rate(contextgate_cost_total[5m])) by (tenant, model)
 
 - [ ] 长路径：LangFuse 有 `llm_generate` + usage  
 - [ ] 短路径：默认可能无 trace；调 `LANGFUSE_SAMPLE_SHORT_PATH=1` 后可见  
-- [ ] `curl /metrics` 能指出至少 4 个 `contextgate_*` 名  
+- [ ] `curl /metrics` 能指出至少 4 个 `nexusai_*` 名  
 - [ ] auditor 能在 Audit 看到对应 `chat` / `rag.ask`  
 - [ ] 能口述「找不到 trace」的两种原因（采样 / 非 chat 入口）
 
@@ -281,7 +281,7 @@ sum(rate(contextgate_cost_total[5m])) by (tenant, model)
 curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \
   -d '{"message":"用三句话解释向量检索","session_id":"obs-1"}' \
   http://localhost:8000/chat | jq '{trace_id,finish_reason,total_cost}'
-curl -s localhost:8000/metrics | grep -E 'contextgate_(cache|cost|tokens|guardrails)_' | head
+curl -s localhost:8000/metrics | grep -E 'nexusai_(cache|cost|tokens|guardrails)_' | head
 open http://localhost:3001
 ```
 

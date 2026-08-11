@@ -123,7 +123,7 @@ permission（默认空 → 当 chat:write）, tenant_id（* / 某租户）
 **Kind：** `model | tool | agent | external_app | workflow | datasource`  
 （后两者 invoke 里仍可能 `unsupported_kind`）
 
-**Provider：** contextgate / dify / coze / ai-platform / self-hosted …
+**Provider：** nexusai / dify / coze / ai-platform / self-hosted …
 
 ### 2.3 Registry 加载顺序
 

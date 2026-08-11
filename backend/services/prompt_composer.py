@@ -29,7 +29,7 @@ class PromptComposer:
     
     def _get_base_prompt(self) -> str:
         """获取基础Prompt"""
-        return "你是ContextGate企业信息平台助手，专业、准确、安全，服务于企业用户的日常工作。"
+        return "你是NexusAI企业信息平台助手，专业、准确、安全，服务于企业用户的日常工作。"
     
     def compose(self, context: str = "") -> str:
         """
@@ -77,7 +77,7 @@ class PromptComposer:
     def _build_role_prompt(self) -> str:
         """构建角色设定Prompt"""
         role = self.config.get("role", "专业助手")
-        role_name = self.config.get("role_name", "ContextGate")
+        role_name = self.config.get("role_name", "NexusAI")
         personality = self.config.get("personality", "严谨专业")
         role_background = self.config.get("role_background", "")
         
@@ -204,7 +204,7 @@ class PromptComposer:
         """获取当前配置摘要"""
         return {
             "role": self.config.get("role", "专业助手"),
-            "role_name": self.config.get("role_name", "ContextGate"),
+            "role_name": self.config.get("role_name", "NexusAI"),
             "tone": self.config.get("tone", "专业"),
             "style": self.config.get("style", "简洁"),
             "use_emoji": self.config.get("use_emoji", False),
@@ -327,7 +327,7 @@ if __name__ == "__main__":
     test_config = {
         "user_id": "test_user",
         "role": "专业助手",
-        "role_name": "ContextGate",
+        "role_name": "NexusAI",
         "personality": "严谨专业",
         "tone": "专业",
         "style": "简洁",

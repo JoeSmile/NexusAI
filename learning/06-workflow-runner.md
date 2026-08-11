@@ -36,6 +36,22 @@ Chat DAG（[05b](05b-pipeline-nodes.md)）**并行存在**，只服务人侧模�
 
 ---
 
+## 组合（多 Workflow / 多 Agent · 目标态）
+
+> 设计全文：[`docs/superpowers/plans/2026-08-05-pilot-b-composition-runtime.md`](../docs/superpowers/plans/2026-08-05-pilot-b-composition-runtime.md)（D14/D15）。实现 Wave 8。
+
+| 关系 | 形态 |
+|------|------|
+| 并列 | 多个根 run（每用户 running 根 ≤2） |
+| 嵌套 | `kind=workflow` → 子 run + `parent_run_id`；父节点 `waiting_child` |
+| Agent | `kind=agent` → **同 run** 内 Hub 链；**不起**子 run |
+| 通信 | 同 run：`edges` + `${output…}`；父子：input_bindings + 子终态汇总 |
+| 防爆 | 环检测 + `composition_depth≤3`；子不占额外并发槽 |
+
+**现状：** Hub 有 agent 链雏形；Runner/嵌套未建——面试区分目标/现状。
+
+---
+
 ## 最小能力（试点 Must）
 
 | 能力 | 说明 |
@@ -44,7 +60,7 @@ Chat DAG（[05b](05b-pipeline-nodes.md)）**并行存在**，只服务人侧模�
 | Run 状态机 | running / succeeded / failed / **suspended** |
 | 历史 | 按 OrgScope 列表；节点日志可见 |
 | 二次鉴权 | 每节点相对 `acting_user`；delegation 的 `caps` 只是上限 |
-| 挂起等批 | 可申请且过 **S1–S4** → suspended → 业务角色/admin 批 → resume |
+| 挂起等批 | 可申请且过 **S1–S4** → suspended → 业务角色/admin 批 → resume；请假等 HITL 见 [human-gate 设计](../docs/superpowers/designs/2026-08-08-human-gate-hitl.md) |
 | 护栏 | LLM/外发必须过治理入口（Harness/guardrails），禁裸 SDK（T5） |
 | Coze A | 导入→校验→映射本租户能力；不支持则整单拒或标红不可发布（写死一种） |
 

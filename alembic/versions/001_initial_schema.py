@@ -1,4 +1,4 @@
-"""Initial schema — ContextGate 全量表结构
+"""Initial schema — NexusAI 全量表结构
 
 Revision ID: 001
 Revises: 

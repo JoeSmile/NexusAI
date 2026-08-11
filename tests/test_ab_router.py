@@ -11,7 +11,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from backend.core.auth.api_key_auth import verify_api_key
+from backend.core.auth.dual_auth import verify_human_or_legacy_key
 from backend.core.auth.models import TenantContext
 from backend.routers import ab as ab_mod
 from backend.routers.ab import router
@@ -25,7 +25,7 @@ def admin_client(monkeypatch):
     async def _admin() -> TenantContext:
         return TenantContext("acme", "admin", "super_admin", [], True)
 
-    app.dependency_overrides[verify_api_key] = _admin
+    app.dependency_overrides[verify_human_or_legacy_key] = _admin
 
     # 默认空会话桩，具体用例可再改 monkeypatch
     session = MagicMock()

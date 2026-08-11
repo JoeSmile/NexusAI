@@ -101,7 +101,7 @@ def test_embed_text_calls_api_with_dimensions(monkeypatch):
 
     monkeypatch.setattr("openai.OpenAI", _Client)
 
-    vec = emb.embed_text("你好 ContextGate")
+    vec = emb.embed_text("你好 NexusAI")
     assert created["model"] == "text-embedding-v3"
     assert created["dimensions"] == 768
     assert client_kwargs.get("api_key") == "sk-test"

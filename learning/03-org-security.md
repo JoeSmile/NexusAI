@@ -1,7 +1,7 @@
 # 03 — 组织 B 与安全红线
 
-> 更新：2026-08-05。设计：[pilot-b §11](../docs/superpowers/specs/2026-08-05-enterprise-pilot-b-gaps-design.md) · 安全：[§10 S1–S4](../docs/superpowers/specs/2026-08-05-enterprise-pilot-b-gaps-design.md)。  
-> **代码现状：** 仅四平台角色 + `user_app_perms`；**无**部门树 / 业务角色 / `OrgScope`。  
+> 更新：2026-08-05。设计：[pilot-b §11](../docs/superpowers/specs/2026-08-05-enterprise-pilot-b-gaps-design.md) · 安全：[§10 S1–S4](../docs/superpowers/specs/2026-08-05-enterprise-pilot-b-gaps-design.md)。
+> **代码现状：** 仅四平台角色 + `user_app_perms`；**无**部门树 / 业务角色 / `OrgScope`。
 > 原则：**质量与安全优先于工期**——组织按 B 档设计，不先做扁平凑合。
 
 ---
@@ -19,7 +19,7 @@
 | `platform_role` | `/app` vs `/admin`、治理权限包 | `user` / `tenant_admin` / `auditor` / `super_admin` |
 | `business_role` | 部门内谁能批、数据范围 | `member` / `dept_manager` / `dept_operator` … |
 
-例：`platform_role=user` + `dept_manager@财务部` → 默认工作台，可批本部门挂起。  
+例：`platform_role=user` + `dept_manager@财务部` → 默认工作台，可批本部门挂起。
 **禁止**用「人人升 tenant_admin」模拟经理。
 
 现状四角色深挖 → [04a](04a-auth-rbac.md)。
@@ -36,7 +36,7 @@ tenant
 user（display_name，employee_no，…）
 ```
 
-- 兼职多部门；**主部门**用于顶栏与默认审批路由。  
+- 兼职多部门；**主部门**用于顶栏与默认审批路由。
 - 列表 / Runner / 出站：**只**经 `OrgScope`；禁止散落 `department_id ==`，禁止客户端自报部门扩权。
 
 ---
@@ -53,6 +53,7 @@ user（display_name，employee_no，…）
 ```
 
 挂起路由：本部门业务角色（如 `dept_manager`）→ 找不到则升级 `tenant_admin` 并审计原因。
+请假样板（全员可提、领导可批）与缺权挂起 / `human_gate` 分界 → [human-gate HITL](../docs/superpowers/designs/2026-08-08-human-gate-hitl.md)。
 
 ---
 
@@ -66,13 +67,16 @@ user（display_name，employee_no，…）
 | **S4** | 票不绕人 | delegation / machine key 不能绕过 acting_user；浏览器无连接器密钥/delegation |
 
 **红线未满足：不上挂起等批，无权节点直接失败。**
-
+S1 对抗的是恶意开发/运维（禁止篡改身份）；
+S2 对抗的是权限泛滥（收缩提权路径）；
+S3 对抗的是系统 BUG（即使代码写错查不到租户，也不返回数据）；
+S4 对抗的是前端渗透（即使 XSS/CSRF 成功，也拿不到持久化令牌）
 ---
 
 ## 面试追问
 
-1. `user` 和「财务经理」是一回事吗？→ 不是；平台角色 vs 业务角色。  
-2. 子部门数据上级能否看？→ 由 `OrgScope`/显式授权决定，默认安全侧拒绝要能说清。  
-3. 有 delegation 就能调 OA？→ 否；二次鉴权 + OrgScope + S4。  
+1. `user` 和「财务经理」是一回事吗？→ 不是；平台角色 vs 业务角色。
+2. 子部门数据上级能否看？→ 由 `OrgScope`/显式授权决定，默认安全侧拒绝要能说清。
+3. 有 delegation 就能调 OA？→ 否；二次鉴权 + OrgScope + S4。
 
 UX 里组织怎么露 → [08](08-ux-shells.md)。Runner 里怎么挂起 → [06](06-workflow-runner.md)。

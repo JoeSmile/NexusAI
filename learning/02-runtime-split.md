@@ -36,6 +36,10 @@
 
 **「确定动作不进 Chat」** = 执行不进 Chat **管线**；不是禁止以后在 Chat **UI** 里点卡片——后期 Chat 办公桌面点卡仍调 Runner（见 [08](08-ux-shells.md)）。
 
+**Plan 也不在 Chat：** 管线无任务分解/tool-loop；复杂诉求的 plan = **Plan→IR**（Wave 3b），产出草稿节点序列后人确认再跑 Runner。Chat 最多给 handoff 卡。详见 [plan-process](../docs/superpowers/plans/2026-08-05-pilot-b-plan-process.md)。
+
+**过渡债（Runner/3b 前）：** chat 里复杂问题 = 单次 LLM，无工具保证——汇报时主动说。
+
 ---
 
 ## 目标白板

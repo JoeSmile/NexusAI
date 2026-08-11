@@ -7,7 +7,7 @@
 ## 准备
 
 ```bash
-cd ~/Desktop/github/contextgate
+cd ~/Desktop/github/nexusai
 KEY=<你的 user key>            # make seed 或 admin 创建
 ```
 

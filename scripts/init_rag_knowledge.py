@@ -21,7 +21,7 @@ from backend.modules.rag import EnterpriseKnowledgeLoader, KnowledgeBaseManager
 def main():
     """初始化知识库"""
     print("\n" + "=" * 70)
-    print(" ContextGate - RAG知识库初始化")
+    print(" NexusAI - RAG知识库初始化")
     print("=" * 70 + "\n")
     
     try:

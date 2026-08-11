@@ -27,13 +27,16 @@ _REGISTRY: CapabilityRegistry | None = None
 
 
 def _provider_from_str(raw: str) -> CapabilityProvider:
+    # legacy provider id from pre-rebrand DB / seeds
+    if raw == "contextgate":
+        return CapabilityProvider.NEXUSAI
     try:
         return CapabilityProvider(raw)
     except ValueError:
-        # model_registry 可能是 deepseek/openai/mock 等 → 归到 contextgate 或 self-hosted
+        # model_registry 可能是 deepseek/openai/mock 等 → 归到 nexusai 或 self-hosted
         if raw in ("vllm", "local", "mock"):
             return CapabilityProvider.SELF_HOSTED
-        return CapabilityProvider.CONTEXTGATE
+        return CapabilityProvider.NEXUSAI
 
 
 def _status_from_enabled(enabled: bool) -> CapabilityStatus:
@@ -46,7 +49,7 @@ def model_spec_to_capability(model: Any) -> CapabilitySpec:
         id=f"model:{model.name}",
         name=model.name,
         kind=CapabilityKind.MODEL,
-        provider=_provider_from_str(str(getattr(model, "provider", "contextgate"))),
+        provider=_provider_from_str(str(getattr(model, "provider", "nexusai"))),
         spec={
             "base_url": getattr(model, "base_url", "") or "",
             "api_key_ref": getattr(model, "api_key_ref", "") or "",
@@ -149,7 +152,7 @@ class CapabilityRegistry:
                     name=str(item.get("name") or item["id"]),
                     kind=CapabilityKind(str(item["kind"])),
                     provider=CapabilityProvider(
-                        str(item.get("provider", "contextgate"))
+                        str(item.get("provider", "nexusai"))
                     ),
                     spec=nested,
                     status=CapabilityStatus(str(item.get("status", "enabled"))),

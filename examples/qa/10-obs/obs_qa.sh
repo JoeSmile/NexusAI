@@ -5,7 +5,7 @@ set -u
 
 BASE="${QA_BASE:-localhost:8000}"
 KEY="${QA_KEY:-${RAG_QA_KEY:-}}"
-REDIS="${QA_REDIS:-contextgate-redis-1}"
+REDIS="${QA_REDIS:-nexusai-redis-1}"
 LOG="data/qa/obs_qa_$(date +%Y%m%d_%H%M%S).log"
 mkdir -p data/qa
 
@@ -20,7 +20,7 @@ say "=== 可观测 QA $(date '+%F %T') ==="
 
 # 10.3 Prometheus(/metrics 307 -> /metrics/)
 C=$(curl -sL -o /tmp/obs_body.$$ -w "%{http_code}" "$BASE/metrics")
-if [ "$C" = 200 ] && grep -q "contextgate_cache_hits_total" /tmp/obs_body.$$; then
+if [ "$C" = 200 ] && grep -q "nexusai_cache_hits_total" /tmp/obs_body.$$; then
   ok "10.3 /metrics/ 指标含缓存计数器"
 else
   bad "10.3 /metrics http=$C"

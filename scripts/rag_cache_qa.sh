@@ -117,10 +117,10 @@ fi
 # ── 3. PII 跳过缓存 ──
 say ""
 say "[3] PII: 含身份证号的问题不落 L1"
-N0=$(docker exec contextgate-redis-1 redis-cli --scan --pattern 'rag:a:*' 2>/dev/null | wc -l | tr -d ' ')
+N0=$(docker exec nexusai-redis-1 redis-cli --scan --pattern 'rag:a:*' 2>/dev/null | wc -l | tr -d ' ')
 CODE=$(ask "$PII_Q")
 CH=$(dget /tmp/rq_body.$$ cache_hit)
-N1=$(docker exec contextgate-redis-1 redis-cli --scan --pattern 'rag:a:*' 2>/dev/null | wc -l | tr -d ' ')
+N1=$(docker exec nexusai-redis-1 redis-cli --scan --pattern 'rag:a:*' 2>/dev/null | wc -l | tr -d ' ')
 if [ "$N1" = "$N0" ]; then
   ok "L1 键数不变($N0->$N1),PII 未落缓存"
 else
@@ -181,7 +181,7 @@ fi
 # ── 7. redis 键分布 ──
 say ""
 say "[7] redis 键分布(rag:* )"
-if docker exec contextgate-redis-1 redis-cli --scan --pattern 'rag:*' 2>/dev/null | sort | head -20 | tee -a "$LOG" | grep -q .; then
+if docker exec nexusai-redis-1 redis-cli --scan --pattern 'rag:*' 2>/dev/null | sort | head -20 | tee -a "$LOG" | grep -q .; then
   ok "redis 键可见(上方列表)"
 else
   bad "redis 中无 rag:* 键"
@@ -191,11 +191,11 @@ fi
 if [ "${RAG_QA_DEGRADE:-0}" = "1" ]; then
   say ""
   say "[8] 降级: 停 redis -> ask 应照常(哈希/缓存穿透) -> 恢复"
-  docker stop contextgate-redis-1 >/dev/null 2>&1
+  docker stop nexusai-redis-1 >/dev/null 2>&1
   sleep 1
   CODE=$(ask "降级测试问题")
   if [ "$CODE" = "200" ]; then ok "redis 停后 ask 仍 200(静默降级)"; else bad "redis 停后 ask http=$CODE"; fi
-  docker start contextgate-redis-1 >/dev/null 2>&1
+  docker start nexusai-redis-1 >/dev/null 2>&1
   sleep 2
   say "  redis 已恢复"
 fi

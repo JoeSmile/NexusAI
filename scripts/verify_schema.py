@@ -23,7 +23,7 @@ for table in ModelsBase.metadata.sorted_tables:
         continue
     table.to_metadata(merged)
 
-url = os.getenv("DATABASE_URL", "postgresql://contextgate:contextgate_local@localhost:5432/contextgate")
+url = os.getenv("DATABASE_URL", "postgresql://nexusai:nexusai_local@localhost:5432/nexusai")
 engine = create_engine(url)
 inspector = inspect(engine)
 

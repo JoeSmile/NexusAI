@@ -22,7 +22,7 @@ from backend.database import DatabaseManager, create_tables
 from backend.models import ChatResponse
 from backend.modules.llm.harness import resolve_llm_settings, try_create_chat_openai
 
-# 导入ContextGatePrompt配置
+# 导入NexusAIPrompt配置
 from backend.system_prompt import (
     SYSTEM_PROMPT,
     build_full_prompt,
@@ -74,7 +74,7 @@ class ChatEngine:
                     print("警告: LangChain ChatOpenAI 不可用，将使用传统方式")
                     self.chain = None
                 else:
-                    # 2. 定义 AI 人格与行为准则（使用完整的ContextGatePrompt）
+                    # 2. 定义 AI 人格与行为准则（使用完整的NexusAIPrompt）
                     self.template = f"""{SYSTEM_PROMPT}
 
 {{long_term_memory}}
@@ -83,7 +83,7 @@ class ChatEngine:
 {{history}}
 
 用户：{{input}}
-ContextGate："""
+NexusAI："""
 
                     # 3. 创建提示模板和链（LCEL表达式）
                     self.prompt = ChatPromptTemplate.from_template(self.template)
@@ -122,7 +122,7 @@ ContextGate："""
             recent_messages = db.get_session_messages(session_id, limit=10)
             history_text = ""
             for msg in reversed(recent_messages[-5:]):  # 最近5条消息
-                history_text += "{}: {}\n".format('用户' if msg.role == 'user' else 'ContextGate', msg.content)
+                history_text += "{}: {}\n".format('用户' if msg.role == 'user' else 'NexusAI', msg.content)
         
         # 从向量数据库检索相似对话（长期记忆）
         long_term_context = ""
@@ -162,7 +162,7 @@ ContextGate："""
     
     def _call_api_traditional(self, user_input, history_text, long_term_context=""):
         """传统HTTP请求方式调用API（兼容旧环境）"""
-        # 使用完整的ContextGatePrompt构建提示词
+        # 使用完整的NexusAIPrompt构建提示词
         full_prompt = build_full_prompt(
             user_input=user_input,
             history_text=history_text,

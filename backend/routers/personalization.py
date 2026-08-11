@@ -123,7 +123,7 @@ async def get_user_config(
                 "config": {
                     "user_id": user_id,
                     "role": "专业助手",
-                    "role_name": "ContextGate",
+                    "role_name": "NexusAI",
                     "personality": "专业严谨",
                     "tone": "温和",
                     "style": "简洁",
@@ -241,7 +241,7 @@ async def create_or_update_config(
             config_data = {
                 "user_id": user_id,
                 "role": update_data.role or "专业助手",
-                "role_name": update_data.role_name or "ContextGate",
+                "role_name": update_data.role_name or "NexusAI",
                 "role_background": update_data.role_background,
                 "personality": update_data.personality or "专业严谨",
                 "tone": update_data.tone or "温和",

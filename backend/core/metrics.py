@@ -10,55 +10,55 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 # ── 请求指标 ──
 request_duration = Histogram(
-    "contextgate_request_duration_ms",
+    "nexusai_request_duration_ms",
     "Request latency in milliseconds",
     labelnames=["method", "endpoint", "status"],
     buckets=[5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000],
 )
 
 requests_total = Counter(
-    "contextgate_requests_total",
+    "nexusai_requests_total",
     "Total requests",
     labelnames=["tenant", "status"],
 )
 
 # ── Token 指标 ──
 tokens_total = Counter(
-    "contextgate_tokens_total",
+    "nexusai_tokens_total",
     "Total tokens consumed",
     labelnames=["tenant", "model"],
 )
 
 # ── 缓存指标 ──
 cache_hits = Counter(
-    "contextgate_cache_hits_total",
+    "nexusai_cache_hits_total",
     "Total cache hits",
     labelnames=["tenant", "cache_type"],
 )
 
 cache_misses = Counter(
-    "contextgate_cache_misses_total",
+    "nexusai_cache_misses_total",
     "Total cache misses",
     labelnames=["tenant", "cache_type"],
 )
 
 # ── 护栏指标 ──
 guardrails_blocked = Counter(
-    "contextgate_guardrails_blocked_total",
+    "nexusai_guardrails_blocked_total",
     "Total blocked by guardrails",
     labelnames=["tenant", "guard"],
 )
 
 # ── 成本指标 ──
 cost_total = Counter(
-    "contextgate_cost_total",
+    "nexusai_cost_total",
     "Total cost in USD",
     labelnames=["tenant", "model"],
 )
 
 # ── 错误指标 ──
 errors_total = Counter(
-    "contextgate_errors_total",
+    "nexusai_errors_total",
     "Total errors by code",
     labelnames=["tenant", "error_code"],
 )

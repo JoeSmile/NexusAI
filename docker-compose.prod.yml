@@ -5,29 +5,28 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./backend/database/init_pgvector.sql:/docker-entrypoint-initdb.d/init_pgvector.sql
     environment:
-      POSTGRES_DB: contextgate
-      POSTGRES_USER: contextgate
+      POSTGRES_DB: nexusai
+      POSTGRES_USER: nexusai
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U contextgate -d contextgate"]
+      test: ["CMD-SHELL", "pg_isready -U nexusai -d nexusai"]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: always
 
-  contextgate:
+  nexusai:
     build: .
     ports: ["8000:8000"]
     env_file: config.env
     environment:
-      DATABASE_URL: postgresql://contextgate:${DB_PASSWORD}@postgres:5432/contextgate
-      LANGFUSE_HOST: http://langfuse-web:3000
-      LANGFUSE_BASE_URL: http://langfuse-web:3000
+      DATABASE_URL: postgresql://nexusai:${DB_PASSWORD}@postgres:5432/nexusai
+      LANGFUSE_ENABLED: ${LANGFUSE_ENABLED:-false}
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-http://langfuse-web:3000}
+      LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-http://langfuse-web:3000}
     depends_on:
       postgres:
         condition: service_healthy
-      langfuse-web:
-        condition: service_started
     restart: always
     healthcheck:
       test:
@@ -41,8 +40,10 @@ services:
       timeout: 10s
       retries: 3
 
-  # Langfuse OSS v4 — 与业务栈隔离；扩展见 design §5
+  # Langfuse OSS v4 — 默认不启动（profiles: langfuse）
+  # 开启：COMPOSE_PROFILES=langfuse ... 且 LANGFUSE_ENABLED=true
   langfuse-postgres:
+    profiles: ["langfuse"]
     image: docker.io/postgres:17
     environment:
       POSTGRES_USER: langfuse
@@ -60,6 +61,7 @@ services:
     restart: always
 
   langfuse-redis:
+    profiles: ["langfuse"]
     image: docker.io/redis:7
     command: >
       --requirepass ${LANGFUSE_REDIS_AUTH:?set LANGFUSE_REDIS_AUTH}
@@ -74,6 +76,7 @@ services:
     restart: always
 
   langfuse-clickhouse:
+    profiles: ["langfuse"]
     image: docker.io/clickhouse/clickhouse-server:25.12
     user: "101:101"
     environment:
@@ -92,6 +95,7 @@ services:
     restart: always
 
   langfuse-minio:
+    profiles: ["langfuse"]
     image: cgr.dev/chainguard/minio
     entrypoint: sh
     command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
@@ -109,6 +113,7 @@ services:
     restart: always
 
   langfuse-worker:
+    profiles: ["langfuse"]
     image: docker.io/langfuse/langfuse-worker:4
     depends_on:
       langfuse-postgres:
@@ -151,6 +156,7 @@ services:
     restart: always
 
   langfuse-web:
+    profiles: ["langfuse"]
     image: docker.io/langfuse/langfuse:4
     ports: ["3001:3000"]
     depends_on:
@@ -167,13 +173,13 @@ services:
     environment:
       <<: *langfuse-env
       LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: ${LANGFUSE_S3_MEDIA_PUBLIC_ENDPOINT:-http://localhost:9090}
-      LANGFUSE_INIT_ORG_ID: ${LANGFUSE_INIT_ORG_ID:-contextgate-org}
-      LANGFUSE_INIT_ORG_NAME: ${LANGFUSE_INIT_ORG_NAME:-ContextGate}
-      LANGFUSE_INIT_PROJECT_ID: ${LANGFUSE_INIT_PROJECT_ID:-contextgate-project}
-      LANGFUSE_INIT_PROJECT_NAME: ${LANGFUSE_INIT_PROJECT_NAME:-ContextGate}
+      LANGFUSE_INIT_ORG_ID: ${LANGFUSE_INIT_ORG_ID:-nexusai-org}
+      LANGFUSE_INIT_ORG_NAME: ${LANGFUSE_INIT_ORG_NAME:-NexusAI}
+      LANGFUSE_INIT_PROJECT_ID: ${LANGFUSE_INIT_PROJECT_ID:-nexusai-project}
+      LANGFUSE_INIT_PROJECT_NAME: ${LANGFUSE_INIT_PROJECT_NAME:-NexusAI}
       LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
       LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
-      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-admin@contextgate.local}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-admin@nexusai.local}
       LANGFUSE_INIT_USER_NAME: ${LANGFUSE_INIT_USER_NAME:-admin}
       LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD}
     restart: always
@@ -185,8 +191,7 @@ services:
       - ./deploy/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./deploy/ssl:/etc/nginx/ssl:ro
     depends_on:
-      - contextgate
-      - langfuse-web
+      - nexusai
     restart: always
 
 volumes:

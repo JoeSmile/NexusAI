@@ -238,7 +238,7 @@ class IntentService:
         
         # 构建prompt
         base_prompt = f"""
-你是"ContextGate"企业信息平台助手。请根据用户的意图，给予专业、准确的回应。
+你是"NexusAI"企业信息平台助手。请根据用户的意图，给予专业、准确的回应。
 
 【用户状态分析】
 - 主要意图：{intent}

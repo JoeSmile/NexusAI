@@ -31,7 +31,7 @@ database_url = os.getenv(
     getattr(
         Config,
         "DATABASE_URL",
-        "postgresql://contextgate:***@localhost:5432/contextgate",
+        "postgresql://nexusai:nexusai_local@localhost:5432/nexusai",
     ),
 )
 config.set_main_option("sqlalchemy.url", database_url)

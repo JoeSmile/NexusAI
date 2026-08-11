@@ -151,7 +151,7 @@ X-API-Key → TenantContext → chat 或 capability invoke 或 /api/rag/ask
 
 ### 30 秒定位
 
-> NexusAI / ContextGate 是企业 LLM **治理网关**：人侧 JWT 可走 Chat 或点运行 Workflow；机器 API Key **直连 Workflow 执行**（不进 Chat 管线）。编排可自研 / Coze 导入 / 后期画布，执行同一套 Runner + 二次鉴权（挂起等批）。短路径 skill 省成本；全程审计 + LangFuse。
+> NexusAI / NexusAI 是企业 LLM **治理网关**：人侧 JWT 可走 Chat 或点运行 Workflow；机器 API Key **直连 Workflow 执行**（不进 Chat 管线）。编排可自研 / Coze 导入 / 后期画布，执行同一套 Runner + 二次鉴权（挂起等批）。短路径 skill 省成本；全程审计 + LangFuse。
 
 ### 掌握优先级（ROI）
 

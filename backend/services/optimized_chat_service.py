@@ -234,7 +234,7 @@ class OptimizedChatService:
                          memory: dict, safety: dict) -> str:
         """构造Prompt"""
         prompt_parts = [
-            "你是ContextGate企业信息平台助手。",
+            "你是NexusAI企业信息平台助手。",
         ]
         
         if memory.get('relevant_memories'):

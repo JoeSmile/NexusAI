@@ -26,10 +26,10 @@ def test_get_llm_client_mock_invoke_without_api_key(mock_provider):
 
     client = get_llm_client(model="test-model")
     assert client is not None
-    result = client.invoke("你好，ContextGate")
+    result = client.invoke("你好，NexusAI")
     text = getattr(result, "content", None) or str(result)
     assert "mock" in text.lower() or "已收到" in text
-    assert "你好" in text or "ContextGate" in text
+    assert "你好" in text or "NexusAI" in text
 
 
 def test_get_llm_client_mock_is_deterministic(mock_provider):
@@ -125,7 +125,7 @@ def test_evaluation_engine_works_without_api_key(mock_provider):
     engine = EvaluationEngine()
     result = engine.evaluate_response(
         user_message="你好",
-        bot_response="你好，我是 ContextGate",
+        bot_response="你好，我是 NexusAI",
     )
     assert "未配置API_KEY" not in str(result.get("error", ""))
     assert result.get("accuracy_score", 0) >= 1
@@ -150,7 +150,7 @@ def test_rag_service_llm_available_without_api_key(mock_provider, monkeypatch):
 
     svc = RAGService(kb_manager=_FakeKB())
     assert svc.llm is not None
-    out = svc.ask("什么是 ContextGate？", search_k=1)
+    out = svc.ask("什么是 NexusAI？", search_k=1)
     assert out.get("answer")
     assert "LLM_API_KEY" not in str(out.get("answer", ""))
 

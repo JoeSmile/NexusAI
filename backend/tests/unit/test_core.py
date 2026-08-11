@@ -11,7 +11,7 @@ import pytest
 from backend.core.config import Config, Environment, get_config
 from backend.core.exceptions import (
     ConfigurationError,
-    ContextGateException,
+    NexusAIException,
     DatabaseError,
     ValidationError,
 )
@@ -70,7 +70,7 @@ class TestExceptions:
     
     def test_context_gate_exception(self):
         """测试基础异常"""
-        exc = ContextGateException("测试错误", "TEST_ERROR")
+        exc = NexusAIException("测试错误", "TEST_ERROR")
         assert exc.message == "测试错误"
         assert exc.error_code == "TEST_ERROR"
         
@@ -91,13 +91,13 @@ class TestExceptions:
     def test_configuration_error(self):
         """测试配置异常"""
         exc = ConfigurationError("配置错误")
-        assert isinstance(exc, ContextGateException)
+        assert isinstance(exc, NexusAIException)
         assert exc.message == "配置错误"
     
     def test_database_error(self):
         """测试数据库异常"""
         exc = DatabaseError("数据库连接失败")
-        assert isinstance(exc, ContextGateException)
+        assert isinstance(exc, NexusAIException)
         assert exc.message == "数据库连接失败"
 
 

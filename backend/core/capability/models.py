@@ -17,7 +17,7 @@ class CapabilityKind(StrEnum):
 
 
 class CapabilityProvider(StrEnum):
-    CONTEXTGATE = "contextgate"
+    NEXUSAI = "nexusai"
     DIFY = "dify"
     COZE = "coze"
     AI_PLATFORM = "ai-platform"

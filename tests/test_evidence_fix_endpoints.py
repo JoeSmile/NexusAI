@@ -17,13 +17,13 @@ from backend.services.agent_service import get_agent_service
 
 @pytest.fixture
 def perf_client(monkeypatch):
-    from backend.core.auth.api_key_auth import verify_api_key
+    from backend.core.auth.dual_auth import verify_human_or_legacy_key
     from backend.core.auth.models import TenantContext
 
     app = FastAPI()
     app.include_router(perf_router)
     # 路由现要求 chat:write；清缓存另需 tenant_admin
-    app.dependency_overrides[verify_api_key] = lambda: TenantContext(
+    app.dependency_overrides[verify_human_or_legacy_key] = lambda: TenantContext(
         "t1", "admin1", "tenant_admin", [], False
     )
     client = TestClient(app)
@@ -62,10 +62,10 @@ def test_agent_memory_awaits_summary():
     app = FastAPI()
     app.include_router(agent_router)
     # Task 29 QA: agent 端点现要求 chat:write 认证——注入认证上下文
-    from backend.core.auth.api_key_auth import verify_api_key
+    from backend.core.auth.dual_auth import verify_human_or_legacy_key
     from backend.core.auth.models import TenantContext
 
-    app.dependency_overrides[verify_api_key] = lambda: TenantContext(
+    app.dependency_overrides[verify_human_or_legacy_key] = lambda: TenantContext(
         "t1", "user1", "user", [], False
     )
 
@@ -98,10 +98,10 @@ def test_rag_init_sample_uses_add_documents(monkeypatch):
     app = FastAPI()
     app.include_router(rag_mod.router)
     # Task 29: RAG 端点要求 chat:write 认证——注入认证上下文(用户角色含 chat:*)
-    from backend.core.auth.api_key_auth import verify_api_key
+    from backend.core.auth.dual_auth import verify_human_or_legacy_key
     from backend.core.auth.models import TenantContext
 
-    app.dependency_overrides[verify_api_key] = lambda: TenantContext(
+    app.dependency_overrides[verify_human_or_legacy_key] = lambda: TenantContext(
         "t1", "user1", "user", [], False
     )
 

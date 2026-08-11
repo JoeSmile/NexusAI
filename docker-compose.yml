@@ -1,6 +1,6 @@
 services:
   # 后端API服务
-  contextgate:
+  nexusai:
     build:
       context: .
       dockerfile: Dockerfile
@@ -9,7 +9,7 @@ services:
     environment:
       - ENVIRONMENT=production
       - DEBUG=false
-      - DATABASE_URL=postgresql://contextgate:contextgate_password@postgres:5432/contextgate
+      - DATABASE_URL=postgresql://nexusai:nexusai_password@postgres:5432/nexusai
       - DB_TYPE=postgresql
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -26,28 +26,28 @@ services:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - contextgate_network
+      - nexusai_network
 
   # PostgreSQL + pgvector
   postgres:
     image: pgvector/pgvector:pg16
     environment:
-      POSTGRES_DB: contextgate
-      POSTGRES_USER: contextgate
-      POSTGRES_PASSWORD: contextgate_password
+      POSTGRES_DB: nexusai
+      POSTGRES_USER: nexusai
+      POSTGRES_PASSWORD: nexusai_password
     volumes:
       - pgvector_data:/var/lib/postgresql/data
       - ./backend/database/init_pgvector.sql:/docker-entrypoint-initdb.d/init_pgvector.sql
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U contextgate -d contextgate"]
+      test: ["CMD-SHELL", "pg_isready -U nexusai -d nexusai"]
       interval: 5s
       timeout: 5s
       retries: 10
     restart: unless-stopped
     networks:
-      - contextgate_network
+      - nexusai_network
 
   # Redis缓存
   redis:
@@ -62,7 +62,7 @@ services:
       retries: 5
     restart: unless-stopped
     networks:
-      - contextgate_network
+      - nexusai_network
 
   # Nginx反向代理
   nginx:
@@ -74,10 +74,10 @@ services:
       - ./deploy/nginx.conf:/etc/nginx/nginx.conf
       - ./deploy/ssl:/etc/nginx/ssl
     depends_on:
-      - contextgate
+      - nexusai
     restart: unless-stopped
     networks:
-      - contextgate_network
+      - nexusai_network
 
   # 监控服务
   prometheus:
@@ -96,7 +96,7 @@ services:
       - '--web.enable-lifecycle'
     restart: unless-stopped
     networks:
-      - contextgate_network
+      - nexusai_network
 
   grafana:
     image: grafana/grafana:latest
@@ -110,7 +110,7 @@ services:
       - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
     restart: unless-stopped
     networks:
-      - contextgate_network
+      - nexusai_network
 
   # --- 日志聚合（V2.0）: ES/kibana 空壳已停用；backend 无 ES 引用。
   # 需要时取消下列注释并接 logging_config / grafana ES 数据源。
@@ -126,7 +126,7 @@ services:
   #     - "9200:9200"
   #   restart: unless-stopped
   #   networks:
-  #     - contextgate_network
+  #     - nexusai_network
   #
   # kibana:
   #   image: docker.elastic.co/kibana/kibana:8.8.0
@@ -138,7 +138,7 @@ services:
   #     - elasticsearch
   #   restart: unless-stopped
   #   networks:
-  #     - contextgate_network
+  #     - nexusai_network
 
 volumes:
   pgvector_data:
@@ -148,5 +148,5 @@ volumes:
   # elasticsearch_data:  # 与上方 ES 服务一并恢复
 
 networks:
-  contextgate_network:
+  nexusai_network:
     driver: bridge

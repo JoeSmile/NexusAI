@@ -7,8 +7,8 @@
 from typing import Any
 
 
-class ContextGateException(Exception):
-    """ContextGate机器人基础异常类"""
+class NexusAIException(Exception):
+    """NexusAI机器人基础异常类"""
     
     def __init__(
         self,
@@ -30,19 +30,19 @@ class ContextGateException(Exception):
         }
 
 
-class ConfigurationError(ContextGateException):
+class ConfigurationError(NexusAIException):
     """配置错误"""
 
 
-class DatabaseError(ContextGateException):
+class DatabaseError(NexusAIException):
     """数据库错误"""
 
 
-class RAGError(ContextGateException):
+class RAGError(NexusAIException):
     """RAG知识库错误"""
 
 
-class ValidationError(ContextGateException):
+class ValidationError(NexusAIException):
     """验证错误"""
     
     def __init__(
@@ -66,15 +66,15 @@ class ValidationError(ContextGateException):
         return result
 
 
-class AuthenticationError(ContextGateException):
+class AuthenticationError(NexusAIException):
     """认证错误"""
 
 
-class AuthorizationError(ContextGateException):
+class AuthorizationError(NexusAIException):
     """授权错误"""
 
 
-class RateLimitError(ContextGateException):
+class RateLimitError(NexusAIException):
     """频率限制错误"""
     
     def __init__(
@@ -94,7 +94,7 @@ class RateLimitError(ContextGateException):
         return result
 
 
-class ExternalServiceError(ContextGateException):
+class ExternalServiceError(NexusAIException):
     """外部服务错误"""
     
     def __init__(
@@ -117,28 +117,28 @@ class ExternalServiceError(ContextGateException):
         return result
 
 
-class MemoryError(ContextGateException):
+class MemoryError(NexusAIException):
     """记忆系统错误"""
 
 
 
-class ContextError(ContextGateException):
+class ContextError(NexusAIException):
     """上下文管理错误"""
 
 
-class ChatError(ContextGateException):
+class ChatError(NexusAIException):
     """聊天服务错误"""
 
 
-class EvaluationError(ContextGateException):
+class EvaluationError(NexusAIException):
     """评估系统错误"""
 
 
-class FeedbackError(ContextGateException):
+class FeedbackError(NexusAIException):
     """反馈系统错误"""
 
 
-class AgentError(ContextGateException):
+class AgentError(NexusAIException):
     """Agent系统错误"""
 
 
@@ -158,5 +158,5 @@ EXCEPTION_HANDLERS = {
     EvaluationError: lambda e: (500, {"error": "评估系统错误", "details": e.message}),
     FeedbackError: lambda e: (500, {"error": "反馈系统错误", "details": e.message}),
     AgentError: lambda e: (500, {"error": "Agent系统错误", "details": e.message}),
-    ContextGateException: lambda e: (500, {"error": "系统错误", "details": e.message}),
+    NexusAIException: lambda e: (500, {"error": "系统错误", "details": e.message}),
 }

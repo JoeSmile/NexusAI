@@ -57,7 +57,7 @@ class RAGService:
         
         # RAG 通用 prompt 模板
         self.prompt_template = PromptTemplate(
-            template="""你是"ContextGate"，企业级 LLM 信息平台的智能助手。你正在使用企业知识库来回答用户的问题。
+            template="""你是"NexusAI"，企业级 LLM 信息平台的智能助手。你正在使用企业知识库来回答用户的问题。
 
 参考知识：
 {context}
@@ -464,13 +464,13 @@ class RAGService:
                 recent_history = conversation_history[-3:]  # 只使用最近3轮对话
                 history_lines = []
                 for msg in recent_history:
-                    role = "用户" if msg.get("role") == "user" else "ContextGate"
+                    role = "用户" if msg.get("role") == "user" else "NexusAI"
                     content = msg.get("content", "")
                     history_lines.append(f"{role}: {content}")
                 history_context = "\n".join(history_lines)
             
             # 构建完整的prompt
-            enhanced_prompt = f"""你是"ContextGate"，企业级 LLM 信息平台的智能助手。
+            enhanced_prompt = f"""你是"NexusAI"，企业级 LLM 信息平台的智能助手。
 
 
 最近对话：
@@ -566,7 +566,7 @@ class RAGService:
 
 
 class RAGIntegrationService:
-    """RAG集成服务 - 将RAG功能集成到ContextGate机器人"""
+    """RAG集成服务 - 将RAG功能集成到NexusAI机器人"""
     
     def __init__(self, rag_service: RAGService | None = None):
         """

@@ -6,7 +6,7 @@
 from .config import Config, get_config
 from .exceptions import (
     ConfigurationError,
-    ContextGateException,
+    NexusAIException,
     DatabaseError,
     RAGError,
     ValidationError,
@@ -17,7 +17,7 @@ __all__ = [
     "Config",
     "ConfigurationError",
     "DatabaseError",
-    "ContextGateException",
+    "NexusAIException",
     "IChatEngine",
     "IContextService",
     "IMemoryService",

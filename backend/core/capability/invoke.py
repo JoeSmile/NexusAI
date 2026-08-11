@@ -26,7 +26,7 @@ from backend.core.capability.registry import (
     get_capability_registry,
     resolve_credential,
 )
-from backend.core.errors import ContextGateException, ErrorCode
+from backend.core.errors import NexusAIException, ErrorCode
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +77,7 @@ def _check_permission(spec: CapabilitySpec, tenant: TenantContext) -> None:
         )
     needed = (spec.permission or "").strip() or "chat:write"
     if not tenant.has_permission(needed):
-        raise ContextGateException(
+        raise NexusAIException(
             ErrorCode.AUTH_INSUFFICIENT_PERMISSIONS.value,
             "insufficient_permissions",
             detail=needed,
@@ -93,7 +93,7 @@ async def _invoke_model(
 
     messages = _messages_from_payload(payload)
     if not messages:
-        raise ContextGateException(
+        raise NexusAIException(
             ErrorCode.REQ_INVALID.value,
             "invalid_payload",
             detail="messages_or_message_required",
@@ -188,7 +188,7 @@ async def _invoke_rag(
 
     messages = _messages_from_payload(payload)
     if not messages:
-        raise ContextGateException(
+        raise NexusAIException(
             ErrorCode.REQ_INVALID.value,
             "invalid_payload",
             detail="messages_or_message_required",
@@ -203,7 +203,7 @@ async def _invoke_rag(
             tenant_id=tenant.tenant_id,
             user_id=tenant.user_id or "anonymous",
         )
-    except ContextGateException:
+    except NexusAIException:
         raise
     except Exception as exc:
         logger.exception("rag tool invoke failed: %s", spec.id)

@@ -140,7 +140,7 @@ class PersonalizationConfig(BaseModel):
     
     # 角色层
     role: str = "专业助手"
-    role_name: str = "ContextGate"
+    role_name: str = "NexusAI"
     role_background: str | None = None
     personality: str = "专业严谨"
     core_principles: list[str] | None = None

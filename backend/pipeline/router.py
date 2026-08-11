@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from backend.core.audit import log_audit
 from backend.core.auth.models import TenantContext
 from backend.core.auth.permissions import require_permission
-from backend.core.errors import ContextGateException
+from backend.core.errors import NexusAIException
 from backend.core.guardrails.output_guard import DRIFT_PATTERNS, VIOLATION_PATTERNS
 from backend.observability.decorators import observe
 from backend.pipeline.graph import compiled_graph
@@ -154,7 +154,7 @@ async def _run_chat_pipeline(
             error_code=final.get("error_code"),
         )
 
-    except ContextGateException:
+    except NexusAIException:
         raise
     except Exception as e:
         latency = (time.time() - start) * 1000
@@ -238,7 +238,7 @@ async def chat_streaming(
 
     try:
         final = await _ainvoke_streaming(initial)
-    except ContextGateException as e:
+    except NexusAIException as e:
         return JSONResponse(
             status_code=400,
             content={

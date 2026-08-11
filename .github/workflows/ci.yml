@@ -13,13 +13,13 @@ jobs:
       postgres:
         image: pgvector/pgvector:pg16
         env:
-          POSTGRES_DB: contextgate
-          POSTGRES_USER: contextgate
-          POSTGRES_PASSWORD: contextgate_local
+          POSTGRES_DB: nexusai
+          POSTGRES_USER: nexusai
+          POSTGRES_PASSWORD: nexusai_local
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U contextgate -d contextgate"
+          --health-cmd "pg_isready -U nexusai -d nexusai"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -46,11 +46,11 @@ jobs:
         run: |
           uv run python -c "from backend.database.pgvector_session import PGVectorSession; PGVectorSession().init_db()"
         env:
-          DATABASE_URL: postgresql://contextgate:contextgate_local@localhost:5432/contextgate
+          DATABASE_URL: postgresql://nexusai:nexusai_local@localhost:5432/nexusai
           LLM_MOCK: "true"
 
       - name: Run tests
         run: uv run pytest tests/ -v --tb=short
         env:
-          DATABASE_URL: postgresql://contextgate:contextgate_local@localhost:5432/contextgate
+          DATABASE_URL: postgresql://nexusai:nexusai_local@localhost:5432/nexusai
           LLM_MOCK: "true"

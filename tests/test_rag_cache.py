@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.core.errors import ContextGateException, ErrorCode
+from backend.core.errors import NexusAIException, ErrorCode
 from backend.modules.rag import cache as rag_cache
 
 
@@ -236,7 +236,7 @@ def test_rate_limit_miss(fake_redis, monkeypatch):
 
     # 强制每次 L1 miss:每次 bump epoch
     svc = _make_rag_service(invoke)
-    with pytest.raises(ContextGateException) as ei:
+    with pytest.raises(NexusAIException) as ei:
         for i in range(5):
             rag_cache.bump_epoch("t-rl")
             # 清掉可能的命中

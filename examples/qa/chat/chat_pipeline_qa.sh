@@ -50,9 +50,9 @@ else
   bad "长路径不符: http=$CODE trace_id=$TR"
 fi
 
-# 3.3 缓存命中(/metrics 的 contextgate_cache_hits_total 增量;接口只暴露命中率,大基数下不敏感)
+# 3.3 缓存命中(/metrics 的 nexusai_cache_hits_total 增量;接口只暴露命中率,大基数下不敏感)
 say "[3.3] 缓存命中"
-cache_total() { curl -sL "$BASE/metrics" | grep -E "^contextgate_cache_hits_total" | awk '{s+=$2} END{print s+0}'; }
+cache_total() { curl -sL "$BASE/metrics" | grep -E "^nexusai_cache_hits_total" | awk '{s+=$2} END{print s+0}'; }
 CT0=$(cache_total)
 chat "如何查询公司的信息安全管理制度?" "$KEY" >/dev/null
 chat "如何查询公司的信息安全管理制度?" "$KEY" >/dev/null

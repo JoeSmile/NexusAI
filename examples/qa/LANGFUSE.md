@@ -8,11 +8,13 @@
 
 | 项 | 值 |
 |----|-----|
-| Server | `langfuse/langfuse:4` + `langfuse-worker:4` |
-| Python SDK | `langfuse>=4.7,<5`（当前锁 4.14.x） |
+| Server | `langfuse/langfuse:4` + `langfuse-worker:4`（**默认不启**） |
+| Python SDK | `langfuse>=4.7,<5`（当前锁 4.14.x）；`LANGFUSE_ENABLED=false` 时 no-op |
+| 开启 Docker 栈 | `COMPOSE_PROFILES=langfuse docker compose -f docker-compose.local.yml up -d` |
+| 开启应用上报 | `LANGFUSE_ENABLED=true`（与 profile 一起开） |
 | UI | http://localhost:3001 |
-| 账号 | `admin@contextgate.local` / `contextgate` |
-| Key | `pk-lf-local-contextgate` / `sk-lf-local-contextgate` |
+| 账号 | `admin@nexusai.local` / `nexusai` |
+| Key | `pk-lf-local-nexusai` / `sk-lf-local-nexusai` |
 
 应用侧请同时设 `LANGFUSE_HOST` 与 `LANGFUSE_BASE_URL`（宿主机 `http://localhost:3001`；compose 内网 `http://langfuse-web:3000`）。
 
@@ -53,7 +55,7 @@
 
 > **实测结论:** 结构/时序/用量/成本(metadata)全部可用。**Public API 字段是 camelCase**(startTime/endTime/
 > parentObservationId),且 observations 的 `latency` 字段疑似不渲染——核实用 DB:
-> `docker exec contextgate-postgres-1 psql -U contextgate -d langfuse -c "SELECT name, start_time, end_time, (end_time-start_time) AS dur FROM observations WHERE trace_id='<id>';"`
+> `docker exec nexusai-langfuse-postgres-1 psql -U langfuse -d langfuse -c "SELECT name, start_time, end_time, (end_time-start_time) AS dur FROM observations WHERE trace_id='<id>';"`
 
 ## 3. 什么情况说明需要优化(从 LangFuse 看什么)
 

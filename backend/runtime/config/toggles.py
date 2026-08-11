@@ -5,7 +5,7 @@ Module Toggles — per-module enable/disable switches
   runtime.modules.<module>.enabled = true | false
 
 支持环境变量覆盖：
-  CONTEXTGATE__MODULES__<MODULE>__ENABLED=true|false
+  NEXUSAI__MODULES__<MODULE>__ENABLED=true|false
 
 这使得：
 1. 渐进式发布：新功能背后有开关
@@ -55,7 +55,7 @@ class ModuleToggles:
 
     环境变量覆盖（优先级最高）::
 
-        CONTEXTGATE__MODULES__MEMORY_SKILL__ENABLED=true
+        NEXUSAI__MODULES__MEMORY_SKILL__ENABLED=true
     """
 
     # 所有模块的默认状态
@@ -79,7 +79,8 @@ class ModuleToggles:
         "skill_review": False,
     }
 
-    ENV_PREFIX = "CONTEXTGATE__MODULES__"
+    ENV_PREFIX = "NEXUSAI__MODULES__"
+    _LEGACY_ENV_PREFIX = "CONTEXTGATE__MODULES__"
 
     def __init__(self, overrides: dict[str, bool] | None = None):
         # 初始化为默认值
@@ -99,10 +100,14 @@ class ModuleToggles:
         self._apply_env_overrides()
 
     def _apply_env_overrides(self) -> None:
-        """从环境变量中读取覆盖配置"""
+        """从环境变量中读取覆盖配置（NEXUSAI__ 优先，兼容旧 CONTEXTGATE__）"""
         for name in self._toggles:
             env_key = f"{self.ENV_PREFIX}{name.upper()}__ENABLED"
             env_val = os.environ.get(env_key)
+            if env_val is None:
+                legacy_key = f"{self._LEGACY_ENV_PREFIX}{name.upper()}__ENABLED"
+                env_val = os.environ.get(legacy_key)
+                env_key = legacy_key if env_val is not None else env_key
             if env_val is not None:
                 enabled = env_val.lower() in ("true", "1", "yes")
                 self._toggles[name].enabled = enabled

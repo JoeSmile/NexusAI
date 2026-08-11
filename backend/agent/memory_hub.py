@@ -1,7 +1,7 @@
 """
 Memory Hub — 六层记忆中枢
 
-参考 ai-buddy Phase 6.3 六层记忆架构设计，适配 ContextGate 场景。
+参考 ai-buddy Phase 6.3 六层记忆架构设计，适配 NexusAI 场景。
 
 六层作用域：
   L1 组织级  (organization)  — 全局知识库，系统 prompt 注入，只读
@@ -105,7 +105,7 @@ class MemoryHub:
         self,
         user_id: str = "",
         session_id: str = "",
-        agent_type: str = "contextgate",
+        agent_type: str = "nexusai",
         tenant_id: str = "default",
         memory_manager: MemoryManager | None = None,
         toggles: ModuleToggles | None = None,
@@ -792,7 +792,7 @@ _memory_hub_registry_lock = threading.RLock()
 def get_memory_hub(
     user_id: str = "",
     session_id: str = "",
-    agent_type: str = "contextgate",
+    agent_type: str = "nexusai",
     tenant_id: str = "default",
 ) -> MemoryHub:
     """Return a MemoryHub isolated by tenant/user/session/agent.
@@ -805,7 +805,7 @@ def get_memory_hub(
         tenant_id or "default",
         user_id or "",
         session_id or "",
-        agent_type or "contextgate",
+        agent_type or "nexusai",
     )
     with _memory_hub_registry_lock:
         hub = _memory_hub_registry.get(key)
@@ -823,7 +823,7 @@ def get_memory_hub(
 async def get_memory_hub_async(
     user_id: str = "",
     session_id: str = "",
-    agent_type: str = "contextgate",
+    agent_type: str = "nexusai",
     tenant_id: str = "default",
 ) -> MemoryHub:
     """Return an isolated hub after loading its persistent state."""

@@ -22,8 +22,8 @@ say "=== 冒烟 QA $(date '+%F %T') ==="
 
 # 1.1 根路径
 C=$(code "$BASE/")
-if [ "$C" = 200 ] && grep -q '"name": *"ContextGate"' /tmp/smoke_body.$$; then
-  ok "1.1 根路径 name=ContextGate"
+if [ "$C" = 200 ] && grep -q '"name": *"NexusAI"' /tmp/smoke_body.$$; then
+  ok "1.1 根路径 name=NexusAI"
 else
   bad "1.1 根路径 http=$C"
 fi

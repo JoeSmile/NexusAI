@@ -30,13 +30,13 @@ def block_optional_imports(monkeypatch):
 
 def test_audio_file_not_found():
     with pytest.raises(MultimodalDependencyError) as ei:
-        extract_audio_text("/tmp/contextgate-missing-audio-xyz.wav")
+        extract_audio_text("/tmp/nexusai-missing-audio-xyz.wav")
     assert ei.value.code == ErrorCode.FILE_NOT_FOUND.value
 
 
 def test_image_file_not_found():
     with pytest.raises(MultimodalDependencyError) as ei:
-        extract_image_text("/tmp/contextgate-missing-image-xyz.png")
+        extract_image_text("/tmp/nexusai-missing-image-xyz.png")
     assert ei.value.code == ErrorCode.FILE_NOT_FOUND.value
 
 

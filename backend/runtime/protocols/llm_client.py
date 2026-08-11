@@ -4,7 +4,7 @@ Protocol 1: LLM Client — LLM 调用抽象
 Defines the contract for LLM interaction. All ConversationRuntime
 modules depend on this Protocol, never on concrete implementations.
 
-Adapted for ContextGate:
+Adapted for NexusAI:
 - 支持 stream 和 complete 两种调用模式
 - 统一的 AssistantEvent 事件格式
 - 支持 tool_use 和纯文本两种输出

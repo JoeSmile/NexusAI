@@ -148,7 +148,7 @@ def _is_leaf_stub(spec: CapabilitySpec) -> bool:
 
 
 def _should_chain_audit(spec: CapabilitySpec) -> bool:
-    """``spec.chain_audit=false`` 时不写入 agent.invoke 主链审计（如 contextgate-chat）。"""
+    """``spec.chain_audit=false`` 时不写入 agent.invoke 主链审计（如 nexusai-chat）。"""
     raw = spec.spec if isinstance(spec.spec, dict) else {}
     return raw.get("chain_audit", True) is not False
 

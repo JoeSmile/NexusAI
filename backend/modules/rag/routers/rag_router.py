@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict
 
 from backend.core.auth.models import TenantContext
 from backend.core.auth.permissions import require_permission
-from backend.core.errors import ContextGateException, ErrorCode
+from backend.core.errors import NexusAIException, ErrorCode
 from backend.logging_config import get_logger
 from backend.modules.rag.cache import bump_epoch
 
@@ -65,14 +65,14 @@ def _rag_guard(
 
 
 def _rag_errors(fn):
-    """端点错误统一处理:ContextGateException/HTTPException 放行,其余记日志转 500。"""
+    """端点错误统一处理:NexusAIException/HTTPException 放行,其余记日志转 500。"""
     import functools
 
     @functools.wraps(fn)
     async def wrapper(*args, **kwargs):
         try:
             return await fn(*args, **kwargs)
-        except ContextGateException:
+        except NexusAIException:
             raise
         except HTTPException:
             raise
@@ -311,7 +311,7 @@ async def upload_multimodal(
     filename = file.filename or "upload.bin"
     ok, err = validate_file(filename, content, file.content_type or "")
     if not ok:
-        raise ContextGateException(
+        raise NexusAIException(
             ErrorCode.FILE_INVALID_TYPE.value, err or "invalid_file"
         )
 
@@ -372,7 +372,7 @@ async def upload_multimodal(
 
             text = extract_image_text(tmp_path)
             if not text:
-                raise ContextGateException(
+                raise NexusAIException(
                     ErrorCode.RAG_EMPTY_EXTRACT.value, "OCR 未识别到文本"
                 )
             cid = add_knowledge(
@@ -385,7 +385,7 @@ async def upload_multimodal(
             )
             chunk_ids.append(cid)
         else:
-            raise ContextGateException(
+            raise NexusAIException(
                 ErrorCode.FILE_INVALID_TYPE.value, f"不支持的类型 {kind}"
             )
 
@@ -398,11 +398,11 @@ async def upload_multimodal(
             "chunk_ids": chunk_ids,
         }
     except MultimodalDependencyError as e:
-        raise ContextGateException(
+        raise NexusAIException(
             e.code if e.code.startswith("RAG_") else ErrorCode.RAG_DEP_MISSING.value,
             str(e),
         ) from e
-    except ContextGateException:
+    except NexusAIException:
         raise
     except HTTPException:
         raise

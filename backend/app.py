@@ -36,7 +36,7 @@ logger = get_logger(__name__)
 async def lifespan(app: FastAPI):
     """启动预热 / 关闭清理。"""
     logger.info("═" * 40)
-    logger.info("ContextGate 启动中...")
+    logger.info("NexusAI 启动中...")
     logger.info("═" * 40)
 
     try:
@@ -75,12 +75,12 @@ async def lifespan(app: FastAPI):
         logger.warning("Skill discovery failed: %s", e)
 
     logger.info("═" * 40)
-    logger.info("ContextGate 就绪")
+    logger.info("NexusAI 就绪")
     logger.info("═" * 40)
 
     yield
 
-    logger.info("ContextGate 关闭中...")
+    logger.info("NexusAI 关闭中...")
     try:
         from backend.services.performance_optimizer import performance_optimizer
 
@@ -130,7 +130,7 @@ def _lazy_include(
 def create_app() -> FastAPI:
     """创建并配置 FastAPI 应用实例。"""
     app = FastAPI(
-        title="ContextGate API",
+        title="NexusAI API",
         description="The Intelligent Gateway for LLM Context Management",
         version="1.0.0",
         docs_url="/docs",
@@ -139,12 +139,12 @@ def create_app() -> FastAPI:
     )
 
     from backend.core.errors import (
-        ContextGateException,
-        contextgate_exception_handler,
+        NexusAIException,
+        nexusai_exception_handler,
         global_exception_handler,
     )
 
-    app.add_exception_handler(ContextGateException, contextgate_exception_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(NexusAIException, nexusai_exception_handler)  # type: ignore[arg-type]
     app.add_exception_handler(Exception, global_exception_handler)
 
     _cors_all = os.getenv("CORS_ALLOW_ALL", "").strip().lower() in ("1", "true", "yes")
@@ -260,7 +260,7 @@ def create_app() -> FastAPI:
             feature_list.append("Capability Hub")
 
         return {
-            "name": "ContextGate",
+            "name": "NexusAI",
             "version": "1.0.0",
             "status": "running",
             "features": feature_list,

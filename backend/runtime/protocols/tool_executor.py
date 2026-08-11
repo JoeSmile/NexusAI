@@ -4,7 +4,7 @@ Protocol 2: Tool Executor — 工具执行抽象
 Defines the contract for tool execution. Tools always return ToolResult
 and never raise exceptions (error in .error field).
 
-Adapted for ContextGate:
+Adapted for NexusAI:
 - 工具包含LLM Gateway专用工具 (日历、提醒服务等)
 - ToolResult 包含工具类别标记
 """

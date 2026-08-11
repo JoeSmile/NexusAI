@@ -1,4 +1,4 @@
-# Contributing to ContextGate
+# Contributing to NexusAI
 
 ## PR Process
 

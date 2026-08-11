@@ -1,7 +1,7 @@
 """
 Activity Distiller — 活动蒸馏管道
 
-参考 ai-buddy Phase 6.3 六层记忆架构设计，适配 ContextGate 场景。
+参考 ai-buddy Phase 6.3 六层记忆架构设计，适配 NexusAI 场景。
 
 后台蒸馏管道：每轮对话结束后，将 L2 活动日志浓缩到 L3 用户偏好。
   - 不调用 LLM，纯聚合计算

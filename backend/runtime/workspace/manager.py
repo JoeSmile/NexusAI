@@ -27,10 +27,12 @@ logger = logging.getLogger(__name__)
 
 def _resolve_default_base() -> Path:
     """解析默认基础目录"""
-    val = os.environ.get("CONTEXTGATE_WORKSPACE_BASE")
+    val = os.environ.get("NEXUSAI_WORKSPACE_BASE") or os.environ.get(
+        "CONTEXTGATE_WORKSPACE_BASE"
+    )
     if val:
         return Path(val)
-    return Path.home() / ".contextgate"
+    return Path.home() / ".nexusai"
 
 
 @dataclass
@@ -53,7 +55,7 @@ class WorkspaceManager:
 
         mgr = WorkspaceManager()
         ws = mgr.create_workspace(user_id="user_123")
-        # ws.root = Path("/home/user/.contextgate/users/user_123")
+        # ws.root = Path("/home/user/.nexusai/users/user_123")
     """
 
     def __init__(self, base_dir: Path | None = None):

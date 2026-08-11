@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from backend.core.errors import ContextGateException, ErrorCode
+from backend.core.errors import NexusAIException, ErrorCode
 from backend.database import vector_ops
 from backend.logging_config import get_logger
 
@@ -399,9 +399,9 @@ class EnterpriseKnowledgeLoader:
         """
         sample_texts = [
             """
-            ContextGate 平台简介
+            NexusAI 平台简介
 
-            ContextGate 是企业级 LLM 信息平台网关，提供认证鉴权、多租户隔离、
+            NexusAI 是企业级 LLM 信息平台网关，提供认证鉴权、多租户隔离、
             安全护栏、可观测性、模型路由与缓存能力。
 
             核心能力：
@@ -454,7 +454,7 @@ class EnterpriseKnowledgeLoader:
         """
         从PDF文件加载知识;返回提取到文本的页数。
 
-        扫描件/无文本层 PDF(整份提取为空)→ 抛 ContextGateException(RAG_002),
+        扫描件/无文本层 PDF(整份提取为空)→ 抛 NexusAIException(RAG_002),
         不再静默返回"上传成功";空页(图片页)自动跳过。
         """
         try:
@@ -466,7 +466,7 @@ class EnterpriseKnowledgeLoader:
             # 过滤空页(扫描件/图片页无文本层)
             non_empty = [d for d in documents if (d.page_content or "").strip()]
             if not non_empty:
-                raise ContextGateException(
+                raise NexusAIException(
                     ErrorCode.RAG_EMPTY_EXTRACT.value,
                     "未提取到文本:扫描件或无文本层 PDF。请逐页导出为图片后走 /api/rag/upload 的 image 分支"
                     "(需 uv sync --extra multimodal),或上传带文本层的 PDF",
@@ -483,7 +483,7 @@ class EnterpriseKnowledgeLoader:
             logger.info(f"成功从PDF加载知识: {pdf_path}({len(non_empty)} 页有文本)")
             return len(non_empty)
 
-        except ContextGateException:
+        except NexusAIException:
             raise
         except Exception as e:
             logger.error(f"从PDF加载知识失败: {e}")

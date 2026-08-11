@@ -62,7 +62,7 @@ class ErrorCode(StrEnum):
     SKILL_NOT_FOUND = "SKILL_001"
 
 
-class ContextGateException(Exception):
+class NexusAIException(Exception):
     """业务异常 — 统一结构化"""
 
     def __init__(self, code: str, message: str, detail: str | None = None):
@@ -72,8 +72,8 @@ class ContextGateException(Exception):
         super().__init__(f"[{code}] {message}")
 
 
-async def contextgate_exception_handler(
-    request: Request, exc: ContextGateException
+async def nexusai_exception_handler(
+    request: Request, exc: NexusAIException
 ) -> JSONResponse:
     """全局业务异常处理器"""
     return JSONResponse(

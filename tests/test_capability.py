@@ -23,7 +23,7 @@ from backend.core.capability.models import (
     CapabilityStatus,
 )
 from backend.core.capability.registry import CapabilityRegistry
-from backend.core.errors import ContextGateException, ErrorCode
+from backend.core.errors import NexusAIException, ErrorCode
 
 
 @pytest.fixture
@@ -58,7 +58,7 @@ def test_validate_governance_model_exempt() -> None:
             id="model:m",
             name="m",
             kind=CapabilityKind.MODEL,
-            provider=CapabilityProvider.CONTEXTGATE,
+            provider=CapabilityProvider.NEXUSAI,
         )
     )
 
@@ -74,7 +74,7 @@ def test_get_missing_and_disabled() -> None:
             id="off",
             name="off",
             kind=CapabilityKind.MODEL,
-            provider=CapabilityProvider.CONTEXTGATE,
+            provider=CapabilityProvider.NEXUSAI,
             status=CapabilityStatus.DISABLED,
             permission="chat:write",
         )
@@ -134,12 +134,12 @@ async def test_invoke_model_stream_and_auth(
         patch("backend.core.capability.governance._redis", return_value=None),
     ):
         auditor = TenantContext("t1", "a1", "auditor", [], True)
-        with pytest.raises(ContextGateException) as ei:
+        with pytest.raises(NexusAIException) as ei:
             async for _ in invoke("model:mock-local", {"message": "hi"}, auditor):
                 pass
         assert ei.value.code == ErrorCode.AUTH_INSUFFICIENT_PERMISSIONS.value
 
-        with pytest.raises(ContextGateException) as e2:
+        with pytest.raises(NexusAIException) as e2:
             async for _ in invoke("model:mock-local", {}, tenant_user):
                 pass
         assert e2.value.code == ErrorCode.REQ_INVALID.value
@@ -292,7 +292,7 @@ def test_env_load_and_db_override_same_id() -> None:
                     "id": "shared-cap",
                     "name": "from-env",
                     "kind": "model",
-                    "provider": "contextgate",
+                    "provider": "nexusai",
                     "permission": "chat:write",
                 }
             ]
@@ -306,7 +306,7 @@ def test_env_load_and_db_override_same_id() -> None:
             id="shared-cap",
             name="from-db",
             kind=CapabilityKind.MODEL,
-            provider=CapabilityProvider.CONTEXTGATE,
+            provider=CapabilityProvider.NEXUSAI,
             permission="chat:write",
         )
     )
@@ -321,7 +321,7 @@ async def test_unsupported_kind_raises_cap_001(tenant_user: TenantContext) -> No
             id="tool-x",
             name="tool-x",
             kind=CapabilityKind.TOOL,
-            provider=CapabilityProvider.CONTEXTGATE,
+            provider=CapabilityProvider.NEXUSAI,
             permission="chat:write",
             spec={"governance": True},
         )
@@ -350,10 +350,10 @@ async def test_tool_executor_model_streams(
     reg = CapabilityRegistry()
     reg.register(
         CapabilitySpec(
-            id="contextgate-chat",
-            name="ContextGate Chat",
+            id="nexusai-chat",
+            name="NexusAI Chat",
             kind=CapabilityKind.TOOL,
-            provider=CapabilityProvider.CONTEXTGATE,
+            provider=CapabilityProvider.NEXUSAI,
             permission="chat:write",
             spec={"governance": True, "leaf": True, "executor": "model"},
         )
@@ -367,13 +367,13 @@ async def test_tool_executor_model_streams(
     ):
         frames: list[dict] = []
         async for f in invoke(
-            "contextgate-chat", {"message": "hello tool"}, tenant_user
+            "nexusai-chat", {"message": "hello tool"}, tenant_user
         ):
             frames.append(f)
     tokens = "".join(
         str(f.get("data") or "") for f in frames if f.get("event") == "token"
     )
-    assert "[contextgate-chat] processed:" not in tokens
+    assert "[nexusai-chat] processed:" not in tokens
     assert any(f.get("event") == "done" for f in frames)
 
 
@@ -388,7 +388,7 @@ async def test_tool_executor_rag_uses_rag_service(
             id="rag-ask",
             name="RAG Ask",
             kind=CapabilityKind.TOOL,
-            provider=CapabilityProvider.CONTEXTGATE,
+            provider=CapabilityProvider.NEXUSAI,
             permission="chat:write",
             spec={"governance": True, "leaf": True, "executor": "rag"},
         )
@@ -437,7 +437,7 @@ async def test_leaf_stub_mode_still_stubs(
         id="rag-ask",
         name="RAG Ask",
         kind=CapabilityKind.TOOL,
-        provider=CapabilityProvider.CONTEXTGATE,
+        provider=CapabilityProvider.NEXUSAI,
         permission="chat:write",
         spec={"governance": True, "leaf": True, "executor": "rag"},
     )
@@ -445,7 +445,7 @@ async def test_leaf_stub_mode_still_stubs(
         id="wrap-rag",
         name="wrap",
         kind=CapabilityKind.AGENT,
-        provider=CapabilityProvider.CONTEXTGATE,
+        provider=CapabilityProvider.NEXUSAI,
         permission="chat:write",
         spec={"governance": True, "capabilities": ["rag-ask"]},
     )

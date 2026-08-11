@@ -31,7 +31,7 @@ def _agent(cap_id: str, caps: list[str]) -> CapabilitySpec:
         id=cap_id,
         name=cap_id,
         kind=CapabilityKind.AGENT,
-        provider=CapabilityProvider.CONTEXTGATE,
+        provider=CapabilityProvider.NEXUSAI,
         permission="chat:write",
         spec={"governance": True, "capabilities": caps},
     )
@@ -42,7 +42,7 @@ def _leaf(cap_id: str, *, chain_audit: bool = True) -> CapabilitySpec:
         id=cap_id,
         name=cap_id,
         kind=CapabilityKind.TOOL,
-        provider=CapabilityProvider.CONTEXTGATE,
+        provider=CapabilityProvider.NEXUSAI,
         permission="chat:write",
         spec={"governance": True, "leaf": True, "chain_audit": chain_audit},
     )
@@ -64,9 +64,9 @@ async def test_vendor_risk_call_chain_and_audits(
     reg = CapabilityRegistry()
     for spec in (
         _leaf("rag-ask"),
-        _leaf("contextgate-chat", chain_audit=False),
-        _agent("contract-query-agent", ["rag-ask", "contextgate-chat"]),
-        _agent("vendor-risk-agent", ["contract-query-agent", "contextgate-chat"]),
+        _leaf("nexusai-chat", chain_audit=False),
+        _agent("contract-query-agent", ["rag-ask", "nexusai-chat"]),
+        _agent("vendor-risk-agent", ["contract-query-agent", "nexusai-chat"]),
     ):
         reg.register(spec)
 

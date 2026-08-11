@@ -6,7 +6,9 @@
 
 **The Governance Hub for Enterprise AI.**
 
-Enterprises already have business and data platforms. What’s missing is an **AI governance layer**. NexusAI is a unified gateway for access, capability orchestration, internal data (RAG and planned OA), and compliance — apps may run on Dify or custom stacks; **calls and data should pass through governance**.
+Enterprises already have business and data platforms. What’s missing is an **AI middle platform**.
+NexusAI fills that layer: unified access, capability orchestration, data connectivity, and compliance guardrails.
+Orchestration may come from Dify, Coze, or custom stacks; **execution and data calls go through the governance entry** — we don’t ship another general-purpose drag-and-drop engine, and we don’t replace existing business/data platforms.
 
 [简体中文](README.md) · [English](README.en.md)
 

@@ -47,7 +47,7 @@ def _resolve_database_url() -> str:
     - 默认 postgresql + pgvector。
     """
     if _truthy_env("USE_SQLITE"):
-        filename = os.getenv("SQLITE_PATH", os.path.join(_project_root(), "data", "contextgate_local.db"))
+        filename = os.getenv("SQLITE_PATH", os.path.join(_project_root(), "data", "nexusai_local.db"))
         parent = os.path.dirname(filename)
         if parent:
             os.makedirs(parent, exist_ok=True)
@@ -62,14 +62,14 @@ def _resolve_database_url() -> str:
             "Use DATABASE_URL=postgresql://... or DB_TYPE=postgresql."
         )
     if db_type == "sqlite":
-        filename = os.getenv("SQLITE_PATH", os.path.join(_project_root(), "data", "contextgate.db"))
+        filename = os.getenv("SQLITE_PATH", os.path.join(_project_root(), "data", "nexusai.db"))
         parent = os.path.dirname(filename)
         if parent:
             os.makedirs(parent, exist_ok=True)
         return _sqlite_url_from_path(filename)
     # 默认 postgresql + pgvector
     return (
-        "postgresql://contextgate:contextgate_local@localhost:5432/contextgate"
+        "postgresql://nexusai:nexusai_local@localhost:5432/nexusai"
     )
 
 
@@ -338,7 +338,7 @@ class UserPersonalization(Base):
     
     # 角色层：AI身份与人格
     role = Column(String(100), default="专业助手")  # 角色类型
-    role_name = Column(String(100), default="ContextGate")  # 角色名称
+    role_name = Column(String(100), default="NexusAI")  # 角色名称
     role_background = Column(Text)  # 角色背景故事
     personality = Column(String(100), default="专业严谨")  # 性格特征
     core_principles = Column(Text)  # 核心原则 (JSON数组)
@@ -409,7 +409,7 @@ def create_tables():
             or not _truthy_env("USE_SQLITE_FALLBACK", default="1")
         ):
             raise
-        sqlite_path = os.path.join(_project_root(), "data", "contextgate_local.db")
+        sqlite_path = os.path.join(_project_root(), "data", "nexusai_local.db")
         sqlite_url = _sqlite_url_from_path(sqlite_path)
         print(
             "警告: 无法连接 PostgreSQL，已自动改用 SQLite: "

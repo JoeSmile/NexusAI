@@ -319,8 +319,8 @@ def _minute_bucket() -> str:
 
 
 def check_rate_limit(tenant_id: str, *, miss: bool = False) -> None:
-    """超限抛 ContextGateException RATE_001。"""
-    from backend.core.errors import ContextGateException, ErrorCode
+    """超限抛 NexusAIException RATE_001。"""
+    from backend.core.errors import NexusAIException, ErrorCode
 
     r = get_redis()
     if r is None:
@@ -337,12 +337,12 @@ def check_rate_limit(tenant_id: str, *, miss: bool = False) -> None:
         if n == 1:
             r.expire(key, 70)
         if n > limit:
-            raise ContextGateException(
+            raise NexusAIException(
                 ErrorCode.RATE_LIMITED.value,
                 "rate_limited",
                 detail=f"{'miss' if miss else 'req'}>{limit}/min",
             )
-    except ContextGateException:
+    except NexusAIException:
         raise
     except Exception as e:
         logger.debug("rate limit check skipped: %s", e)

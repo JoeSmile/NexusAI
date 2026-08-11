@@ -16,7 +16,7 @@ from backend.core.capability.errors import (
     CapabilityQuotaExceededError,
 )
 from backend.core.capability.models import CapabilityKind, CapabilitySpec
-from backend.core.errors import ContextGateException, ErrorCode
+from backend.core.errors import NexusAIException, ErrorCode
 from backend.core.guardrails.input_guard import check_input
 from backend.core.guardrails.output_guard import check_output
 
@@ -61,7 +61,7 @@ async def guard_input_text(message: str) -> str:
     """入向护栏；blocked → GUARD_001 / CAP_004 语义。"""
     result = await check_input(message)
     if result.action == "blocked":
-        raise ContextGateException(
+        raise NexusAIException(
             ErrorCode.PROMPT_INJECTION.value,
             "prompt_injection",
             detail=result.reason or "blocked",
@@ -73,7 +73,7 @@ async def guard_output_text(text: str) -> str:
     """出向护栏；blocked → GUARD_003。"""
     result = await check_output(text)
     if result.action == "blocked":
-        raise ContextGateException(
+        raise NexusAIException(
             ErrorCode.OUTPUT_BLOCKED.value,
             "output_blocked",
             detail=result.reason or "blocked",
@@ -94,12 +94,12 @@ def check_cap_rate_limit(tenant_id: str) -> None:
         if n == 1:
             r.expire(key, 70)
         if n > limit:
-            raise ContextGateException(
+            raise NexusAIException(
                 ErrorCode.RATE_LIMITED.value,
                 "rate_limited",
                 detail=f"cap_req>{limit}/min",
             )
-    except ContextGateException:
+    except NexusAIException:
         raise
     except Exception as exc:
         logger.debug("cap rate limit skipped: %s", exc)

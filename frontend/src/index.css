@@ -4,7 +4,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* ContextGate UX tokens — 云蓝 × 控制台密度（Task 30.09） */
+/* NexusAI UX tokens — 云蓝 × 控制台密度（Task 30.09） */
 @theme inline {
   --font-heading: var(--font-sans);
   --font-sans: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI",

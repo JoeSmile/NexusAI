@@ -228,7 +228,7 @@ class EnhancedChatService:
     
     def _build_system_prompt(self, context: dict[str, Any]) -> str:
         """构建系统Prompt"""
-        return """你是"ContextGate"，企业级 LLM 信息平台的智能助手，专业、准确、安全。"""
+        return """你是"NexusAI"，企业级 LLM 信息平台的智能助手，专业、准确、安全。"""
     
     async def _try_rag_enhancement(self, message: str,
                                   chat_history: list[dict]) -> dict | None:

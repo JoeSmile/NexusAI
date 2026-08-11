@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from backend.core.errors import ContextGateException, ErrorCode
+from backend.core.errors import NexusAIException, ErrorCode
 
 
-class CapabilityNotFoundError(ContextGateException):
+class CapabilityNotFoundError(NexusAIException):
     """CAP_001 — 能力不存在。"""
 
     def __init__(
@@ -16,7 +16,7 @@ class CapabilityNotFoundError(ContextGateException):
         super().__init__(ErrorCode.CAP_NOT_FOUND.value, message, detail)
 
 
-class CapabilityDisabledError(ContextGateException):
+class CapabilityDisabledError(NexusAIException):
     """CAP_002 — 能力已禁用。"""
 
     def __init__(
@@ -27,7 +27,7 @@ class CapabilityDisabledError(ContextGateException):
         super().__init__(ErrorCode.CAP_DISABLED.value, message, detail)
 
 
-class CapabilityUpstreamError(ContextGateException):
+class CapabilityUpstreamError(NexusAIException):
     """CAP_003 — 上游（外部应用/模型端点）失败。"""
 
     def __init__(
@@ -38,7 +38,7 @@ class CapabilityUpstreamError(ContextGateException):
         super().__init__(ErrorCode.CAP_UPSTREAM_ERROR.value, message, detail)
 
 
-class CapabilityGovernanceRequiredError(ContextGateException):
+class CapabilityGovernanceRequiredError(NexusAIException):
     """CAP_004 — 治理校验未通过（护栏/权限等）。"""
 
     def __init__(
@@ -49,7 +49,7 @@ class CapabilityGovernanceRequiredError(ContextGateException):
         super().__init__(ErrorCode.CAP_GOVERNANCE_REQUIRED.value, message, detail)
 
 
-class CapabilityQuotaExceededError(ContextGateException):
+class CapabilityQuotaExceededError(NexusAIException):
     """CAP_005 — 配额/预算超限。"""
 
     def __init__(

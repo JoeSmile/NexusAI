@@ -1,4 +1,4 @@
-# ContextGate — Multi-stage Docker build with uv
+# NexusAI — Multi-stage Docker build with uv
 FROM python:3.11-slim AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/

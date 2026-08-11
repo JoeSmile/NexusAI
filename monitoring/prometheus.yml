@@ -3,7 +3,7 @@ global:
   scrape_interval: 15s          # 抓取间隔
   evaluation_interval: 15s      # 规则评估间隔
   external_labels:
-    monitor: 'contextgate-monitor'
+    monitor: 'nexusai-monitor'
 
 # Alertmanager 配置（可选）
 alerting:
@@ -22,8 +22,8 @@ scrape_configs:
       - targets: ['localhost:9090']
 
   # 后端服务监控
-  - job_name: 'contextgate'
+  - job_name: 'nexusai'
     static_configs:
-      - targets: ['contextgate:8000']
+      - targets: ['nexusai:8000']
     metrics_path: '/metrics'
     scrape_interval: 10s
