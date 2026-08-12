@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
+import { BrandMark } from '@/components/brand/BrandMark'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -20,6 +21,7 @@ import {
 } from '@/components/ui/select'
 import { ApiError } from '@/api/http'
 import { registerAccount } from '@/api/auth'
+import { HOME_PATH } from '@/lib/routes'
 import { ROLES, useAuthStore } from '@/stores/authStore'
 import type { RoleName } from '@/types/api'
 
@@ -88,7 +90,7 @@ export default function RegisterPage() {
         accessToken: resp.access_token,
         roleEpoch: s.roleEpoch + 1,
       }))
-      navigate('/panels/chat', { replace: true })
+      navigate(HOME_PATH, { replace: true })
     } catch (err) {
       setError(registerErrorMessage(err))
     } finally {
@@ -97,13 +99,20 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-svh items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md shadow-[var(--shadow-overlay)]">
-        <CardHeader>
-          <CardTitle className="text-xl font-semibold">注册账号</CardTitle>
-          <CardDescription className="text-muted-foreground text-xs">
-            测试 FE 注册 — 创建账号并自动登录进入 Chat 面板
-          </CardDescription>
+    <div className="relative flex min-h-svh items-center justify-center overflow-hidden bg-background p-4">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--accent)_0%,_transparent_55%)]"
+      />
+      <Card className="relative w-full max-w-md border-border shadow-[var(--shadow-overlay)]">
+        <CardHeader className="space-y-4 text-center">
+          <BrandMark size="lg" className="justify-center" />
+          <div className="space-y-1">
+            <CardTitle className="text-lg font-semibold">创建账号</CardTitle>
+            <CardDescription className="text-muted-foreground text-xs">
+              注册后进入工作台（{HOME_PATH}）
+            </CardDescription>
+          </div>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={onSubmit}>

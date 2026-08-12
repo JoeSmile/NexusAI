@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 
-import { useNavigate } from 'react-router-dom'
-
+import { BrandMark } from '@/components/brand/BrandMark'
+import { RoleSwitcher } from '@/components/role/RoleSwitcher'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -11,33 +11,77 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { RoleSwitcher } from '@/components/role/RoleSwitcher'
+import { KEYS_ROLES, ORG_ROLES, roleAllowed } from '@/lib/navAccess'
 import { useAuthStore } from '@/stores/authStore'
+import type { RoleName } from '@/types/api'
 import { cn } from '@/lib/utils'
 
 type AppEnv = 'dev' | 'test' | 'demo'
 
-const NAV = [
-  { to: '/panels/chat', label: 'Chat' },
-  { to: '/panels/rag', label: 'RAG' },
-  { to: '/panels/admin', label: 'Admin' },
-  { to: '/panels/audit', label: 'Audit' },
-  { to: '/panels/agent', label: 'Agent' },
-  { to: '/panels/eval', label: 'Eval' },
-  { to: '/panels/performance', label: '性能' },
-  { to: '/panels/capabilities', label: '能力' },
-] as const
+type NavItem = { to: string; label: string; roles?: RoleName[] }
+
+type NavGroup = { id: string; label: string; items: NavItem[] }
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    id: 'workspace',
+    label: '工作台',
+    items: [
+      { to: '/workspace/chat', label: '对话' },
+      { to: '/workspace/agent', label: 'Agent' },
+      { to: '/workspace/eval', label: '评估' },
+    ],
+  },
+  {
+    id: 'workflows',
+    label: '工作流',
+    items: [{ to: '/workflows', label: '流程' }],
+  },
+  {
+    id: 'approvals',
+    label: '审批',
+    items: [{ to: '/approvals', label: '待办' }],
+  },
+  {
+    id: 'knowledge',
+    label: '知识库',
+    items: [{ to: '/knowledge', label: 'RAG' }],
+  },
+  {
+    id: 'governance',
+    label: '治理',
+    items: [
+      {
+        to: '/governance/org',
+        label: '组织',
+        roles: ORG_ROLES,
+      },
+      { to: '/governance/audit', label: '审计' },
+      { to: '/governance/capabilities', label: '能力' },
+      { to: '/governance/performance', label: '性能' },
+      {
+        to: '/governance/keys',
+        label: 'API Keys',
+        roles: KEYS_ROLES,
+      },
+    ],
+  },
+]
 
 function envBadgeClass(env: AppEnv): string {
-  if (env === 'test') return 'bg-[var(--primary)] text-white'
+  if (env === 'test') return 'bg-primary text-primary-foreground'
   if (env === 'demo') return 'bg-[var(--success)] text-white'
-  return 'bg-secondary text-muted-foreground' // dev=灰
+  return 'bg-secondary text-muted-foreground'
 }
 
 function resolveEnv(raw: unknown): AppEnv {
   const v = String(raw || '').toLowerCase()
   if (v === 'test' || v === 'demo' || v === 'dev') return v
   return 'dev'
+}
+
+function itemVisible(item: NavItem, role: RoleName): boolean {
+  return roleAllowed(role, item.roles)
 }
 
 export function AppShell() {
@@ -52,7 +96,6 @@ export function AppShell() {
       setEnv(resolveEnv(fromVite))
       return
     }
-    // Vite 下 `/` 是 SPA；经 /cg-meta 反代到后端根（见 vite.config）
     fetch('/cg-meta')
       .then((r) => (r.ok ? r.json() : null))
       .then((j: { environment?: string; env?: string } | null) => {
@@ -61,10 +104,17 @@ export function AppShell() {
       .catch(() => setEnv('dev'))
   }, [])
 
+  const groups = useMemo(() => {
+    return NAV_GROUPS.map((g) => ({
+      ...g,
+      items: g.items.filter((it) => itemVisible(it, activeRole)),
+    })).filter((g) => g.items.length > 0)
+  }, [activeRole])
+
   return (
     <div className="flex min-h-svh flex-col bg-background">
       <header className="flex h-12 items-center gap-3 border-b border-border bg-card px-4">
-        <div className="text-sm font-semibold text-foreground">NexusAI</div>
+        <BrandMark size="sm" />
         <Badge className={cn('rounded-full text-xs', envBadgeClass(env))}>
           {env}
         </Badge>
@@ -91,24 +141,32 @@ export function AppShell() {
         </div>
       </header>
       <div className="flex min-h-0 flex-1">
-        <aside className="w-52 shrink-0 border-r border-border bg-sidebar px-2 py-3">
-          <div className="text-muted-foreground mb-2 px-2 text-xs">演示区</div>
-          <nav className="flex flex-col gap-0.5">
-            {NAV.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) =>
-                  cn(
-                    'rounded-md px-2 py-1.5 text-sm text-sidebar-foreground',
-                    isActive
-                      ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
-                      : 'hover:bg-muted',
-                  )
-                }
-              >
-                {item.label}
-              </NavLink>
+        <aside className="w-56 shrink-0 border-r border-border bg-sidebar px-2 py-3">
+          <nav className="flex flex-col gap-4">
+            {groups.map((group) => (
+              <div key={group.id}>
+                <div className="text-muted-foreground mb-1.5 px-2 text-[11px] font-medium tracking-wide uppercase">
+                  {group.label}
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  {group.items.map((item) => (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      className={({ isActive }) =>
+                        cn(
+                          'rounded-md px-2 py-1.5 text-sm text-sidebar-foreground',
+                          isActive
+                            ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
+                            : 'hover:bg-muted',
+                        )
+                      }
+                    >
+                      {item.label}
+                    </NavLink>
+                  ))}
+                </div>
+              </div>
             ))}
           </nav>
         </aside>

@@ -1,6 +1,6 @@
-# NexusAI 测试前端（Task 30）
+# NexusAI 前端（Task 30 → Wave S 产品壳）
 
-Vite + React 19 测试控制台：同一界面填入 **4 角色 API Key**，用右上角角色切换器切换，对照 `examples/qa/journeys/` 剧本做联调。**不是**产品 FE（产品形态见 30.29）。
+Vite + React 19：密码/JWT 与 **4 角色 API Key** 槽位；左侧产品分组导航 + 顶栏角色切换。联调剧本见 `examples/qa/journeys/`。
 
 ## 从零启动
 
@@ -39,13 +39,15 @@ cd frontend && pnpm install && pnpm run dev
 
 | 面板 | 路径 | journeys 线索 |
 |------|------|----------------|
-| Chat | `/panels/chat` | 用户对话 / 流式 |
-| RAG | `/panels/rag` | 同问两次看 `cache_hit` |
-| Admin | `/panels/admin` | 审批 / 建 key |
-| Audit | `/panels/audit` | 审计导出 |
-| Agent | `/panels/agent` | `vendor-risk-agent` 嵌套链 |
-| Capabilities | `/panels/capabilities` | kind 徽章 / 可见性 |
-| Eval / Performance | `/panels/eval` · `/panels/performance` | 评估与基准 |
+| Chat | `/workspace/chat`（旧 `/panels/chat` 兼容） | 用户对话 / 流式 |
+| RAG | `/knowledge` | 同问两次看 `cache_hit` |
+| API Keys | `/governance/keys` | 审批 / 建 key |
+| Audit | `/governance/audit` | 审计导出 |
+| Agent | `/workspace/agent` | `vendor-risk-agent` 嵌套链 |
+| Capabilities | `/governance/capabilities` | kind 徽章 / 可见性 |
+| Eval / Performance | `/workspace/eval` · `/governance/performance` | 评估与基准 |
+| 组织（占位） | `/governance/org` | Wave B |
+| 工作流 / 审批（占位） | `/workflows` · `/approvals` | Wave C–E |
 
 剧本目录：[`examples/qa/journeys/`](../examples/qa/journeys/)。QA 主入口迁到本测试 FE；`examples/*.html` 仍由后端 `/playground/` 挂载，保留不删。
 

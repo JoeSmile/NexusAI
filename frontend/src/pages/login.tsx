@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
+import { BrandMark } from '@/components/brand/BrandMark'
 import { RoleSwitcher } from '@/components/role/RoleSwitcher'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -16,6 +17,7 @@ import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ROLE_BADGE, ROLE_SHORT } from '@/components/role/roleStyles'
 import { ApiError } from '@/api/http'
+import { HOME_PATH, resolvePostLoginPath } from '@/lib/routes'
 import { useAuthStore } from '@/stores/authStore'
 import { cn } from '@/lib/utils'
 
@@ -42,7 +44,6 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false)
   const role = activeRole
 
-  // 密码 tab 状态
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [pwError, setPwError] = useState('')
@@ -52,14 +53,17 @@ export default function LoginPage() {
     setKeyInput(keys[role] || '')
   }, [role, keys])
 
+  const goHome = () => {
+    navigate(resolvePostLoginPath(params.get('next')), { replace: true })
+  }
+
   const onSubmitKey = async (e: FormEvent) => {
     e.preventDefault()
     setError('')
     setBusy(true)
     try {
       await loginWithKey(role, keyInput)
-      const next = params.get('next') || '/panels/chat'
-      navigate(next.startsWith('/') ? next : '/panels/chat', { replace: true })
+      goHome()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'login_failed')
     } finally {
@@ -73,8 +77,7 @@ export default function LoginPage() {
     setPwBusy(true)
     try {
       await loginWithPassword(username, password)
-      const next = params.get('next') || '/panels/chat'
-      navigate(next.startsWith('/') ? next : '/panels/chat', { replace: true })
+      goHome()
     } catch (err) {
       setPwError(passwordErrorMessage(err))
     } finally {
@@ -83,13 +86,20 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-svh items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md shadow-[var(--shadow-overlay)]">
-        <CardHeader>
-          <CardTitle className="text-xl font-semibold">NexusAI</CardTitle>
-          <CardDescription className="text-muted-foreground text-xs">
-            测试 FE 登录 — 密码登录 / Key 登录
-          </CardDescription>
+    <div className="relative flex min-h-svh items-center justify-center overflow-hidden bg-background p-4">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--accent)_0%,_transparent_55%)]"
+      />
+      <Card className="relative w-full max-w-md border-border shadow-[var(--shadow-overlay)]">
+        <CardHeader className="space-y-4 text-center">
+          <BrandMark size="lg" className="justify-center" />
+          <div className="space-y-1">
+            <CardTitle className="text-lg font-semibold">登录工作台</CardTitle>
+            <CardDescription className="text-muted-foreground text-xs">
+              企业 LLM 上下文网关 · 密码或 API Key
+            </CardDescription>
+          </div>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="password" className="w-full">
@@ -132,7 +142,7 @@ export default function LoginPage() {
                 <Button type="submit" className="w-full" disabled={pwBusy}>
                   {pwBusy ? '登录中…' : '登录'}
                 </Button>
-                <div className="text-muted-foreground text-xs text-center">
+                <div className="text-muted-foreground text-center text-xs">
                   没有账号？
                   <Link
                     to="/register"
@@ -169,8 +179,11 @@ export default function LoginPage() {
                   </p>
                 ) : null}
                 <Button type="submit" className="w-full" disabled={busy}>
-                  {busy ? '验证中…' : '进入控制台'}
+                  {busy ? '验证中…' : '进入工作台'}
                 </Button>
+                <p className="text-muted-foreground text-center text-[11px]">
+                  成功后进入 {HOME_PATH}
+                </p>
               </form>
             </TabsContent>
           </Tabs>
