@@ -242,8 +242,12 @@ def add_knowledge(
     metadata: dict | None = None,
     source: str = "",
     source_type: str = "text",
+    org_unit_id: str | None = None,
 ) -> int:
     emb = embed_text(text)
+    meta = dict(metadata or {})
+    if org_unit_id:
+        meta.setdefault("org_unit_id", org_unit_id)
     session_factory = get_pg_session()
     with session_factory.Session() as session:
         row = KnowledgeChunk(
@@ -252,8 +256,9 @@ def add_knowledge(
             content=text,
             source=source,
             source_type=source_type,
-            meta=metadata or {},
+            meta=meta,
             embedding=emb,
+            org_unit_id=org_unit_id,
         )
         session.add(row)
         session.commit()
@@ -272,13 +277,16 @@ def search_knowledge(
     with session_factory.Session() as session:
         sql = text(
             """
-            SELECT id, category, content, meta,
-                   1 - (embedding <=> :vec::vector) AS similarity
-            FROM knowledge_chunks
-            WHERE tenant_id = :tid
-              AND embedding IS NOT NULL
-              AND 1 - (embedding <=> :vec::vector) >= :min_score
-            ORDER BY embedding <=> :vec::vector
+            SELECT kc.id, kc.category, kc.content, kc.meta, kc.org_unit_id,
+                   ou.path AS org_path,
+                   1 - (kc.embedding <=> :vec::vector) AS similarity
+            FROM knowledge_chunks kc
+            LEFT JOIN org_units ou
+              ON ou.id = kc.org_unit_id AND ou.tenant_id = kc.tenant_id
+            WHERE kc.tenant_id = :tid
+              AND kc.embedding IS NOT NULL
+              AND 1 - (kc.embedding <=> :vec::vector) >= :min_score
+            ORDER BY kc.embedding <=> :vec::vector
             LIMIT :lim
             """
         )
@@ -292,7 +300,17 @@ def search_knowledge(
             },
         ).fetchall()
     docs = [r.content for r in rows]
-    metas = [{"category": r.category, **(r.meta or {})} for r in rows]
+    metas = []
+    for r in rows:
+        m = dict(r.meta or {})
+        m["category"] = r.category
+        if r.org_unit_id is not None:
+            m["org_unit_id"] = r.org_unit_id
+        elif "org_unit_id" not in m:
+            m["org_unit_id"] = None
+        if getattr(r, "org_path", None):
+            m["org_path"] = r.org_path
+        metas.append(m)
     ids = [str(r.id) for r in rows]
     dists = [max(0.0, 1.0 - float(r.similarity or 0.0)) for r in rows]
     return {

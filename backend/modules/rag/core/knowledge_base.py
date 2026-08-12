@@ -241,10 +241,13 @@ class KnowledgeBaseManager:
         """将文档块写入 pgvector knowledge_chunks"""
         try:
             logger.info(f"开始写入 pgvector 知识库，共 {len(chunks)} 个文档块")
+            org_unit_id = getattr(self, "org_unit_id", None)
             for i, chunk in enumerate(chunks):
                 meta = dict(chunk.metadata or {})
                 meta.setdefault("chunk_id", i)
                 meta.setdefault("timestamp", datetime.now().isoformat())
+                if org_unit_id:
+                    meta["org_unit_id"] = org_unit_id
                 # 只保留简单类型
                 clean_meta = {
                     k: v for k, v in meta.items() if isinstance(v, (str, int, float, bool))
@@ -254,6 +257,7 @@ class KnowledgeBaseManager:
                     category=str(meta.get("category", "general")),
                     tenant_id=self.tenant_id,
                     metadata=clean_meta,
+                    org_unit_id=org_unit_id,
                 )
             self.vectorstore = "pgvector"
             logger.info("pgvector 知识库写入完成")
@@ -284,17 +288,29 @@ class KnowledgeBaseManager:
         try:
             logger.info(f"执行相似度搜索: {query[:50]}...")
             raw = vector_ops.search_knowledge(
-                query=query, tenant_id=self.tenant_id, n_results=k
+                query=query, tenant_id=self.tenant_id, n_results=max(k * 3, k)
             )
             docs: list[Document] = []
             documents = (raw.get("documents") or [[]])[0]
             metadatas = (raw.get("metadatas") or [[]])[0]
+            org_scope = getattr(self, "org_scope", None)
             for i, content in enumerate(documents):
                 meta = metadatas[i] if i < len(metadatas) else {}
                 if filter:
                     if any(meta.get(fk) != fv for fk, fv in filter.items()):
                         continue
+                if org_scope is not None:
+                    from backend.modules.rag.org_tag import chunk_visible_to_scope
+
+                    if not chunk_visible_to_scope(
+                        org_scope,
+                        org_unit_id=meta.get("org_unit_id"),
+                        unit_path=meta.get("org_path"),
+                    ):
+                        continue
                 docs.append(Document(page_content=content, metadata=meta))
+                if len(docs) >= k:
+                    break
             logger.info(f"搜索完成，返回 {len(docs)} 个结果")
             return docs
         except Exception as e:

@@ -192,6 +192,14 @@ def create_app() -> FastAPI:
     _lazy_include(
         app, "backend.routers.auth", "router", label="账号认证", required=True
     )
+    _lazy_include(
+        app,
+        "backend.routers.org",
+        "router",
+        prefix="/api",
+        required=True,
+        label="组织 Org",
+    )
 
     # 可选路由
     features = {

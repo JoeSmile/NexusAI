@@ -247,7 +247,41 @@ class KnowledgeChunk(Base):
     source_type = Column(String(32), default="text", index=True)  # text|pdf|audio|image
     meta = Column(JSON, default=dict)
     embedding = Column(Vector(1536), nullable=True)
+    org_unit_id = Column(String(36), nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class OrgUnit(Base):
+    """部门树节点（Wave B / alembic 008）。"""
+
+    __tablename__ = "org_units"
+    id = Column(String(36), primary_key=True)
+    tenant_id = Column(String(50), nullable=False, index=True)
+    parent_id = Column(String(36), nullable=True)
+    name = Column(String(200), nullable=False)
+    path = Column(String(1024), nullable=False)
+    deleted_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    __table_args__ = (Index("ix_org_units_tenant_path", "tenant_id", "path"),)
+
+
+class OrgMembership(Base):
+    """用户 ↔ 部门兼岗 + 业务角色（Wave B）。"""
+
+    __tablename__ = "org_memberships"
+    id = Column(String(36), primary_key=True)
+    tenant_id = Column(String(50), nullable=False)
+    user_id = Column(String(100), nullable=False)
+    org_unit_id = Column(String(36), nullable=False)
+    is_primary = Column(Boolean, nullable=False, default=False)
+    business_roles = Column(JSON, nullable=False, default=list)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id", "user_id", "org_unit_id", name="uq_org_membership_tenant_user_unit"
+        ),
+        Index("ix_org_memberships_tenant_user", "tenant_id", "user_id"),
+    )
 
 
 class PGVectorSession:

@@ -83,6 +83,36 @@ def _rag_errors(fn):
     return wrapper
 
 
+def _bind_ingest_org(tenant: TenantContext) -> str:
+    """Resolve primary org for RAG write; raises 400 if missing/archived."""
+    from backend.database.pgvector_session import get_pg_session
+    from backend.modules.rag.org_tag import require_primary_org_for_ingest
+
+    sf = get_pg_session()
+    with sf.Session() as session:
+        oid, _scope = require_primary_org_for_ingest(session, tenant)
+    return oid
+
+
+def _attach_org_scope_to_kb(
+    kb_manager: KnowledgeBaseManager, tenant: TenantContext
+) -> None:
+    from backend.core.org.scope import resolve_org_scope
+    from backend.database.pgvector_session import get_pg_session
+
+    sf = get_pg_session()
+    with sf.Session() as session:
+        scope = resolve_org_scope(
+            session,
+            tenant_id=tenant.tenant_id,
+            user_id=tenant.user_id,
+            platform_role=tenant.role,
+            is_cross_tenant=tenant.is_cross_tenant,
+        )
+    kb_manager.org_scope = scope
+    kb_manager.tenant_id = tenant.tenant_id
+
+
 # ========== 请求模型 ==========
 
 class AskRequest(BaseModel):
@@ -259,6 +289,7 @@ async def upload_pdf(
     """
     tid = tenant.tenant_id
     logger.info(f"收到PDF上传请求: {file.filename}")
+    org_unit_id = _bind_ingest_org(tenant)
     
     # 验证文件类型
     if not file.filename.endswith('.pdf'):
@@ -273,6 +304,8 @@ async def upload_pdf(
     try:
         # 加载PDF到知识库(扫描件/无文本层 → 抛 RAG_002,不静默成功)
         kb_manager = get_kb_manager()
+        kb_manager.tenant_id = tid
+        kb_manager.org_unit_id = org_unit_id
         loader = EnterpriseKnowledgeLoader(kb_manager)
         pages = loader.load_from_pdf(tmp_path)
         bump_epoch(tid)
@@ -307,6 +340,7 @@ async def upload_multimodal(
     from backend.modules.rag.extractors.audio import MultimodalDependencyError
 
     tenant_id = tenant.tenant_id
+    org_unit_id = _bind_ingest_org(tenant)
     content = await file.read()
     filename = file.filename or "upload.bin"
     ok, err = validate_file(filename, content, file.content_type or "")
@@ -327,6 +361,8 @@ async def upload_multimodal(
 
         if kind == "pdf":
             kb_manager = get_kb_manager()
+            kb_manager.tenant_id = tenant_id
+            kb_manager.org_unit_id = org_unit_id
             loader = EnterpriseKnowledgeLoader(kb_manager)
             pages = loader.load_from_pdf(tmp_path)
             bump_epoch(tenant_id)
@@ -335,6 +371,7 @@ async def upload_multimodal(
                 "source_type": "pdf",
                 "message": f"PDF {filename} 已入库({pages} 页有文本)",
                 "chunks": pages,
+                "org_unit_id": org_unit_id,
             }
 
         if kind == "text":
@@ -347,6 +384,7 @@ async def upload_multimodal(
                     source=safe_name,
                     source_type="text",
                     metadata={"filename": filename},
+                    org_unit_id=org_unit_id,
                 )
                 chunk_ids.append(cid)
         elif kind == "audio":
@@ -365,6 +403,7 @@ async def upload_multimodal(
                         "start": seg.get("start"),
                         "end": seg.get("end"),
                     },
+                    org_unit_id=org_unit_id,
                 )
                 chunk_ids.append(cid)
         elif kind == "image":
@@ -382,6 +421,7 @@ async def upload_multimodal(
                 source=safe_name,
                 source_type="image",
                 metadata={"filename": filename},
+                org_unit_id=org_unit_id,
             )
             chunk_ids.append(cid)
         else:
@@ -396,6 +436,7 @@ async def upload_multimodal(
             "message": f"{safe_name} 已提取并写入知识库",
             "chunks": len(chunk_ids),
             "chunk_ids": chunk_ids,
+            "org_unit_id": org_unit_id,
         }
     except MultimodalDependencyError as e:
         raise NexusAIException(
@@ -426,8 +467,11 @@ async def ask_question(
     基于知识库内容生成专业的回答
     """
     logger.info(f"收到问答请求: {request.question[:50]}...")
-    
+
+    kb = get_kb_manager()
+    _attach_org_scope_to_kb(kb, tenant)
     rag_service = get_rag_service()
+    rag_service.kb_manager = kb
     result = rag_service.ask(
         question=request.question,
         search_k=request.search_k,
@@ -452,8 +496,11 @@ async def ask_with_context(
     考虑对话历史，生成更精准的回答(不做 L1,只吃 L2 embed 缓存)
     """
     logger.info(f"收到带上下文的问答请求: {request.question[:50]}...")
-    
+
+    kb = get_kb_manager()
+    _attach_org_scope_to_kb(kb, tenant)
     rag_service = get_rag_service()
+    rag_service.kb_manager = kb
     result = rag_service.ask_with_context(
         question=request.question,
         conversation_history=request.conversation_history,
@@ -477,8 +524,11 @@ async def search_knowledge(
     只返回相关知识片段，不生成回答
     """
     logger.info(f"收到搜索请求: {request.query[:50]}...")
-    
+
+    kb = get_kb_manager()
+    _attach_org_scope_to_kb(kb, tenant)
     rag_service = get_rag_service()
+    rag_service.kb_manager = kb
     results = rag_service.search_knowledge(
         query=request.query,
         k=request.k

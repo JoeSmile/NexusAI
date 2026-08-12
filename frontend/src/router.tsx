@@ -14,6 +14,7 @@ import EvalPanel from '@/pages/panels/eval'
 import CapabilitiesPanel from '@/pages/panels/capabilities'
 import PerformancePanel from '@/pages/panels/performance'
 import PlaceholderPanel from '@/pages/panels/PlaceholderPanel'
+import OrgTreePage from '@/pages/admin/OrgTree'
 import RagPanel from '@/pages/panels/rag'
 import { useAuthStore } from '@/stores/authStore'
 
@@ -53,7 +54,7 @@ export const router = createBrowserRouter([
           {
             element: <RequireRoles allow={ORG_ROLES} />,
             children: [
-              { path: 'governance/org', element: <PlaceholderPanel /> },
+              { path: 'governance/org', element: <OrgTreePage /> },
             ],
           },
           { path: 'governance/audit', element: <AuditPanel /> },

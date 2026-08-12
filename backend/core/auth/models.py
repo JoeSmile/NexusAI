@@ -69,14 +69,19 @@ class TenantContext:
     credential_kind: str = "api_key"
     key_id: str | None = None
     acting_user_id: str | None = None
+    # Wave B — business roles from org memberships (optional; filled by callers)
+    business_roles: list[str] | None = None
 
-    def has_permission(self, permission: str) -> bool:
-        """权限检查 — 支持通配符 `admin:*` / `chat:*`（角色与 extra 均生效）"""
-        for rp in self.extra_permissions:
-            if _perm_matches(rp, permission):
-                return True
-        role_perms = ROLES.get(self.role, {}).get("permissions", [])
-        for rp in role_perms:
-            if _perm_matches(rp, permission):
-                return True
-        return False
+    def has_permission(self, permission: str, *, org_scope: object | None = None) -> bool:
+        """平台 ∪ extra ∪ 业务角色 — 委托 evaluate_permission（Wave B）。"""
+        from backend.core.auth.evaluator import evaluate_permission
+        from backend.core.org.scope import OrgScope
+
+        scope = org_scope if isinstance(org_scope, OrgScope) else None
+        return evaluate_permission(
+            platform_role=self.role,
+            extra_permissions=self.extra_permissions,
+            business_roles=self.business_roles or [],
+            needed=permission,
+            org_scope=scope,
+        )
