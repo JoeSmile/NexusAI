@@ -29,6 +29,19 @@ SEED_CAPS: list[dict] = [
             "leaf": True,
             "executor": "rag",
         },
+        "param_spec": {
+            "query": {
+                "type": "string",
+                "required": True,
+                "description": "检索问题",
+            },
+            "search_k": {
+                "type": "number",
+                "required": False,
+                "default": 3,
+                "description": "检索条数",
+            },
+        },
         "cost_model": {"cost_per_1k": 0.01},
     },
     {
@@ -43,6 +56,13 @@ SEED_CAPS: list[dict] = [
             "leaf": True,
             "chain_audit": False,
             "executor": "model",
+        },
+        "param_spec": {
+            "message": {
+                "type": "string",
+                "required": True,
+                "description": "用户消息",
+            },
         },
         "cost_model": {"cost_per_1k": 0.01},
     },
@@ -89,6 +109,7 @@ def upsert_capability(row: dict) -> str:
             text("SELECT id FROM capabilities WHERE id = :id"),
             {"id": row["id"]},
         ).fetchone()
+        ps = row.get("param_spec")
         params = {
             "id": row["id"],
             "tid": row["tenant_id"],
@@ -98,7 +119,8 @@ def upsert_capability(row: dict) -> str:
             "spec": json.dumps(row["spec"], ensure_ascii=False),
             "status": "enabled",
             "cost": json.dumps(row.get("cost_model") or {}),
-            "perm": row.get("permission") or "chat:write",
+            "perm": row.get("permission"),
+            "param_spec": json.dumps(ps, ensure_ascii=False) if ps is not None else None,
             "now": now,
         }
         if existing:
@@ -109,6 +131,7 @@ def upsert_capability(row: dict) -> str:
                         tenant_id=:tid, name=:name, kind=:kind, provider=:provider,
                         spec=CAST(:spec AS json), status=:status,
                         cost_model=CAST(:cost AS json), permission=:perm,
+                        param_spec=CAST(:param_spec AS jsonb),
                         updated_at=:now
                     WHERE id=:id
                     """
@@ -122,10 +145,10 @@ def upsert_capability(row: dict) -> str:
                 """
                 INSERT INTO capabilities
                     (id, tenant_id, name, kind, provider, spec, status,
-                     cost_model, permission, created_at, updated_at)
+                     cost_model, permission, param_spec, created_at, updated_at)
                 VALUES
                     (:id, :tid, :name, :kind, :provider, CAST(:spec AS json), :status,
-                     CAST(:cost AS json), :perm, :now, :now)
+                     CAST(:cost AS json), :perm, CAST(:param_spec AS jsonb), :now, :now)
                 """
             ),
             params,

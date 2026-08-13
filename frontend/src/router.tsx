@@ -16,6 +16,10 @@ import PerformancePanel from '@/pages/panels/performance'
 import PlaceholderPanel from '@/pages/panels/PlaceholderPanel'
 import OrgTreePage from '@/pages/admin/OrgTree'
 import RagPanel from '@/pages/panels/rag'
+import WorkflowListPage from '@/pages/workflows/WorkflowList'
+import WorkflowEditorPage from '@/pages/workflows/WorkflowEditor'
+import RunListPage from '@/pages/workflows/RunList'
+import RunDetailPage from '@/pages/workflows/RunDetail'
 import { useAuthStore } from '@/stores/authStore'
 
 function RequireAuth() {
@@ -48,7 +52,11 @@ export const router = createBrowserRouter([
           { path: 'workspace/chat', element: <ChatPanel /> },
           { path: 'workspace/agent', element: <AgentPanel /> },
           { path: 'workspace/eval', element: <EvalPanel /> },
-          { path: 'workflows', element: <PlaceholderPanel /> },
+          { path: 'workflows', element: <WorkflowListPage /> },
+          { path: 'workflows/:id/edit', element: <WorkflowEditorPage /> },
+          { path: 'workflows/:id/runs', element: <RunListPage /> },
+          { path: 'runs', element: <RunListPage /> },
+          { path: 'runs/:runId', element: <RunDetailPage /> },
           { path: 'approvals', element: <PlaceholderPanel /> },
           { path: 'knowledge', element: <RagPanel /> },
           {
