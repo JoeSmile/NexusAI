@@ -147,6 +147,7 @@ class CapabilityRegistry:
                     nested["api_key_ref"] = item["api_key_ref"]
                 if "governance" in item and "governance" not in nested:
                     nested["governance"] = item["governance"]
+                ps = item.get("param_spec")
                 spec = CapabilitySpec(
                     id=str(item["id"]),
                     name=str(item.get("name") or item["id"]),
@@ -159,6 +160,7 @@ class CapabilityRegistry:
                     cost_model=dict(item.get("cost_model") or {}),
                     permission=str(item.get("permission") or ""),
                     tenant_id=str(item.get("tenant_id") or "*"),
+                    param_spec=dict(ps) if isinstance(ps, dict) else None,
                 )
                 self.register(spec)
                 n += 1
@@ -192,6 +194,7 @@ class CapabilityRegistry:
                 rows = session.query(Capability).all()
                 for row in rows:
                     try:
+                        ps = getattr(row, "param_spec", None)
                         spec = CapabilitySpec(
                             id=str(row.id),
                             name=str(row.name),
@@ -202,6 +205,7 @@ class CapabilityRegistry:
                             cost_model=dict(row.cost_model or {}),
                             permission=str(row.permission or ""),
                             tenant_id=str(row.tenant_id or "*"),
+                            param_spec=dict(ps) if isinstance(ps, dict) else None,
                         )
                         self.register(spec)
                         n += 1

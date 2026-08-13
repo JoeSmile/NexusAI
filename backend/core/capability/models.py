@@ -44,6 +44,8 @@ class CapabilitySpec:
     cost_model: dict[str, Any] = field(default_factory=dict)
     permission: str = ""
     tenant_id: str = "*"
+    # Wave C0: { param_name: {type, required, description?, default?, enum_values?} }
+    param_spec: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.kind, str):
@@ -56,3 +58,5 @@ class CapabilitySpec:
             self.cost_model = {}
         if self.spec is None:
             self.spec = {}
+        if self.param_spec is not None and not isinstance(self.param_spec, dict):
+            self.param_spec = dict(self.param_spec)

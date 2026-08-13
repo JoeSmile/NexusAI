@@ -60,6 +60,7 @@ def _spec_public(spec: CapabilitySpec) -> dict[str, Any]:
         "permission": spec.permission or "chat:write",
         "tenant_id": spec.tenant_id,
         "cost_model": dict(spec.cost_model or {}),
+        "param_spec": dict(spec.param_spec) if spec.param_spec else None,
         "spec": {
             k: v
             for k, v in (spec.spec or {}).items()

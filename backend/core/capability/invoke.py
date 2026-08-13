@@ -243,6 +243,8 @@ async def _invoke_rag(
             "executor": "rag",
             "knowledge_count": (result or {}).get("knowledge_count"),
             "cache_hit": (result or {}).get("cache_hit"),
+            # Wave D evidence：透传 sources（不改变 token/usage 语义）
+            "sources": list((result or {}).get("sources") or []),
         },
         "cost_source": "invoke",
     }

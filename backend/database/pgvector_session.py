@@ -231,8 +231,67 @@ class Capability(Base):
     status = Column(String, nullable=False, default="enabled")
     cost_model = Column(JSON, nullable=False, default=dict)
     permission = Column(Text, nullable=True)
+    # Wave C0: workflow 节点参数声明（编辑器 / IR 校验）
+    param_spec = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class Workflow(Base):
+    """Workflow 定义（Wave C / alembic 010）。"""
+
+    __tablename__ = "workflows"
+    id = Column(String(36), primary_key=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    org_unit_id = Column(String(36), nullable=True, index=True)
+    name = Column(String(255), nullable=False)
+    status = Column(String(32), nullable=False, default="draft")
+    ir_json = Column(JSON, nullable=False, default=dict)
+    version = Column(Text, nullable=False, default="V1.0.0")
+    revision = Column(Integer, nullable=False, default=0)
+    forked_from_id = Column(String(36), nullable=True)
+    created_by = Column(String(64), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class WorkflowRun(Base):
+    """Workflow 运行实例（Wave D / alembic 011）。"""
+
+    __tablename__ = "workflow_runs"
+    id = Column(String(36), primary_key=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    workflow_id = Column(String(36), nullable=False, index=True)
+    org_unit_id = Column(String(36), nullable=False, index=True)
+    status = Column(String(32), nullable=False, default="pending")
+    ir_snapshot = Column(JSON, nullable=False, default=dict)
+    workflow_version = Column(Text, nullable=False, default="V1.0.0")
+    workflow_revision = Column(Integer, nullable=False, default=0)
+    context_ref = Column(JSON, nullable=True)
+    parent_run_id = Column(String(36), nullable=True)
+    acting_user_id = Column(String(64), nullable=False)
+    credential_kind = Column(String(32), nullable=True)
+    error_code = Column(String(64), nullable=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    finished_at = Column(DateTime, nullable=True)
+
+
+class WorkflowRunNode(Base):
+    """Workflow 运行节点（Wave D）。"""
+
+    __tablename__ = "workflow_run_nodes"
+    id = Column(String(36), primary_key=True)
+    run_id = Column(String(36), nullable=False, index=True)
+    node_id = Column(String(128), nullable=False)
+    status = Column(String(32), nullable=False, default="pending")
+    attempt = Column(Integer, nullable=False, default=0)
+    idempotency_key = Column(String(200), nullable=False, unique=True)
+    output_json = Column(JSON, nullable=True)
+    error_message = Column(Text, nullable=True)
+    started_at = Column(DateTime, nullable=True)
+    finished_at = Column(DateTime, nullable=True)
 
 
 class KnowledgeChunk(Base):

@@ -48,6 +48,15 @@ async def lifespan(app: FastAPI):
         logger.warning("数据库初始化失败: %s", e)
 
     try:
+        from backend.core.workflow.runner import mark_zombie_runs_failed
+
+        n = mark_zombie_runs_failed()
+        if n:
+            logger.warning("✓ 标记僵尸 running runs → failed: %s", n)
+    except Exception as e:
+        logger.debug("zombie run sweep skipped: %s", e)
+
+    try:
         from backend.core.key_manager import KeyManager
 
         KeyManager()
@@ -199,6 +208,22 @@ def create_app() -> FastAPI:
         prefix="/api",
         required=True,
         label="组织 Org",
+    )
+    _lazy_include(
+        app,
+        "backend.routers.workflows",
+        "router",
+        prefix="/api",
+        required=True,
+        label="Workflow 定义",
+    )
+    _lazy_include(
+        app,
+        "backend.routers.workflow_runs",
+        "router",
+        prefix="/api",
+        required=True,
+        label="Workflow Runs",
     )
 
     # 可选路由

@@ -9,6 +9,16 @@ export type CapabilityItem = {
   permission?: string
   tenant_id?: string
   cost_model?: Record<string, unknown>
+  param_spec?: Record<
+    string,
+    {
+      type?: string
+      required?: boolean
+      description?: string
+      default?: unknown
+      enum_values?: string[]
+    }
+  > | null
   spec?: Record<string, unknown>
 }
 
