@@ -5,16 +5,19 @@ redis 不可用时静默降级,绝不因缓存导致 500。
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import os
 import re
 import struct
 import time
-import unicodedata
 from datetime import datetime
 from typing import Any
+
+from backend.core.text_normalize import (
+    make_normalized_query_hash,
+    normalize_text,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -56,16 +59,11 @@ def rag_cache_enabled() -> bool:
 
 def normalize(text: str) -> str:
     """轻量无损归一化:NFKC + lower + 折叠空白。不做同义词改写。"""
-    if not text:
-        return ""
-    s = unicodedata.normalize("NFKC", text)
-    s = s.lower()
-    s = re.sub(r"\s+", " ", s)
-    return s.strip()
+    return normalize_text(text)
 
 
 def norm_hash(text: str) -> str:
-    return hashlib.sha256(normalize(text).encode("utf-8")).hexdigest()[:16]
+    return make_normalized_query_hash(text)
 
 
 def contains_pii(text: str) -> bool:

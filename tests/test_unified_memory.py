@@ -374,9 +374,10 @@ async def test_build_context_strips_memory_on_role_drift() -> None:
     state["hot_memory"] = []
     state["cold_memory"] = []
     out = await build_context(state)
-    assert MEMORY_ISOLATION_HEADER in out["raw_input"]
-    assert "家人们" not in out["raw_input"]
-    assert "user: 你好" in out["raw_input"]
+    assert MEMORY_ISOLATION_HEADER in (out["assembled_prompt"] or "")
+    assert "家人们" not in (out["assembled_prompt"] or "")
+    assert "user: 你好" in (out["assembled_prompt"] or "")
+    assert out["raw_input"] == "你好"
 
 
 def test_prompt_composer_clamps_relaxed_style() -> None:

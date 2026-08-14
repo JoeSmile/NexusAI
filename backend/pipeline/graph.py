@@ -20,6 +20,7 @@ from backend.pipeline.nodes.guardrails_output import guardrails_output
 from backend.pipeline.nodes.llm_generate import llm_generate
 from backend.pipeline.nodes.load_memory import load_memory
 from backend.pipeline.nodes.model_router import model_router, route_short_or_long
+from backend.pipeline.nodes.preprocess import preprocess, should_gate_block
 from backend.pipeline.nodes.rate_limiter import rate_limiter
 from backend.pipeline.nodes.task_plan import task_plan
 from backend.pipeline.nodes.write_memory import write_memory
@@ -65,16 +66,18 @@ def _lf_node(name: str, fn: Any) -> Any:
 
 
 def build_pipeline():
-    """构建并编译管线"""
+    """构建并编译管线（Task 39 序：preprocess → … → load_memory after guard）。"""
     builder = StateGraph(PipelineState)
 
     builder.add_node("auth_check", _lf_node("auth_check", auth_check))
-    builder.add_node("load_memory", _lf_node("load_memory", load_memory))
+    builder.add_node("preprocess", _lf_node("preprocess", preprocess))
     builder.add_node("rate_limiter", _lf_node("rate_limiter", rate_limiter))
     builder.add_node("cache_check", _lf_node("cache_check", cache_check))
     builder.add_node("guardrails_input", _lf_node("guardrails_input", guardrails_input))
+    builder.add_node("load_memory", _lf_node("load_memory", load_memory))
     builder.add_node("analyze_parallel", _lf_node("analyze_parallel", analyze_parallel))
-    builder.add_node("task_plan", _lf_node("task_plan", task_plan))
+    # Node name ≠ state key `task_plan` (official LangGraph forbids collision)
+    builder.add_node("task_planning", _lf_node("task_planning", task_plan))
     builder.add_node("build_context", _lf_node("build_context", build_context))
     builder.add_node("experiment_hook", _lf_node("experiment_hook", experiment_hook))
     builder.add_node("model_router", _lf_node("model_router", model_router))
@@ -85,8 +88,15 @@ def build_pipeline():
 
     builder.set_entry_point("auth_check")
 
-    builder.add_edge("auth_check", "load_memory")
-    builder.add_edge("load_memory", "rate_limiter")
+    builder.add_edge("auth_check", "preprocess")
+    builder.add_conditional_edges(
+        "preprocess",
+        should_gate_block,
+        {
+            "end": END,
+            "continue": "rate_limiter",
+        },
+    )
     builder.add_edge("rate_limiter", "cache_check")
 
     builder.add_conditional_edges(
@@ -103,11 +113,12 @@ def build_pipeline():
         should_block_to_end,
         {
             "end": END,
-            "continue": "analyze_parallel",
+            "continue": "load_memory",
         },
     )
-    builder.add_edge("analyze_parallel", "task_plan")
-    builder.add_edge("task_plan", "build_context")
+    builder.add_edge("load_memory", "analyze_parallel")
+    builder.add_edge("analyze_parallel", "task_planning")
+    builder.add_edge("task_planning", "build_context")
     builder.add_edge("build_context", "experiment_hook")
     builder.add_edge("experiment_hook", "model_router")
 

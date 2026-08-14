@@ -33,7 +33,8 @@ async def test_experiment_hook_assigns_and_records_exposure(monkeypatch):
     out = await experiment_hook(state)
     assert out["ab_experiment_id"] == "exp1"
     assert out["ab_variant"] == "B"
-    assert out["raw_input"].startswith("PREFIX")
+    assert out["assembled_prompt"].startswith("PREFIX")
+    assert out["raw_input"] == "hello"
     assert len(calls) == 1
     assert calls[0]["event_type"] == "exposure"
     assert calls[0]["group"] == "B"

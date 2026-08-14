@@ -33,10 +33,10 @@ async def build_context(state: PipelineState) -> PipelineState:
             drift_blocked = True
     parts = [memory_block] if memory_block else []
     parts.append(f"user: {state['message']}")
-    state["raw_input"] = "\n\n".join(parts)
+    state["assembled_prompt"] = "\n\n".join(parts)
     enrich_span(
         input_data={"message": state.get("message")},
-        output_data={"raw_input_len": len(state["raw_input"] or "")},
+        output_data={"assembled_prompt_len": len(state["assembled_prompt"] or "")},
         metadata={
             "intent": state.get("intent"),
             "cold_count": len(bundle.cold),

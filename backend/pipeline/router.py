@@ -102,16 +102,20 @@ async def _run_chat_pipeline(
         final["pipeline_latency_ms"] = latency
         finish_reason = final.get("finish_reason") or "llm_generated"
 
+        audit_input = str(final.get("raw_input") or final.get("message") or "")
+        if len(audit_input) > 4000:
+            audit_input = audit_input[:4000]
+
         log_audit(
             background_tasks,
             tenant_id=final["tenant_id"],
             user_id=final["user_id"],
             action="chat",
             trace_id=final["trace_id"],
-            input_text=final["message"],
+            input_text=audit_input,
             output_text=final["response"],
             model=final.get("selected_model", ""),
-            input_tokens=len(final["message"]),
+            input_tokens=len(audit_input),
             output_tokens=len(final.get("response") or ""),
             cost=final.get("total_cost", 0.0),
             latency_ms=latency,
@@ -266,7 +270,11 @@ async def chat_streaming(
 
     harness = LLMHarness()
     model = final.get("selected_model") or "deepseek-v4-flash"
-    prompt = final.get("raw_input") or final.get("message") or ""
+    prompt = (
+        final.get("assembled_prompt")
+        or final.get("message")
+        or ""
+    )
 
     async def event_stream() -> AsyncIterator[str]:
         buffer = ""

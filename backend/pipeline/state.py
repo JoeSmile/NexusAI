@@ -21,6 +21,9 @@ class PipelineState(TypedDict):
     # ── 输入 ──
     message: str
     raw_input: str
+    query_hash: str
+    assembled_prompt: str | None
+    gate_reason: str | None
 
     # ── 记忆 ──
     hot_memory: list[dict]
@@ -103,6 +106,9 @@ def make_initial_state(
         },
         "message": message,
         "raw_input": message,
+        "query_hash": "",
+        "assembled_prompt": None,
+        "gate_reason": None,
         "hot_memory": [],
         "warm_memory": {},
         "cold_memory": [],

@@ -61,6 +61,16 @@ async def test_empty_input():
     assert result.action == "pass"
 
 
+@pytest.mark.asyncio
+async def test_oversize_hard_blocked(monkeypatch):
+    """2B: check_input 超长硬拦（非 truncate），与 GATE_002 同上限。"""
+    monkeypatch.setenv("PIPELINE_MAX_INPUT_CHARS", "10")
+    result = await check_input("abcdefghijk")
+    assert result.action == "blocked"
+    assert result.reason == "length_exceeded"
+    assert result.redacted_text == "abcdefghijk"
+
+
 # ── 角色漂移(企业助手人设)──
 
 

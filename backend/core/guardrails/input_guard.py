@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from typing import Any
 
@@ -42,14 +43,29 @@ def detect_injection_in_params(params: dict[str, Any] | None) -> str | None:
     return None
 
 
+def _max_input_chars() -> int:
+    """与 preprocess GATE_002 同一上限（PIPELINE_MAX_INPUT_CHARS，默认 10000）。"""
+    try:
+        return int(os.getenv("PIPELINE_MAX_INPUT_CHARS", "10000") or "10000")
+    except ValueError:
+        return 10000
+
+
 async def check_input(message: str) -> GuardResult:
-    """检查用户输入"""
+    """检查用户输入。超长硬拦（非 truncate）；chat 另有 GATE_002 早退。"""
     hit = detect_injection(message)
     if hit:
         return GuardResult(
             action="blocked",
             redacted_text=message,
             reason=f"injection:{hit}",
+        )
+
+    if len(message or "") > _max_input_chars():
+        return GuardResult(
+            action="blocked",
+            redacted_text=message,
+            reason="length_exceeded",
         )
 
     redacted = message
@@ -61,13 +77,6 @@ async def check_input(message: str) -> GuardResult:
             action="redacted",
             redacted_text=redacted,
             reason="pii_found",
-        )
-
-    if len(message) > 10000:
-        return GuardResult(
-            action="redacted",
-            redacted_text=message[:10000],
-            reason="length_exceeded",
         )
 
     return GuardResult(action="pass", redacted_text=message, reason="")

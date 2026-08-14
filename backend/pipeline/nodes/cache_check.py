@@ -2,18 +2,21 @@
 
 from __future__ import annotations
 
-import hashlib
+import logging
 
 from sqlalchemy import text
 
+from backend.core.text_normalize import make_normalized_query_hash
 from backend.database.pgvector_session import get_pg_session
 from backend.observability.decorators import observe
 from backend.pipeline.state import PipelineState
 
+logger = logging.getLogger(__name__)
+
 
 def make_query_hash(message: str) -> str:
-    """生成查询哈希（前 16 位）"""
-    return hashlib.sha256(message.encode()).hexdigest()[:16]
+    """生成查询哈希（前 16 位）— 与 preprocess / RAG 同源 normalize。"""
+    return make_normalized_query_hash(message)
 
 
 def _cheap_fingerprint(message: str) -> str | None:
@@ -29,12 +32,21 @@ def _cheap_fingerprint(message: str) -> str | None:
 
 @observe(name="pipeline.cache_check")
 async def cache_check(state: PipelineState) -> PipelineState:
-    """检查精确缓存 + 指纹缓存"""
+    """检查精确缓存 + 指纹缓存；exact key 只用 state.query_hash（Task 39）。"""
     tenant_id = state["tenant_id"]
     user_id = state["user_id"]
     message = state["message"]
 
-    query_hash = make_query_hash(message)
+    query_hash = state.get("query_hash") or ""
+    if not query_hash:
+        logger.warning(
+            "cache_check: missing query_hash (tenant=%s); treating as miss",
+            tenant_id,
+        )
+        from backend.core.metrics import cache_misses
+
+        cache_misses.labels(tenant=tenant_id, cache_type="pipeline").inc()
+        return state
 
     session_factory = get_pg_session()
     with session_factory.Session() as session:

@@ -21,13 +21,17 @@ async def experiment_hook(state: PipelineState) -> PipelineState:
     state["ab_variant"] = assignment["variant"]
     state["ab_variant_config"] = assignment.get("variant_config") or {}
 
-    # prompt_prefix 拼进上下文；system_prompt 由 llm_generate 作为 system 消息注入
+    # prompt_prefix 拼进 assembled_prompt；system_prompt 由 llm_generate 作为 system 消息注入
     cfg = state["ab_variant_config"]
     prefix = cfg.get("prompt_prefix")
     if prefix and isinstance(prefix, str):
-        raw = state.get("raw_input") or state.get("message") or ""
-        if not raw.startswith(prefix):
-            state["raw_input"] = f"{prefix}\n\n{raw}"
+        base = (
+            state.get("assembled_prompt")
+            or state.get("message")
+            or ""
+        )
+        if not str(base).startswith(prefix):
+            state["assembled_prompt"] = f"{prefix}\n\n{base}"
 
     try:
         record_event(

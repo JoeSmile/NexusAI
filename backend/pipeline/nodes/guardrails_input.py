@@ -14,13 +14,15 @@ async def guardrails_input(state: PipelineState) -> PipelineState:
     result = await check_input(state["message"])
 
     if result.action == "blocked":
-        state["prompt_injection_detected"] = True
+        is_injection = str(result.reason or "").startswith("injection")
+        state["prompt_injection_detected"] = is_injection
         state["guardrails_passed"] = False
         state["response"] = "输入内容不符合安全规范，已被拦截。"
         state["finish_reason"] = "blocked"
         state["error_code"] = "GUARD_001"
         guardrails_blocked.labels(
-            tenant=state["tenant_id"], guard="injection"
+            tenant=state["tenant_id"],
+            guard="injection" if is_injection else "length",
         ).inc()
         return state
 

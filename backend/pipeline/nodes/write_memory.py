@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import os
 from datetime import datetime, timedelta
@@ -97,22 +96,27 @@ async def write_memory(state: PipelineState) -> PipelineState:
     with session_factory.Session() as session:
         mock = os.getenv("LLM_MOCK", "true").lower() == "true"
         if mock and response:
-            query_hash = hashlib.sha256(message.encode()).hexdigest()[:16]
-            exact_key = f"exact:{tenant_id}:{user_id}:{query_hash}"
-            session.execute(
-                text("DELETE FROM cache_entries WHERE cache_key = :k"),
-                {"k": exact_key},
-            )
-            session.add(
-                CacheEntry(
-                    cache_key=exact_key,
-                    cache_type="exact",
-                    tenant_id=tenant_id,
-                    value=response,
-                    ttl_seconds=300,
-                    expires_at=datetime.utcnow() + timedelta(seconds=300),
+            query_hash = state.get("query_hash") or ""
+            if not query_hash:
+                logger.warning(
+                    "write_memory: missing query_hash; skip exact cache write"
                 )
-            )
+            else:
+                exact_key = f"exact:{tenant_id}:{user_id}:{query_hash}"
+                session.execute(
+                    text("DELETE FROM cache_entries WHERE cache_key = :k"),
+                    {"k": exact_key},
+                )
+                session.add(
+                    CacheEntry(
+                        cache_key=exact_key,
+                        cache_type="exact",
+                        tenant_id=tenant_id,
+                        value=response,
+                        ttl_seconds=300,
+                        expires_at=datetime.utcnow() + timedelta(seconds=300),
+                    )
+                )
 
             fingerprint = state.get("fingerprint")
             if fingerprint:
@@ -149,10 +153,10 @@ async def write_memory(state: PipelineState) -> PipelineState:
                 "tid": tenant_id,
                 "uid": user_id,
                 "trace_id": trace_id,
-                "input": message,
+                "input": (state.get("raw_input") or message or "")[:4000],
                 "output": response,
                 "model": state.get("selected_model", ""),
-                "in_tok": len(message),
+                "in_tok": len(state.get("raw_input") or message or ""),
                 "out_tok": len(response or ""),
                 "cost": state.get("total_cost", 0.0),
                 "latency": state.get("pipeline_latency_ms", 0.0),

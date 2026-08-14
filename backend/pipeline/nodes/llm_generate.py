@@ -21,7 +21,11 @@ async def llm_generate(state: PipelineState) -> PipelineState:
     tenant_id = state["tenant_id"]
     api_key = state.get("llm_api_key") or os.getenv("LLM_API_KEY", "")
     base_url = state.get("llm_base_url") or os.getenv("LLM_BASE_URL", "")
-    message = state.get("raw_input", state["message"])
+    message = (
+        state.get("assembled_prompt")
+        or state.get("message")
+        or ""
+    )
 
     messages: list[dict[str, str]] = []
     ab_cfg = state.get("ab_variant_config") or {}
