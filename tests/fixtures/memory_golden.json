@@ -1,0 +1,268 @@
+{
+  "cases": [
+    {
+      "id": "entity_ok_colleague",
+      "expect": "accept",
+      "source_text": "请同事王工明天来评审预算报表",
+      "item": {
+        "type": "entity",
+        "text": "王工",
+        "source_span": "同事王工",
+        "confidence": 0.7,
+        "status": "active",
+        "name": "王工",
+        "entity_type": "person",
+        "relation": "同事",
+        "mention_source": "user",
+        "related": []
+      }
+    },
+    {
+      "id": "entity_ok_customer",
+      "expect": "accept",
+      "source_text": "客户张三反馈接口超时",
+      "item": {
+        "type": "entity",
+        "text": "张三",
+        "source_span": "客户张三",
+        "confidence": 0.7,
+        "status": "active",
+        "name": "张三",
+        "entity_type": "person",
+        "relation": "客户",
+        "mention_source": "user",
+        "related": []
+      }
+    },
+    {
+      "id": "entity_reject_hallucination",
+      "expect": "REJECT_GROUNDING",
+      "source_text": "王工说今天开会",
+      "item": {
+        "type": "entity",
+        "text": "张伟",
+        "source_span": "张伟",
+        "confidence": 0.7,
+        "status": "active",
+        "name": "张伟",
+        "entity_type": "person",
+        "relation": "同事",
+        "mention_source": "user",
+        "related": []
+      }
+    },
+    {
+      "id": "entity_reject_secret",
+      "expect": "REJECT_SECURITY",
+      "source_text": "同事王工的密码是 abc123",
+      "item": {
+        "type": "entity",
+        "text": "王工的密码是abc123",
+        "source_span": "密码是 abc123",
+        "confidence": 0.7,
+        "status": "active",
+        "name": "王工",
+        "entity_type": "person",
+        "relation": "同事",
+        "mention_source": "user",
+        "related": []
+      }
+    },
+    {
+      "id": "error_ok_platform",
+      "expect": "accept",
+      "source_text": "调用失败返回 AUTH_001 无效密钥",
+      "item": {
+        "type": "error_code",
+        "text": "AUTH_001",
+        "source_span": "AUTH_001",
+        "confidence": 1.0,
+        "status": "active",
+        "code": "AUTH_001",
+        "count": 1
+      }
+    },
+    {
+      "id": "error_ok_external",
+      "expect": "accept",
+      "source_text": "上游返回 FOO_999 可重试",
+      "item": {
+        "type": "error_code",
+        "text": "FOO_999",
+        "source_span": "FOO_999",
+        "confidence": 0.9,
+        "status": "active",
+        "code": "FOO_999",
+        "count": 1
+      }
+    },
+    {
+      "id": "error_reject_bad_format",
+      "expect": "REJECT_SCHEMA",
+      "source_text": "出错了 err42",
+      "item": {
+        "type": "error_code",
+        "text": "err42",
+        "source_span": "err42",
+        "confidence": 0.9,
+        "status": "active",
+        "code": "err42",
+        "count": 1
+      }
+    },
+    {
+      "id": "error_reject_not_in_source",
+      "expect": "REJECT_GROUNDING",
+      "source_text": "一切正常",
+      "item": {
+        "type": "error_code",
+        "text": "RATE_001",
+        "source_span": "RATE_001",
+        "confidence": 1.0,
+        "status": "active",
+        "code": "RATE_001",
+        "count": 1
+      }
+    },
+    {
+      "id": "decision_ok",
+      "expect": "accept",
+      "source_text": "我们决定采用 Redis 集群做缓存方案",
+      "item": {
+        "type": "decision",
+        "text": "采用 Redis 集群",
+        "source_span": "决定采用 Redis 集群",
+        "confidence": 0.8,
+        "status": "active",
+        "statement": "缓存方案改用 Redis 集群",
+        "options": [],
+        "chosen": "Redis 集群",
+        "related": []
+      }
+    },
+    {
+      "id": "decision_reject_related_unknown",
+      "expect": "REJECT_SEMANTIC",
+      "source_text": "决定采用方案A",
+      "known_entity_names": [],
+      "item": {
+        "type": "decision",
+        "text": "采用方案A",
+        "source_span": "决定采用方案A",
+        "confidence": 0.8,
+        "status": "active",
+        "statement": "采用方案A",
+        "related": ["幽灵人"]
+      }
+    },
+    {
+      "id": "todo_ok_self",
+      "expect": "accept",
+      "source_text": "待办:周五前提交预算报表",
+      "item": {
+        "type": "todo",
+        "text": "提交预算报表",
+        "source_span": "待办:周五前提交预算报表",
+        "confidence": 0.75,
+        "status": "open",
+        "action": "提交预算报表",
+        "owner_kind": "self",
+        "due": "周五前"
+      }
+    },
+    {
+      "id": "todo_ok_entity_owner",
+      "expect": "accept",
+      "source_text": "待办:请王工周五前完成评审",
+      "known_entity_names": ["王工"],
+      "item": {
+        "type": "todo",
+        "text": "完成评审",
+        "source_span": "待办:请王工周五前完成评审",
+        "confidence": 0.75,
+        "status": "open",
+        "action": "完成评审",
+        "owner": "王工",
+        "owner_kind": "entity",
+        "due": "周五前"
+      }
+    },
+    {
+      "id": "todo_reject_missing_action",
+      "expect": "REJECT_SCHEMA",
+      "source_text": "待办:",
+      "item": {
+        "type": "todo",
+        "text": "x",
+        "source_span": "待办:",
+        "confidence": 0.75,
+        "status": "open",
+        "action": "",
+        "owner_kind": "self"
+      }
+    },
+    {
+      "id": "todo_reject_pronoun_owner",
+      "expect": "REJECT_SEMANTIC",
+      "source_text": "待办:让他周五前交报表",
+      "known_entity_names": [],
+      "item": {
+        "type": "todo",
+        "text": "交报表",
+        "source_span": "让他周五前交报表",
+        "confidence": 0.75,
+        "status": "open",
+        "action": "交报表",
+        "owner": "他",
+        "owner_kind": "entity",
+        "due": "周五前"
+      }
+    },
+    {
+      "id": "r11_bind_skeleton_pending",
+      "expect": "accept",
+      "note": "R1.1 skeleton: entity item valid; bind timing exercised in S2",
+      "source_text": "请同事王工评审，明天来可以",
+      "item": {
+        "type": "entity",
+        "text": "王工",
+        "source_span": "同事王工",
+        "confidence": 0.7,
+        "status": "active",
+        "name": "王工",
+        "entity_type": "person",
+        "relation": "同事",
+        "mention_source": "bind_pending",
+        "related": []
+      },
+      "bind_context": {
+        "pending_snippet": "他明天来",
+        "explicit_turn": "请同事王工评审，明天来可以",
+        "should_bind": true
+      }
+    },
+    {
+      "id": "r11_nobind_skeleton",
+      "expect": "REJECT_GROUNDING",
+      "note": "explicit name without overlapping context vs wrong span",
+      "source_text": "今天天气不错顺便提下同事李四",
+      "item": {
+        "type": "entity",
+        "text": "王工",
+        "source_span": "王工",
+        "confidence": 0.7,
+        "status": "active",
+        "name": "王工",
+        "entity_type": "person",
+        "relation": "同事",
+        "mention_source": "user",
+        "related": []
+      },
+      "bind_context": {
+        "pending_snippet": "他明天来",
+        "explicit_turn": "今天天气不错顺便提下同事李四",
+        "should_bind": false
+      }
+    }
+  ]
+}
