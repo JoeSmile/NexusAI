@@ -7,6 +7,7 @@ import logging
 from typing import Any
 
 from backend.core.audit import write_audit_sync
+from backend.core.memory.flywheel import record_correction_phrase, record_item_outcome
 from backend.core.memory.item_rules import (
     extract_structured_items,
     pending_key,
@@ -85,6 +86,7 @@ async def persist_structured_turn(
         user_id=user_id, session_id=session_id, role="user"
     )
     text = message or ""
+    record_correction_phrase(text)
 
     # 1) pending upsert for pronouns
     for ant in pronoun_hits(text):
@@ -169,6 +171,9 @@ async def persist_structured_turn(
             item, cand.source_text, known_entity_names=accepted_entities
         )
         if not ok:
+            record_item_outcome(
+                accepted=False, reason_code=reason, item_type=item.type
+            )
             _audit(
                 tenant_id=tenant_id,
                 user_id=user_id,
@@ -179,6 +184,7 @@ async def persist_structured_turn(
                 error_code=reason,
             )
             continue
+        record_item_outcome(accepted=True, item_type=item.type)
         await mem.write(
             "warm",
             user_id=user_id,
