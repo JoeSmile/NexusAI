@@ -112,6 +112,33 @@ def complete_via_provider(
     key_chain: list | None = None,
 ) -> str:
     """按 LLM_PROVIDER 完成一次文本生成（同步）。openai/record 支持 429/401 切 key。"""
+    from backend.core.llm_concurrency import llm_slot_sync
+
+    with llm_slot_sync():
+        return _complete_via_provider_unlocked(
+            model,
+            messages,
+            temperature=temperature,
+            api_key=api_key,
+            base_url=base_url,
+            tenant_id=tenant_id,
+            key_provider=key_provider,
+            key_chain=key_chain,
+        )
+
+
+def _complete_via_provider_unlocked(
+    model: str,
+    messages: list[dict],
+    *,
+    temperature: float = 0.7,
+    api_key: str | None = None,
+    base_url: str | None = None,
+    tenant_id: str = "default",
+    key_provider: str = "default",
+    key_chain: list | None = None,
+) -> str:
+    """无信号量包装的同步完成（供 complete_via_provider 内部使用）。"""
     provider = get_llm_provider()
     prompt = _messages_to_prompt(messages)
 

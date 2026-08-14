@@ -51,40 +51,43 @@ class LLMHarness(Harness):
 
         input_tokens = sum(count_tokens(m.get("content", "")) for m in messages)
 
-        async def _call():
-            provider = get_llm_provider()
-            prompt = "\n".join(m.get("content", "") for m in messages)
-            if provider == "mock":
-                return mock_response(model, prompt)
-            if provider == "replay":
-                hit = load_fixture(model, messages)
-                if hit is not None:
-                    return hit
-                return mock_response(model, prompt)
-            # record / openai:真实调用 + Task 27 key failover
-            return await self._call_api(
-                model,
-                messages,
-                api_key,
-                base_url,
-                tenant_id=tenant_id,
-                key_provider=str(kwargs.get("provider") or "default"),
-                max_tokens=int(kwargs.get("max_tokens", 1000)),
-            )
+        from backend.core.llm_concurrency import llm_slot
 
-        result = await self.wrap(
-            fn=_call,
-            type="llm",
-            name=model,
-            tenant_id=tenant_id,
-            input=messages,
-            metadata={
-                "model": model,
-                "input_tokens": input_tokens,
-                "max_tokens": kwargs.get("max_tokens", 1000),
-                "cost_per_token": COST_TABLE.get(model, COST_TABLE["default"]),
-            },
-        )
+        async with llm_slot():
+            async def _call():
+                provider = get_llm_provider()
+                prompt = "\n".join(m.get("content", "") for m in messages)
+                if provider == "mock":
+                    return mock_response(model, prompt)
+                if provider == "replay":
+                    hit = load_fixture(model, messages)
+                    if hit is not None:
+                        return hit
+                    return mock_response(model, prompt)
+                # record / openai:真实调用 + Task 27 key failover
+                return await self._call_api(
+                    model,
+                    messages,
+                    api_key,
+                    base_url,
+                    tenant_id=tenant_id,
+                    key_provider=str(kwargs.get("provider") or "default"),
+                    max_tokens=int(kwargs.get("max_tokens", 1000)),
+                )
+
+            result = await self.wrap(
+                fn=_call,
+                type="llm",
+                name=model,
+                tenant_id=tenant_id,
+                input=messages,
+                metadata={
+                    "model": model,
+                    "input_tokens": input_tokens,
+                    "max_tokens": kwargs.get("max_tokens", 1000),
+                    "cost_per_token": COST_TABLE.get(model, COST_TABLE["default"]),
+                },
+            )
 
         if not result.success:
             return result
@@ -124,6 +127,24 @@ class LLMHarness(Harness):
         **kwargs: Any,
     ) -> AsyncIterator[str]:
         """真流式：优先 OpenAI-compatible astream；否则 mock/降级切片。"""
+        from backend.core.llm_concurrency import llm_slot
+
+        async with llm_slot():
+            async for chunk in self._stream_unlocked(
+                model, messages, tenant_id, api_key, base_url, **kwargs
+            ):
+                yield chunk
+
+    async def _stream_unlocked(
+        self,
+        model: str,
+        messages: list[dict],
+        tenant_id: str,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[str]:
+        """真流式主体（已在并发槽内）。"""
         estimated = estimate_cost(model, kwargs.get("max_tokens", 1000))
         if not await check_budget(tenant_id, estimated):
             yield "预算超限，请求被拒绝。"
