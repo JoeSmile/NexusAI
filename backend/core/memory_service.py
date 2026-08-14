@@ -546,11 +546,15 @@ class UnifiedMemoryService:
         *,
         context_window_tokens: int | None = None,
         budget_ratio: float | None = None,
+        query: str | None = None,
     ) -> str:
-        """按 token 预算组装记忆段；超预算先丢最旧 cold。
+        """按 token 预算组装记忆段（Task 42 双轨：用户域常驻 + 世界域按需）。
 
         返回含隔离标记的文本，供 system 段拼接（不得当 user role）。
+        ``pending:*`` 永不注入。
         """
+        import json
+
         window = context_window_tokens or int(
             os.getenv("MEMORY_CONTEXT_TOKENS") or _DEFAULT_CONTEXT_TOKENS
         )
@@ -562,35 +566,109 @@ class UnifiedMemoryService:
                 ratio = _DEFAULT_MEMORY_BUDGET_RATIO
         budget = max(64, int(window * ratio))
 
+        def _tok(s: str) -> int:
+            return max(1, len(s) // 4)
+
+        def _parse_val(raw: str) -> dict | str:
+            try:
+                obj = json.loads(raw)
+                return obj if isinstance(obj, dict) else raw
+            except Exception:
+                return raw
+
+        def _hit(query_text: str, key: str, val: str) -> bool:
+            q = (query_text or "").strip().lower()
+            if not q:
+                return False
+            blob = f"{key} {val}".lower()
+            # 关键词：query 中长度≥2 的子串命中
+            for i in range(len(q) - 1):
+                tok = q[i : i + 2]
+                if tok in blob:
+                    return True
+            return key.split(":", 1)[-1].lower() in q
+
+        user_lines: list[str] = []
+        todo_lines: list[str] = []
+        decision_lines: list[str] = []
+        error_lines: list[str] = []
+        entity_lines: list[str] = []
+
+        for key, raw in (bundle.warm or {}).items():
+            if key.startswith("pending:"):
+                continue
+            val = _parse_val(str(raw))
+            if key.startswith(
+                ("fact:", "preference:", "identity:", "user:", "profile:")
+            ):
+                display = val if isinstance(val, str) else (val.get("text") or raw)
+                user_lines.append(f"- {key}: {display}")
+                continue
+            if key.startswith(("todo:", "decision:", "error:", "entity:")):
+                if not isinstance(val, dict):
+                    continue
+                if key.startswith("todo:"):
+                    if val.get("status", "open") == "done":
+                        continue
+                    owner = val.get("owner") or (
+                        "自己" if val.get("owner_kind") == "self" else ""
+                    )
+                    todo_lines.append(
+                        f"- {val.get('action') or val.get('text')} (owner:{owner or '自己'})"
+                    )
+                elif key.startswith("decision:"):
+                    if query and not _hit(query, key, str(raw)):
+                        continue
+                    decision_lines.append(
+                        f"- {val.get('statement') or val.get('text')}"
+                    )
+                elif key.startswith("error:"):
+                    if query and not _hit(query, key, str(raw)):
+                        continue
+                    error_lines.append(f"- {val.get('code') or val.get('text')}")
+                elif key.startswith("entity:"):
+                    if query and not _hit(query, key, str(raw)):
+                        continue
+                    rel = val.get("relation") or ""
+                    name = val.get("name") or val.get("text")
+                    entity_lines.append(f"- {name}({rel})" if rel else f"- {name}")
+                continue
+            # 其它遗留 key → 用户域
+            display = val if isinstance(val, str) else str(raw)
+            user_lines.append(f"- {key}: {display}")
+
+        # 优先级：todo > decision > error > entity > 用户画像 > cold > hot
         parts: list[str] = [MEMORY_ISOLATION_HEADER]
-        # warm first (compact)
-        if bundle.warm:
-            warm_lines = [f"- {k}: {v}" for k, v in list(bundle.warm.items())[:20]]
-            parts.append("## 画像/偏好\n" + "\n".join(warm_lines))
-        # cold (drop oldest first when over budget)
+        if todo_lines:
+            parts.append("[活跃待办]\n" + "\n".join(todo_lines[:10]))
+        if decision_lines:
+            parts.append("[近期决策]\n" + "\n".join(decision_lines[:8]))
+        if error_lines:
+            parts.append("[相关错误码]\n" + "\n".join(error_lines[:8]))
+        if entity_lines:
+            parts.append("[用户提到的对象]\n" + "\n".join(entity_lines[:8]))
+        if user_lines:
+            parts.append("[用户背景]\n" + "\n".join(user_lines[:20]))
+
         cold_blocks = [
             f"- {c.get('summary')}" for c in bundle.cold if c.get("summary")
         ]
-        # hot
         hot_lines = [
             f"{m.get('role')}: {m.get('content')}"
             for m in bundle.hot
             if m.get("content")
         ]
 
-        def _tok(s: str) -> int:
-            return max(1, len(s) // 4)
-
         used = _tok("\n".join(parts))
         cold_kept: list[str] = []
-        for block in reversed(cold_blocks):  # newest first keep
+        for block in reversed(cold_blocks):
             t = _tok(block)
             if used + t > budget:
                 break
             cold_kept.insert(0, block)
             used += t
         if cold_kept:
-            parts.append("## 会话摘要\n" + "\n".join(cold_kept))
+            parts.append("[会话摘要]\n" + "\n".join(cold_kept))
 
         hot_kept: list[str] = []
         for line in reversed(hot_lines):
@@ -600,7 +678,7 @@ class UnifiedMemoryService:
             hot_kept.insert(0, line)
             used += t
         if hot_kept:
-            parts.append("## 最近对话\n" + "\n".join(hot_kept))
+            parts.append("[最近对话]\n" + "\n".join(hot_kept))
 
         return "\n\n".join(parts)
 

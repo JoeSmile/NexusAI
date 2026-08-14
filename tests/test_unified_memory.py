@@ -152,7 +152,12 @@ def test_assemble_prompt_block_has_isolation_and_budget() -> None:
         bundle, context_window_tokens=200, budget_ratio=0.3
     )
     assert MEMORY_ISOLATION_HEADER in text
-    assert "画像" in text or "profile" in text.lower() or "偏好" in text
+    assert (
+        "画像" in text
+        or "profile" in text.lower()
+        or "偏好" in text
+        or "用户背景" in text
+    )
     # 小预算应丢弃部分 cold/hot，但隔离头保留
     assert text.startswith(MEMORY_ISOLATION_HEADER)
 

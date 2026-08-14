@@ -21,7 +21,9 @@ async def build_context(state: PipelineState) -> PipelineState:
         warm=dict(state.get("warm_memory") or {}),
         cold=list(state.get("cold_memory") or []),
     )
-    memory_block = mem.assemble_prompt_block(bundle)
+    memory_block = mem.assemble_prompt_block(
+        bundle, query=str(state.get("message") or "")
+    )
     drift_blocked = False
     if memory_block:
         drift = await check_role_drift(memory_block)
