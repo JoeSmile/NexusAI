@@ -214,6 +214,7 @@ async def task_plan(state: PipelineState) -> PipelineState:
                     tenant_id=state["tenant_id"],
                     query=state.get("raw_input") or state.get("message") or "",
                     limit=1,
+                    user_id=state.get("user_id"),
                 )
                 if hits:
                     asset, score = hits[0]

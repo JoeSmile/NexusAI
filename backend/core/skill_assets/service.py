@@ -221,35 +221,48 @@ def search_published(
     query: str,
     limit: int = 5,
     min_score: float | None = None,
+    user_id: str | None = None,
 ) -> list[tuple[SkillAsset, float]]:
-    """向量相似度检索 published（private 本租户 + tenant_public）。"""
+    """向量相似度检索 published。
+
+    - ``user_id`` 提供 → 可见性过滤:``tenant_public`` 全租户 + ``private`` 仅 owner
+      （评审 08-14 F2 拍板:private 字段已入表,不区分 = 字段空转）。
+    - ``user_id=None`` → 全租户 published 视图（系统/管理侧:miner 去重,防 publish
+      撞部分唯一索引 (tenant_id, name) WHERE status='published'）。
+    """
     threshold = _hit_threshold() if min_score is None else float(min_score)
     vec = embed_text(query or "")
     vec_str = "[" + ",".join(str(v) for v in vec) + "]"
     sf = get_pg_session()
     with sf.Session() as session:
+        vis_cond = (
+            "AND (visibility = 'tenant_public' OR owner_user_id = :uid)"
+            if user_id
+            else ""
+        )
         sql = text(
-            """
+            f"""
             SELECT id,
                    1 - (embedding <=> CAST(:vec AS vector)) AS similarity
             FROM skill_assets
             WHERE tenant_id = :tid
               AND status = 'published'
               AND embedding IS NOT NULL
+              {vis_cond}
               AND 1 - (embedding <=> CAST(:vec AS vector)) >= :min_score
             ORDER BY embedding <=> CAST(:vec AS vector)
             LIMIT :lim
             """
         )
-        rows = session.execute(
-            sql,
-            {
-                "vec": vec_str,
-                "tid": tenant_id,
-                "min_score": threshold,
-                "lim": limit,
-            },
-        ).fetchall()
+        params: dict[str, Any] = {
+            "vec": vec_str,
+            "tid": tenant_id,
+            "min_score": threshold,
+            "lim": limit,
+        }
+        if user_id:
+            params["uid"] = user_id
+        rows = session.execute(sql, params).fetchall()
         out: list[tuple[SkillAsset, float]] = []
         for r in rows:
             asset = session.query(SkillAsset).filter(SkillAsset.id == r.id).one()

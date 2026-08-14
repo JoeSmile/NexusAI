@@ -86,3 +86,37 @@ def test_search_published_hit_miss(ensure_table):
     )
     assert miss == []
     _cleanup(sf, tid)
+
+
+def test_search_published_visibility(ensure_table):
+    """评审 08-14 F2:private 仅 owner,tenant_public 租户内共享,None=系统全租户视图。"""
+    tid = f"ska-vis-{uuid.uuid4().hex[:8]}"
+    sf = ensure_table
+    priv = svc.create_draft(
+        tenant_id=tid, owner_user_id="admin", name="private_flow",
+        description="private invoice flow", cot_template="private steps", embed=True,
+    )
+    svc.publish(tenant_id=tid, asset_id=priv.id, actor_user_id="admin")
+    pub = svc.create_draft(
+        tenant_id=tid, owner_user_id="admin", name="public_flow",
+        description="public invoice flow", cot_template="public steps",
+        visibility="tenant_public", embed=True,
+    )
+    svc.publish(tenant_id=tid, asset_id=pub.id, actor_user_id="admin")
+
+    owner_hits = svc.search_published(
+        tenant_id=tid, query="invoice flow", limit=5, user_id="admin"
+    )
+    owner_names = {h[0].name for h in owner_hits}
+    assert owner_names == {"private_flow", "public_flow"}
+
+    other_hits = svc.search_published(
+        tenant_id=tid, query="invoice flow", limit=5, user_id="other"
+    )
+    other_names = {h[0].name for h in other_hits}
+    assert "public_flow" in other_names and "private_flow" not in other_names
+
+    sys_hits = svc.search_published(tenant_id=tid, query="invoice flow", limit=5)
+    sys_names = {h[0].name for h in sys_hits}
+    assert sys_names == {"private_flow", "public_flow"}
+    _cleanup(sf, tid)
