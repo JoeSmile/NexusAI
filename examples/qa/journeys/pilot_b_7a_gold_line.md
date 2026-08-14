@@ -31,8 +31,8 @@
 | 角标三态 | ✅ FE 人工 / API requestable | FE 目视补勾 |
 | 审计导出 params 非明文 | ✅ | CSV 无 `cg_`/`sk-` |
 | 并发 CAS / 429 | ✅ 单元 + Wave D/H | 本脚本 50 起步见下 |
-| 性能冒烟 50 并发起步 | ✅ | **50/50 ok · 1.947s**（`20_perf_smoke.json`） |
-| 性能冒烟 1000 run 列表 &lt;2s | ⚠️ 缺口 | API `limit≤100`；现库仅数十行；分页探测 **0.015s / 57 items**；标 `insufficient_history_rows` |
+| 性能冒烟 50 并发起步 | ✅ | **50/50 ok · ~1.86s**（`20_perf_smoke.json`） |
+| 性能冒烟 1000 run 列表 &lt;2s | ✅ | seed 灌至 1000 后 10×100 页 **0.191s / 1000 items**（`api_page_max_100`）；证据 `20_perf_smoke.json` |
 | 通知站内信 | 归 WaveE_2 | 7A 后补勾，不阻塞 |
 | W6 Coze | skip | 旁路 |
 
@@ -60,3 +60,12 @@ APP_ENV=dev JWT_SECRET=dev-only-wave-a-jwt-secret-min-32b \
 # Journey
 PERF=1 uv run python examples/qa/journeys/pilot_b_7a_gold_line.py
 ```
+
+
+## Important 落档（2026-08-14）
+
+| ID | 结论 |
+|----|------|
+| B1→A | seed ≥1000 `workflow_runs` 再测列表；诚实记录 page cap=100 + 耗时 |
+| F2→B | `_load_key_chain_sync` 不补 sync DB；约定 async 只经 `to_thread`/harness（见 `llm_client` docstring + BACKLOG D6） |
+| F3→A | `stream` 整段占槽保持（见 `llm_concurrency` 模块 docstring） |

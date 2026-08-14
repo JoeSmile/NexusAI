@@ -1,5 +1,5 @@
 {
-  "run_id": "a4c05b71-d018-408a-aed6-99117a87deb7",
+  "run_id": "bcd0c0bc-4be8-4d0b-9857-e97efb523cd3",
   "steps": {
     "01_jwt_admin": {
       "ok": true,
@@ -15,23 +15,23 @@
     },
     "03_org_unit": {
       "ok": true,
-      "detail": "{\"id\":\"785ed59a-c0c4-439e-9eae-27b917eeb279\",\"tenant_id\":\"acme\",\"parent_id\":null,\"name\":\"g7a-868e1c8b\",\"path\":\"/785ed59a-c0c4-439e-9eae-27b917eeb279/\",\"deleted_at\":null,\"created_at\":\"2026-08-14T07:47:"
+      "detail": "{\"id\":\"046d01b3-c1ba-418d-82d0-5d1ab5b9318c\",\"tenant_id\":\"acme\",\"parent_id\":null,\"name\":\"g7a-5bc20c4b\",\"path\":\"/046d01b3-c1ba-418d-82d0-5d1ab5b9318c/\",\"deleted_at\":null,\"created_at\":\"2026-08-14T07:58:"
     },
     "04_bind_dept_manager": {
       "ok": true,
-      "detail": "{\"id\":\"b2d6c9d7-2a85-4689-b103-61eeec005a8f\",\"tenant_id\":\"acme\",\"user_id\":\"g7a_admin_868e1c8b\",\"org_unit_id\":\"785ed59a-c0c4-439e-9eae-27b917eeb279\",\"is_primary\":true,\"business_roles\":[\"dept_manager\"],"
+      "detail": "{\"id\":\"41381de8-c0c6-455f-a332-88723e29b4c7\",\"tenant_id\":\"acme\",\"user_id\":\"g7a_admin_5bc20c4b\",\"org_unit_id\":\"046d01b3-c1ba-418d-82d0-5d1ab5b9318c\",\"is_primary\":true,\"business_roles\":[\"dept_manager\"],"
     },
     "05_bind_member": {
       "ok": true,
-      "detail": "{\"id\":\"a7ef35bb-d1aa-4318-8106-687177681426\",\"tenant_id\":\"acme\",\"user_id\":\"g7a_member_868e1c8b\",\"org_unit_id\":\"785ed59a-c0c4-439e-9eae-27b917eeb279\",\"is_primary\":true,\"business_roles\":[\"member\"],\"crea"
+      "detail": "{\"id\":\"c7305c28-c11c-4a78-a90f-48452d009780\",\"tenant_id\":\"acme\",\"user_id\":\"g7a_member_5bc20c4b\",\"org_unit_id\":\"046d01b3-c1ba-418d-82d0-5d1ab5b9318c\",\"is_primary\":true,\"business_roles\":[\"member\"],\"crea"
     },
     "06_reload_capabilities": {
       "ok": true,
-      "detail": "{\"ok\":true,\"total\":13}"
+      "detail": "{\"ok\":true,\"total\":14}"
     },
     "07_hang_cap_visible": {
       "ok": true,
-      "detail": "n=13"
+      "detail": "n=14"
     },
     "08_member_cap_list_note": {
       "ok": true,
@@ -39,15 +39,15 @@
     },
     "09_create_draft": {
       "ok": true,
-      "detail": "{\"id\":\"0b3a221c-8c47-41e9-8045-cd7883efa22d\",\"tenant_id\":\"acme\",\"org_unit_id\":\"785ed59a-c0c4-439e-9eae-27b917eeb279\",\"name\":\"g7a-868e1c8b\",\"status\":\"draft\",\"ir\":{\"edges\":[],\"nodes\":[{\"kind\":\"capability\",\"params\":{\"query\":\"g7a-868e1c8b\"},\"node_id\":\"n1\",\"requestable\":\"true\",\"approval_note\":\"7A need kb"
+      "detail": "{\"id\":\"d09db2c1-4d71-4f11-99e0-30eaa6766b3b\",\"tenant_id\":\"acme\",\"org_unit_id\":\"046d01b3-c1ba-418d-82d0-5d1ab5b9318c\",\"name\":\"g7a-5bc20c4b\",\"status\":\"draft\",\"ir\":{\"edges\":[],\"nodes\":[{\"kind\":\"capability\",\"params\":{\"query\":\"g7a-5bc20c4b\"},\"node_id\":\"n1\",\"requestable\":\"true\",\"approval_note\":\"7A need kb"
     },
     "10_publish": {
       "ok": true,
-      "detail": "{\"id\":\"0b3a221c-8c47-41e9-8045-cd7883efa22d\",\"tenant_id\":\"acme\",\"org_unit_id\":\"785ed59a-c0c4-439e-9eae-27b917eeb279\",\"name\":\"g7a-868e1c8b\",\"status\":\"published\",\"ir\":{\"edges\":[],\"nodes\":[{\"kind\":\"capability\",\"params\":{\"query\":\"g7a-868e1c8b\"},\"node_id\":\"n1\",\"requestable\":\"true\",\"approval_note\":\"7A nee"
+      "detail": "{\"id\":\"d09db2c1-4d71-4f11-99e0-30eaa6766b3b\",\"tenant_id\":\"acme\",\"org_unit_id\":\"046d01b3-c1ba-418d-82d0-5d1ab5b9318c\",\"name\":\"g7a-5bc20c4b\",\"status\":\"published\",\"ir\":{\"edges\":[],\"nodes\":[{\"kind\":\"capability\",\"params\":{\"query\":\"g7a-5bc20c4b\"},\"node_id\":\"n1\",\"requestable\":\"true\",\"approval_note\":\"7A nee"
     },
     "11_member_run": {
       "ok": true,
-      "detail": "{\"id\":\"a4c05b71-d018-408a-aed6-99117a87deb7\",\"status\":\"pending\",\"workflow_id\":\"0b3a221c-8c47-41e9-8045-cd7883efa22d\",\"org_unit_id\":\"785ed59a-c0c4-439e-9eae-27b917eeb279\"}"
+      "detail": "{\"id\":\"bcd0c0bc-4be8-4d0b-9857-e97efb523cd3\",\"status\":\"pending\",\"workflow_id\":\"d09db2c1-4d71-4f11-99e0-30eaa6766b3b\",\"org_unit_id\":\"046d01b3-c1ba-418d-82d0-5d1ab5b9318c\"}"
     },
     "12_suspended": {
       "ok": true,
@@ -63,7 +63,7 @@
     },
     "15_approve": {
       "ok": true,
-      "detail": "{\"ok\":true,\"request_id\":\"8982d4bc-1ac1-41a5-8f6c-950fb39e12ff\",\"grant_id\":\"b2dd4f85-1bcc-414c-b9e6-8a1663bb4606\",\"run_id\":\"a4c05b71-d018-408a-aed6-99117a87deb7\",\"status\":\"approved\"}"
+      "detail": "{\"ok\":true,\"request_id\":\"3762035c-3b1e-4652-8a3d-caab07457a09\",\"grant_id\":\"f194fc29-ad8a-42f9-a8f8-df0063bb6f68\",\"run_id\":\"bcd0c0bc-4be8-4d0b-9857-e97efb523cd3\",\"status\":\"approved\"}"
     },
     "16_resume_succeeded": {
       "ok": true,
@@ -75,7 +75,7 @@
     },
     "18_audit_export": {
       "ok": true,
-      "detail": "status=200 bytes=153103 secretish=False"
+      "detail": "status=200 bytes=170965 secretish=False"
     },
     "19_jwt_not_apikey": {
       "ok": true,
@@ -83,10 +83,10 @@
     },
     "20_perf_smoke": {
       "ok": true,
-      "detail": "{\"mode\": \"50_concurrent_start\", \"perf_wf\": {\"cap\": \"nexusai-chat\", \"create\": 200, \"publish\": 200, \"create_body\": \"{\\\"id\\\":\\\"e2cae104-3cec-4c32-a312-01883e27339a\\\",\\\"tenant_id\\\":\\\"acme\\\",\\\"org_unit_id\\\":\\\"785ed59a-c0c4-439e-9eae-27b917eeb279\\\",\\\"name\\\":\\\"g7a-perf-868e1c8b\\\",\\\"status\\\":\\\"draft\\\",\\\"ir\\\":{\\\"edges\\\":[],\\\"nodes\\\":[{\\\"kind\\\":\\\"capa\"}, \"50_start\": {\"elapsed_s\": 1.947, \"ok\": 50, \"429\": 0, \"other\": 0, \"samples\": []}, \"list_1000\": {\"status\": 200, \"pages\": 1, \"elapsed_s\": 0.015, \"items\": 57, \"api_max_page\": 100, \"target_lt_2s\": true, \"gap\": \"insufficient_history_rows\"}}"
+      "detail": "{\"mode\": \"50_concurrent_start\", \"perf_wf\": {\"id\": \"1f2ef8f0-d5bf-47bd-8b03-a83c30a904c3\", \"cap\": \"nexusai-chat\", \"create\": 200, \"publish\": 200, \"create_body\": \"{\\\"id\\\":\\\"1f2ef8f0-d5bf-47bd-8b03-a83c30a904c3\\\",\\\"tenant_id\\\":\\\"acme\\\",\\\"org_unit_id\\\":\\\"046d01b3-c1ba-418d-82d0-5d1ab5b9318c\\\",\\\"name\\\":\\\"g7a-perf-5bc20c4b\\\",\\\"status\\\":\\\"draft\\\",\\\"ir\\\":{\\\"edges\\\":[],\\\"nodes\\\":[{\\\"kind\\\":\\\"capa\"}, \"50_start\": {\"elapsed_s\": 1.855, \"ok\": 50, \"429\": 0, \"other\": 0, \"samples\": []}, \"list_seed\": {\"existing_before\": 51, \"inserted\": 949, \"total_after\": 1000, \"target\": 1000}, \"list_1000\": {\"status\": 200, \"pages\": 10, \"elapsed_s\": 0.191, \"items\": 1000, \"api_max_page\": 100, \"target_lt_2s\": true, \"gap\": null, \"notes\": [\"seed_bulk_insert\", \"api_page_max_100\"]}}"
     }
   },
-  "started_at": "2026-08-14T07:47:11.278329+00:00",
-  "finished_at": "2026-08-14T07:47:15.505260+00:00",
+  "started_at": "2026-08-14T07:58:57.085365+00:00",
+  "finished_at": "2026-08-14T07:59:01.824623+00:00",
   "failed": 0
 }

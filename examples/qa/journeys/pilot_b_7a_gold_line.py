@@ -46,6 +46,66 @@ def _write(step: str, payload: object) -> Path:
     return path
 
 
+
+def seed_run_history(
+    *,
+    tenant_id: str,
+    workflow_id: str,
+    org_unit_id: str,
+    acting_user_id: str,
+    target: int = 1000,
+) -> dict:
+    """Bulk-insert succeeded runs for list-latency smoke (Finding B1→A)."""
+    from datetime import datetime as dt
+
+    from backend.database.pgvector_session import WorkflowRun, get_pg_session
+
+    sf = get_pg_session()
+    with sf.Session() as session:
+        existing = (
+            session.query(WorkflowRun)
+            .filter(
+                WorkflowRun.tenant_id == tenant_id,
+                WorkflowRun.org_unit_id == org_unit_id,
+            )
+            .count()
+        )
+        need = max(0, target - int(existing))
+        now = dt.utcnow()
+        for i in range(need):
+            session.add(
+                WorkflowRun(
+                    id=str(uuid.uuid4()),
+                    tenant_id=tenant_id,
+                    workflow_id=workflow_id,
+                    org_unit_id=org_unit_id,
+                    status="succeeded",
+                    ir_snapshot={"ir_schema": "1", "nodes": [], "edges": []},
+                    workflow_version="V1.0.0",
+                    workflow_revision=0,
+                    context_ref={"seed": "g7a_list_perf"},
+                    parent_run_id=None,
+                    acting_user_id=acting_user_id,
+                    credential_kind="jwt",
+                    error_code=None,
+                    error_message=None,
+                    created_at=now,
+                    updated_at=now,
+                    finished_at=now,
+                )
+            )
+        if need:
+            session.commit()
+        total = (
+            session.query(WorkflowRun)
+            .filter(
+                WorkflowRun.tenant_id == tenant_id,
+                WorkflowRun.org_unit_id == org_unit_id,
+            )
+            .count()
+        )
+    return {"existing_before": existing, "inserted": need, "total_after": total, "target": target}
+
 def wait_health(client: httpx.Client, *, timeout_s: float = 60.0) -> None:
     deadline = time.time() + timeout_s
     last = ""
@@ -366,6 +426,7 @@ def main() -> None:
                 None,
             )
             perf_notes: dict = {"mode": "50_concurrent_start"}
+            pwid = ""
             if chat_cap:
                 ps = chat_cap.get("param_spec") or {}
                 params2: dict = {}
@@ -405,6 +466,7 @@ def main() -> None:
                     else None
                 )
                 perf_notes["perf_wf"] = {
+                    "id": pwid,
                     "cap": chat_cap.get("id"),
                     "create": r.status_code,
                     "publish": None if pub is None else pub.status_code,
@@ -439,8 +501,22 @@ def main() -> None:
             else:
                 perf_notes["50_start"] = {"skipped": "no_chat_cap"}
 
-            # list latency — pad history if needed then time GET
-            # API list_runs limit le=100 — 诚实：10 页 ×100 ≈ 1000 条总耗时
+            # Finding B1→A: seed ≥1000 runs then measure 10×100 list pages
+            seed_wf = pwid or wid
+            tenant_id = (
+                (final.get("tenant_id") if isinstance(final, dict) else None)
+                or (detail.get("tenant_id") if isinstance(detail, dict) else None)
+                or "acme"
+            )
+            seed_meta = seed_run_history(
+                tenant_id=str(tenant_id),
+                workflow_id=str(seed_wf or wid),
+                org_unit_id=str(ou),
+                acting_user_id=admin_user,
+                target=1000,
+            )
+            perf_notes["list_seed"] = seed_meta
+
             t1 = time.perf_counter()
             items_n = 0
             pages = 0
@@ -458,18 +534,20 @@ def main() -> None:
                 if len(batch) < 100:
                     break
             list_s = time.perf_counter() - t1
+            gap = None
+            if items_n < 1000:
+                gap = "insufficient_history_rows_after_seed"
+            elif list_s >= 2.0:
+                gap = "list_over_2s"
             perf_notes["list_1000"] = {
                 "status": last_status,
                 "pages": pages,
                 "elapsed_s": round(list_s, 3),
                 "items": items_n,
                 "api_max_page": 100,
-                "target_lt_2s": list_s < 2.0,
-                "gap": (
-                    "insufficient_history_rows"
-                    if items_n < 1000
-                    else (None if list_s < 2.0 else "list_over_2s")
-                ),
+                "target_lt_2s": bool(list_s < 2.0 and items_n >= 1000),
+                "gap": gap,
+                "notes": ["seed_bulk_insert", "api_page_max_100"],
             }
             step(
                 "20_perf_smoke",

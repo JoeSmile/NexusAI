@@ -8,6 +8,10 @@
 部署注记:
 - 单进程 ``threading.BoundedSemaphore`` 够用（async / sync 出口共享同一池）。
 - 多 worker 后升级 Redis 分布式信号量（依赖 D1 Redis 化）；勿假定多进程共享本进程内信号量。
+
+Wave H Important F3（2026-08-14 落档）: ``LLMHarness.stream`` **整段**持有并发槽
+（含真流式与降级 generate）。长流式会占满 ``LLM_CONCURRENCY_LIMIT``——这是刻意
+设计（防上游打爆），不是遗漏；不改为「仅 generate 占槽」。
 """
 
 from __future__ import annotations

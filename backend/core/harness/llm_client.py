@@ -78,6 +78,11 @@ def _load_key_chain_sync(
 
     无事件循环时用 asyncio.run;已在 async 上下文中则在线程池跑新 loop,
     避免 get_running_loop 时直接返回空(Task 27 review Important #2)。
+
+    Wave G Important F2（2026-08-14 落档）: 本函数仍可能在「已有 loop」路径用
+    ``pool.submit(asyncio.run).result()``。约定：**禁止从 async 协程直接调用**
+    ``complete_via_provider`` / 本函数；async 边界必须 ``asyncio.to_thread``（或
+    走 ``LLMHarness.generate``）。暂不补 sync DB 读链（B）。
     """
     import asyncio
     import concurrent.futures

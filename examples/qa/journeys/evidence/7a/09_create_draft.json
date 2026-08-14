@@ -1,8 +1,8 @@
 {
-  "id": "0b3a221c-8c47-41e9-8045-cd7883efa22d",
+  "id": "d09db2c1-4d71-4f11-99e0-30eaa6766b3b",
   "tenant_id": "acme",
-  "org_unit_id": "785ed59a-c0c4-439e-9eae-27b917eeb279",
-  "name": "g7a-868e1c8b",
+  "org_unit_id": "046d01b3-c1ba-418d-82d0-5d1ab5b9318c",
+  "name": "g7a-5bc20c4b",
   "status": "draft",
   "ir": {
     "edges": [],
@@ -10,12 +10,12 @@
       {
         "kind": "capability",
         "params": {
-          "query": "g7a-868e1c8b"
+          "query": "g7a-5bc20c4b"
         },
         "node_id": "n1",
         "requestable": "true",
         "approval_note": "7A need kb:read",
-        "capability_id": "g7a-hang-868e1c8b"
+        "capability_id": "g7a-hang-5bc20c4b"
       }
     ],
     "ir_schema": "1"
@@ -23,12 +23,12 @@
   "version": "V1.0.0",
   "revision": 0,
   "forked_from_id": null,
-  "created_by": "g7a_admin_868e1c8b",
+  "created_by": "g7a_admin_5bc20c4b",
   "request_policy": {
     "scope": "recurring",
     "default_ttl_days": 90,
     "auto_renew": false
   },
-  "created_at": "2026-08-14T07:47:12.490429",
-  "updated_at": "2026-08-14T07:47:12.490431"
+  "created_at": "2026-08-14T07:58:58.479618",
+  "updated_at": "2026-08-14T07:58:58.479621"
 }
