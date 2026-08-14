@@ -6,6 +6,7 @@ from backend.core.cost_manager import estimate_cost
 from backend.core.model_registry import get_model, select_model_for_intent
 from backend.observability.decorators import enrich_span, observe
 from backend.observability.sampling import set_tracing_enabled, should_sample
+from backend.pipeline.intent_path import resolve_short_path_skill, skill_to_state
 from backend.pipeline.state import PipelineState
 from backend.skills.registry import registry
 
@@ -22,36 +23,38 @@ async def model_router(state: PipelineState) -> PipelineState:
     intent = state.get("intent", "default") or "default"
     confidence = float(state.get("intent_confidence", 0.0) or 0.0)
 
-    if confidence >= 0.85:
+    # Task 43: 复用 task_plan 预解析的 short_path_skill（同源 helper）
+    skill = resolve_short_path_skill(state)
+    state["short_path_skill"] = skill_to_state(skill)
+
+    if confidence >= 0.85 and skill is not None:
         try:
-            skill = registry.get_skill_for_intent(intent, confidence)
-            if skill:
-                result = await registry.execute_skill(
-                    skill_id=skill.id,
-                    entities=state.get("entities") or {},
-                    tenant_id=state["tenant_id"],
-                    user_context=state.get("user_context") or {},
-                )
-                state["response"] = result.output
-                state["finish_reason"] = (
-                    "skill_executed" if result.success else (result.error or "error")
-                )
-                state["total_cost"] = 0.0
-                state["pipeline_latency_ms"] = result.latency_ms
-                if result.error == "PENDING_APPROVAL":
-                    state["approval_request_id"] = result.approval_request_id
-                if result.error:
-                    state["error_code"] = result.error
-                enrich_span(
-                    metadata={
-                        "path": "short",
-                        "intent": intent,
-                        "skill_id": skill.id,
-                    },
-                    output_data=state.get("finish_reason"),
-                )
-                _maybe_disable_short_path_trace(state["finish_reason"])
-                return state
+            result = await registry.execute_skill(
+                skill_id=skill.id,
+                entities=state.get("entities") or {},
+                tenant_id=state["tenant_id"],
+                user_context=state.get("user_context") or {},
+            )
+            state["response"] = result.output
+            state["finish_reason"] = (
+                "skill_executed" if result.success else (result.error or "error")
+            )
+            state["total_cost"] = 0.0
+            state["pipeline_latency_ms"] = result.latency_ms
+            if result.error == "PENDING_APPROVAL":
+                state["approval_request_id"] = result.approval_request_id
+            if result.error:
+                state["error_code"] = result.error
+            enrich_span(
+                metadata={
+                    "path": "short",
+                    "intent": intent,
+                    "skill_id": skill.id,
+                },
+                output_data=state.get("finish_reason"),
+            )
+            _maybe_disable_short_path_trace(state["finish_reason"])
+            return state
         except Exception as e:
             state["response"] = f"Skill 执行错误: {e!s}"
             state["finish_reason"] = "error"

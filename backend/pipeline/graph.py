@@ -21,6 +21,7 @@ from backend.pipeline.nodes.llm_generate import llm_generate
 from backend.pipeline.nodes.load_memory import load_memory
 from backend.pipeline.nodes.model_router import model_router, route_short_or_long
 from backend.pipeline.nodes.rate_limiter import rate_limiter
+from backend.pipeline.nodes.task_plan import task_plan
 from backend.pipeline.nodes.write_memory import write_memory
 from backend.pipeline.state import PipelineState
 
@@ -73,6 +74,7 @@ def build_pipeline():
     builder.add_node("cache_check", _lf_node("cache_check", cache_check))
     builder.add_node("guardrails_input", _lf_node("guardrails_input", guardrails_input))
     builder.add_node("analyze_parallel", _lf_node("analyze_parallel", analyze_parallel))
+    builder.add_node("task_plan", _lf_node("task_plan", task_plan))
     builder.add_node("build_context", _lf_node("build_context", build_context))
     builder.add_node("experiment_hook", _lf_node("experiment_hook", experiment_hook))
     builder.add_node("model_router", _lf_node("model_router", model_router))
@@ -104,7 +106,8 @@ def build_pipeline():
             "continue": "analyze_parallel",
         },
     )
-    builder.add_edge("analyze_parallel", "build_context")
+    builder.add_edge("analyze_parallel", "task_plan")
+    builder.add_edge("task_plan", "build_context")
     builder.add_edge("build_context", "experiment_hook")
     builder.add_edge("experiment_hook", "model_router")
 

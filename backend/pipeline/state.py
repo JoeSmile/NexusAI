@@ -75,6 +75,11 @@ class PipelineState(TypedDict):
     ab_variant: str | None
     ab_variant_config: dict
 
+    # ── Task 43 task_plan / skill ──
+    task_plan: dict | None
+    short_path_skill: dict | None  # {id, name} — Chat skills registry
+    skill_asset_hit: dict | None  # skill_assets CoT template hit
+
 
 def make_initial_state(
     tenant_id: str,
@@ -131,4 +136,7 @@ def make_initial_state(
         "ab_experiment_id": None,
         "ab_variant": None,
         "ab_variant_config": {},
+        "task_plan": None,
+        "short_path_skill": None,
+        "skill_asset_hit": None,
     }

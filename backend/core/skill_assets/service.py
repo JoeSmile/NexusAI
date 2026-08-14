@@ -1,0 +1,270 @@
+"""CRUD / lifecycle / vector search for skill_assets (Task 43.2)."""
+
+from __future__ import annotations
+
+import logging
+import os
+import uuid
+from datetime import datetime
+from typing import Any
+
+from fastapi import HTTPException
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
+from backend.core.audit import write_audit_sync
+from backend.core.skill_assets.gates import GateReject, run_publish_gates
+from backend.database.embeddings import embed_text
+from backend.database.pgvector_session import SkillAsset, get_pg_session
+
+logger = logging.getLogger(__name__)
+
+STATUSES = frozenset({"draft", "published", "deprecated"})
+VISIBILITIES = frozenset({"private", "tenant_public"})
+
+
+def _hit_threshold() -> float:
+    raw = (os.getenv("SKILL_ASSET_HIT_THRESHOLD") or "").strip()
+    if not raw:
+        return 0.75
+    try:
+        return float(raw)
+    except ValueError:
+        return 0.75
+
+
+def create_draft(
+    *,
+    tenant_id: str,
+    owner_user_id: str,
+    name: str,
+    description: str = "",
+    cot_template: str = "",
+    ir_skeleton: dict[str, Any] | None = None,
+    visibility: str = "private",
+    embed: bool = True,
+) -> SkillAsset:
+    if visibility not in VISIBILITIES:
+        visibility = "private"
+    sf = get_pg_session()
+    with sf.Session() as session:
+        row = SkillAsset(
+            id=str(uuid.uuid4()),
+            tenant_id=tenant_id,
+            owner_user_id=owner_user_id,
+            name=name.strip()[:128],
+            description=(description or "")[:2000],
+            cot_template=cot_template or "",
+            ir_skeleton=dict(ir_skeleton or {}),
+            version=1,
+            status="draft",
+            visibility=visibility,
+            usage_stats={},
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        )
+        if embed:
+            try:
+                row.embedding = embed_text(
+                    f"{row.name}\n{row.description}\n{row.cot_template[:500]}"
+                )
+            except Exception:
+                logger.debug("skill_asset embed failed", exc_info=True)
+        session.add(row)
+        session.commit()
+        session.refresh(row)
+        session.expunge(row)
+        return row
+
+
+def publish(
+    *,
+    tenant_id: str,
+    asset_id: str,
+    actor_user_id: str,
+    required_permissions: list[str] | None = None,
+) -> SkillAsset:
+    """CAS draft→published + gates。冲突 → 409。"""
+    sf = get_pg_session()
+    with sf.Session() as session:
+        row = (
+            session.query(SkillAsset)
+            .filter(
+                SkillAsset.id == asset_id,
+                SkillAsset.tenant_id == tenant_id,
+            )
+            .one_or_none()
+        )
+        if row is None:
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "SKA_404", "message": "not_found"},
+            )
+        if row.status != "draft":
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "SKA_409", "message": "not_draft"},
+            )
+        try:
+            perms = run_publish_gates(
+                cot_template=row.cot_template,
+                ir_skeleton=row.ir_skeleton
+                if isinstance(row.ir_skeleton, dict)
+                else {},
+                required_permissions=required_permissions,
+            )
+        except GateReject as exc:
+            raise HTTPException(
+                status_code=400,
+                detail={"code": exc.code, "message": exc.message},
+            ) from exc
+
+        res = session.execute(
+            text(
+                "UPDATE skill_assets SET status='published', updated_at=:now, "
+                "version=version+1 WHERE id=:id AND status='draft'"
+            ),
+            {"id": asset_id, "now": datetime.utcnow()},
+        )
+        if res.rowcount != 1:
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "SKA_409", "message": "publish_cas_conflict"},
+            )
+        session.refresh(row)
+        stats = dict(row.usage_stats or {})
+        stats["required_permissions"] = perms
+        row.usage_stats = stats
+        session.commit()
+        write_audit_sync(
+            {
+                "tenant_id": tenant_id,
+                "user_id": actor_user_id,
+                "action": "skill_assets.publish",
+                "trace_id": asset_id,
+                "input_text": "",
+                "output_text": f"name={row.name}:v={row.version}",
+                "model": "",
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cost": 0.0,
+                "latency_ms": 0.0,
+                "error_code": None,
+                "ip_address": "",
+                "user_agent": "",
+                "credential_kind": None,
+                "key_id": None,
+                "run_id": None,
+                "node_id": None,
+                "created_at": datetime.utcnow(),
+            }
+        )
+        session.refresh(row)
+        session.expunge(row)
+        return row
+
+
+def deprecate(*, tenant_id: str, asset_id: str) -> SkillAsset:
+    sf = get_pg_session()
+    with sf.Session() as session:
+        row = (
+            session.query(SkillAsset)
+            .filter(
+                SkillAsset.id == asset_id,
+                SkillAsset.tenant_id == tenant_id,
+            )
+            .one_or_none()
+        )
+        if row is None:
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "SKA_404", "message": "not_found"},
+            )
+        if row.status == "deprecated":
+            return row
+        if row.status != "published":
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "SKA_409", "message": "not_published"},
+            )
+        row.status = "deprecated"
+        row.updated_at = datetime.utcnow()
+        session.commit()
+        session.refresh(row)
+        session.expunge(row)
+        return row
+
+
+def reject_draft(*, tenant_id: str, asset_id: str) -> bool:
+    """管理员拒绝候选：删除 draft。"""
+    sf = get_pg_session()
+    with sf.Session() as session:
+        row = (
+            session.query(SkillAsset)
+            .filter(
+                SkillAsset.id == asset_id,
+                SkillAsset.tenant_id == tenant_id,
+                SkillAsset.status == "draft",
+            )
+            .one_or_none()
+        )
+        if row is None:
+            return False
+        session.delete(row)
+        session.commit()
+        return True
+
+
+def search_published(
+    *,
+    tenant_id: str,
+    query: str,
+    limit: int = 5,
+    min_score: float | None = None,
+) -> list[tuple[SkillAsset, float]]:
+    """向量相似度检索 published（private 本租户 + tenant_public）。"""
+    threshold = _hit_threshold() if min_score is None else float(min_score)
+    vec = embed_text(query or "")
+    vec_str = "[" + ",".join(str(v) for v in vec) + "]"
+    sf = get_pg_session()
+    with sf.Session() as session:
+        sql = text(
+            """
+            SELECT id,
+                   1 - (embedding <=> CAST(:vec AS vector)) AS similarity
+            FROM skill_assets
+            WHERE tenant_id = :tid
+              AND status = 'published'
+              AND embedding IS NOT NULL
+              AND 1 - (embedding <=> CAST(:vec AS vector)) >= :min_score
+            ORDER BY embedding <=> CAST(:vec AS vector)
+            LIMIT :lim
+            """
+        )
+        rows = session.execute(
+            sql,
+            {
+                "vec": vec_str,
+                "tid": tenant_id,
+                "min_score": threshold,
+                "lim": limit,
+            },
+        ).fetchall()
+        out: list[tuple[SkillAsset, float]] = []
+        for r in rows:
+            asset = session.query(SkillAsset).filter(SkillAsset.id == r.id).one()
+            session.expunge(asset)
+            out.append((asset, float(r.similarity)))
+        return out
+
+
+def bump_usage(session: Session, asset: SkillAsset, *, tokens: int = 0, ok: bool = True) -> None:
+    stats = dict(asset.usage_stats or {})
+    stats["uses"] = int(stats.get("uses") or 0) + 1
+    if ok:
+        stats["successes"] = int(stats.get("successes") or 0) + 1
+    prev = float(stats.get("avg_tokens") or 0.0)
+    n = int(stats.get("uses") or 1)
+    stats["avg_tokens"] = ((prev * (n - 1)) + tokens) / n
+    asset.usage_stats = stats
+    asset.updated_at = datetime.utcnow()

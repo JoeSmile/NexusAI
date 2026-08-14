@@ -386,6 +386,35 @@ class Notification(Base):
     )
 
 
+class SkillAsset(Base):
+    """规划器 CoT 缓存资产（Task 43 / alembic 015）。"""
+
+    __tablename__ = "skill_assets"
+    id = Column(String(36), primary_key=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    owner_user_id = Column(String(64), nullable=False)
+    name = Column(String(128), nullable=False)
+    description = Column(Text, nullable=False, default="")
+    cot_template = Column(Text, nullable=False, default="")
+    ir_skeleton = Column(JSON, nullable=False, default=dict)
+    version = Column(Integer, nullable=False, default=1)
+    status = Column(String(32), nullable=False, default="draft")
+    visibility = Column(String(32), nullable=False, default="private")
+    usage_stats = Column(JSON, nullable=False, default=dict)
+    embedding = Column(Vector(1536), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    __table_args__ = (
+        Index(
+            "ix_skill_assets_published_name",
+            "tenant_id",
+            "name",
+            unique=True,
+            postgresql_where=text("status = 'published'"),
+        ),
+    )
+
+
 class KnowledgeChunk(Base):
     """RAG 知识块 — 替代 Chroma knowledge collection"""
 
