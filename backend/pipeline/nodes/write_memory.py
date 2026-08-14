@@ -49,9 +49,10 @@ async def write_memory(state: PipelineState) -> PipelineState:
         )
         state["cold_memory"] = existing
 
-    # Task 41 Slice 2: 零 LLM 规则抽取 → warm 记忆（失败静默，不阻塞管线）
+    # Task 41/42: 规则抽取 → warm（失败静默；REJECT_* 进 audit）
     try:
         from backend.core.memory.extractor import get_extractor, min_confidence
+        from backend.core.memory.write_items import persist_structured_turn
 
         extractor = get_extractor()
         candidates = await extractor.extract(
@@ -69,6 +70,25 @@ async def write_memory(state: PipelineState) -> PipelineState:
                 value=c.value,
                 confidence=c.confidence,
                 source=c.source,
+            )
+        await persist_structured_turn(
+            mem,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            session_id=session_id,
+            message=message or "",
+            trace_id=trace_id or "",
+            aggregate=False,
+        )
+        if cold:
+            await persist_structured_turn(
+                mem,
+                tenant_id=tenant_id,
+                user_id=user_id,
+                session_id=session_id,
+                message=message or "",
+                trace_id=trace_id or "",
+                aggregate=True,
             )
     except Exception as exc:  # 抽取是增强路径，永不因它 500
         logger.warning("memory extraction skipped: %s", exc)

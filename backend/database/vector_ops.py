@@ -152,9 +152,11 @@ def store_user_memory(
     value: str,
     confidence: float = 1.0,
     source: str = "extracted",
+    *,
+    embed: bool = True,
 ) -> int | None:
-    """写入 UserMemory 并附 embedding"""
-    emb = embed_text(f"{key} {value}")
+    """写入 UserMemory。``embed=False`` 跳过 embedding（pending 中间态，R5）。"""
+    emb = embed_text(f"{key} {value}") if embed else None
     session_factory = get_pg_session()
     with session_factory.Session() as session:
         existing = (
@@ -166,7 +168,8 @@ def store_user_memory(
             existing.value = value
             existing.confidence = confidence
             existing.source = source
-            existing.embedding = emb
+            if embed:
+                existing.embedding = emb
             existing.updated_at = datetime.utcnow()
             session.commit()
             return existing.id
@@ -182,6 +185,47 @@ def store_user_memory(
         session.add(row)
         session.commit()
         return row.id
+
+
+def delete_user_memory(tenant_id: str, user_id: str, key: str) -> bool:
+    """按 (tenant, user, key) 删除一条 warm 记忆（pending 绑定/过期用）。"""
+    session_factory = get_pg_session()
+    with session_factory.Session() as session:
+        row = (
+            session.query(UserMemory)
+            .filter_by(tenant_id=tenant_id, user_id=user_id, key=key)
+            .first()
+        )
+        if row is None:
+            return False
+        session.delete(row)
+        session.commit()
+        return True
+
+
+def list_user_memories_by_prefix(
+    tenant_id: str, user_id: str, prefix: str, *, limit: int = 100
+) -> list[dict[str, Any]]:
+    """按 key 前缀列出 warm 记忆。"""
+    session_factory = get_pg_session()
+    with session_factory.Session() as session:
+        rows = (
+            session.query(UserMemory)
+            .filter_by(tenant_id=tenant_id, user_id=user_id)
+            .filter(UserMemory.key.startswith(prefix))
+            .limit(limit)
+            .all()
+        )
+    return [
+        {
+            "id": r.id,
+            "key": r.key,
+            "value": r.value,
+            "confidence": r.confidence,
+            "source": r.source,
+        }
+        for r in rows
+    ]
 
 
 def search_user_memories(

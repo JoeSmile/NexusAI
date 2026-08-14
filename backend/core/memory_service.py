@@ -141,6 +141,7 @@ class UnifiedMemoryService:
                 value=str(payload["value"]),
                 confidence=float(payload.get("confidence") or 0.5),
                 source=str(payload.get("source") or "unified"),
+                embed=bool(payload.get("embed", True)),
             )
             return {"id": mid, "tier": "warm", "key": payload["key"]}
         if tier == "cold":
@@ -207,18 +208,19 @@ class UnifiedMemoryService:
             "wrote_assistant": bool(assistant_message),
         }
 
-    def count_session_messages(self, *, user_id: str, session_id: str) -> int:
+    def count_session_messages(
+        self, *, user_id: str, session_id: str, role: str | None = None
+    ) -> int:
         session_factory = get_pg_session()
         with session_factory.Session() as session:
-            return (
-                session.query(ChatMessage)
-                .filter_by(
-                    tenant_id=self.tenant_id,
-                    user_id=user_id,
-                    session_id=session_id,
-                )
-                .count()
+            q = session.query(ChatMessage).filter_by(
+                tenant_id=self.tenant_id,
+                user_id=user_id,
+                session_id=session_id,
             )
+            if role:
+                q = q.filter_by(role=role)
+            return q.count()
 
     def list_session_messages(
         self, *, user_id: str, session_id: str, limit: int = 200
