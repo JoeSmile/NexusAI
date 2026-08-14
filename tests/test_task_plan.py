@@ -12,7 +12,12 @@ from backend.pipeline.intent_path import (
     short_path_predicate,
     skill_to_state,
 )
-from backend.pipeline.nodes.task_plan import task_plan, validate_task_plan
+from backend.pipeline.nodes.task_plan import (
+    audit_task_plan_on_success,
+    plan_for_audit,
+    task_plan,
+    validate_task_plan,
+)
 from backend.pipeline.state import make_initial_state
 from backend.skills.base import BaseSkill
 
@@ -109,9 +114,6 @@ async def test_task_plan_produces_plan_on_long_path(monkeypatch):
         ],
     )
     monkeypatch.setattr(
-        "backend.pipeline.nodes.task_plan._audit_plan", lambda *a, **k: None
-    )
-    monkeypatch.setattr(
         "backend.pipeline.intent_path.registry.get_skill_for_intent",
         lambda *a, **k: None,
     )
@@ -165,3 +167,78 @@ def test_validate_task_plan_rejects_forbidden_keys():
                 ]
             }
         )
+
+
+def test_plan_for_audit_strips_params():
+    raw = {
+        "steps": [
+            {"capability_id": "c1", "params": {"q": "secret"}, "decision": "d"},
+        ]
+    }
+    scrubbed = plan_for_audit(raw)
+    assert scrubbed["steps"][0]["capability_id"] == "c1"
+    assert scrubbed["steps"][0]["params"] == {}
+    assert scrubbed["steps"][0]["decision"] == "d"
+
+
+@pytest.mark.asyncio
+async def test_task_plan_blocks_on_output_guard(monkeypatch):
+    plan = {
+        "steps": [{"capability_id": "cap.a", "params": {}, "decision": None}],
+    }
+
+    async def fake_gen(*a, **k):
+        return SimpleNamespace(
+            success=True,
+            output=__import__("json").dumps(plan),
+            error=None,
+            metadata={},
+            latency_ms=1.0,
+        )
+
+    async def blocked(text: str):
+        return SimpleNamespace(action="blocked", reason="sensitive_content:sk-", redacted_text="")
+
+    monkeypatch.setattr(
+        "backend.pipeline.nodes.task_plan.harness.generate", fake_gen
+    )
+    monkeypatch.setattr(
+        "backend.pipeline.nodes.task_plan._list_visible_capabilities",
+        lambda state: [
+            {"id": "cap.a", "name": "A", "permission": "chat:write", "param_spec": {}}
+        ],
+    )
+    monkeypatch.setattr(
+        "backend.pipeline.nodes.task_plan.check_output", blocked
+    )
+    monkeypatch.setattr(
+        "backend.pipeline.intent_path.registry.get_skill_for_intent",
+        lambda *a, **k: None,
+    )
+    state = make_initial_state("t", "u", "s", "x")
+    state["intent_confidence"] = 0.2
+    out = await task_plan(state)
+    assert out["task_plan"] is None
+
+
+def test_audit_only_on_llm_success(monkeypatch):
+    calls: list[dict] = []
+
+    def fake_audit(rec):
+        calls.append(rec)
+
+    monkeypatch.setattr(
+        "backend.pipeline.nodes.task_plan.write_audit_sync", fake_audit
+    )
+    state = make_initial_state("t", "u", "s", "hi")
+    state["task_plan"] = {
+        "steps": [{"capability_id": "c1", "params": {"x": 1}, "decision": None}]
+    }
+    state["finish_reason"] = "llm_generated"
+    audit_task_plan_on_success(state)
+    assert len(calls) == 1
+    blob = __import__("json").loads(calls[0]["output_text"])
+    assert blob["plan"]["steps"][0]["params"] == {}
+    # idempotent
+    audit_task_plan_on_success(state)
+    assert len(calls) == 1

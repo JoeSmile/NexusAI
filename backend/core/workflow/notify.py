@@ -181,7 +181,6 @@ def mark_escalated(
                 "request_id": req.id,
                 "org_unit_id": req.org_unit_id,
                 "capability_id": req.capability_id,
-                "reason": reason,
             },
         )
     except Exception:

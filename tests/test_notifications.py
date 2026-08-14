@@ -101,6 +101,21 @@ def test_unavailable_provider_skipped(ensure_table, monkeypatch):
         session.commit()
 
 
+def test_refs_only_strips_reason():
+    from backend.modules.notification.service import refs_only
+
+    clean = refs_only(
+        {
+            "run_id": "r1",
+            "request_id": "q1",
+            "reason": "should_not_store",
+            "secret": "x",
+        }
+    )
+    assert clean == {"run_id": "r1", "request_id": "q1"}
+    assert "reason" not in clean
+
+
 def test_notify_failure_does_not_raise(ensure_table, monkeypatch):
     """Channel 全挂也不抛。"""
 

@@ -358,7 +358,6 @@ async def reject(
                 "run_id": run_id,
                 "node_id": node_id,
                 "request_id": request_id,
-                "reason": (body.reason or "rejected")[:64],
             },
         )
     except Exception:

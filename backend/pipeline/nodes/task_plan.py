@@ -12,6 +12,7 @@ from backend.core.audit import write_audit_sync
 from backend.core.auth.models import TenantContext
 from backend.core.capability.invoke import capability_visible_to
 from backend.core.capability.registry import get_capability_registry
+from backend.core.guardrails.output_guard import check_output
 from backend.core.harness import LLMHarness
 from backend.core.workflow.ir import _FORBIDDEN_PARAM_KEYS, validate_params_against_spec
 from backend.observability.decorators import enrich_span, observe
@@ -149,14 +150,36 @@ def _build_messages(
     ]
 
 
-def _audit_plan(state: PipelineState, plan: dict[str, Any]) -> None:
+def plan_for_audit(plan: dict[str, Any]) -> dict[str, Any]:
+    """审计用骨架：只留 capability_id / decision，params 恒 {}（CR 1A）。"""
+    steps_out: list[dict[str, Any]] = []
+    for step in plan.get("steps") or []:
+        if not isinstance(step, dict):
+            continue
+        steps_out.append(
+            {
+                "capability_id": step.get("capability_id"),
+                "params": {},
+                "decision": step.get("decision"),
+            }
+        )
+    return {"steps": steps_out[:40]}
+
+
+def audit_task_plan_on_success(state: PipelineState) -> None:
+    """Chat 成功终态写 chat.task_plan（CR 4A）；幂等靠调用方只在成功出口调用一次。"""
+    plan = state.get("task_plan")
+    if not isinstance(plan, dict) or not plan.get("steps"):
+        return
+    if state.get("_task_plan_audited"):
+        return
     try:
         from datetime import datetime
 
         blob = {
             "session_id": state.get("session_id"),
             "trace_id": state.get("trace_id"),
-            "plan": plan,
+            "plan": plan_for_audit(plan),
         }
         write_audit_sync(
             {
@@ -181,6 +204,7 @@ def _audit_plan(state: PipelineState, plan: dict[str, Any]) -> None:
                 "created_at": datetime.utcnow(),
             }
         )
+        state["_task_plan_audited"] = True  # type: ignore[typeddict-item]
     except Exception:
         logger.debug("chat.task_plan audit failed", exc_info=True)
 
@@ -224,6 +248,15 @@ async def task_plan(state: PipelineState) -> PipelineState:
                         "cot_template": asset.cot_template,
                         "score": score,
                     }
+                    try:
+                        from backend.core.skill_assets.service import bump_usage_by_id
+
+                        bump_usage_by_id(
+                            tenant_id=state["tenant_id"],
+                            asset_id=asset.id,
+                        )
+                    except Exception:
+                        logger.debug("skill_asset usage bump skipped", exc_info=True)
             except Exception:
                 logger.debug("skill_asset search skipped", exc_info=True)
 
@@ -266,15 +299,20 @@ async def task_plan(state: PipelineState) -> PipelineState:
                     continue
                 parsed = _parse_plan_json(str(result.output or ""))
                 validate_task_plan(parsed, caps_by_id=caps_by_id)
+                # CR 2A: plan 过 output_guardrails；blocked → 降级 None
+                guard = await check_output(
+                    json.dumps(parsed, ensure_ascii=False)[:4000]
+                )
+                if guard.action == "blocked":
+                    last_err = guard.reason or "output_blocked"
+                    continue
                 plan = parsed
                 break
             except Exception as exc:
-                last_err = str(exc)
+                last_err = type(exc).__name__
                 continue
 
         state["task_plan"] = plan
-        if plan is not None:
-            _audit_plan(state, plan)
         enrich_span(
             metadata={
                 "task_plan": "ok" if plan is not None else "degraded",

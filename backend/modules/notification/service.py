@@ -27,7 +27,6 @@ _ALLOWED_PAYLOAD_KEYS = frozenset(
         "grant_id",
         "org_unit_id",
         "capability_id",
-        "reason",
     }
 )
 
@@ -113,7 +112,7 @@ def notify(
                         user_id=user_id,
                         action="notify_failed",
                         payload=clean,
-                        error=f"{provider.name}:{exc}",
+                        error=f"{provider.name}:{type(exc).__name__}",
                     )
             if own_session:
                 sess.commit()

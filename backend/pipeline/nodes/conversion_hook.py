@@ -10,6 +10,15 @@ from backend.pipeline.state import PipelineState
 @observe(name="pipeline.conversion_hook")
 async def conversion_hook(state: PipelineState) -> PipelineState:
     """有实验且有最终响应时记录 conversion；DB 故障不拖垮管线。"""
+    # CR 4A: Chat 成功终态再写 chat.task_plan（非短路径且有 plan）
+    if state.get("finish_reason") == "llm_generated" and state.get("task_plan"):
+        try:
+            from backend.pipeline.nodes.task_plan import audit_task_plan_on_success
+
+            audit_task_plan_on_success(state)
+        except Exception:
+            pass
+
     experiment_id = state.get("ab_experiment_id")
     variant = state.get("ab_variant")
     response = state.get("response")

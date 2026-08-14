@@ -271,6 +271,33 @@ def search_published(
         return out
 
 
+def bump_usage_by_id(
+    *,
+    tenant_id: str,
+    asset_id: str,
+    tokens: int = 0,
+    ok: bool = True,
+) -> None:
+    """Fail-soft usage bump（task_plan 命中后调用）。"""
+    try:
+        sf = get_pg_session()
+        with sf.Session() as session:
+            asset = (
+                session.query(SkillAsset)
+                .filter(
+                    SkillAsset.id == asset_id,
+                    SkillAsset.tenant_id == tenant_id,
+                )
+                .one_or_none()
+            )
+            if asset is None:
+                return
+            bump_usage(session, asset, tokens=tokens, ok=ok)
+            session.commit()
+    except Exception:
+        logger.debug("bump_usage_by_id failed", exc_info=True)
+
+
 def bump_usage(session: Session, asset: SkillAsset, *, tokens: int = 0, ok: bool = True) -> None:
     stats = dict(asset.usage_stats or {})
     stats["uses"] = int(stats.get("uses") or 0) + 1
