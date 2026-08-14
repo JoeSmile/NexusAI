@@ -37,6 +37,7 @@ _RE_DECISION = re.compile(
 _RE_TODO = re.compile(
     r"(?:待办[:：]?|记得做|请记得)\s*(.{2,80})"
 )
+# 实体句式（Important 2A：宁缺勿滥；勿放宽后继字符类）
 _RE_ENTITY = re.compile(
     r"(同事|客户|供应商)\s*([\u4e00-\u9fa5]{2,4})(?=\s|$|[，。！？、；：]|来|去|帮|评审|完成|负责)"
 )

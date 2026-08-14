@@ -109,7 +109,10 @@ def _has_pii(text: str) -> bool:
 
 
 def security_validator(item: MemoryItem, source_text: str | None = None) -> tuple[bool, str | None]:
-    """扫 item 字段；不扫整段原文（避免叙述里的「密钥」误杀合法 error 条目）。"""
+    """扫 item 字段；不扫整段原文（Task 42 Important 1A 落档）。
+
+    避免叙述里的「密钥」误杀合法 error 条目（如「失败返回 AUTH_001 无效密钥」）。
+    """
     del source_text
     blobs = [item.text, item.source_span]
     if isinstance(item, EntityItem):
