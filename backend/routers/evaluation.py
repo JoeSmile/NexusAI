@@ -3,6 +3,7 @@
 评估相关路由
 """
 
+import asyncio
 import json
 from datetime import datetime
 
@@ -40,10 +41,11 @@ async def evaluate_response(
     使用LLM作为裁判，从准确性、完整性、安全性三个维度评分
     """
     try:
-        # 调用评估引擎
-        evaluation_result = evaluation_engine.evaluate_response(
-            user_message=request.user_message,
-            bot_response=request.bot_response,
+        # Wave G: 同步 evaluate_response（含 LLM）不得堵 event loop
+        evaluation_result = await asyncio.to_thread(
+            evaluation_engine.evaluate_response,
+            request.user_message,
+            request.bot_response,
         )
         
         # 检查是否有错误

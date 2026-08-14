@@ -395,7 +395,7 @@ async def test_tool_executor_rag_uses_rag_service(
     )
 
     class _FakeRag:
-        def ask(self, **_kwargs):
+        def ask(self, *_args, **_kwargs):
             return {
                 "answer": "real-rag-answer-about-vendor",
                 "knowledge_count": 2,

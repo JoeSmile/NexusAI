@@ -6,6 +6,7 @@ RAG路由
 
 import os
 import tempfile
+import asyncio
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel, ConfigDict
@@ -472,9 +473,11 @@ async def ask_question(
     _attach_org_scope_to_kb(kb, tenant)
     rag_service = get_rag_service()
     rag_service.kb_manager = kb
-    result = rag_service.ask(
-        question=request.question,
-        search_k=request.search_k,
+    # D6/Wave G: ask 内含 wait_l1 同步轮询——整段丢线程池，不堵事件循环
+    result = await asyncio.to_thread(
+        rag_service.ask,
+        request.question,
+        request.search_k,
         tenant_id=tenant.tenant_id,
         user_id=tenant.user_id,
     )
@@ -501,10 +504,12 @@ async def ask_with_context(
     _attach_org_scope_to_kb(kb, tenant)
     rag_service = get_rag_service()
     rag_service.kb_manager = kb
-    result = rag_service.ask_with_context(
-        question=request.question,
-        conversation_history=request.conversation_history,
-        search_k=request.search_k
+    # D6/Wave G: ask_with_context 含同步检索/LLM——丢线程池
+    result = await asyncio.to_thread(
+        rag_service.ask_with_context,
+        request.question,
+        request.conversation_history,
+        request.search_k,
     )
     
     return {

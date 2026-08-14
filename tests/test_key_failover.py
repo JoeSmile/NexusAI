@@ -482,6 +482,12 @@ def test_failover_sync_401_switches():
     clears: list[str] = []
 
     class _Repo:
+        def mark_key_failed_sync(self, key_id):
+            marks.append(str(key_id))
+
+        def clear_key_failure_sync(self, key_id):
+            clears.append(str(key_id))
+
         async def mark_key_failed(self, key_id):
             marks.append(str(key_id))
 

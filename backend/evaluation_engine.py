@@ -7,8 +7,6 @@ import json
 from datetime import datetime
 from typing import Any
 
-import requests
-
 # 导入 LangChain (Python 3.10+, langchain 0.2.x+)
 try:
     from langchain_core.output_parsers import StrOutputParser
@@ -201,46 +199,26 @@ class EvaluationEngine:
     def _call_api_traditional(
         self, user_message: str, bot_response: str
     ) -> str:
-        """使用传统HTTP请求调用API"""
+        """走 harness 同步出口（Wave G/H: 禁直接 requests；纳入并发信号量）。"""
+        from backend.core.harness.llm_client import complete_via_provider
+
         prompt = EVALUATION_PROMPT_TEMPLATE.format(
             user_message=user_message,
-            bot_response=bot_response
+            bot_response=bot_response,
         )
-        
-        try:
-            headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
-            }
-            
-            data = {
-                "model": self.model,
-                "messages": [
-                    {"role": "system", "content": "你是一位专业的评估专家，负责评价聊天机器人的回应质量。"},
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0.3
-            }
-            
-            api_url = f"{self.api_base_url}/chat/completions"
-            response = requests.post(
-                api_url,
-                headers=headers,
-                json=data,
-                timeout=30
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                return result["choices"][0]["message"]["content"].strip()
-            else:
-                logger.error(f"API错误: {response.status_code} - {response.text}")
-                raise Exception(f"API调用失败: {response.status_code}")
-                
-        except Exception as e:
-            logger.error(f"API调用失败: {e}")
-            raise
-    
+        return complete_via_provider(
+            model=self.model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "你是一位专业的评估专家，负责评价聊天机器人的回应质量。",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            api_key=self.api_key or None,
+            base_url=self.api_base_url or None,
+            temperature=0.3,
+        )    
     def _parse_evaluation_result(self, result_text: str) -> dict[str, Any]:
         """解析评估结果（从文本中提取JSON）"""
         try:

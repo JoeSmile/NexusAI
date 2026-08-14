@@ -250,6 +250,10 @@ class LLMKeyRepository:
 
     async def mark_key_failed(self, key_id: str | int) -> None:
         """连续失败 +1 并写入 last_failed_at;达阈值则 is_active=false。"""
+        self.mark_key_failed_sync(key_id)
+
+    def mark_key_failed_sync(self, key_id: str | int) -> None:
+        """同步版（Wave G: sync failover 禁在事件循环里 asyncio.run/.result）。"""
         if str(key_id) == "fallback":
             return
         max_fail = _max_consecutive_failures()
@@ -271,11 +275,13 @@ class LLMKeyRepository:
                 {"id": int(key_id), "max_fail": max_fail},
             )
             session.commit()
-        # 失败后缓存可能指向已冷却/摘除 key
         self._cache = LLMKeyCache()
 
     async def clear_key_failure(self, key_id: str | int) -> None:
         """成功调用后归零失败计数与冷却。"""
+        self.clear_key_failure_sync(key_id)
+
+    def clear_key_failure_sync(self, key_id: str | int) -> None:
         if str(key_id) == "fallback":
             return
         session_factory = get_pg_session()

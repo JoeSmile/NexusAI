@@ -10,6 +10,7 @@ kind=tool 经 ``spec.executor`` 映射到 model / rag（Task 30b）。
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from collections.abc import AsyncIterator
@@ -201,9 +202,10 @@ async def _invoke_rag(
     search_k = int(payload.get("search_k") or spec.spec.get("search_k") or 3)
 
     try:
-        result = get_rag_service().ask(
-            question=question,
-            search_k=search_k,
+        result = await asyncio.to_thread(
+            get_rag_service().ask,
+            question,
+            search_k,
             tenant_id=tenant.tenant_id,
             user_id=tenant.user_id or "anonymous",
         )

@@ -143,9 +143,7 @@ def call_with_key_failover_sync(
     tenant_id: str = "default",
     provider: str = "default",
 ) -> T:
-    """同步版(供 complete_via_provider)。mark/clear 用 asyncio.run 包装。"""
-    import asyncio
-
+    """同步版(供 complete_via_provider)。DB 走 sync 方法，禁事件循环内 .result()。"""
     if not keys:
         raise RuntimeError("无可用 LLM API Key 候选")
 
@@ -153,27 +151,16 @@ def call_with_key_failover_sync(
     chain = keys[:3]
     last_err: BaseException | None = None
 
-    def _run(coro: Awaitable[Any]) -> Any:
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            return asyncio.run(coro)
-        # 已在事件循环中:同步路径尽量用后台线程跑
-        import concurrent.futures
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            return pool.submit(asyncio.run, coro).result()
-
     for i, key in enumerate(chain):
         try:
             result = call_fn(key.api_key, key.base_url or "")
-            _run(repository.clear_key_failure(key.id))
+            repository.clear_key_failure_sync(key.id)
             return result
         except Exception as e:
             status = classify_switchable_status(e)
             if status is None:
                 raise
-            _run(repository.mark_key_failed(key.id))
+            repository.mark_key_failed_sync(key.id)
             last_err = e
             next_key = chain[i + 1] if i + 1 < len(chain) else None
             if next_key is not None:

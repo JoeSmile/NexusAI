@@ -302,12 +302,28 @@ def release_lock(key: str) -> None:
 
 
 def wait_l1(tenant_id: str, question: str, timeout_ms: int = 500) -> dict[str, Any] | None:
+    """同步轮询 L1（仅供同步调用方）。async 路径请用 wait_l1_async。"""
     deadline = time.time() + timeout_ms / 1000.0
     while time.time() < deadline:
         hit = l1_get(tenant_id, question)
         if hit:
             return hit
         time.sleep(0.05)
+    return None
+
+
+async def wait_l1_async(
+    tenant_id: str, question: str, timeout_ms: int = 500
+) -> dict[str, Any] | None:
+    """异步轮询 L1（不阻塞事件循环）。"""
+    import asyncio
+
+    deadline = time.time() + timeout_ms / 1000.0
+    while time.time() < deadline:
+        hit = l1_get(tenant_id, question)
+        if hit:
+            return hit
+        await asyncio.sleep(0.05)
     return None
 
 

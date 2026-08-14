@@ -4,8 +4,6 @@
 """
 import uuid
 
-import requests
-
 # 导入 LangChain (Python 3.10+, langchain 0.2.x+)
 try:
     from langchain_core.output_parsers import StrOutputParser
@@ -161,45 +159,22 @@ NexusAI："""
         return self._call_api_traditional(user_input, history_text, long_term_context)
     
     def _call_api_traditional(self, user_input, history_text, long_term_context=""):
-        """传统HTTP请求方式调用API（兼容旧环境）"""
-        # 使用完整的NexusAIPrompt构建提示词
+        """传统方式：走 harness 同步出口（Wave G: 禁直接 requests；纳入并发信号量）。"""
+        from backend.core.harness.llm_client import complete_via_provider
+
         full_prompt = build_full_prompt(
             user_input=user_input,
             history_text=history_text,
-            long_term_memory=long_term_context
+            long_term_memory=long_term_context,
         )
-        
-        # 调用API (支持Qwen和OpenAI)
         try:
-            headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
-            }
-            
-            data = {
-                "model": self.model,
-                "messages": [
-                    {"role": "system", "content": full_prompt}
-                ],
-                "temperature": 0.7,
-                "max_tokens": 300  # 控制响应长度（3-4句话）
-            }
-            
-            api_url = f"{self.api_base_url}/chat/completions"
-            response = requests.post(
-                api_url,
-                headers=headers,
-                json=data,
-                timeout=120
+            return complete_via_provider(
+                model=self.model,
+                messages=[{"role": "system", "content": full_prompt}],
+                api_key=self.api_key or None,
+                base_url=self.api_base_url or None,
+                temperature=0.7,
             )
-            
-            if response.status_code == 200:
-                result = response.json()
-                return result["choices"][0]["message"]["content"].strip()
-            else:
-                print(f"API错误 ({self.model}): {response.status_code} - {response.text}")
-                return self._get_fallback_response(user_input)
-                
         except Exception as e:
             print(f"API调用失败 ({self.model}): {e}")
             return self._get_fallback_response(user_input)
