@@ -62,7 +62,7 @@ auth_check → load_memory → rate_limiter → cache_check
                  └─ long:  llm_generate → guardrails_out → write_memory → END
 ```
 
-Interview-oriented walkthroughs: [`learning/`](learning/README.md).
+Module deep-dives: [`learning/`](learning/README.md).
 
 ## Requirements
 
@@ -127,7 +127,7 @@ tasks/            Active design notes (e.g. Task 39 preprocess)
 | Doc | Description |
 |-----|-------------|
 | [AI middle platform](docs/strategy/AI_MIDDLE_PLATFORM.md) | Positioning & five-layer map |
-| [Strategy index](docs/strategy/README.md) | Moat / job-hunt / market notes |
+| [Strategy index](docs/strategy/README.md) | Moat / GTM / market notes |
 | [Architecture](docs/ARCHITECTURE.md) | Technical architecture |
 | [Cache](docs/CACHE.md) | Cache key semantics |
 | [Deployment](docs/DEPLOYMENT.md) | Deploy notes |

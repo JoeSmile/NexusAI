@@ -62,7 +62,7 @@ auth_check → load_memory → rate_limiter → cache_check
                  └─ long:  llm_generate → guardrails_out → write_memory → END
 ```
 
-Deep-dives for interviews: [`learning/`](learning/README.md).
+Module deep-dives: [`learning/`](learning/README.md).
 
 ## Requirements
 
