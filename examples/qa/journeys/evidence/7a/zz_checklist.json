@@ -1,0 +1,92 @@
+{
+  "run_id": "a4c05b71-d018-408a-aed6-99117a87deb7",
+  "steps": {
+    "01_jwt_admin": {
+      "ok": true,
+      "detail": ""
+    },
+    "02_jwt_member": {
+      "ok": true,
+      "detail": ""
+    },
+    "02b_jwt_auditor": {
+      "ok": true,
+      "detail": ""
+    },
+    "03_org_unit": {
+      "ok": true,
+      "detail": "{\"id\":\"785ed59a-c0c4-439e-9eae-27b917eeb279\",\"tenant_id\":\"acme\",\"parent_id\":null,\"name\":\"g7a-868e1c8b\",\"path\":\"/785ed59a-c0c4-439e-9eae-27b917eeb279/\",\"deleted_at\":null,\"created_at\":\"2026-08-14T07:47:"
+    },
+    "04_bind_dept_manager": {
+      "ok": true,
+      "detail": "{\"id\":\"b2d6c9d7-2a85-4689-b103-61eeec005a8f\",\"tenant_id\":\"acme\",\"user_id\":\"g7a_admin_868e1c8b\",\"org_unit_id\":\"785ed59a-c0c4-439e-9eae-27b917eeb279\",\"is_primary\":true,\"business_roles\":[\"dept_manager\"],"
+    },
+    "05_bind_member": {
+      "ok": true,
+      "detail": "{\"id\":\"a7ef35bb-d1aa-4318-8106-687177681426\",\"tenant_id\":\"acme\",\"user_id\":\"g7a_member_868e1c8b\",\"org_unit_id\":\"785ed59a-c0c4-439e-9eae-27b917eeb279\",\"is_primary\":true,\"business_roles\":[\"member\"],\"crea"
+    },
+    "06_reload_capabilities": {
+      "ok": true,
+      "detail": "{\"ok\":true,\"total\":13}"
+    },
+    "07_hang_cap_visible": {
+      "ok": true,
+      "detail": "n=13"
+    },
+    "08_member_cap_list_note": {
+      "ok": true,
+      "detail": "listed=False n=8 (list optional; run path is Must)"
+    },
+    "09_create_draft": {
+      "ok": true,
+      "detail": "{\"id\":\"0b3a221c-8c47-41e9-8045-cd7883efa22d\",\"tenant_id\":\"acme\",\"org_unit_id\":\"785ed59a-c0c4-439e-9eae-27b917eeb279\",\"name\":\"g7a-868e1c8b\",\"status\":\"draft\",\"ir\":{\"edges\":[],\"nodes\":[{\"kind\":\"capability\",\"params\":{\"query\":\"g7a-868e1c8b\"},\"node_id\":\"n1\",\"requestable\":\"true\",\"approval_note\":\"7A need kb"
+    },
+    "10_publish": {
+      "ok": true,
+      "detail": "{\"id\":\"0b3a221c-8c47-41e9-8045-cd7883efa22d\",\"tenant_id\":\"acme\",\"org_unit_id\":\"785ed59a-c0c4-439e-9eae-27b917eeb279\",\"name\":\"g7a-868e1c8b\",\"status\":\"published\",\"ir\":{\"edges\":[],\"nodes\":[{\"kind\":\"capability\",\"params\":{\"query\":\"g7a-868e1c8b\"},\"node_id\":\"n1\",\"requestable\":\"true\",\"approval_note\":\"7A nee"
+    },
+    "11_member_run": {
+      "ok": true,
+      "detail": "{\"id\":\"a4c05b71-d018-408a-aed6-99117a87deb7\",\"status\":\"pending\",\"workflow_id\":\"0b3a221c-8c47-41e9-8045-cd7883efa22d\",\"org_unit_id\":\"785ed59a-c0c4-439e-9eae-27b917eeb279\"}"
+    },
+    "12_suspended": {
+      "ok": true,
+      "detail": "status=suspended"
+    },
+    "13_hang_visibility": {
+      "ok": true,
+      "detail": "待 dept_manager 审批"
+    },
+    "14_inbox": {
+      "ok": true,
+      "detail": "count=1"
+    },
+    "15_approve": {
+      "ok": true,
+      "detail": "{\"ok\":true,\"request_id\":\"8982d4bc-1ac1-41a5-8f6c-950fb39e12ff\",\"grant_id\":\"b2dd4f85-1bcc-414c-b9e6-8a1663bb4606\",\"run_id\":\"a4c05b71-d018-408a-aed6-99117a87deb7\",\"status\":\"approved\"}"
+    },
+    "16_resume_succeeded": {
+      "ok": true,
+      "detail": "status=succeeded"
+    },
+    "17_evidence_queue": {
+      "ok": true,
+      "detail": "count=0"
+    },
+    "18_audit_export": {
+      "ok": true,
+      "detail": "status=200 bytes=153103 secretish=False"
+    },
+    "19_jwt_not_apikey": {
+      "ok": true,
+      "detail": "jwt_prefix_ok"
+    },
+    "20_perf_smoke": {
+      "ok": true,
+      "detail": "{\"mode\": \"50_concurrent_start\", \"perf_wf\": {\"cap\": \"nexusai-chat\", \"create\": 200, \"publish\": 200, \"create_body\": \"{\\\"id\\\":\\\"e2cae104-3cec-4c32-a312-01883e27339a\\\",\\\"tenant_id\\\":\\\"acme\\\",\\\"org_unit_id\\\":\\\"785ed59a-c0c4-439e-9eae-27b917eeb279\\\",\\\"name\\\":\\\"g7a-perf-868e1c8b\\\",\\\"status\\\":\\\"draft\\\",\\\"ir\\\":{\\\"edges\\\":[],\\\"nodes\\\":[{\\\"kind\\\":\\\"capa\"}, \"50_start\": {\"elapsed_s\": 1.947, \"ok\": 50, \"429\": 0, \"other\": 0, \"samples\": []}, \"list_1000\": {\"status\": 200, \"pages\": 1, \"elapsed_s\": 0.015, \"items\": 57, \"api_max_page\": 100, \"target_lt_2s\": true, \"gap\": \"insufficient_history_rows\"}}"
+    }
+  },
+  "started_at": "2026-08-14T07:47:11.278329+00:00",
+  "finished_at": "2026-08-14T07:47:15.505260+00:00",
+  "failed": 0
+}

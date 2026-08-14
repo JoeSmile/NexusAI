@@ -1,0 +1,34 @@
+{
+  "id": "0b3a221c-8c47-41e9-8045-cd7883efa22d",
+  "tenant_id": "acme",
+  "org_unit_id": "785ed59a-c0c4-439e-9eae-27b917eeb279",
+  "name": "g7a-868e1c8b",
+  "status": "draft",
+  "ir": {
+    "edges": [],
+    "nodes": [
+      {
+        "kind": "capability",
+        "params": {
+          "query": "g7a-868e1c8b"
+        },
+        "node_id": "n1",
+        "requestable": "true",
+        "approval_note": "7A need kb:read",
+        "capability_id": "g7a-hang-868e1c8b"
+      }
+    ],
+    "ir_schema": "1"
+  },
+  "version": "V1.0.0",
+  "revision": 0,
+  "forked_from_id": null,
+  "created_by": "g7a_admin_868e1c8b",
+  "request_policy": {
+    "scope": "recurring",
+    "default_ttl_days": 90,
+    "auto_renew": false
+  },
+  "created_at": "2026-08-14T07:47:12.490429",
+  "updated_at": "2026-08-14T07:47:12.490431"
+}

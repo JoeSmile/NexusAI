@@ -34,3 +34,10 @@ Task 30(能力中枢 + 统一前端)的五角色评审指出: 现有 QA 是"端�
 旅程测试发现的别扭点 = 前端要补的页面/交互的需求来源
 (例: user 403 后无申请入口 → 前端审批页;admin 看不到 key 最后使用 → last_used_at)。
 测出的别扭点合并进 `tasks/30-capability-hub-frontend.md`,再交给 Cursor 实现——先测后写。
+
+
+## Pilot B 7A 金线
+
+- 剧本: [`pilot_b_7a_gold_line.md`](pilot_b_7a_gold_line.md)
+- 脚本: `PERF=1 ./pilot_b_7a_gold_line.sh`
+- 证据: `evidence/7a/`
