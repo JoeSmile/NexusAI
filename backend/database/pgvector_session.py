@@ -358,6 +358,34 @@ class WorkflowGrant(Base):
     )
 
 
+class Notification(Base):
+    """站内信 / 多渠道通知（Task 44 / alembic 014）。"""
+
+    __tablename__ = "notifications"
+    id = Column(String(36), primary_key=True)
+    tenant_id = Column(String(64), nullable=False)
+    user_id = Column(String(64), nullable=False)
+    type = Column(String(64), nullable=False)
+    channel = Column(String(20), nullable=False, default="inbox")
+    payload = Column(JSON, nullable=False, default=dict)
+    read_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    __table_args__ = (
+        Index(
+            "ix_notifications_tenant_user_read",
+            "tenant_id",
+            "user_id",
+            "read_at",
+        ),
+        Index(
+            "ix_notifications_tenant_user_created",
+            "tenant_id",
+            "user_id",
+            "created_at",
+        ),
+    )
+
+
 class KnowledgeChunk(Base):
     """RAG 知识块 — 替代 Chroma knowledge collection"""
 

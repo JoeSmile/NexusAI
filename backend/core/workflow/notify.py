@@ -163,11 +163,34 @@ def mark_escalated(
         node_id=req.node_id,
         reason=reason,
     )
+    # Task 44: 升级 → 相关方（tenant_admin）；失败不阻断
+    try:
+        from backend.modules.notification.service import (
+            list_tenant_admin_user_ids,
+            notify_many,
+        )
+
+        admins = list_tenant_admin_user_ids(session, req.tenant_id)
+        notify_many(
+            req.tenant_id,
+            admins,
+            "hang.escalated",
+            {
+                "run_id": req.run_id,
+                "node_id": req.node_id,
+                "request_id": req.id,
+                "org_unit_id": req.org_unit_id,
+                "capability_id": req.capability_id,
+                "reason": reason,
+            },
+        )
+    except Exception:
+        logger.debug("hang escalate notify failed", exc_info=True)
     return True
 
 
 def notify_hang_pending(run_id: str, node_id: str) -> HangRoute | None:
-    """挂起后调用：路由；无经理则立即 escalate_no_dept_manager。失败静默。"""
+    """挂起后调用：路由；无经理则立即 escalate；再投递 inbox。失败静默。"""
     try:
         sf = get_pg_session()
         with sf.Session() as session:
@@ -190,6 +213,26 @@ def notify_hang_pending(run_id: str, node_id: str) -> HangRoute | None:
             if route.escalate_to_tenant_admin:
                 mark_escalated(session, req, reason="escalate_no_dept_manager")
                 session.commit()
+            else:
+                session.commit()
+                # 先 route，再投递待批（升级路径由 mark_escalated 发 hang.escalated）
+                try:
+                    from backend.modules.notification.service import notify_many
+
+                    notify_many(
+                        req.tenant_id,
+                        list(route.manager_user_ids),
+                        "hang.pending",
+                        {
+                            "run_id": req.run_id,
+                            "node_id": req.node_id,
+                            "request_id": req.id,
+                            "org_unit_id": req.org_unit_id,
+                            "capability_id": req.capability_id,
+                        },
+                    )
+                except Exception:
+                    logger.debug("hang pending inbox notify failed", exc_info=True)
             return route
     except Exception:
         logger.debug("notify_hang_pending failed", exc_info=True)

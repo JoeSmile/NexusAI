@@ -238,6 +238,7 @@ async def approve(
         run_id = req.run_id
         grant_id = grant.id
         node_id = req.node_id
+        applicant_user_id = req.applicant_user_id
         _audit(
             tenant_id=tenant.tenant_id,
             user_id=tenant.user_id,
@@ -246,6 +247,25 @@ async def approve(
             node_id=node_id,
             output_text=f"grant={grant_id}:cap={req.capability_id}",
         )
+
+    # 批 → 申请人（self_approve 不另发用户通知，对齐 auto-grant 只审计）
+    try:
+        if action == "workflow.approve":
+            from backend.modules.notification.service import notify
+
+            notify(
+                tenant.tenant_id,
+                applicant_user_id,
+                "hang.approved",
+                {
+                    "run_id": run_id,
+                    "node_id": node_id,
+                    "request_id": request_id,
+                    "grant_id": grant_id,
+                },
+            )
+    except Exception:
+        pass
 
     run_svc.schedule_resume(run_id)
     return {
@@ -316,12 +336,31 @@ async def reject(
             {"id": req.run_id, "now": datetime.utcnow()},
         )
         session.commit()
+        run_id = req.run_id
+        node_id = req.node_id
+        applicant_user_id = req.applicant_user_id
         _audit(
             tenant_id=tenant.tenant_id,
             user_id=tenant.user_id,
             action="workflow.reject",
-            run_id=req.run_id,
-            node_id=req.node_id,
+            run_id=run_id,
+            node_id=node_id,
             output_text=(body.reason or "rejected")[:200],
         )
-        return {"ok": True, "request_id": request_id, "status": "rejected"}
+    try:
+        from backend.modules.notification.service import notify
+
+        notify(
+            tenant.tenant_id,
+            applicant_user_id,
+            "hang.rejected",
+            {
+                "run_id": run_id,
+                "node_id": node_id,
+                "request_id": request_id,
+                "reason": (body.reason or "rejected")[:64],
+            },
+        )
+    except Exception:
+        pass
+    return {"ok": True, "request_id": request_id, "status": "rejected"}

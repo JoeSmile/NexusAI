@@ -247,6 +247,14 @@ def create_app() -> FastAPI:
         required=True,
         label="Workflow Approvals",
     )
+    _lazy_include(
+        app,
+        "backend.routers.notifications",
+        "router",
+        prefix="/api",
+        required=True,
+        label="Notifications",
+    )
 
     # 可选路由
     features = {

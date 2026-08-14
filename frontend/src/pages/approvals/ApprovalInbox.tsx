@@ -80,9 +80,9 @@ export default function ApprovalInboxPage() {
       <ForbiddenBanner />
       <Card>
         <CardHeader>
-          <CardTitle>审批待办</CardTitle>
+          <CardTitle>待办审批</CardTitle>
           <CardDescription>
-            实时业务角色 + 组织范围；敏感能力仅 tenant_admin。审批说明为 approval_note（非执行证据）。
+            可行动的审批队列。事件流通知见「通知」页；角标为通知未读。
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

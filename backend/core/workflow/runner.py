@@ -813,10 +813,19 @@ def cancel_run(
         .all()
     )
     now = datetime.utcnow()
+    cancelled_meta: list[dict[str, Any]] = []
     for req in pending:
         req.status = "cancelled"
         req.updated_at = now
         req.review_reason = "run_cancelled"
+        cancelled_meta.append(
+            {
+                "request_id": req.id,
+                "node_id": req.node_id,
+                "org_unit_id": req.org_unit_id,
+                "capability_id": req.capability_id,
+            }
+        )
     session.commit()
     _audit(
         tenant_id=run.tenant_id,
@@ -826,6 +835,38 @@ def cancel_run(
         run_id=run.id,
         output_text=f"requests_cancelled={len(pending)}",
     )
+    # 撤销 → 审批人（dept_manager / tenant_admin）
+    try:
+        from backend.core.workflow.notify import resolve_hang_route
+        from backend.modules.notification.service import (
+            list_tenant_admin_user_ids,
+            notify_many,
+        )
+
+        for meta in cancelled_meta:
+            route = resolve_hang_route(
+                session,
+                tenant_id=run.tenant_id,
+                org_unit_id=meta["org_unit_id"],
+            )
+            targets = (
+                list_tenant_admin_user_ids(session, run.tenant_id)
+                if route.escalate_to_tenant_admin
+                else list(route.manager_user_ids)
+            )
+            notify_many(
+                run.tenant_id,
+                targets,
+                "hang.cancelled",
+                {
+                    "run_id": run.id,
+                    "node_id": meta["node_id"],
+                    "request_id": meta["request_id"],
+                    "capability_id": meta["capability_id"],
+                },
+            )
+    except Exception:
+        logger.debug("cancel notify failed", exc_info=True)
     return {
         "id": run.id,
         "status": run.status,

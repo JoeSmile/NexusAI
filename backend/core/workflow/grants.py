@@ -358,6 +358,38 @@ def expire_stale_approvals_for_node(
                 "created_at": now,
             }
         )
+        # TTL 过期重申请 → 审批人（相关方）；新 pending 由调用方 create
+        try:
+            from backend.core.workflow.notify import resolve_hang_route
+            from backend.modules.notification.service import (
+                list_tenant_admin_user_ids,
+                notify_many,
+            )
+
+            route = resolve_hang_route(
+                session,
+                tenant_id=tenant_id,
+                org_unit_id=req.org_unit_id,
+            )
+            targets = (
+                list_tenant_admin_user_ids(session, tenant_id)
+                if route.escalate_to_tenant_admin
+                else list(route.manager_user_ids)
+            )
+            notify_many(
+                tenant_id,
+                targets,
+                "hang.ttl_reapply",
+                {
+                    "run_id": run_id,
+                    "node_id": node_id,
+                    "request_id": req.id,
+                    "grant_id": g.id,
+                    "capability_id": capability_id,
+                },
+            )
+        except Exception:
+            pass
     return n
 
 

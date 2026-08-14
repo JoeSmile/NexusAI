@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 
+import { getNotificationUnreadCount } from '@/api/notifications'
 import { BrandMark } from '@/components/brand/BrandMark'
 import { RoleSwitcher } from '@/components/role/RoleSwitcher'
 import { Badge } from '@/components/ui/badge'
@@ -43,7 +44,10 @@ const NAV_GROUPS: NavGroup[] = [
   {
     id: 'approvals',
     label: '审批',
-    items: [{ to: '/approvals', label: '待办' }],
+    items: [
+      { to: '/approvals', label: '待办审批' },
+      { to: '/notifications', label: '通知' },
+    ],
   },
   {
     id: 'knowledge',
@@ -92,6 +96,7 @@ export function AppShell() {
   const activeRole = useAuthStore((s) => s.activeRole)
   const clear = useAuthStore((s) => s.clear)
   const [env, setEnv] = useState<AppEnv>('dev')
+  const [unread, setUnread] = useState(0)
 
   useEffect(() => {
     const fromVite = import.meta.env.VITE_APP_ENV
@@ -106,6 +111,25 @@ export function AppShell() {
       })
       .catch(() => setEnv('dev'))
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    const tick = () => {
+      getNotificationUnreadCount()
+        .then((r) => {
+          if (!cancelled) setUnread(Number(r.unread) || 0)
+        })
+        .catch(() => {
+          if (!cancelled) setUnread(0)
+        })
+    }
+    tick()
+    const id = window.setInterval(tick, 30000)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
+  }, [activeRole])
 
   const groups = useMemo(() => {
     return NAV_GROUPS.map((g) => ({
@@ -122,6 +146,21 @@ export function AppShell() {
           {env}
         </Badge>
         <div className="text-muted-foreground ml-auto flex items-center gap-3 text-xs">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="relative"
+            aria-label="通知"
+            onClick={() => navigate('/notifications')}
+          >
+            通知
+            {unread > 0 ? (
+              <Badge className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
+                {unread > 99 ? '99+' : unread}
+              </Badge>
+            ) : null}
+          </Button>
           <RoleSwitcher />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -166,6 +205,11 @@ export function AppShell() {
                       }
                     >
                       {item.label}
+                      {item.to === '/notifications' && unread > 0 ? (
+                        <span className="text-muted-foreground ml-1 text-xs">
+                          ({unread > 99 ? '99+' : unread})
+                        </span>
+                      ) : null}
                     </NavLink>
                   ))}
                 </div>

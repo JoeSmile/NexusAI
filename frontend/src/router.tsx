@@ -20,6 +20,7 @@ import WorkflowEditorPage from '@/pages/workflows/WorkflowEditor'
 import RunListPage from '@/pages/workflows/RunList'
 import RunDetailPage from '@/pages/workflows/RunDetail'
 import ApprovalInboxPage from '@/pages/approvals/ApprovalInbox'
+import NotificationsPage from '@/pages/notifications/NotificationsPage'
 import { useAuthStore } from '@/stores/authStore'
 
 function RequireAuth() {
@@ -58,6 +59,7 @@ export const router = createBrowserRouter([
           { path: 'runs', element: <RunListPage /> },
           { path: 'runs/:runId', element: <RunDetailPage /> },
           { path: 'approvals', element: <ApprovalInboxPage /> },
+          { path: 'notifications', element: <NotificationsPage /> },
           { path: 'knowledge', element: <RagPanel /> },
           {
             element: <RequireRoles allow={ORG_ROLES} />,
