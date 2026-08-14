@@ -82,7 +82,7 @@ def extract_structured_items(user_message: str) -> list[StructuredCandidate]:
             if rel_raw in ("同事", "客户", "供应商")
             else (EntityType.PROJECT if rel_raw == "项目" else EntityType.SYSTEM)
         )
-        item = EntityItem(
+        item: MemoryItem = EntityItem(
             text=name,
             source_span=span,
             confidence=0.7,

@@ -4,9 +4,9 @@ RAG路由
 提供知识库管理和问答的API接口
 """
 
+import asyncio
 import os
 import tempfile
-import asyncio
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel, ConfigDict

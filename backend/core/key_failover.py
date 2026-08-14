@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Awaitable, Callable
 from datetime import datetime
-from typing import Any, TypeVar
+from typing import TypeVar
 
 from backend.core.key_repository import LLMKey, LLMKeyRepository
 
