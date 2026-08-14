@@ -22,7 +22,17 @@ from backend.core.errors import ErrorCode, NexusAIException
 from backend.core.guardrails.input_guard import detect_injection_in_params
 from backend.core.org.scope import OrgScope, assert_org_access, resolve_org_scope
 from backend.core.workflow.evidence import evidence_from_rag_sources, node_output
+from backend.core.workflow.grants import (
+    create_pending_request,
+    expire_stale_approvals_for_node,
+    find_active_grant_covering,
+    grant_auth_context,
+    is_eligible_approver,
+    issue_auto_grant,
+)
 from backend.core.workflow.ir import WorkflowIR
+from backend.core.workflow.run_state import assert_transition
+from backend.core.workflow.security_gates import HangGateError, assert_hang_wait_allowed
 from backend.core.workflow.service import capability_catalog_visible
 from backend.database.pgvector_session import (
     Workflow,
@@ -34,6 +44,15 @@ from backend.database.pgvector_session import (
 logger = logging.getLogger(__name__)
 
 MAX_RUNNING_ROOT_RUNS = 2
+
+
+class RunSuspended(Exception):
+    """Node hung waiting for approval — executor exits cleanly (no fail)."""
+
+    def __init__(self, run_id: str, node_id: str) -> None:
+        self.run_id = run_id
+        self.node_id = node_id
+        super().__init__(f"run_suspended:{run_id}:{node_id}")
 
 
 def _audit(
@@ -296,6 +315,8 @@ async def execute_run(run_id: str) -> None:
                 credential_kind=run.credential_kind,
                 run_id=run.id,
             )
+    except RunSuspended:
+        return
     except HTTPException as exc:
         _fail_run(run_id, error_code=str((exc.detail or {}).get("code") if isinstance(exc.detail, dict) else ErrorCode.RUN_500), error_message=str(exc.detail))
     except Exception as exc:
@@ -309,7 +330,7 @@ def _fail_run(run_id: str, *, error_code: str, error_message: str) -> None:
         run = session.query(WorkflowRun).filter(WorkflowRun.id == run_id).one_or_none()
         if run is None:
             return
-        if run.status in ("succeeded", "failed"):
+        if run.status in ("succeeded", "failed", "suspended", "cancelled"):
             return
         run.status = "failed"
         run.error_code = error_code[:64]
@@ -438,40 +459,154 @@ async def _execute_node(
                 "capability_id": cap_id,
             },
         )
-    if not tenant.has_permission(needed, org_scope=org_scope):
-        row.status = "failed"
-        row.error_message = f"auth_denied:{needed}"
-        row.finished_at = datetime.utcnow()
-        session.commit()
-        _audit(
-            tenant_id=run.tenant_id,
-            user_id=run.acting_user_id,
-            action="workflow.node.auth_fail",
-            credential_kind=run.credential_kind,
-            run_id=run.id,
-            node_id=node_id,
-            error_code=ErrorCode.AUTH_INSUFFICIENT_PERMISSIONS,
-            output_text=f"{cap_id}:{needed}",
+
+    has_perm = tenant.has_permission(needed, org_scope=org_scope)
+    grant_hit = find_active_grant_covering(
+        session,
+        tenant_id=run.tenant_id,
+        workflow_id=run.workflow_id,
+        applicant_user_id=run.acting_user_id,
+        capability_id=cap_id,
+    )
+    if not has_perm and grant_hit is None:
+        # Wave E2: requestable 三态 → suspend / auto-grant / fail-closed
+        try:
+            gate = assert_hang_wait_allowed(
+                tenant=tenant,
+                org_scope=org_scope,
+                node_requestable=node.get("requestable"),
+                capability=spec,
+            )
+        except HangGateError as exc:
+            row.status = "failed"
+            row.error_message = f"auth_denied:{needed}:{exc.code}"
+            row.finished_at = datetime.utcnow()
+            session.commit()
+            _audit(
+                tenant_id=run.tenant_id,
+                user_id=run.acting_user_id,
+                action="workflow.node.auth_fail",
+                credential_kind=run.credential_kind,
+                run_id=run.id,
+                node_id=node_id,
+                error_code=ErrorCode.AUTH_INSUFFICIENT_PERMISSIONS,
+                output_text=f"{cap_id}:{needed}:{exc.code}",
+            )
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": ErrorCode.AUTH_INSUFFICIENT_PERMISSIONS,
+                    "message": "permission_denied",
+                    "needed_perm": needed,
+                    "capability_id": cap_id,
+                    "gate": exc.code,
+                },
+            ) from exc
+
+        mode = gate.requestable
+        note = node.get("approval_note")
+        note_s = str(note).strip() if note else None
+
+        wf_row = (
+            session.query(Workflow)
+            .filter(Workflow.id == run.workflow_id)
+            .one_or_none()
         )
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "code": ErrorCode.AUTH_INSUFFICIENT_PERMISSIONS,
-                "message": "permission_denied",
-                "needed_perm": needed,
-                "capability_id": cap_id,
-            },
-        )
+        policy = dict(wf_row.request_policy) if wf_row and wf_row.request_policy else None
+
+        if is_eligible_approver(
+            tenant,
+            org_scope,
+            resource_org_unit_id=run.org_unit_id,
+            requestable_mode=mode,
+            session=session,
+        ):
+            issue_auto_grant(
+                session,
+                tenant_id=run.tenant_id,
+                workflow_id=run.workflow_id,
+                run_id=run.id,
+                node_id=node_id,
+                applicant_user_id=run.acting_user_id,
+                needed_perm=needed,
+                org_unit_id=run.org_unit_id,
+                capability_id=cap_id,
+                requestable_mode=mode,
+                approval_note=note_s,
+                request_policy=policy,
+            )
+            session.commit()
+            _audit(
+                tenant_id=run.tenant_id,
+                user_id=run.acting_user_id,
+                action="workflow.auto_grant",
+                credential_kind="delegation",
+                run_id=run.id,
+                node_id=node_id,
+                output_text=f"{cap_id}:{needed}:self_approve",
+            )
+            # fall through → invoke with grant context
+        else:
+            assert_transition(run.status, "suspended")
+            run.status = "suspended"
+            run.updated_at = datetime.utcnow()
+            row.status = "waiting"
+            row.error_message = f"waiting_approval:{needed}"
+            expire_stale_approvals_for_node(
+                session,
+                tenant_id=run.tenant_id,
+                workflow_id=run.workflow_id,
+                run_id=run.id,
+                node_id=node_id,
+                applicant_user_id=run.acting_user_id,
+                capability_id=cap_id,
+            )
+            create_pending_request(
+                session,
+                tenant_id=run.tenant_id,
+                run_id=run.id,
+                node_id=node_id,
+                applicant_user_id=run.acting_user_id,
+                needed_perm=needed,
+                org_unit_id=run.org_unit_id,
+                capability_id=cap_id,
+                requestable_mode=mode,
+                approval_note=note_s,
+            )
+            session.commit()
+            _audit(
+                tenant_id=run.tenant_id,
+                user_id=run.acting_user_id,
+                action="workflow.run.suspended",
+                credential_kind=run.credential_kind,
+                run_id=run.id,
+                node_id=node_id,
+                output_text=f"{cap_id}:{needed}:{mode}",
+            )
+            # E3: notify_hang_pending async (silent)
+            try:
+                from backend.core.workflow.notify import notify_hang_pending
+
+                notify_hang_pending(run.id, node_id)
+            except Exception:
+                logger.debug("hang notify skipped", exc_info=True)
+            raise RunSuspended(run.id, node_id)
 
     try:
         text_parts: list[str] = []
         done_meta: dict[str, Any] = {}
-        async for frame in invoke(cap_id, params, tenant):
-            ev = frame.get("event")
-            if ev == "token":
-                text_parts.append(str(frame.get("data") or ""))
-            elif ev == "done":
-                done_meta = dict(frame.get("data") or {})
+        with grant_auth_context(
+            tenant_id=run.tenant_id,
+            workflow_id=run.workflow_id,
+            applicant_user_id=run.acting_user_id,
+            capability_id=cap_id,
+        ):
+            async for frame in invoke(cap_id, params, tenant):
+                ev = frame.get("event")
+                if ev == "token":
+                    text_parts.append(str(frame.get("data") or ""))
+                elif ev == "done":
+                    done_meta = dict(frame.get("data") or {})
         answer = "".join(text_parts)
         sources = done_meta.get("sources")
         if not isinstance(sources, list):
@@ -549,6 +684,153 @@ def mark_zombie_runs_failed() -> int:
             )
         session.commit()
     return n
+
+
+def schedule_resume(run_id: str) -> None:
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        asyncio.run(resume_run(run_id))
+        return
+    loop.create_task(resume_run(run_id))
+
+
+async def resume_run(run_id: str) -> None:
+    """suspended → running CAS；跳过已 succeeded 节点，waiting/未完成重鉴权。"""
+    sf = get_pg_session()
+    try:
+        with sf.Session() as session:
+            res = session.execute(
+                text(
+                    "UPDATE workflow_runs SET status='running', updated_at=:now, "
+                    "error_code=NULL, error_message=NULL "
+                    "WHERE id=:id AND status='suspended'"
+                ),
+                {"id": run_id, "now": datetime.utcnow()},
+            )
+            if res.rowcount != 1:
+                return
+            session.commit()
+            run = session.query(WorkflowRun).filter(WorkflowRun.id == run_id).one()
+
+            tenant, org_scope = rebuild_tenant_context(
+                session,
+                tenant_id=run.tenant_id,
+                acting_user_id=run.acting_user_id,
+                credential_kind=run.credential_kind,
+            )
+            ir = WorkflowIR.model_validate(dict(run.ir_snapshot or {}))
+            for node in ir.nodes:
+                await _execute_node(
+                    session,
+                    run=run,
+                    node=node.model_dump(),
+                    tenant=tenant,
+                    org_scope=org_scope,
+                )
+
+            # 若中途又挂起，_execute_node 抛 RunSuspended
+            run = session.query(WorkflowRun).filter(WorkflowRun.id == run_id).one()
+            if run.status == "suspended":
+                return
+            # CAS: 仅 running → succeeded（评审 M-1）——避免与并发 cancel 互相覆盖
+            res2 = session.execute(
+                text(
+                    "UPDATE workflow_runs SET status='succeeded', finished_at=:now, "
+                    "updated_at=:now WHERE id=:id AND status='running'"
+                ),
+                {"id": run_id, "now": datetime.utcnow()},
+            )
+            session.commit()
+            if res2.rowcount != 1:
+                return  # 已被并发 cancel/fail 收走,不再写成功
+            _audit(
+                tenant_id=run.tenant_id,
+                user_id=run.acting_user_id,
+                action="workflow.run.succeeded",
+                credential_kind=run.credential_kind or "delegation",
+                run_id=run.id,
+            )
+    except RunSuspended:
+        return
+    except HTTPException as exc:
+        _fail_run(
+            run_id,
+            error_code=str(
+                (exc.detail or {}).get("code")
+                if isinstance(exc.detail, dict)
+                else ErrorCode.RUN_500
+            ),
+            error_message=str(exc.detail),
+        )
+    except Exception as exc:
+        logger.exception("resume_run failed run_id=%s", run_id)
+        _fail_run(run_id, error_code=ErrorCode.RUN_500, error_message=str(exc)[:500])
+
+
+def cancel_run(
+    session: Session,
+    *,
+    tenant: TenantContext,
+    org_scope: OrgScope,
+    run_id: str,
+) -> dict[str, Any]:
+    """pending/running/suspended → cancelled；挂起 request 同步 cancelled。"""
+    from backend.database.pgvector_session import PermissionRequest
+
+    run = (
+        session.query(WorkflowRun)
+        .filter(WorkflowRun.tenant_id == tenant.tenant_id, WorkflowRun.id == run_id)
+        .one_or_none()
+    )
+    if run is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": ErrorCode.RUN_NOT_FOUND, "message": "run_not_found"},
+        )
+    assert_org_access(org_scope, run.org_unit_id, session=session)
+    if run.status not in ("pending", "running", "suspended"):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": ErrorCode.RUN_CAS_CONFLICT,
+                "message": "cannot_cancel",
+                "status": run.status,
+            },
+        )
+    assert_transition(run.status, "cancelled")
+    run.status = "cancelled"
+    run.finished_at = datetime.utcnow()
+    run.updated_at = datetime.utcnow()
+    run.error_code = None
+    run.error_message = "cancelled_by_user"
+    pending = (
+        session.query(PermissionRequest)
+        .filter(
+            PermissionRequest.run_id == run_id,
+            PermissionRequest.status == "pending",
+        )
+        .all()
+    )
+    now = datetime.utcnow()
+    for req in pending:
+        req.status = "cancelled"
+        req.updated_at = now
+        req.review_reason = "run_cancelled"
+    session.commit()
+    _audit(
+        tenant_id=run.tenant_id,
+        user_id=tenant.user_id,
+        action="workflow.run.cancelled",
+        credential_kind=run.credential_kind,
+        run_id=run.id,
+        output_text=f"requests_cancelled={len(pending)}",
+    )
+    return {
+        "id": run.id,
+        "status": run.status,
+        "requests_cancelled": len(pending),
+    }
 
 
 def freeze_ir_snapshot(ir: dict[str, Any]) -> dict[str, Any]:

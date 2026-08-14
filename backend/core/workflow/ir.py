@@ -46,7 +46,9 @@ class WorkflowNode(BaseModel):
     capability_id: str
     kind: Literal["capability"] = "capability"
     params: dict[str, Any] = Field(default_factory=dict)
-    requestable: bool = False
+    # Wave E: tri-state; default true（S2）
+    requestable: Literal["true", "sensitive", "false"] = "true"
+    approval_note: str | None = None
 
     @field_validator("capability_id")
     @classmethod
@@ -54,6 +56,19 @@ class WorkflowNode(BaseModel):
         if not v or not str(v).strip():
             raise ValueError("capability_id required")
         return str(v).strip()
+
+    @field_validator("requestable", mode="before")
+    @classmethod
+    def _normalize_requestable(cls, v: Any) -> str:
+        from backend.core.workflow.security_gates import (
+            HangGateError,
+            normalize_requestable,
+        )
+
+        try:
+            return normalize_requestable(v)
+        except HangGateError as exc:
+            raise ValueError(str(exc)) from exc
 
     @field_validator("params")
     @classmethod

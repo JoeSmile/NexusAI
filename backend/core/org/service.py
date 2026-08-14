@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException
@@ -19,7 +19,7 @@ from backend.core.org.models import (
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 def _new_id() -> str:

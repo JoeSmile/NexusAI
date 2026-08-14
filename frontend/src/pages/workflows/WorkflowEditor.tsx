@@ -7,6 +7,7 @@ import {
   getWorkflow,
   patchWorkflow,
   publishWorkflow,
+  type RequestPolicy,
   type Workflow,
   type WorkflowNode,
 } from '@/api/workflows'
@@ -37,8 +38,16 @@ function emptyNode(caps: CapabilityItem[]): WorkflowNode {
     capability_id: first?.id ?? '',
     kind: 'capability',
     params: {},
-    requestable: false,
+    requestable: 'true',
+    approval_note: '',
   }
+}
+
+function requestableValue(node: WorkflowNode): 'true' | 'sensitive' | 'false' {
+  const r = node.requestable
+  if (r === false || r === 'false') return 'false'
+  if (r === 'sensitive') return 'sensitive'
+  return 'true'
 }
 
 export default function WorkflowEditorPage() {
@@ -51,6 +60,11 @@ export default function WorkflowEditorPage() {
   const [caps, setCaps] = useState<CapabilityItem[]>([])
   const [name, setName] = useState('')
   const [nodes, setNodes] = useState<WorkflowNode[]>([])
+  const [policy, setPolicy] = useState<RequestPolicy>({
+    scope: 'recurring',
+    default_ttl_days: 90,
+    auto_renew: false,
+  })
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -65,6 +79,11 @@ export default function WorkflowEditorPage() {
       setWf(w)
       setName(w.name)
       setNodes(w.ir?.nodes ?? [])
+      setPolicy({
+        scope: w.request_policy?.scope ?? 'recurring',
+        default_ttl_days: w.request_policy?.default_ttl_days ?? 90,
+        auto_renew: w.request_policy?.auto_renew ?? false,
+      })
       setCaps(capRes.items ?? [])
     } catch (e) {
       setErr(formatApiError(e, 'workflow'))
@@ -115,10 +134,16 @@ export default function WorkflowEditorPage() {
         base_revision: wf.revision,
         name: name.trim() || wf.name,
         ir: { ir_schema: '1', nodes, edges: [] },
+        request_policy: policy,
       })
       setWf(updated)
       setName(updated.name)
       setNodes(updated.ir?.nodes ?? [])
+      setPolicy({
+        scope: updated.request_policy?.scope ?? 'recurring',
+        default_ttl_days: updated.request_policy?.default_ttl_days ?? 90,
+        auto_renew: updated.request_policy?.auto_renew ?? false,
+      })
     } catch (e) {
       setErr(formatApiError(e, 'workflow'))
     } finally {
@@ -136,6 +161,7 @@ export default function WorkflowEditorPage() {
         base_revision: wf.revision,
         name: name.trim() || wf.name,
         ir: { ir_schema: '1', nodes, edges: [] },
+        request_policy: policy,
       })
       const published = await publishWorkflow(saved.id, saved.revision)
       setWf(published)
@@ -186,6 +212,46 @@ export default function WorkflowEditorPage() {
               disabled={readOnly || busy}
               onChange={(e) => setName(e.target.value)}
             />
+          </div>
+
+          <div className="max-w-md space-y-2 rounded-md border p-3">
+            <h3 className="text-sm font-medium">授权策略 (request_policy)</h3>
+            <div className="space-y-1">
+              <Label>scope</Label>
+              <Select
+                disabled={readOnly}
+                value={policy.scope ?? 'recurring'}
+                onValueChange={(v) =>
+                  setPolicy((p) => ({ ...p, scope: v as 'single' | 'recurring' }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="recurring">recurring（默认 90 天）</SelectItem>
+                  <SelectItem value="single">single（高敏短窗口）</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="ttl">default_ttl_days</Label>
+              <Input
+                id="ttl"
+                type="number"
+                disabled={readOnly}
+                value={policy.default_ttl_days ?? 90}
+                onChange={(e) =>
+                  setPolicy((p) => ({
+                    ...p,
+                    default_ttl_days: Number(e.target.value) || 90,
+                  }))
+                }
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              auto_renew 本 Wave 仅存储，实现归 WaveE_3。
+            </p>
           </div>
 
           <div className="space-y-3">
@@ -251,6 +317,39 @@ export default function WorkflowEditorPage() {
                           ))}
                         </SelectContent>
                       </Select>
+                    </div>
+                    <div className="max-w-md space-y-1">
+                      <Label>requestable</Label>
+                      <Select
+                        disabled={readOnly}
+                        value={requestableValue(node)}
+                        onValueChange={(v) =>
+                          updateNode(idx, {
+                            requestable: v as 'true' | 'sensitive' | 'false',
+                          })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="true">true（可申请）</SelectItem>
+                          <SelectItem value="sensitive">sensitive（仅 tenant_admin）</SelectItem>
+                          <SelectItem value="false">false（缺权直接失败）</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="max-w-md space-y-1">
+                      <Label htmlFor={`note-${node.node_id}`}>approval_note</Label>
+                      <Input
+                        id={`note-${node.node_id}`}
+                        disabled={readOnly}
+                        placeholder="审批说明：做什么 / 为何需要 / 影响范围"
+                        value={node.approval_note ?? ''}
+                        onChange={(e) =>
+                          updateNode(idx, { approval_note: e.target.value })
+                        }
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>参数</Label>

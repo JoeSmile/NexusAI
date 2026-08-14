@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict
 
 from backend.core.auth.models import TenantContext
 from backend.core.auth.permissions import require_permission
-from backend.core.errors import NexusAIException, ErrorCode
+from backend.core.errors import ErrorCode, NexusAIException
 from backend.logging_config import get_logger
 from backend.modules.rag.cache import bump_epoch
 

@@ -16,7 +16,7 @@ import secrets
 import sys
 import time
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 # Allow `uv run python scripts/smoke_wave_a.py` to import backend.*
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -156,7 +156,7 @@ def main() -> None:
                 "tid": "acme",
                 "role": "user",
                 "jti": str(uuid.uuid4()),
-                "exp": datetime.now(timezone.utc) - timedelta(seconds=10),
+                "exp": datetime.now(UTC) - timedelta(seconds=10),
             },
             JWT_SECRET,
             algorithm="HS256",

@@ -33,7 +33,7 @@ class TestBasicIntegration:
     
     def test_exception_handling(self):
         """测试异常处理"""
-        from backend.core.exceptions import NexusAIException, DatabaseError, ValidationError
+        from backend.core.exceptions import DatabaseError, NexusAIException, ValidationError
         
         # 测试异常可以正常创建
         exc = NexusAIException("测试错误")

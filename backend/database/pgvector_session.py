@@ -251,6 +251,8 @@ class Workflow(Base):
     revision = Column(Integer, nullable=False, default=0)
     forked_from_id = Column(String(36), nullable=True)
     created_by = Column(String(64), nullable=False)
+    # Wave E: {scope, default_ttl_days, auto_renew}
+    request_policy = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -292,6 +294,68 @@ class WorkflowRunNode(Base):
     error_message = Column(Text, nullable=True)
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, nullable=True)
+
+
+class PermissionRequest(Base):
+    """挂起审批申请（Wave E / alembic 012）。"""
+
+    __tablename__ = "permission_requests"
+    id = Column(String(36), primary_key=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    run_id = Column(String(36), nullable=False, index=True)
+    node_id = Column(String(128), nullable=False)
+    applicant_user_id = Column(String(64), nullable=False)
+    needed_perm = Column(String(128), nullable=False)
+    org_unit_id = Column(String(36), nullable=False)
+    capability_id = Column(String(128), nullable=False)
+    status = Column(String(32), nullable=False, default="pending")
+    escalated_at = Column(DateTime, nullable=True)
+    reviewed_by = Column(String(64), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+    review_reason = Column(Text, nullable=True)
+    approval_note = Column(Text, nullable=True)
+    requestable_mode = Column(String(16), nullable=False, default="true")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    __table_args__ = (
+        Index(
+            "ix_permission_requests_pending_unique",
+            "run_id",
+            "node_id",
+            unique=True,
+            postgresql_where=text("status = 'pending'"),
+        ),
+    )
+
+
+class WorkflowGrant(Base):
+    """Workflow 级授权凭证（Wave E / alembic 012）。"""
+
+    __tablename__ = "workflow_grants"
+    id = Column(String(36), primary_key=True)
+    tenant_id = Column(String(64), nullable=False)
+    request_id = Column(String(36), nullable=False, unique=True)
+    workflow_id = Column(String(36), nullable=False)
+    scope = Column(String(32), nullable=False, default="recurring")
+    applicant_user_id = Column(String(64), nullable=False)
+    caps = Column(JSON, nullable=False, default=list)
+    issued_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=False)
+    revoked_at = Column(DateTime, nullable=True)
+    origin = Column(String(32), nullable=False, default="approval")
+    __table_args__ = (
+        Index(
+            "ix_workflow_grants_tenant_wf",
+            "tenant_id",
+            "workflow_id",
+        ),
+        Index(
+            "ix_workflow_grants_applicant",
+            "tenant_id",
+            "applicant_user_id",
+            "workflow_id",
+        ),
+    )
 
 
 class KnowledgeChunk(Base):

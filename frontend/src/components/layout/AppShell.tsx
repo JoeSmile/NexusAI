@@ -35,7 +35,10 @@ const NAV_GROUPS: NavGroup[] = [
   {
     id: 'workflows',
     label: '工作流',
-    items: [{ to: '/workflows', label: '流程' }],
+    items: [
+      { to: '/workflows', label: '流程' },
+      { to: '/runs', label: '运行历史' },
+    ],
   },
   {
     id: 'approvals',

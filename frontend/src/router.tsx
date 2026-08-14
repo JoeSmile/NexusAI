@@ -13,13 +13,13 @@ import ChatPanel from '@/pages/panels/chat'
 import EvalPanel from '@/pages/panels/eval'
 import CapabilitiesPanel from '@/pages/panels/capabilities'
 import PerformancePanel from '@/pages/panels/performance'
-import PlaceholderPanel from '@/pages/panels/PlaceholderPanel'
 import OrgTreePage from '@/pages/admin/OrgTree'
 import RagPanel from '@/pages/panels/rag'
 import WorkflowListPage from '@/pages/workflows/WorkflowList'
 import WorkflowEditorPage from '@/pages/workflows/WorkflowEditor'
 import RunListPage from '@/pages/workflows/RunList'
 import RunDetailPage from '@/pages/workflows/RunDetail'
+import ApprovalInboxPage from '@/pages/approvals/ApprovalInbox'
 import { useAuthStore } from '@/stores/authStore'
 
 function RequireAuth() {
@@ -57,7 +57,7 @@ export const router = createBrowserRouter([
           { path: 'workflows/:id/runs', element: <RunListPage /> },
           { path: 'runs', element: <RunListPage /> },
           { path: 'runs/:runId', element: <RunDetailPage /> },
-          { path: 'approvals', element: <PlaceholderPanel /> },
+          { path: 'approvals', element: <ApprovalInboxPage /> },
           { path: 'knowledge', element: <RagPanel /> },
           {
             element: <RequireRoles allow={ORG_ROLES} />,

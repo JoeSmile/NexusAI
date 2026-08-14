@@ -19,7 +19,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 
-const TERMINAL = new Set(['succeeded', 'failed'])
+const TERMINAL = new Set(['succeeded', 'failed', 'cancelled'])
 
 function formatDuration(start?: string | null, end?: string | null): string {
   if (!start || !end) return '—'
@@ -85,6 +85,11 @@ export default function RunDetailPage() {
                 <Badge>{run.status}</Badge>
                 {run.error_message ? (
                   <span className="ml-2 text-destructive">{run.error_message}</span>
+                ) : null}
+                {run.status === 'suspended' && run.hang_summary ? (
+                  <span className="ml-2 text-amber-700 dark:text-amber-400">
+                    {run.hang_summary}
+                  </span>
                 ) : null}
               </>
             ) : (

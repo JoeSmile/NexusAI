@@ -16,7 +16,7 @@ from backend.core.capability.errors import (
     CapabilityQuotaExceededError,
 )
 from backend.core.capability.models import CapabilityKind, CapabilitySpec
-from backend.core.errors import NexusAIException, ErrorCode
+from backend.core.errors import ErrorCode, NexusAIException
 from backend.core.guardrails.input_guard import check_input
 from backend.core.guardrails.output_guard import check_output
 

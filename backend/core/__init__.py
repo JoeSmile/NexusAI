@@ -6,8 +6,8 @@
 from .config import Config, get_config
 from .exceptions import (
     ConfigurationError,
-    NexusAIException,
     DatabaseError,
+    NexusAIException,
     RAGError,
     ValidationError,
 )

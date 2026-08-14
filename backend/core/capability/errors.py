@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.core.errors import NexusAIException, ErrorCode
+from backend.core.errors import ErrorCode, NexusAIException
 
 
 class CapabilityNotFoundError(NexusAIException):

@@ -226,6 +226,26 @@ async def list_capabilities(
     return {"items": items, "total": len(items)}
 
 
+@router.post("/reload")
+async def reload_capabilities(
+    tenant: TenantContext = Depends(verify_human_or_legacy_key),
+):
+    """tenant_admin：从 DB 重载 registry（smoke / 运维；不改权限模型）。"""
+    from fastapi import HTTPException
+
+    from backend.core.capability.registry import reload_capability_registry
+
+    if tenant.role not in ("tenant_admin", "super_admin") and not tenant.has_permission(
+        "admin:*"
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "AUTH_002", "message": "admin_required_for_reload"},
+        )
+    reg = reload_capability_registry()
+    return {"ok": True, "total": len(reg.list(include_disabled=True))}
+
+
 @observe(name="capability.invoke")
 async def _invoke_short(
     cap_id: str,

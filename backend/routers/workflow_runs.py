@@ -122,10 +122,28 @@ async def get_run(
             .filter(Workflow.id == run.workflow_id)
             .one_or_none()
         )
-        return _run_dict(
+        out = _run_dict(
             run,
             workflow_name=wf.name if wf else None,
             workflow_status=wf.status if wf else None,
+        )
+        if run.status == "suspended":
+            from backend.core.workflow.notify import hang_visibility
+
+            out.update(hang_visibility(session, run_id=run.id))
+        return out
+
+
+@router.post("/runs/{run_id}/cancel")
+async def cancel_run(
+    run_id: str,
+    tenant: TenantContext = Depends(verify_human_or_legacy_key),
+) -> dict[str, Any]:
+    sf = get_pg_session()
+    with sf.Session() as session:
+        scope = _scope(session, tenant)
+        return run_svc.cancel_run(
+            session, tenant=tenant, org_scope=scope, run_id=run_id
         )
 
 

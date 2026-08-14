@@ -101,6 +101,7 @@ async def patch_workflow(
             name=body.name,
             ir_data=body.ir,
             org_unit_id=body.org_unit_id,
+            request_policy=body.request_policy,
         )
 
 

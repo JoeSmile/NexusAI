@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import os
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import jwt
@@ -49,7 +49,7 @@ def jwt_ttl_seconds() -> int:
 
 def issue_access_token(*, sub: str, tid: str, role: str) -> str:
     """Issue a short-lived HS256 access token."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     ttl = jwt_ttl_seconds()
     payload = {
         "sub": sub,

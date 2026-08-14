@@ -194,7 +194,10 @@ def patch_workflow(
     name: str | None = None,
     ir_data: dict[str, Any] | None = None,
     org_unit_id: str | None = None,
+    request_policy: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    from backend.core.workflow.grants import normalize_request_policy
+
     row = _get_row(session, tenant_id=tenant.tenant_id, workflow_id=workflow_id)
     assert_org_access(org_scope, row.org_unit_id, session=session)
     require_workflow_editor(tenant, created_by=row.created_by)
@@ -227,6 +230,8 @@ def patch_workflow(
     if ir_data is not None:
         ir = validate_ir_for_save(ir_data, tenant)
         row.ir_json = ir.model_dump()
+    if request_policy is not None:
+        row.request_policy = normalize_request_policy(request_policy)
 
     row.revision = int(row.revision) + 1
     row.updated_at = datetime.utcnow()

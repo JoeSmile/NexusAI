@@ -16,6 +16,15 @@ export type WorkflowRun = {
   created_at?: string | null
   updated_at?: string | null
   finished_at?: string | null
+  hang_summary?: string | null
+  waiting_nodes?: Array<{
+    node_id: string
+    needed_perm: string
+    capability_id: string
+    waiting_for: string
+    escalated_at?: string | null
+    approval_note?: string | null
+  }>
 }
 
 export type EvidenceItem = {

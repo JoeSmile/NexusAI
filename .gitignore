@@ -67,3 +67,6 @@ uploads/
 # Local assets (repo root only; do not ignore frontend/src/assets)
 /assets/
 .superpowers
+
+# Internal pitch/positioning — NOT open-source (do not commit)
+docs/pitch/

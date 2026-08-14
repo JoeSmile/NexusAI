@@ -5,13 +5,21 @@ export type WorkflowNode = {
   capability_id: string
   kind?: 'capability'
   params?: Record<string, unknown>
-  requestable?: boolean
+  /** Wave E: 'true' | 'sensitive' | 'false' (bool still accepted by API) */
+  requestable?: boolean | 'true' | 'sensitive' | 'false'
+  approval_note?: string | null
 }
 
 export type WorkflowIR = {
   ir_schema?: string
   nodes: WorkflowNode[]
   edges?: unknown[]
+}
+
+export type RequestPolicy = {
+  scope?: 'single' | 'recurring'
+  default_ttl_days?: number
+  auto_renew?: boolean
 }
 
 export type Workflow = {
@@ -25,6 +33,7 @@ export type Workflow = {
   revision: number
   forked_from_id: string | null
   created_by: string
+  request_policy?: RequestPolicy
   created_at: string | null
   updated_at: string | null
 }
@@ -59,6 +68,7 @@ export function patchWorkflow(
     name?: string
     ir?: WorkflowIR
     org_unit_id?: string | null
+    request_policy?: RequestPolicy
   },
 ) {
   return apiPatch<Workflow>(`/api/workflows/${id}`, body)

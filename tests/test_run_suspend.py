@@ -1,4 +1,4 @@
-"""Wave D3 — secondary auth fail-closed."""
+"""Wave E2 — suspend transaction + state machine."""
 
 from __future__ import annotations
 
@@ -16,32 +16,46 @@ from backend.core.capability.models import (
 )
 from backend.core.capability.registry import CapabilityRegistry
 from backend.core.org.scope import OrgScope
+from backend.core.workflow.run_state import can_node_transition, can_transition
 from backend.core.workflow.runner import execute_run, start_run
-from backend.database.pgvector_session import Workflow, WorkflowRun, WorkflowRunNode, get_pg_session
+from backend.database.pgvector_session import (
+    PermissionRequest,
+    Workflow,
+    WorkflowRun,
+    WorkflowRunNode,
+    get_pg_session,
+)
+
+
+def test_suspended_and_waiting_transitions():
+    assert can_transition("running", "suspended")
+    assert can_transition("suspended", "running")
+    assert can_transition("suspended", "cancelled")
+    assert can_transition("suspended", "failed")
+    assert can_node_transition("running", "waiting")
+    assert can_node_transition("waiting", "running")
+    assert not can_transition("succeeded", "suspended")
 
 
 @pytest.mark.asyncio
-async def test_secondary_auth_fail_marks_run_failed(monkeypatch):
-    tid = f"run-auth-{uuid.uuid4().hex[:8]}"
+async def test_suspend_same_txn_fields(monkeypatch):
+    tid = f"e2-txn-{uuid.uuid4().hex[:8]}"
     uid = f"user_{uuid.uuid4().hex[:6]}"
     sf = get_pg_session()
-
     reg = CapabilityRegistry()
     reg.register(
         CapabilitySpec(
-            id="admin-tool",
-            name="Admin",
+            id="tool-x",
+            name="X",
             kind=CapabilityKind.TOOL,
             provider=CapabilityProvider.NEXUSAI,
             spec={"governance": True, "leaf": True},
-            permission="admin:*",
+            permission="kb:write",
         )
     )
     monkeypatch.setattr(
         "backend.core.workflow.runner.get_capability_registry", lambda: reg
     )
-
-    # user without admin:*
     tenant = TenantContext(tid, uid, "user", [], False)
     scope = OrgScope(
         tenant_id=tid,
@@ -58,15 +72,15 @@ async def test_secondary_auth_fail_marks_run_failed(monkeypatch):
             id=str(uuid.uuid4()),
             tenant_id=tid,
             org_unit_id="ou-1",
-            name="authfail",
+            name="txn",
             status="published",
             ir_json={
                 "nodes": [
                     {
                         "node_id": "n1",
-                        "capability_id": "admin-tool",
+                        "capability_id": "tool-x",
                         "params": {},
-                        "requestable": False,  # Wave E: explicit fail-closed
+                        "requestable": "true",
                     }
                 ],
                 "edges": [],
@@ -79,9 +93,7 @@ async def test_secondary_auth_fail_marks_run_failed(monkeypatch):
         )
         session.add(wf)
         session.commit()
-        started = start_run(
-            session, tenant=tenant, org_scope=scope, workflow_id=wf.id
-        )
+        started = start_run(session, tenant=tenant, org_scope=scope, workflow_id=wf.id)
         run_id = started["id"]
 
     with patch(
@@ -92,18 +104,23 @@ async def test_secondary_auth_fail_marks_run_failed(monkeypatch):
 
     with sf.Session() as session:
         run = session.query(WorkflowRun).filter(WorkflowRun.id == run_id).one()
-        assert run.status == "failed"
-        assert run.error_code in ("AUTH_002", "HTTP") or (
-            run.error_message and "auth" in (run.error_message or "").lower()
-        ) or run.error_code == "AUTH_002"
-        # detail from HTTPException uses AUTH_002
-        nodes = (
+        node = (
             session.query(WorkflowRunNode)
             .filter(WorkflowRunNode.run_id == run_id)
-            .all()
+            .one()
         )
-        assert nodes and nodes[0].status == "failed"
+        req = (
+            session.query(PermissionRequest)
+            .filter(PermissionRequest.run_id == run_id, PermissionRequest.node_id == "n1")
+            .one()
+        )
+        assert run.status == "suspended"
+        assert node.status == "waiting"
+        assert req.status == "pending"
+        assert req.org_unit_id == "ou-1"
+        assert req.applicant_user_id == uid
 
+        session.query(PermissionRequest).filter(PermissionRequest.run_id == run_id).delete()
         session.query(WorkflowRunNode).filter(WorkflowRunNode.run_id == run_id).delete()
         session.query(WorkflowRun).filter(WorkflowRun.id == run_id).delete()
         session.query(Workflow).filter(Workflow.tenant_id == tid).delete()

@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from backend.core.errors import NexusAIException, ErrorCode
+from backend.core.errors import ErrorCode, NexusAIException
 from backend.database import vector_ops
 from backend.logging_config import get_logger
 

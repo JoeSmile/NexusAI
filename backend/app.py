@@ -57,6 +57,14 @@ async def lifespan(app: FastAPI):
         logger.debug("zombie run sweep skipped: %s", e)
 
     try:
+        from backend.core.workflow.notify import start_hang_scanner
+
+        start_hang_scanner()
+        logger.info("✓ hang escalate scanner 已启动")
+    except Exception as e:
+        logger.debug("hang scanner skipped: %s", e)
+
+    try:
         from backend.core.key_manager import KeyManager
 
         KeyManager()
@@ -90,6 +98,12 @@ async def lifespan(app: FastAPI):
     yield
 
     logger.info("NexusAI 关闭中...")
+    try:
+        from backend.core.workflow.notify import stop_hang_scanner
+
+        stop_hang_scanner()
+    except Exception:
+        pass
     try:
         from backend.services.performance_optimizer import performance_optimizer
 
@@ -149,8 +163,8 @@ def create_app() -> FastAPI:
 
     from backend.core.errors import (
         NexusAIException,
-        nexusai_exception_handler,
         global_exception_handler,
+        nexusai_exception_handler,
     )
 
     app.add_exception_handler(NexusAIException, nexusai_exception_handler)  # type: ignore[arg-type]
@@ -224,6 +238,14 @@ def create_app() -> FastAPI:
         prefix="/api",
         required=True,
         label="Workflow Runs",
+    )
+    _lazy_include(
+        app,
+        "backend.routers.workflow_approvals",
+        "router",
+        prefix="/api",
+        required=True,
+        label="Workflow Approvals",
     )
 
     # 可选路由

@@ -11,8 +11,8 @@ import pytest
 from backend.core.config import Config, Environment, get_config
 from backend.core.exceptions import (
     ConfigurationError,
-    NexusAIException,
     DatabaseError,
+    NexusAIException,
     ValidationError,
 )
 from backend.core.utils.formatters import format_error, format_response, format_timestamp
