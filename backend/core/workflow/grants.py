@@ -262,6 +262,206 @@ def issue_approval_grant(
     return grant
 
 
+def renew_grant(
+    session: Session,
+    *,
+    grant: WorkflowGrant,
+    request_policy: dict[str, Any] | None,
+    now: datetime | None = None,
+) -> WorkflowGrant | None:
+    """E3.2 — auto_renew：同 scope/ttl 签发新 grant；幂等键 origin=renew:{old_id}。
+
+    调用方须已持有行级锁 / 确认 grant 仍 active 且未 revoked。
+    """
+    now = now or datetime.utcnow()
+    if grant.revoked_at is not None:
+        return None
+    policy = normalize_request_policy(request_policy)
+    if not policy.get("auto_renew"):
+        return None
+    renew_origin = f"renew:{grant.id}"
+    if len(renew_origin) > 80:
+        renew_origin = f"r:{grant.id.replace('-', '')}"
+    existing = (
+        session.query(WorkflowGrant)
+        .filter(
+            WorkflowGrant.tenant_id == grant.tenant_id,
+            WorkflowGrant.origin == renew_origin,
+        )
+        .one_or_none()
+    )
+    if existing is not None:
+        return existing  # 幂等：已续过
+
+    old_req = (
+        session.query(PermissionRequest)
+        .filter(PermissionRequest.id == grant.request_id)
+        .one_or_none()
+    )
+    cap0 = (grant.caps or [{}])[0] if isinstance(grant.caps, list) else {}
+    capability_id = str(
+        (cap0.get("capability_id") if isinstance(cap0, dict) else None)
+        or (old_req.capability_id if old_req else "")
+        or ""
+    )
+    permission = str(
+        (cap0.get("permission") if isinstance(cap0, dict) else None)
+        or (old_req.needed_perm if old_req else "")
+        or ""
+    )
+    org_unit_id = (old_req.org_unit_id if old_req else "") or ""
+    run_id = (old_req.run_id if old_req else "") or f"renew-{grant.id}"
+    node_id = (old_req.node_id if old_req else "") or "renew"
+
+    ttl = int(policy["default_ttl_days"])
+    req = PermissionRequest(
+        id=str(uuid.uuid4()),
+        tenant_id=grant.tenant_id,
+        run_id=run_id,
+        node_id=node_id,
+        applicant_user_id=grant.applicant_user_id,
+        needed_perm=permission or "renewed",
+        org_unit_id=org_unit_id or "unknown",
+        capability_id=capability_id or "renewed",
+        status="auto_approved",
+        reviewed_by="system:auto_renew",
+        reviewed_at=now,
+        review_reason=f"auto_renew_from:{grant.id}",
+        approval_note=None,
+        requestable_mode=(old_req.requestable_mode if old_req else "true") or "true",
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(req)
+    session.flush()
+    new_grant = WorkflowGrant(
+        id=str(uuid.uuid4()),
+        tenant_id=grant.tenant_id,
+        request_id=req.id,
+        workflow_id=grant.workflow_id,
+        scope=str(policy["scope"]),
+        applicant_user_id=grant.applicant_user_id,
+        caps=list(grant.caps) if isinstance(grant.caps, list) else [
+            cap_entry(capability_id=capability_id, permission=permission)
+        ],
+        issued_at=now,
+        expires_at=now + timedelta(days=ttl),
+        revoked_at=None,
+        origin=renew_origin,
+    )
+    session.add(new_grant)
+    from backend.core.audit import write_audit_sync
+
+    write_audit_sync(
+        {
+            "tenant_id": grant.tenant_id,
+            "user_id": grant.applicant_user_id,
+            "action": "renew",
+            "trace_id": run_id,
+            "input_text": "",
+            "output_text": f"from={grant.id}:to={new_grant.id}:ttl={ttl}",
+            "model": "",
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "cost": 0.0,
+            "latency_ms": 0.0,
+            "error_code": None,
+            "ip_address": "",
+            "user_agent": "",
+            "credential_kind": "delegation",
+            "key_id": None,
+            "run_id": run_id,
+            "node_id": node_id,
+            "created_at": now,
+        }
+    )
+    return new_grant
+
+
+def scan_grants_for_auto_renew(
+    *,
+    within_days: int = 7,
+    now: datetime | None = None,
+    limit: int = 100,
+) -> dict[str, int]:
+    """主动日扫：expires_at <= now+within_days 且未 revoked → 按 workflow.request_policy 续期。
+
+    行级 ``FOR UPDATE SKIP LOCKED`` 防多副本双续。
+    """
+    from sqlalchemy import text
+
+    from backend.database.pgvector_session import Workflow, get_pg_session
+
+    now = now or datetime.utcnow()
+    horizon = now + timedelta(days=within_days)
+    renewed = 0
+    skipped = 0
+    expired_marked = 0
+    sf = get_pg_session()
+    with sf.Session() as session:
+        # advisory lock: 单扫描领导者（进程间）
+        locked = session.execute(
+            text("SELECT pg_try_advisory_lock(:k)"),
+            {"k": 41030215},
+        ).scalar()
+        if not locked:
+            return {"renewed": 0, "skipped": 0, "expired_marked": 0, "lock": 0}
+        try:
+            rows = session.execute(
+                text(
+                    """
+                    SELECT id FROM workflow_grants
+                    WHERE revoked_at IS NULL
+                      AND expires_at <= :horizon
+                      AND expires_at > :now
+                    ORDER BY expires_at ASC
+                    LIMIT :lim
+                    FOR UPDATE SKIP LOCKED
+                    """
+                ),
+                {"horizon": horizon, "now": now, "lim": limit},
+            ).fetchall()
+            for (gid,) in rows:
+                grant = (
+                    session.query(WorkflowGrant)
+                    .filter(WorkflowGrant.id == gid)
+                    .one_or_none()
+                )
+                if grant is None or grant.revoked_at is not None:
+                    skipped += 1
+                    continue
+                wf = (
+                    session.query(Workflow)
+                    .filter(
+                        Workflow.id == grant.workflow_id,
+                        Workflow.tenant_id == grant.tenant_id,  # 拍板 08-15:纵深防御,防跨租户读 policy
+                    )
+                    .one_or_none()
+                )
+                policy = normalize_request_policy(
+                    dict(wf.request_policy) if wf and wf.request_policy else None
+                )
+                if policy.get("auto_renew"):
+                    ng = renew_grant(
+                        session, grant=grant, request_policy=policy, now=now
+                    )
+                    if ng is not None and ng.id != grant.id:
+                        renewed += 1
+                    else:
+                        skipped += 1
+                else:
+                    skipped += 1
+            session.commit()
+        finally:
+            session.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": 41030215})
+    return {
+        "renewed": renewed,
+        "skipped": skipped,
+        "expired_marked": expired_marked,
+        "lock": 1,
+    }
+
+
 def can_review_request(
     tenant: TenantContext,
     org_scope: OrgScope,
