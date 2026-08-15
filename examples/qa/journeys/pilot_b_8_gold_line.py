@@ -16,7 +16,7 @@ import os
 import sys
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
@@ -124,7 +124,7 @@ def main() -> None:
         "run_id": None,
         "child_run_id": None,
         "steps": {},
-        "started_at": datetime.now(timezone.utc).isoformat(),
+        "started_at": datetime.now(UTC).isoformat(),
     }
 
     def step(name: str, cond: bool, detail: str = "", evidence: object | None = None) -> None:
@@ -384,7 +384,7 @@ def main() -> None:
             {"trigger_message": bridge_msg, **bridge},
         )
 
-        checklist["finished_at"] = datetime.now(timezone.utc).isoformat()
+        checklist["finished_at"] = datetime.now(UTC).isoformat()
         checklist["passed"] = failed == 0
         summary_path = EVIDENCE / "00_summary.json"
         summary_path.write_text(
