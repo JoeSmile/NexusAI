@@ -268,6 +268,78 @@ async def get_run(
         return out
 
 
+@router.post("/workflows/{workflow_id}/schedules")
+async def create_workflow_schedule(
+    workflow_id: str,
+    body: dict[str, Any] | None = Body(default=None),
+    tenant: TenantContext = Depends(verify_human_or_legacy_key),
+) -> dict[str, Any]:
+    """I6：创建 cron；created_by 从 auth 钉死，忽略/拒 body.created_by。"""
+    from backend.core.workflow.scheduler import create_scheduled_run
+
+    payload = body or {}
+    body_cb = payload.get("created_by")
+    if body_cb is not None and str(body_cb) != str(tenant.user_id):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "CREATED_BY_FORGED",
+                "message": "created_by_must_match_auth",
+            },
+        )
+    cron = str(payload.get("cron") or "").strip()
+    if not cron:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "BAD_CRON", "message": "cron_required"},
+        )
+    run_inputs = payload.get("input") or payload.get("run_inputs")
+    if run_inputs is not None and not isinstance(run_inputs, dict):
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "BAD_INPUT", "message": "input_must_be_object"},
+        )
+    sf = get_pg_session()
+    with sf.Session() as session:
+        scope = _scope(session, tenant)
+        wf = (
+            session.query(Workflow)
+            .filter(Workflow.tenant_id == tenant.tenant_id, Workflow.id == workflow_id)
+            .one_or_none()
+        )
+        if wf is None:
+            raise HTTPException(
+                status_code=404,
+                detail={"code": ErrorCode.WF_NOT_FOUND, "message": "workflow_not_found"},
+            )
+        assert_org_access(scope, wf.org_unit_id, session=session)
+        try:
+            row = create_scheduled_run(
+                session,
+                tenant_id=tenant.tenant_id,
+                workflow_id=workflow_id,
+                cron=cron,
+                created_by=tenant.user_id,
+                run_inputs=run_inputs if isinstance(run_inputs, dict) else None,
+                enabled=bool(payload.get("enabled", True)),
+            )
+            session.commit()
+        except ValueError as exc:
+            session.rollback()
+            raise HTTPException(
+                status_code=400,
+                detail={"code": "BAD_SCHEDULE", "message": str(exc)},
+            ) from exc
+        return {
+            "id": row.id,
+            "workflow_id": row.workflow_id,
+            "cron": row.cron,
+            "next_run_at": row.next_run_at.isoformat() if row.next_run_at else None,
+            "created_by": row.created_by,
+            "enabled": row.enabled,
+        }
+
+
 @router.post("/runs/{run_id}/cancel")
 async def cancel_run(
     run_id: str,

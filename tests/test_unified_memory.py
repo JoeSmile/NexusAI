@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -70,7 +71,9 @@ class _FakeSession:
             )
 
     def flush(self) -> None:
-        return None
+        for obj in self.added:
+            if type(obj).__name__ == "UserMemory" and getattr(obj, "id", None) is None:
+                obj.id = 42
 
     def commit(self) -> None:
         self.committed = True
@@ -110,19 +113,50 @@ async def test_write_turn_and_read_hot() -> None:
 
 @pytest.mark.asyncio
 async def test_write_warm_delegates_store() -> None:
+    """warm 写在同一事务内 supersede + upsert。"""
+    sess = _FakeSession()
+    # UserMemory: no existing row; empty list for supersede scan
+    um_q = MagicMock()
+    um_q.filter_by.return_value = um_q
+    um_q.filter.return_value = um_q
+    um_q.first.return_value = None
+    um_q.all.return_value = []
+    um_q.delete.return_value = 0
+
+    def _query(model):  # noqa: ANN001
+        name = getattr(model, "__name__", str(model))
+        if name == "UserMemory":
+            return um_q
+        return MagicMock()
+
+    sess.query = _query  # type: ignore[method-assign]
     svc = UnifiedMemoryService(tenant_id="t1")
-    with patch(
-        "backend.core.memory_service.store_user_memory", return_value=42
-    ) as store:
+    with (
+        patch(
+            "backend.database.pgvector_session.get_pg_session",
+            return_value=_FakeFactory(sess),
+        ),
+        patch(
+            "backend.database.embeddings.embed_text",
+            return_value=[0.0] * 8,
+        ),
+        patch(
+            "backend.database.vector_ops.list_user_memories_by_prefix",
+            return_value=[],
+        ),
+    ):
         out = await svc.write(
             "warm",
             user_id="u1",
             key="pref:tone",
             value="formal",
             confidence=0.9,
+            embed=False,
         )
+    assert out["key"] == "pref:tone"
     assert out["id"] == 42
-    store.assert_called_once()
+    assert sess.committed
+    assert any(type(a).__name__ == "UserMemory" for a in sess.added)
 
 
 @pytest.mark.asyncio
@@ -326,6 +360,7 @@ async def test_forget_user_clears_warm_cold_and_redacts() -> None:
     class _Sess:
         def __init__(self) -> None:
             self.committed = False
+            self.added: list[Any] = []
 
         def query(self, model):  # noqa: ANN001
             q = MagicMock()
@@ -333,12 +368,18 @@ async def test_forget_user_clears_warm_cold_and_redacts() -> None:
             filt = MagicMock()
             q.filter_by.return_value = filt
             if name == "UserMemory":
-                filt.delete.return_value = 2
+                # wipe: filter_by → filter(key!=marker) → delete
+                filt.filter.return_value.delete.return_value = 2
+                # marker upsert: filter_by(key=__forgotten__) → first
+                filt.first.return_value = None
             elif name == "ColdMemory":
                 filt.delete.return_value = 1
             elif name == "ChatMessage":
                 filt.filter.return_value.update.return_value = 3
             return q
+
+        def add(self, obj: Any) -> None:
+            self.added.append(obj)
 
         def commit(self) -> None:
             self.committed = True
@@ -360,6 +401,8 @@ async def test_forget_user_clears_warm_cold_and_redacts() -> None:
     assert out["deleted_cold"] == 1
     assert out["redacted_messages"] == 3
     assert sess.committed
+    assert len(sess.added) == 1
+    assert sess.added[0].key == "__forgotten__"
     assert REDACTED_MESSAGE == "[REDACTED]"
 
 

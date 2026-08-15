@@ -427,7 +427,7 @@ class ToolCaller:
             
             context = {"time_range": time_range}
             
-            results = memory_hub.retrieve(
+            results = await memory_hub.retrieve(
                 query=query,
                 user_id=user_id,
                 context=context,

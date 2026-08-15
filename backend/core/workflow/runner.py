@@ -353,6 +353,26 @@ async def execute_run(run_id: str) -> None:
             session.commit()
             run = session.query(WorkflowRun).filter(WorkflowRun.id == run_id).one()
 
+            try:
+                from backend.core.workflow.scheduler import validate_grants_before_execute
+
+                validate_grants_before_execute(
+                    session,
+                    tenant_id=run.tenant_id,
+                    workflow_id=run.workflow_id,
+                    acting_user_id=run.acting_user_id,
+                )
+                session.commit()
+            except Exception as exc:
+                # I3 拍板：不得吞异常（fail-closed）
+                logger.exception("grant validate at execute failed run=%s", run_id)
+                _fail_run(
+                    run_id,
+                    error_code=ErrorCode.AUTH_INSUFFICIENT_PERMISSIONS,
+                    error_message=f"grant_validate_failed:{exc!s}"[:500],
+                )
+                return
+
             tenant, org_scope = rebuild_tenant_context(
                 session,
                 tenant_id=run.tenant_id,
@@ -1378,6 +1398,27 @@ async def resume_run(run_id: str) -> None:
                 return
             session.commit()
             run = session.query(WorkflowRun).filter(WorkflowRun.id == run_id).one()
+
+            # E3.5 — 执行前授权校验
+            try:
+                from backend.core.workflow.scheduler import validate_grants_before_execute
+
+                validate_grants_before_execute(
+                    session,
+                    tenant_id=run.tenant_id,
+                    workflow_id=run.workflow_id,
+                    acting_user_id=run.acting_user_id,
+                )
+                session.commit()
+            except Exception as exc:
+                # I3 拍板：不得吞异常（fail-closed）
+                logger.exception("grant validate at resume failed run=%s", run_id)
+                _fail_run(
+                    run_id,
+                    error_code=ErrorCode.AUTH_INSUFFICIENT_PERMISSIONS,
+                    error_message=f"grant_validate_failed:{exc!s}"[:500],
+                )
+                return
 
             tenant, org_scope = rebuild_tenant_context(
                 session,

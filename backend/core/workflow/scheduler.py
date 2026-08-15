@@ -132,6 +132,67 @@ def _resolve_schedule_scope(session, sched):
         )
 
 
+def _user_still_valid(session: Session, *, tenant_id: str, user_id: str) -> bool:
+    """I6：created_by 对应用户须仍有 active api_key。"""
+    from backend.database.pgvector_session import ApiKey
+
+    if not user_id:
+        return False
+    row = (
+        session.query(ApiKey.id)
+        .filter(
+            ApiKey.tenant_id == tenant_id,
+            ApiKey.user_id == user_id,
+            ApiKey.is_active.is_(True),
+        )
+        .first()
+    )
+    return row is not None
+
+
+def _audit_schedule(
+    *,
+    tenant_id: str,
+    user_id: str,
+    action: str,
+    input_text: str = "",
+    output_text: str = "",
+    error_code: str | None = None,
+) -> None:
+    from backend.core.audit import write_audit_sync
+
+    write_audit_sync(
+        {
+            "tenant_id": tenant_id,
+            "user_id": user_id,
+            "action": action,
+            "trace_id": "",
+            "input_text": (input_text or "")[:500],
+            "output_text": (output_text or "")[:500],
+            "model": "",
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "cost": 0.0,
+            "latency_ms": 0.0,
+            "error_code": error_code,
+            "ip_address": "",
+            "user_agent": "",
+            "created_at": datetime.utcnow(),
+        }
+    )
+
+
+def _advance_next(session: Session, sched: Any, *, now: datetime) -> None:
+    try:
+        sched.next_run_at = parse_cron_next(sched.cron, after=now)
+        sched.updated_at = now
+        session.commit()
+    except ValueError:
+        sched.enabled = False
+        sched.updated_at = now
+        session.commit()
+
+
 def scan_due_schedules(*, now: datetime | None = None, limit: int = 50) -> dict[str, int]:
     from backend.core.auth.models import TenantContext
     from backend.core.workflow import runner as run_svc
@@ -174,6 +235,25 @@ def scan_due_schedules(*, now: datetime | None = None, limit: int = 50) -> dict[
                 if sched is None or not sched.enabled:
                     skipped += 1
                     continue
+
+                # I6：触发前校验 created_by 仍有效
+                if not _user_still_valid(
+                    session, tenant_id=sched.tenant_id, user_id=sched.created_by
+                ):
+                    _audit_schedule(
+                        tenant_id=sched.tenant_id,
+                        user_id=sched.created_by,
+                        action="workflow.schedule.user_invalid",
+                        input_text=sched.id,
+                        output_text=sched.workflow_id,
+                        error_code="SCHEDULE_USER_INACTIVE",
+                    )
+                    sched.enabled = False
+                    sched.updated_at = now
+                    session.commit()
+                    skipped += 1
+                    continue
+
                 # 上一 run 未终态不重触
                 inflight = (
                     session.query(WorkflowRun)
@@ -188,11 +268,7 @@ def scan_due_schedules(*, now: datetime | None = None, limit: int = 50) -> dict[
                 )
                 if inflight > 0:
                     skipped += 1
-                    try:
-                        sched.next_run_at = parse_cron_next(sched.cron, after=now)
-                        sched.updated_at = now
-                    except ValueError:
-                        sched.enabled = False
+                    _advance_next(session, sched, now=now)
                     continue
 
                 tenant = TenantContext(
@@ -202,8 +278,8 @@ def scan_due_schedules(*, now: datetime | None = None, limit: int = 50) -> dict[
                     [],
                     False,
                 )
+                # I3：授权校验单独 try——异常 fail-closed，绝不当通过继续 start_run
                 try:
-                    org_scope = _resolve_schedule_scope(session, sched)
                     validate_grants_before_execute(
                         session,
                         tenant_id=sched.tenant_id,
@@ -211,6 +287,37 @@ def scan_due_schedules(*, now: datetime | None = None, limit: int = 50) -> dict[
                         acting_user_id=sched.created_by,
                         now=now,
                     )
+                    session.commit()
+                except Exception as exc:
+                    logger.warning(
+                        "schedule auth_check failed sid=%s: %s",
+                        sched.id,
+                        exc,
+                        exc_info=True,
+                    )
+                    session.rollback()
+                    sched = (
+                        session.query(ScheduledRun)
+                        .filter(ScheduledRun.id == sid)
+                        .one_or_none()
+                    )
+                    if sched is None:
+                        skipped += 1
+                        continue
+                    _audit_schedule(
+                        tenant_id=sched.tenant_id,
+                        user_id=sched.created_by,
+                        action="workflow.run.auth_check_failed",
+                        input_text=sched.workflow_id,
+                        output_text=f"{sched.id}:{exc!s}"[:500],
+                        error_code="AUTH_GRANT_VALIDATE",
+                    )
+                    _advance_next(session, sched, now=now)
+                    skipped += 1
+                    continue
+
+                try:
+                    org_scope = _resolve_schedule_scope(session, sched)
                     out = run_svc.start_run(
                         session,
                         tenant=tenant,
@@ -229,7 +336,6 @@ def scan_due_schedules(*, now: datetime | None = None, limit: int = 50) -> dict[
                     )
                     session.rollback()
                     skipped += 1
-                    # re-load after rollback
                     sched = (
                         session.query(ScheduledRun)
                         .filter(ScheduledRun.id == sid)
@@ -237,13 +343,7 @@ def scan_due_schedules(*, now: datetime | None = None, limit: int = 50) -> dict[
                     )
                     if sched is None:
                         continue
-                try:
-                    sched.next_run_at = parse_cron_next(sched.cron, after=now)
-                    sched.updated_at = now
-                    session.commit()
-                except ValueError:
-                    sched.enabled = False
-                    session.commit()
+                _advance_next(session, sched, now=now)
         finally:
             session.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": 41030417})
     return {"triggered": triggered, "skipped": skipped, "lock": 1}

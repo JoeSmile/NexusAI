@@ -32,6 +32,10 @@ _ALLOWED_PAYLOAD_KEYS = frozenset(
         "status",
         "error_code",
         "summary",
+        # E3.3 / E3.3b
+        "expires_at",
+        "plan",
+        "auto_renew",
     }
 )
 

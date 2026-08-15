@@ -455,7 +455,7 @@ class AgentCore:
             relevant_memories = []
             user_profile = {}
             if self.memory_hub:
-                relevant_memories = self.memory_hub.retrieve(
+                relevant_memories = await self.memory_hub.retrieve(
                     query=user_input, user_id=user_id,
                     context={"time_range": 30},
                     top_k=5,

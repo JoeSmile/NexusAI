@@ -71,6 +71,30 @@ async def lifespan(app: FastAPI):
         logger.debug("hang scanner skipped: %s", e)
 
     try:
+        from backend.core.workflow.grant_scanner import start_grant_scanner
+
+        start_grant_scanner()
+        logger.info("✓ grant auto_renew scanner 已启动")
+    except Exception as e:
+        logger.debug("grant scanner skipped: %s", e)
+
+    try:
+        # I2：显式 import 注册 Prometheus gauges（不 import 不进 /metrics）
+        import backend.core.metrics_memory as _metrics_memory  # noqa: F401
+
+        logger.info("✓ memory metrics gauges registered")
+    except Exception as e:
+        logger.debug("memory metrics skipped: %s", e)
+
+    try:
+        from backend.core.workflow.scheduler import start_schedule_scanner
+
+        start_schedule_scanner()
+        logger.info("✓ workflow schedule scanner 已启动")
+    except Exception as e:
+        logger.debug("schedule scanner skipped: %s", e)
+
+    try:
         from backend.core.key_manager import KeyManager
 
         KeyManager()
@@ -108,6 +132,18 @@ async def lifespan(app: FastAPI):
         from backend.core.workflow.notify import stop_hang_scanner
 
         stop_hang_scanner()
+    except Exception:
+        pass
+    try:
+        from backend.core.workflow.grant_scanner import stop_grant_scanner
+
+        stop_grant_scanner()
+    except Exception:
+        pass
+    try:
+        from backend.core.workflow.scheduler import stop_schedule_scanner
+
+        stop_schedule_scanner()
     except Exception:
         pass
     try:
@@ -252,6 +288,12 @@ def create_app() -> FastAPI:
         prefix="/api",
         required=True,
         label="Workflow Approvals",
+    )
+    _lazy_include(
+        app,
+        "backend.routers.tenant_subscription",
+        "router",
+        label="Tenant Subscription",
     )
     _lazy_include(
         app,

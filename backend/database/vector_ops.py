@@ -234,35 +234,47 @@ def search_user_memories(
     query: str,
     limit: int = 5,
     min_score: float = 0.3,
+    domains: list[str] | None = None,
 ) -> list[dict[str, Any]]:
-    """检索用户长期记忆"""
+    """检索用户长期记忆（Task 41 S2a：domains 过滤 + 排除 pending:*）。"""
     vec = embed_text(query)
     vec_str = "[" + ",".join(str(v) for v in vec) + "]"
+    domain_clauses: list[str] = []
+    params: dict[str, Any] = {
+        "vec": vec_str,
+        "tid": tenant_id,
+        "uid": user_id,
+        "min_score": min_score,
+        "lim": limit,
+    }
+    if domains:
+        for i, d in enumerate(domains):
+            prefix = d if d.endswith(":") else f"{d}:"
+            pname = f"dom{i}"
+            domain_clauses.append(f"key LIKE :{pname}")
+            params[pname] = f"{prefix}%"
+    domain_sql = ""
+    if domain_clauses:
+        domain_sql = " AND (" + " OR ".join(domain_clauses) + ")"
+
     session_factory = get_pg_session()
     with session_factory.Session() as session:
         sql = text(
-            """
+            f"""
             SELECT id, key, value, confidence, source, created_at,
                    1 - (embedding <=> :vec::vector) AS similarity
             FROM user_memories
             WHERE tenant_id = :tid
               AND user_id = :uid
               AND embedding IS NOT NULL
+              AND key NOT LIKE 'pending:%'
               AND 1 - (embedding <=> :vec::vector) >= :min_score
+              {domain_sql}
             ORDER BY embedding <=> :vec::vector
             LIMIT :lim
             """
         )
-        rows = session.execute(
-            sql,
-            {
-                "vec": vec_str,
-                "tid": tenant_id,
-                "uid": user_id,
-                "min_score": min_score,
-                "lim": limit,
-            },
-        ).fetchall()
+        rows = session.execute(sql, params).fetchall()
     return [
         {
             "id": str(r.id),

@@ -22,7 +22,9 @@ async def build_context(state: PipelineState) -> PipelineState:
         cold=list(state.get("cold_memory") or []),
     )
     memory_block = mem.assemble_prompt_block(
-        bundle, query=str(state.get("message") or "")
+        bundle,
+        query=str(state.get("message") or ""),
+        user_id=str(state.get("user_id") or ""),
     )
     drift_blocked = False
     if memory_block:

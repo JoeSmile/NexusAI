@@ -24,6 +24,76 @@ from backend.database.vector_ops import delete_user_memory, list_user_memories_b
 logger = logging.getLogger(__name__)
 
 
+async def persist_warm_by_key(
+    mem: UnifiedMemoryService,
+    *,
+    tenant_id: str,
+    user_id: str,
+    key: str,
+    value: str,
+    confidence: float,
+    source: str,
+    request_trace_id: str = "",
+    embed: bool = True,
+) -> str:
+    """I1：按 is_sync_key 分流。返回 queued | synced | degraded。"""
+    from backend.core.memory.extractor import is_sync_key
+    from backend.core.memory.memory_queue import enqueue_memory_write, queue_depth
+    from backend.core.metrics_memory import (
+        observe_queue_depth,
+        record_backlog_trigger,
+        record_degraded,
+    )
+
+    if is_sync_key(key):
+        await mem.write(
+            "warm",
+            user_id=user_id,
+            key=key,
+            value=value,
+            confidence=confidence,
+            source=source,
+            embed=embed,
+        )
+        return "synced"
+
+    xid = enqueue_memory_write(
+        {
+            "tenant_id": tenant_id,
+            "user_id": user_id,
+            "key": key,
+            "value": value,
+            "confidence": confidence,
+            "source": source,
+            "request_trace_id": request_trace_id or "",
+            "embed": embed,
+        }
+    )
+    if xid:
+        try:
+            observe_queue_depth(queue_depth())
+        except Exception:
+            pass
+        return "queued"
+
+    # Redis 挂 / 积压 → 世界域同步兜底（不丢，标 degraded）
+    try:
+        record_backlog_trigger()
+        record_degraded(1.0)
+    except Exception:
+        pass
+    await mem.write(
+        "warm",
+        user_id=user_id,
+        key=key,
+        value=value,
+        confidence=confidence,
+        source=source or "degraded",
+        embed=embed,
+    )
+    return "degraded"
+
+
 def _audit(
     *,
     tenant_id: str,
@@ -185,13 +255,16 @@ async def persist_structured_turn(
             )
             continue
         record_item_outcome(accepted=True, item_type=item.type)
-        await mem.write(
-            "warm",
+        # I1：世界域 entity/decision/error 入队；todo/pending 同步
+        await persist_warm_by_key(
+            mem,
+            tenant_id=tenant_id,
             user_id=user_id,
             key=cand.key,
             value=item.model_dump_json(),
             confidence=item.confidence,
             source="rule_t0",
+            request_trace_id=trace_id,
             embed=True,
         )
         if isinstance(item, EntityItem):

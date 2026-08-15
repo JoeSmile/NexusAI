@@ -26,12 +26,38 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_MIN_CONFIDENCE = 0.6
 
-# 显式记忆命令：记住/请记住/记得
-_RE_REMEMBER = re.compile(r"(?:请)?(?:记住|记得)[:：]?\s*(.{1,120})")
+# 显式记忆命令：记住/请记住/记得（吞冒号/逗号/顿号）
+_RE_REMEMBER = re.compile(r"(?:请)?(?:记住|记得)[:：,，、]?\s*(.{1,120})")
 # 偏好句式：我喜欢/不喜欢/偏好/偏爱/习惯 …
 _RE_PREFERENCE = re.compile(r"(?:我|用户)\s*(喜欢|不喜欢|偏好|偏爱|习惯)\s*(.{1,40})")
 # 身份句式：我叫/我是 …
 _RE_IDENTITY = re.compile(r"(?:我|用户)\s*(?:叫|是)\s*(.{1,20})")
+# 更正句式（P0-10 同步高优先级）：其实/改成/更喜欢/不是…是…
+_RE_CORRECTION = re.compile(
+    r"(?:其实|改成|更喜欢)\s*(?:我)?\s*(?:喜欢|偏好|偏爱|习惯)?\s*(.{1,40})"
+    r"|不是\s*(.+?)\s*[，,]\s*(?:是|改成)\s*(.{1,40})"
+    r"|不(?:喜欢|要)\s*(.+?)\s*[，,]?\s*(?:改成|更喜欢)\s*(.{1,40})"
+)
+
+# 同步写白名单前缀（P0-3）；异步 = entity/decision/error（S2c 入队）
+SYNC_KEY_PREFIXES: tuple[str, ...] = (
+    "identity:",
+    "preference:",
+    "fact:",
+    "pending:",
+    "todo:",
+)
+ASYNC_KEY_PREFIXES: tuple[str, ...] = ("entity:", "decision:", "error:")
+
+
+def is_sync_key(key: str) -> bool:
+    """identity/preference/fact/todo/pending → 同步；entity/decision/error → 入队。"""
+    return any(key.startswith(p) for p in SYNC_KEY_PREFIXES)
+
+
+def is_async_key(key: str) -> bool:
+    return any(key.startswith(p) for p in ASYNC_KEY_PREFIXES)
+
 
 _RE_STRIP = re.compile(r"[，。！？、\s]+")
 _RE_PARTICLE_TRAIL = re.compile(r"[啊呀哦嘛咯嘿诶]+$")
@@ -159,6 +185,11 @@ class MemoryCandidate:
     value: str
     confidence: float
     source: str = "rule"
+    sync: bool | None = None  # None → 由 is_sync_key(key) 判定（I1）
+
+    def __post_init__(self) -> None:
+        if self.sync is None:
+            self.sync = is_sync_key(self.key)
 
 
 class MemoryExtractor(Protocol):
@@ -192,11 +223,40 @@ class RuleExtractor:
             return []
 
         found: list[MemoryCandidate] = []
+        # 更正句式优先（同步高优先级）
+        for m in _RE_CORRECTION.finditer(text):
+            groups = [g for g in m.groups() if g]
+            phrase = (groups[-1] if groups else "").strip()
+            phrase = _strip_particles(phrase)
+            if not phrase or not _is_clean_pref(phrase):
+                if phrase and _is_safe_fact(phrase):
+                    found.append(
+                        MemoryCandidate(
+                            key=f"fact:{_slug(phrase)}",
+                            value=phrase,
+                            confidence=0.92,
+                            source="correction",
+                            sync=True,
+                        )
+                    )
+                continue
+            found.append(
+                MemoryCandidate(
+                    key=f"preference:{_slug('喜欢' + phrase)}",
+                    value=f"喜欢{phrase}",
+                    confidence=0.92,
+                    source="correction",
+                    sync=True,
+                )
+            )
+        if found:
+            return found
+
         remembers = list(_RE_REMEMBER.finditer(text))
         if remembers:
             # 显式"记住 X"是最高权威命令：命中则只取它，避免同句双写
             for m in remembers:
-                phrase = m.group(1).strip()
+                phrase = m.group(1).strip().lstrip("，,、")
                 if not _is_safe_fact(phrase):
                     continue
                 found.append(
@@ -204,6 +264,7 @@ class RuleExtractor:
                         key=f"fact:{_slug(phrase)}",
                         value=phrase,
                         confidence=0.9,
+                        sync=True,
                     )
                 )
             return found
@@ -216,6 +277,7 @@ class RuleExtractor:
                     key=f"preference:{_slug(verb + obj)}",
                     value=f"{verb}{obj}",
                     confidence=0.7,
+                    sync=True,
                 )
             )
         for m in _RE_IDENTITY.finditer(text):
@@ -227,6 +289,7 @@ class RuleExtractor:
                     key=f"identity:{_slug(name)}",
                     value=f"叫{name}",
                     confidence=0.85,
+                    sync=True,
                 )
             )
         # 去重（同句多模式命中同一事实时取置信度最高者）
@@ -291,4 +354,8 @@ __all__ = [
     "SmallModelExtractor",
     "get_extractor",
     "min_confidence",
+    "is_sync_key",
+    "is_async_key",
+    "SYNC_KEY_PREFIXES",
+    "ASYNC_KEY_PREFIXES",
 ]

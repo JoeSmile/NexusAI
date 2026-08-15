@@ -116,7 +116,7 @@ class MemorySkill(Skill):
         """检索相关记忆"""
         if self._memory_hub:
             try:
-                memories = self._memory_hub.retrieve(
+                memories = await self._memory_hub.retrieve(
                     query=context.user_input,
                     user_id=context.user_id,
                     context={

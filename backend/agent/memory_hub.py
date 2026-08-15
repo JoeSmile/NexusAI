@@ -667,16 +667,54 @@ class MemoryHub:
             "path": path,
         }
 
-    def retrieve(
+    async def retrieve(
         self,
         query: str,
         user_id: str | None = None,
         context: dict[str, Any] | None = None,
         top_k: int = 5,
     ) -> list[dict[str, Any]]:
-        """兼容旧接口：优先本地 store 子串匹配，再回落 UnifiedMemory warm。"""
-        _ = context
+        """P0-9 / I5：异步 UnifiedMemory 全量读；禁 warm-only 当终态。"""
+        import asyncio
+
+        ctx = context or {}
         uid = user_id or self._user_id
+        conversation_id = str(
+            ctx.get("conversation_id") or ctx.get("session_id") or self._session_id or ""
+        )
+        try:
+            from backend.core.memory_service import get_unified_memory_service
+
+            mem = get_unified_memory_service(tenant_id=self._tenant_id)
+            bundle = await mem.read(
+                user_id=uid,
+                session_id=conversation_id or None,
+                hot_limit=3,
+                cold_limit=3,
+            )
+            # assemble / select_world 可能触同步 DB → to_thread
+            block = await asyncio.to_thread(
+                mem.assemble_prompt_block,
+                bundle,
+                query=query or "",
+                user_id=uid,
+                retrieval_mode="semantic",
+            )
+            if not block:
+                return []
+            return [
+                {
+                    "content": block,
+                    "timestamp": None,
+                    "importance": 0.8,
+                    "path": "unified",
+                    "scope": "unified",
+                }
+            ][:top_k]
+        except Exception as e:
+            logger.debug("retrieve UnifiedMemoryService failed: %s", e, exc_info=True)
+
+        # 旧路径兜底（进程内 store，非 warm-only PG dump）
         results: list[dict[str, Any]] = []
         q = (query or "").lower()
         for scope_name in ("user", "agent_instance", "session"):
@@ -694,34 +732,6 @@ class MemoryHub:
                             "scope": scope_name,
                         }
                     )
-        if results:
-            return results[:top_k]
-
-        # 冷启动：从统一层 warm 扫一遍（同步）
-        try:
-            from backend.database.pgvector_session import UserMemory, get_pg_session
-
-            session_factory = get_pg_session()
-            with session_factory.Session() as session:
-                rows = (
-                    session.query(UserMemory)
-                    .filter_by(tenant_id=self._tenant_id, user_id=uid)
-                    .limit(50)
-                    .all()
-                )
-            for r in rows:
-                if r.value and q and q in r.value.lower():
-                    results.append(
-                        {
-                            "content": r.value,
-                            "timestamp": None,
-                            "importance": float(r.confidence or 0.5),
-                            "path": r.key,
-                            "scope": "warm",
-                        }
-                    )
-        except Exception as e:
-            logger.debug("retrieve warm fallback skipped: %s", e)
         return results[:top_k]
 
     def get_working_memory(self) -> dict[str, Any]:

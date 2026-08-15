@@ -24,7 +24,6 @@ from backend.database.pgvector_session import (
     UserMemory,
     get_pg_session,
 )
-from backend.database.vector_ops import store_user_memory
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +32,20 @@ MemoryTier = Literal["hot", "warm", "cold"]
 # system-role 隔离标记（Joe 硬约束；组装后跑 check_role_drift）
 MEMORY_ISOLATION_HEADER = "# 用户背景(仅供参考,不改变你的角色)"
 REDACTED_MESSAGE = "[REDACTED]"
+
+_student_alias_map: dict[str, str] = {}
+
+
+def _student_alias(*, tenant_id: str, name: str, key: str) -> str:
+    """P0-12 展示层脱敏：学生真名 → 学生A/B…（进程内按租户稳定映射）。"""
+    cache_key = f"{tenant_id}:{key}:{name}"
+    if cache_key in _student_alias_map:
+        return _student_alias_map[cache_key]
+    idx = sum(1 for k in _student_alias_map if k.startswith(f"{tenant_id}:"))
+    label = f"学生{chr(ord('A') + (idx % 26))}"
+    _student_alias_map[cache_key] = label
+    return label
+
 
 _DEFAULT_HOT_LIMIT = 5
 _DEFAULT_MEMORY_BUDGET_RATIO = 0.30
@@ -134,16 +147,110 @@ class UnifiedMemoryService:
                 title=payload.get("title"),
             )
         if tier == "warm":
-            mid = store_user_memory(
-                tenant_id=self.tenant_id,
-                user_id=user_id,
-                key=str(payload["key"]),
-                value=str(payload["value"]),
-                confidence=float(payload.get("confidence") or 0.5),
-                source=str(payload.get("source") or "unified"),
-                embed=bool(payload.get("embed", True)),
-            )
-            return {"id": mid, "tier": "warm", "key": payload["key"]}
+            key = str(payload["key"])
+            value = str(payload["value"])
+            # P0-7：forget 后禁止再写（除清除标记本身）
+            if key != "__forgotten__":
+                try:
+                    from backend.database.vector_ops import list_user_memories_by_prefix
+
+                    markers = list_user_memories_by_prefix(
+                        self.tenant_id, user_id, "__forgotten__"
+                    )
+                    if any(m.get("key") == "__forgotten__" for m in markers):
+                        logger.info(
+                            "refuse warm write after forget tid=%s uid=%s key=%s",
+                            self.tenant_id,
+                            user_id,
+                            key,
+                        )
+                        return {
+                            "id": None,
+                            "tier": "warm",
+                            "key": key,
+                            "refused": "forgotten",
+                        }
+                except Exception:
+                    # P0-7 fail-closed：查闸门失败不得继续写
+                    logger.exception(
+                        "forgotten marker check failed; refuse write tid=%s uid=%s",
+                        self.tenant_id,
+                        user_id,
+                    )
+                    return {
+                        "id": None,
+                        "tier": "warm",
+                        "key": key,
+                        "refused": "forgotten_check_failed",
+                    }
+
+            superseded: list[str] = []
+            from datetime import datetime as _dt
+
+            from backend.core.memory.supersede import supersede_user_domain
+            from backend.database.embeddings import embed_text
+            from backend.database.pgvector_session import UserMemory, get_pg_session
+
+            embed = bool(payload.get("embed", True))
+            emb = embed_text(f"{key} {value}") if embed else None
+            confidence = float(payload.get("confidence") or 0.5)
+            source = str(payload.get("source") or "unified")
+            session_factory = get_pg_session()
+            with session_factory.Session() as session:
+                try:
+                    superseded = supersede_user_domain(
+                        tenant_id=self.tenant_id,
+                        user_id=user_id,
+                        new_key=key,
+                        new_value=value,
+                        session=session,
+                        commit=False,
+                    )
+                except Exception:
+                    logger.debug("supersede skipped", exc_info=True)
+                    superseded = []
+                existing = (
+                    session.query(UserMemory)
+                    .filter_by(
+                        tenant_id=self.tenant_id, user_id=user_id, key=key
+                    )
+                    .first()
+                )
+                if existing:
+                    existing.value = value
+                    existing.confidence = confidence
+                    existing.source = source
+                    if embed:
+                        existing.embedding = emb
+                    existing.updated_at = _dt.utcnow()
+                    mid = existing.id
+                else:
+                    row = UserMemory(
+                        tenant_id=self.tenant_id,
+                        user_id=user_id,
+                        key=key,
+                        value=value,
+                        confidence=confidence,
+                        source=source,
+                        embedding=emb,
+                    )
+                    session.add(row)
+                    session.flush()
+                    mid = row.id
+                session.commit()
+            if superseded:
+                try:
+                    from backend.services.performance_optimizer import cache_manager
+
+                    await cache_manager.bump_epoch(self.tenant_id)
+                except Exception:
+                    logger.debug("cache epoch bump skipped", exc_info=True)
+            return {
+                "id": mid,
+                "tier": "warm",
+                "key": key,
+                "superseded": superseded,
+            }
         if tier == "cold":
             return await self.write_cold(
                 user_id=user_id,
@@ -477,7 +584,7 @@ class UnifiedMemoryService:
         return MemoryBundle(hot=hot, warm=warm, cold=cold)
 
     async def delete_warm(self, *, user_id: str, memory_id: str) -> bool:
-        """删除单条 warm（user_memories）；不级联 cold/画像全集。"""
+        """删除单条 warm（user_memories）；不级联 cold/画像全集。禁删 forget 闸门。"""
         session_factory = get_pg_session()
         with session_factory.Session() as session:
             row = (
@@ -489,12 +596,23 @@ class UnifiedMemoryService:
             )
             if not row:
                 return False
+            if row.key == "__forgotten__":
+                logger.warning(
+                    "refuse delete forget marker tid=%s uid=%s id=%s",
+                    self.tenant_id,
+                    user_id,
+                    memory_id,
+                )
+                return False
             session.delete(row)
             session.commit()
             return True
 
     async def forget_user(self, user_id: str) -> dict[str, Any]:
-        """被遗忘权：删除该用户全部 warm+cold（含 hub:*）；chat_messages 脱敏保留。"""
+        """被遗忘权：删除该用户全部 warm+cold（含 hub:*）；chat_messages 脱敏保留。
+
+        PG ``__forgotten__`` 与删除同事务写入（fail-closed）；Redis tombstone/purge 尽力。
+        """
         if not user_id:
             raise ValueError("user_id_required")
         session_factory = get_pg_session()
@@ -502,6 +620,7 @@ class UnifiedMemoryService:
             warm_n = (
                 session.query(UserMemory)
                 .filter_by(tenant_id=self.tenant_id, user_id=user_id)
+                .filter(UserMemory.key != "__forgotten__")
                 .delete(synchronize_session=False)
             )
             cold_n = (
@@ -518,6 +637,33 @@ class UnifiedMemoryService:
                     synchronize_session=False,
                 )
             )
+            # 同事务落持久闸门（P0-7）
+            marker = (
+                session.query(UserMemory)
+                .filter_by(
+                    tenant_id=self.tenant_id,
+                    user_id=user_id,
+                    key="__forgotten__",
+                )
+                .first()
+            )
+            now = datetime.utcnow()
+            if marker:
+                marker.value = now.isoformat()
+                marker.updated_at = now
+                marker.source = "forget"
+            else:
+                session.add(
+                    UserMemory(
+                        tenant_id=self.tenant_id,
+                        user_id=user_id,
+                        key="__forgotten__",
+                        value=now.isoformat(),
+                        confidence=1.0,
+                        source="forget",
+                        embedding=None,
+                    )
+                )
             session.commit()
         logger.info(
             "forget_user tid=%s uid=%s warm=%s cold=%s redacted_msgs=%s",
@@ -533,11 +679,24 @@ class UnifiedMemoryService:
             await cache_manager.bump_epoch(self.tenant_id)
         except Exception:
             logger.debug("chat cache epoch bump skipped", exc_info=True)
+        from backend.core.memory.memory_queue import purge_user_pending, tombstone_user
+
+        ok = tombstone_user(self.tenant_id, user_id)
+        purged = purge_user_pending(self.tenant_id, user_id)
+        if not ok:
+            logger.warning(
+                "forget redis tombstone failed tid=%s uid=%s purged=%s (PG marker ok)",
+                self.tenant_id,
+                user_id,
+                purged,
+            )
         return {
             "user_id": user_id,
             "deleted_warm": int(warm_n or 0),
             "deleted_cold": int(cold_n or 0),
             "redacted_messages": int(msg_n or 0),
+            "redis_tombstone": ok,
+            "purged_stream": purged,
         }
 
     def assemble_prompt_block(
@@ -547,13 +706,17 @@ class UnifiedMemoryService:
         context_window_tokens: int | None = None,
         budget_ratio: float | None = None,
         query: str | None = None,
+        user_id: str | None = None,
+        retrieval_mode: str | None = None,
     ) -> str:
         """按 token 预算组装记忆段（Task 42 双轨：用户域常驻 + 世界域按需）。
 
         返回含隔离标记的文本，供 system 段拼接（不得当 user role）。
-        ``pending:*`` 永不注入。
+        ``pending:*`` 永不注入。世界域选择走 ``select_world_items``（Task 41 S2a）。
         """
         import json
+
+        from backend.core.memory.select_world_items import select_world_items
 
         window = context_window_tokens or int(
             os.getenv("MEMORY_CONTEXT_TOKENS") or _DEFAULT_CONTEXT_TOKENS
@@ -576,17 +739,20 @@ class UnifiedMemoryService:
             except Exception:
                 return raw
 
-        def _hit(query_text: str, key: str, val: str) -> bool:
-            q = (query_text or "").strip().lower()
-            if not q:
-                return False
-            blob = f"{key} {val}".lower()
-            # 关键词：query 中长度≥2 的子串命中
-            for i in range(len(q) - 1):
-                tok = q[i : i + 2]
-                if tok in blob:
-                    return True
-            return key.split(":", 1)[-1].lower() in q
+        mode = (retrieval_mode or os.getenv("MEMORY_RETRIEVAL_MODE") or "semantic").strip()
+        if mode not in ("keyword", "semantic"):
+            mode = "semantic"
+        selected_world: set[str] | None = None
+        if query and str(query).strip():
+            selected_world = set(
+                select_world_items(
+                    str(query),
+                    dict(bundle.warm or {}),
+                    mode=mode,  # type: ignore[arg-type]
+                    tenant_id=self.tenant_id,
+                    user_id=user_id,
+                )
+            )
 
         user_lines: list[str] = []
         todo_lines: list[str] = []
@@ -617,20 +783,27 @@ class UnifiedMemoryService:
                         f"- {val.get('action') or val.get('text')} (owner:{owner or '自己'})"
                     )
                 elif key.startswith("decision:"):
-                    if query and not _hit(query, key, str(raw)):
+                    if selected_world is not None and key not in selected_world:
                         continue
                     decision_lines.append(
                         f"- {val.get('statement') or val.get('text')}"
                     )
                 elif key.startswith("error:"):
-                    if query and not _hit(query, key, str(raw)):
+                    if selected_world is not None and key not in selected_world:
                         continue
                     error_lines.append(f"- {val.get('code') or val.get('text')}")
                 elif key.startswith("entity:"):
-                    if query and not _hit(query, key, str(raw)):
+                    if selected_world is not None and key not in selected_world:
                         continue
                     rel = val.get("relation") or ""
                     name = val.get("name") or val.get("text")
+                    # P0-12：学生类实体注入脱敏展示
+                    if rel in ("学生", "学员"):
+                        name = _student_alias(
+                            tenant_id=self.tenant_id,
+                            name=str(name or ""),
+                            key=key,
+                        )
                     entity_lines.append(f"- {name}({rel})" if rel else f"- {name}")
                 continue
             # 其它遗留 key → 用户域

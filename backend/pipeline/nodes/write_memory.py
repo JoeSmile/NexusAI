@@ -51,7 +51,10 @@ async def write_memory(state: PipelineState) -> PipelineState:
     # Task 41/42: 规则抽取 → warm（失败静默；REJECT_* 进 audit）
     try:
         from backend.core.memory.extractor import get_extractor, min_confidence
-        from backend.core.memory.write_items import persist_structured_turn
+        from backend.core.memory.write_items import (
+            persist_structured_turn,
+            persist_warm_by_key,
+        )
 
         extractor = get_extractor()
         candidates = await extractor.extract(
@@ -62,13 +65,16 @@ async def write_memory(state: PipelineState) -> PipelineState:
         for c in candidates:
             if c.confidence < threshold:
                 continue
-            await mem.write(
-                "warm",
+            # I1：is_sync_key 分流（identity/… 同步；entity/decision/error 入队）
+            await persist_warm_by_key(
+                mem,
+                tenant_id=tenant_id,
                 user_id=user_id,
                 key=c.key,
                 value=c.value,
                 confidence=c.confidence,
                 source=c.source,
+                request_trace_id=trace_id or "",
             )
         await persist_structured_turn(
             mem,

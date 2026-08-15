@@ -38,6 +38,24 @@ class RejectBody(BaseModel):
     reason: str | None = None
 
 
+class BatchBody(BaseModel):
+    run_id: str
+    action: str = Field(..., pattern="^(approve|reject)$")
+    note: str | None = None
+
+
+def _pending_count(session: Session, *, run_id: str, tenant_id: str) -> int:
+    return (
+        session.query(PermissionRequest)
+        .filter(
+            PermissionRequest.tenant_id == tenant_id,
+            PermissionRequest.run_id == run_id,
+            PermissionRequest.status == "pending",
+        )
+        .count()
+    )
+
+
 def _scope(session: Session, tenant: TenantContext) -> OrgScope:
     return resolve_org_scope(
         session,
@@ -149,6 +167,188 @@ async def inbox(
         if dirty:
             session.commit()
         return {"items": items}
+
+
+@router.post("/batch")
+async def batch_review(
+    body: BatchBody,
+    tenant: TenantContext = Depends(verify_human_or_legacy_key),
+) -> dict[str, Any]:
+    """E3.1 — run 级一键审批；逐条 try；仅无剩余 pending 缺权时 resume。"""
+    sf = get_pg_session()
+    results: list[dict[str, Any]] = []
+    run_id = body.run_id
+    with sf.Session() as session:
+        scope = _scope(session, tenant)
+        run = (
+            session.query(WorkflowRun)
+            .filter(
+                WorkflowRun.id == run_id,
+                WorkflowRun.tenant_id == tenant.tenant_id,
+            )
+            .one_or_none()
+        )
+        if run is None:
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "RUN_404", "message": "run_not_found"},
+            )
+        pending = (
+            session.query(PermissionRequest)
+            .filter(
+                PermissionRequest.tenant_id == tenant.tenant_id,
+                PermissionRequest.run_id == run_id,
+                PermissionRequest.status == "pending",
+            )
+            .order_by(PermissionRequest.created_at.asc())
+            .all()
+        )
+        wf = (
+            session.query(Workflow)
+            .filter(Workflow.id == run.workflow_id)
+            .one_or_none()
+        )
+        policy = dict(wf.request_policy) if wf and wf.request_policy else {}
+
+        for req in pending:
+            item: dict[str, Any] = {"request_id": req.id, "node_id": req.node_id}
+            try:
+                if not can_review_request(tenant, scope, req=req, session=session):
+                    item.update({"ok": False, "skipped": True, "reason": "not_eligible"})
+                    results.append(item)
+                    continue
+                try:
+                    assert_org_access(scope, req.org_unit_id, session=session)
+                except HTTPException:
+                    item.update({"ok": False, "skipped": True, "reason": "org_denied"})
+                    results.append(item)
+                    continue
+
+                nested = session.begin_nested()
+                try:
+                    if body.action == "approve":
+                        res = session.execute(
+                            text(
+                                "UPDATE permission_requests SET status='approved', "
+                                "updated_at=:now WHERE id=:id AND status='pending'"
+                            ),
+                            {"id": req.id, "now": datetime.utcnow()},
+                        )
+                        if res.rowcount != 1:
+                            nested.rollback()
+                            item.update(
+                                {
+                                    "ok": False,
+                                    "skipped": True,
+                                    "reason": "already_resolved",
+                                }
+                            )
+                            results.append(item)
+                            continue
+                        session.refresh(req)
+                        origin = (
+                            "self_approve"
+                            if req.applicant_user_id == tenant.user_id
+                            else "approval"
+                        )
+                        grant = issue_approval_grant(
+                            session,
+                            req=req,
+                            workflow_id=run.workflow_id,
+                            reviewer_user_id=tenant.user_id,
+                            request_policy=policy,
+                            review_reason=body.note,
+                            origin=origin,
+                        )
+                        session.flush()
+                        _audit(
+                            tenant_id=tenant.tenant_id,
+                            user_id=tenant.user_id,
+                            action="batch_approve",
+                            run_id=run_id,
+                            node_id=req.node_id,
+                            output_text=(body.note or f"grant={grant.id}")[:500],
+                        )
+                        nested.commit()
+                        item.update(
+                            {
+                                "ok": True,
+                                "status": "approved",
+                                "grant_id": grant.id,
+                            }
+                        )
+                    else:
+                        res = session.execute(
+                            text(
+                                "UPDATE permission_requests SET status='rejected', "
+                                "reviewed_by=:uid, reviewed_at=:now, review_reason=:reason, "
+                                "updated_at=:now WHERE id=:id AND status='pending'"
+                            ),
+                            {
+                                "id": req.id,
+                                "uid": tenant.user_id,
+                                "now": datetime.utcnow(),
+                                "reason": (body.note or "batch_rejected")[:500],
+                            },
+                        )
+                        if res.rowcount != 1:
+                            nested.rollback()
+                            item.update(
+                                {
+                                    "ok": False,
+                                    "skipped": True,
+                                    "reason": "already_resolved",
+                                }
+                            )
+                            results.append(item)
+                            continue
+                        session.execute(
+                            text(
+                                "UPDATE workflow_runs SET status='failed', "
+                                "error_code='AUTH_002', "
+                                "error_message='permission_rejected', "
+                                "finished_at=:now, updated_at=:now "
+                                "WHERE id=:id AND status='suspended'"
+                            ),
+                            {"id": run_id, "now": datetime.utcnow()},
+                        )
+                        _audit(
+                            tenant_id=tenant.tenant_id,
+                            user_id=tenant.user_id,
+                            action="batch_reject",
+                            run_id=run_id,
+                            node_id=req.node_id,
+                            output_text=(body.note or "batch_rejected")[:200],
+                        )
+                        nested.commit()
+                        item.update({"ok": True, "status": "rejected"})
+                    results.append(item)
+                except Exception as exc:
+                    nested.rollback()
+                    item.update({"ok": False, "error": str(exc)[:200]})
+                    results.append(item)
+            except Exception as exc:
+                item.update({"ok": False, "error": str(exc)[:200]})
+                results.append(item)
+
+        remaining = _pending_count(
+            session, run_id=run_id, tenant_id=tenant.tenant_id
+        )
+        session.commit()
+
+    resumed = False
+    if body.action == "approve" and remaining == 0:
+        run_svc.schedule_resume(run_id)
+        resumed = True
+
+    return {
+        "ok": True,
+        "run_id": run_id,
+        "action": body.action,
+        "results": results,
+        "pending_remaining": remaining,
+        "resumed": resumed,
+    }
 
 
 @router.post("/{request_id}/approve")

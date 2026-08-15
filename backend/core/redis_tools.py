@@ -23,17 +23,57 @@ _async_failed: dict[bool, float] = {}
 _async_lock: asyncio.Lock | None = None
 
 
+def _assemble_redis_url(
+    host: str,
+    port: str | int = 6379,
+    password: str | None = None,
+    db: str | int = 0,
+) -> str:
+    """Build ``redis://[:password@]host:port/db`` from discrete parts."""
+    auth = f":{password}@" if password else ""
+    return f"redis://{auth}{host}:{port}/{db}"
+
+
 def resolve_redis_url(default: str = "redis://localhost:6379") -> str:
-    url = (os.getenv("REDIS_URL") or "").strip() or default
+    """Resolve Redis URL from env / compose / Config (Task 41 P0-8 / E_3 chore).
+
+    Priority:
+    1. ``REDIS_URL`` env (explicit full URL)
+    2. ``REDIS_HOST`` + ``REDIS_PORT`` (+ optional password/db) — docker-compose path
+    3. ``Config.REDIS_URL`` / ``Config.redis.url`` when available
+    4. ``default`` (localhost)
+    """
+    env_url = (os.getenv("REDIS_URL") or "").strip()
+    if env_url:
+        return env_url
+
+    host = (os.getenv("REDIS_HOST") or "").strip()
+    if host:
+        port = (os.getenv("REDIS_PORT") or "6379").strip() or "6379"
+        password = (os.getenv("REDIS_PASSWORD") or "").strip() or None
+        db = (os.getenv("REDIS_DB") or "0").strip() or "0"
+        return _assemble_redis_url(host, port, password, db)
+
     try:
         from config import Config
 
-        cfg = getattr(Config, "REDIS_URL", None)
-        if cfg:
-            url = str(cfg)
+        cfg_url = getattr(Config, "REDIS_URL", None)
+        if cfg_url and str(cfg_url).strip():
+            return str(cfg_url).strip()
     except Exception:
         pass
-    return url
+
+    try:
+        from backend.core.config import get_config
+
+        redis_cfg = getattr(get_config(), "redis", None)
+        url_prop = getattr(redis_cfg, "url", None) if redis_cfg is not None else None
+        if url_prop and str(url_prop).strip():
+            return str(url_prop).strip()
+    except Exception:
+        pass
+
+    return default
 
 
 def _should_retry(failed: dict[bool, float], slot: bool) -> bool:

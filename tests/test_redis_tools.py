@@ -67,6 +67,31 @@ def test_cache_key_shape() -> None:
     assert redis_tools.cache_key("rag", "l1", "t1", "abc") == "rag:l1:t1:abc"
 
 
+def test_resolve_redis_url_prefers_explicit_redis_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("REDIS_URL", "redis://explicit:6380/2")
+    monkeypatch.setenv("REDIS_HOST", "ignored-host")
+    monkeypatch.setenv("REDIS_PORT", "9999")
+    assert redis_tools.resolve_redis_url() == "redis://explicit:6380/2"
+
+
+def test_resolve_redis_url_assembles_from_host_port(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("REDIS_URL", raising=False)
+    monkeypatch.setenv("REDIS_HOST", "redis")
+    monkeypatch.setenv("REDIS_PORT", "6379")
+    monkeypatch.delenv("REDIS_PASSWORD", raising=False)
+    monkeypatch.delenv("REDIS_DB", raising=False)
+    assert redis_tools.resolve_redis_url() == "redis://redis:6379/0"
+
+
+def test_resolve_redis_url_assembles_with_password(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("REDIS_URL", raising=False)
+    monkeypatch.setenv("REDIS_HOST", "redis")
+    monkeypatch.setenv("REDIS_PORT", "6379")
+    monkeypatch.setenv("REDIS_PASSWORD", "s3cret")
+    monkeypatch.setenv("REDIS_DB", "1")
+    assert redis_tools.resolve_redis_url() == "redis://:s3cret@redis:6379/1"
+
+
 @pytest.mark.asyncio
 async def test_get_async_redis_degrades() -> None:
     with patch(

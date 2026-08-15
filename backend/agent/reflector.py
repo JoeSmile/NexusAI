@@ -200,7 +200,7 @@ class Reflector:
         memory_hub = get_memory_hub()
         
         # 获取用户近期重要记忆
-        recent_memories = memory_hub.retrieve(
+        recent_memories = await memory_hub.retrieve(
             query="重要事件 问题 计划",
             user_id=user_id,
             context={"time_range": 30},
