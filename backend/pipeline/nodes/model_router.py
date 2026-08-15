@@ -20,6 +20,10 @@ def _maybe_disable_short_path_trace(finish_reason: str) -> None:
 @observe(name="pipeline.model_router")
 async def model_router(state: PipelineState) -> PipelineState:
     """双路径路由: Skill 短路径 / LLM 长路径（模型来自 ModelRegistry）"""
+    if state.get("triggered_run") or state.get("finish_reason") == "workflow_triggered":
+        enrich_span(metadata={"path": "workflow_bridge"})
+        return state
+
     intent = state.get("intent", "default") or "default"
     confidence = float(state.get("intent_confidence", 0.0) or 0.0)
 

@@ -320,6 +320,13 @@ async def task_plan(state: PipelineState) -> PipelineState:
                 **prompt_meta,
             }
         )
+        # 40.86: optional Chat → published workflow bridge (fail-soft)
+        try:
+            from backend.pipeline.chat_workflow_bridge import try_bridge_start_run
+
+            state = try_bridge_start_run(state)
+        except Exception:
+            logger.debug("chat workflow bridge skipped", exc_info=True)
     except Exception:
         logger.debug("task_plan node failed", exc_info=True)
         state["task_plan"] = None

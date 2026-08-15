@@ -24,6 +24,7 @@ class PipelineState(TypedDict):
     query_hash: str
     assembled_prompt: str | None
     gate_reason: str | None
+    cache_bypass: bool  # Task 39 GAP-2 / 40.86：触发型消息不查不写 exact
 
     # ── 记忆 ──
     hot_memory: list[dict]
@@ -82,6 +83,7 @@ class PipelineState(TypedDict):
     task_plan: dict | None
     short_path_skill: dict | None  # {id, name} — Chat skills registry
     skill_asset_hit: dict | None  # skill_assets CoT template hit
+    triggered_run: dict | None  # 40.86 {run_id, workflow_id, ...}
 
 
 def make_initial_state(
@@ -109,6 +111,7 @@ def make_initial_state(
         "query_hash": "",
         "assembled_prompt": None,
         "gate_reason": None,
+        "cache_bypass": False,
         "hot_memory": [],
         "warm_memory": {},
         "cold_memory": [],
@@ -145,4 +148,5 @@ def make_initial_state(
         "task_plan": None,
         "short_path_skill": None,
         "skill_asset_hit": None,
+        "triggered_run": None,
     }

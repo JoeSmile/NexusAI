@@ -27,6 +27,11 @@ _ALLOWED_PAYLOAD_KEYS = frozenset(
         "grant_id",
         "org_unit_id",
         "capability_id",
+        "conversation_id",
+        "platform",
+        "status",
+        "error_code",
+        "summary",
     }
 )
 
@@ -75,7 +80,7 @@ def _audit_notify(
 def notify(
     tenant_id: str,
     user_id: str,
-    type: str,
+    notif_type: str,
     payload: dict[str, Any] | None = None,
     *,
     session: Session | None = None,
@@ -99,7 +104,7 @@ def notify(
                         sess,
                         tenant_id=tenant_id,
                         user_id=user_id,
-                        type=type,
+                        type=notif_type,
                         payload=clean,
                     )
                     sent.append(provider.name)
@@ -145,7 +150,7 @@ def notify(
 def notify_many(
     tenant_id: str,
     user_ids: list[str] | tuple[str, ...],
-    type: str,
+    notif_type: str,
     payload: dict[str, Any] | None = None,
 ) -> int:
     """对多用户投递；单用户失败不影响其余。返回成功用户数。"""
@@ -156,7 +161,7 @@ def notify_many(
             continue
         seen.add(uid)
         try:
-            if notify(tenant_id, uid, type, payload):
+            if notify(tenant_id, uid, notif_type, payload):
                 n += 1
         except Exception:
             logger.debug("notify_many user failed uid=%s", uid, exc_info=True)
@@ -248,3 +253,38 @@ def notify_recurring_due_hook(
 ) -> int:
     """recurring 到期 hook（预留）：本任务只接线类型，不实现推送体业务。"""
     return notify_many(tenant_id, user_ids, "hang.recurring_due", payload or {})
+
+
+def notify_run_terminal(
+    *,
+    tenant_id: str,
+    user_id: str,
+    run_id: str,
+    workflow_id: str | None,
+    status: str,
+    conversation_id: str | None = None,
+    platform: str | None = None,
+    error_code: str | None = None,
+    summary: str | None = None,
+) -> list[str]:
+    """44.4: run_completed / run_failed → inbox (+ future channel by conversation_id).
+
+    拍板 4A: failed payload 只含 error_code + 固定友好文案；禁止 error_message 明文。
+    ``summary`` 参数保留兼容，失败路径忽略（避免异常串渗入）。
+    """
+    event = "run_completed" if status == "succeeded" else "run_failed"
+    payload: dict[str, Any] = {
+        "run_id": run_id,
+        "workflow_id": workflow_id,
+        "status": status,
+        "conversation_id": conversation_id,
+        "platform": platform,
+        "error_code": error_code if status != "succeeded" else None,
+        "summary": (
+            None
+            if status == "succeeded"
+            else "运行失败，可在工作台查看详情并重试"
+        ),
+    }
+    _ = summary  # discarded on fail path (4A)
+    return notify(tenant_id, user_id, event, payload)

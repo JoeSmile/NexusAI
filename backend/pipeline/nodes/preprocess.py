@@ -16,6 +16,25 @@ logger = logging.getLogger(__name__)
 
 _GATE_RESPONSE = "输入内容不符合安全规范，已被拦截。"
 
+# 触发型消息启发式（GAP-2 / 40.86）：动态内容勿进 exact cache
+_TRIGGER_ACTION = ("热点", "稿", "生成", "写一篇", "写一篇稿", "口播")
+_TRIGGER_DOMAIN = ("教育", "内容", "选题", "分镜", "案例", "主播")
+
+
+def should_cache_bypass(text: str) -> bool:
+    """True when message looks like a content-factory trigger (stale-cache risk)."""
+    if not text:
+        return False
+    # Scan normalized for stable matching (fullwidth etc. already folded upstream)
+    has_action = any(t in text for t in _TRIGGER_ACTION)
+    has_domain = any(t in text for t in _TRIGGER_DOMAIN)
+    # Doc: 触发词 + 教育/内容词 — require action; domain soft-boosts false-positive control
+    if has_action and has_domain:
+        return True
+    # Strong action alone (热点/写一篇/口播) still bypass — 误伤可接受
+    strong = ("热点", "写一篇", "口播", "生成稿", "生成口播")
+    return any(t in text for t in strong)
+
 
 def _env_bool(name: str, default: bool = True) -> bool:
     v = os.getenv(name)
@@ -70,6 +89,7 @@ async def preprocess(state: PipelineState) -> PipelineState:
     normalized = normalize_text(raw)
     query_hash = make_normalized_query_hash(raw)
     state["query_hash"] = query_hash
+    state["cache_bypass"] = should_cache_bypass(normalized)
 
     enabled = _env_bool("PIPELINE_PREPROCESS_ENABLED", True)
     if not enabled:

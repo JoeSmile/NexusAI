@@ -190,3 +190,48 @@ def test_hang_pending_wires_inbox(ensure_table, monkeypatch):
             PermissionRequest.run_id == run_id
         ).delete()
         session.commit()
+
+
+def test_notify_run_terminal_lifecycle(ensure_table):
+    """44.4: run_completed / run_failed carry conversation_id; 4A no raw errors."""
+    from backend.modules.notification.service import notify_run_terminal
+
+    tid = f"n44r-{uuid.uuid4().hex[:8]}"
+    uid = f"u_{uuid.uuid4().hex[:6]}"
+    rid = str(uuid.uuid4())
+    notify_run_terminal(
+        tenant_id=tid,
+        user_id=uid,
+        run_id=rid,
+        workflow_id="wf1",
+        status="succeeded",
+        conversation_id="feishu:oc_1",
+        platform="feishu",
+    )
+    rows = list_inbox(tenant_id=tid, user_id=uid)
+    assert any(r.type == "run_completed" for r in rows)
+    hit = next(r for r in rows if r.type == "run_completed")
+    assert hit.payload.get("conversation_id") == "feishu:oc_1"
+    assert hit.payload.get("run_id") == rid
+
+    notify_run_terminal(
+        tenant_id=tid,
+        user_id=uid,
+        run_id=rid,
+        workflow_id="wf1",
+        status="failed",
+        conversation_id="feishu:oc_1",
+        error_code="RUN_500",
+        summary="Traceback: secret path /tmp/x Exception boom",
+    )
+    rows2 = list_inbox(tenant_id=tid, user_id=uid)
+    fail = next(r for r in rows2 if r.type == "run_failed")
+    assert fail.payload.get("error_code") == "RUN_500"
+    assert fail.payload.get("summary") == "运行失败，可在工作台查看详情并重试"
+    assert "Traceback" not in (fail.payload.get("summary") or "")
+    assert "secret" not in (fail.payload.get("summary") or "")
+
+    sf = ensure_table
+    with sf.Session() as session:
+        session.query(Notification).filter(Notification.tenant_id == tid).delete()
+        session.commit()

@@ -253,6 +253,7 @@ class Workflow(Base):
     created_by = Column(String(64), nullable=False)
     # Wave E: {scope, default_ttl_days, auto_renew}
     request_policy = Column(JSON, nullable=True)
+    intent_tags = Column(JSON, nullable=True)  # Task 40.86 Chat bridge match
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -270,7 +271,10 @@ class WorkflowRun(Base):
     workflow_version = Column(Text, nullable=False, default="V1.0.0")
     workflow_revision = Column(Integer, nullable=False, default=0)
     context_ref = Column(JSON, nullable=True)
-    parent_run_id = Column(String(36), nullable=True)
+    parent_run_id = Column(String(36), nullable=True, index=True)
+    parent_node_id = Column(String(128), nullable=True)
+    composition_depth = Column(Integer, nullable=False, default=0)
+    run_inputs = Column(JSON, nullable=True)
     acting_user_id = Column(String(64), nullable=False)
     credential_kind = Column(String(32), nullable=True)
     error_code = Column(String(64), nullable=True)

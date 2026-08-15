@@ -243,6 +243,21 @@ async def invoke_agent(
             detail=f"{spec.id}:max={MAX_AGENT_DEPTH}",
         )
 
+    # Wave 8 拍板 8A: Hub agent stack counts toward composition budget
+    try:
+        from backend.core.workflow.composition import (
+            CompositionDepthExceeded,
+            check_composition_budget,
+        )
+
+        run_depth = int(payload.get("_composition_run_depth") or 0)
+        check_composition_budget(run_depth, agent_stack=_depth + 1)
+    except CompositionDepthExceeded as exc:
+        raise CapabilityUpstreamError(
+            message="DEPTH_EXCEEDED",
+            detail=str(exc),
+        ) from exc
+
     from backend.core.capability.invoke import _check_permission
 
     _check_permission(spec, tenant)

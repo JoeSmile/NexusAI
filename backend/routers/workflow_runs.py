@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from backend.core.auth.dual_auth import verify_human_or_legacy_key
@@ -27,7 +27,18 @@ def _scope(session: Session, tenant: TenantContext):
     )
 
 
-def _run_dict(run: WorkflowRun, *, workflow_name: str | None = None, workflow_status: str | None = None) -> dict[str, Any]:
+def _run_dict(
+    run: WorkflowRun,
+    *,
+    workflow_name: str | None = None,
+    workflow_status: str | None = None,
+    parent_status: str | None = None,
+) -> dict[str, Any]:
+    # 7A: parent failed/cancelled → child marked orphan (incl. after child finishes)
+    orphan = bool(
+        run.parent_run_id
+        and parent_status in ("failed", "cancelled")
+    )
     return {
         "id": run.id,
         "tenant_id": run.tenant_id,
@@ -40,6 +51,10 @@ def _run_dict(run: WorkflowRun, *, workflow_name: str | None = None, workflow_st
         "workflow_revision": run.workflow_revision,
         "acting_user_id": run.acting_user_id,
         "credential_kind": run.credential_kind,
+        "parent_run_id": run.parent_run_id,
+        "parent_node_id": getattr(run, "parent_node_id", None),
+        "composition_depth": getattr(run, "composition_depth", 0) or 0,
+        "orphan": orphan,
         "error_code": run.error_code,
         "error_message": run.error_message,
         "created_at": run.created_at.isoformat() if run.created_at else None,
@@ -48,11 +63,39 @@ def _run_dict(run: WorkflowRun, *, workflow_name: str | None = None, workflow_st
     }
 
 
+def _parent_statuses(session: Session, runs: list[WorkflowRun]) -> dict[str, str]:
+    pids = {r.parent_run_id for r in runs if r.parent_run_id}
+    if not pids:
+        return {}
+    rows = (
+        session.query(WorkflowRun.id, WorkflowRun.status)
+        .filter(WorkflowRun.id.in_(pids))
+        .all()
+    )
+    return {rid: st for rid, st in rows}
+
+
 @router.post("/workflows/{workflow_id}/runs")
 async def start_workflow_run(
     workflow_id: str,
+    body: dict[str, Any] | None = Body(default=None),
     tenant: TenantContext = Depends(verify_human_or_legacy_key),
 ) -> dict[str, Any]:
+    payload = body or {}
+    if payload.get("parent_run_id") is not None:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "PARENT_FORGED",
+                "message": "client_cannot_set_parent_run_id",
+            },
+        )
+    run_inputs = payload.get("input")
+    if run_inputs is not None and not isinstance(run_inputs, dict):
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "BAD_INPUT", "message": "input_must_be_object"},
+        )
     sf = get_pg_session()
     with sf.Session() as session:
         scope = _scope(session, tenant)
@@ -61,9 +104,84 @@ async def start_workflow_run(
             tenant=tenant,
             org_scope=scope,
             workflow_id=workflow_id,
+            run_inputs=run_inputs if isinstance(run_inputs, dict) else None,
         )
     run_svc.schedule_execute(started["id"])
     return started
+
+
+@router.post("/runs/{run_id}/execute")
+async def execute_run_endpoint(
+    run_id: str,
+    tenant: TenantContext = Depends(verify_human_or_legacy_key),
+) -> dict[str, Any]:
+    """Explicit re-entry; waiting_child → 409 (R-H)."""
+    sf = get_pg_session()
+    with sf.Session() as session:
+        scope = _scope(session, tenant)
+        run = (
+            session.query(WorkflowRun)
+            .filter(WorkflowRun.tenant_id == tenant.tenant_id, WorkflowRun.id == run_id)
+            .one_or_none()
+        )
+        if run is None:
+            raise HTTPException(
+                status_code=404,
+                detail={"code": ErrorCode.RUN_NOT_FOUND, "message": "run_not_found"},
+            )
+        assert_org_access(scope, run.org_unit_id, session=session)
+        waiting = (
+            session.query(WorkflowRunNode)
+            .filter(
+                WorkflowRunNode.run_id == run_id,
+                WorkflowRunNode.status == "waiting_child",
+            )
+            .first()
+        )
+        if waiting is not None:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "WAITING_CHILD",
+                    "message": "run_waiting_on_child",
+                    "node_id": waiting.node_id,
+                },
+            )
+    run_svc.schedule_execute(run_id)
+    return {"id": run_id, "scheduled": True}
+
+
+@router.get("/runs/{run_id}/children")
+async def list_run_children(
+    run_id: str,
+    tenant: TenantContext = Depends(verify_human_or_legacy_key),
+) -> dict[str, Any]:
+    sf = get_pg_session()
+    with sf.Session() as session:
+        scope = _scope(session, tenant)
+        parent = (
+            session.query(WorkflowRun)
+            .filter(WorkflowRun.tenant_id == tenant.tenant_id, WorkflowRun.id == run_id)
+            .one_or_none()
+        )
+        if parent is None:
+            raise HTTPException(
+                status_code=404,
+                detail={"code": ErrorCode.RUN_NOT_FOUND, "message": "run_not_found"},
+            )
+        assert_org_access(scope, parent.org_unit_id, session=session)
+        kids = (
+            session.query(WorkflowRun)
+            .filter(WorkflowRun.parent_run_id == run_id)
+            .order_by(WorkflowRun.created_at.asc())
+            .all()
+        )
+        return {
+            "run_id": run_id,
+            "items": [
+                _run_dict(k, parent_status=parent.status) for k in kids
+            ],
+        }
 
 
 @router.get("/runs")
@@ -91,8 +209,15 @@ async def list_runs(
             .limit(limit)
             .all()
         )
+        runs_only = [run for run, _wf in rows]
+        pstat = _parent_statuses(session, runs_only)
         items = [
-            _run_dict(run, workflow_name=wf.name if wf else None, workflow_status=wf.status if wf else None)
+            _run_dict(
+                run,
+                workflow_name=wf.name if wf else None,
+                workflow_status=wf.status if wf else None,
+                parent_status=pstat.get(run.parent_run_id or ""),
+            )
             for run, wf in rows
         ]
         return {"items": items, "limit": limit, "offset": offset}
@@ -122,10 +247,19 @@ async def get_run(
             .filter(Workflow.id == run.workflow_id)
             .one_or_none()
         )
+        parent_status = None
+        if run.parent_run_id:
+            prow = (
+                session.query(WorkflowRun.status)
+                .filter(WorkflowRun.id == run.parent_run_id)
+                .one_or_none()
+            )
+            parent_status = prow[0] if prow else None
         out = _run_dict(
             run,
             workflow_name=wf.name if wf else None,
             workflow_status=wf.status if wf else None,
+            parent_status=parent_status,
         )
         if run.status == "suspended":
             from backend.core.workflow.notify import hang_visibility

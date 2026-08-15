@@ -247,6 +247,7 @@ def publish_workflow(
     org_scope: OrgScope,
     workflow_id: str,
     base_revision: int | None = None,
+    intent_tags: list[str] | None = None,
 ) -> dict[str, Any]:
     row = _get_row(session, tenant_id=tenant.tenant_id, workflow_id=workflow_id)
     assert_org_access(org_scope, row.org_unit_id, session=session)
@@ -272,6 +273,9 @@ def publish_workflow(
 
     row.status = "published"
     row.revision = int(row.revision) + 1
+    if intent_tags:
+        # 评审 08-14 I-1:发布时写入 intent_tags,40.86 Chat 桥靠它匹配(桥只读,发布不写则桥不可触发)
+        row.intent_tags = [t.strip() for t in intent_tags if t and t.strip()]
     row.updated_at = datetime.utcnow()
 
     if row.forked_from_id:

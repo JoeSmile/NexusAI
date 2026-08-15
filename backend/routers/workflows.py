@@ -19,6 +19,7 @@ router = APIRouter(prefix="/workflows", tags=["workflows"])
 
 class PublishBody(BaseModel):
     base_revision: int | None = Field(None, ge=0)
+    intent_tags: list[str] | None = None
 
 
 def _scope(session, tenant: TenantContext):
@@ -115,12 +116,14 @@ async def publish_workflow(
     with sf.Session() as session:
         scope = _scope(session, tenant)
         br = body.base_revision if body else None
+        tags = body.intent_tags if body else None
         return wf_svc.publish_workflow(
             session,
             tenant=tenant,
             org_scope=scope,
             workflow_id=workflow_id,
             base_revision=br,
+            intent_tags=tags,
         )
 
 

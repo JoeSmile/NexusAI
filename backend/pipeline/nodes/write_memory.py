@@ -95,7 +95,7 @@ async def write_memory(state: PipelineState) -> PipelineState:
     session_factory = get_pg_session()
     with session_factory.Session() as session:
         mock = os.getenv("LLM_MOCK", "true").lower() == "true"
-        if mock and response:
+        if mock and response and not state.get("cache_bypass"):
             query_hash = state.get("query_hash") or ""
             if not query_hash:
                 logger.warning(
@@ -135,6 +135,10 @@ async def write_memory(state: PipelineState) -> PipelineState:
                         expires_at=datetime.utcnow() + timedelta(seconds=3600),
                     )
                 )
+        elif mock and response and state.get("cache_bypass"):
+            logger.info(
+                "write_memory: cache_bypass; skip exact/template cache write"
+            )
 
         session.execute(
             text("""

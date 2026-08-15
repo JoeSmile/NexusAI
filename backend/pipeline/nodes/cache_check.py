@@ -37,6 +37,16 @@ async def cache_check(state: PipelineState) -> PipelineState:
     user_id = state["user_id"]
     message = state["message"]
 
+    if state.get("cache_bypass"):
+        logger.info(
+            "cache_check: cache_bypass (tenant=%s); skip read",
+            tenant_id,
+        )
+        from backend.core.metrics import cache_misses
+
+        cache_misses.labels(tenant=tenant_id, cache_type="bypass").inc()
+        return state
+
     query_hash = state.get("query_hash") or ""
     if not query_hash:
         logger.warning(

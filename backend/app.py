@@ -48,13 +48,19 @@ async def lifespan(app: FastAPI):
         logger.warning("数据库初始化失败: %s", e)
 
     try:
-        from backend.core.workflow.runner import mark_zombie_runs_failed
+        from backend.core.workflow.runner import (
+            mark_zombie_runs_failed,
+            recover_waiting_child_parents,
+        )
 
         n = mark_zombie_runs_failed()
         if n:
             logger.warning("✓ 标记僵尸 running runs → failed: %s", n)
+        r = recover_waiting_child_parents()
+        if r:
+            logger.info("✓ recovered waiting_child parents: %s", r)
     except Exception as e:
-        logger.debug("zombie run sweep skipped: %s", e)
+        logger.debug("zombie/waiting_child sweep skipped: %s", e)
 
     try:
         from backend.core.workflow.notify import start_hang_scanner
@@ -254,6 +260,13 @@ def create_app() -> FastAPI:
         prefix="/api",
         required=True,
         label="Notifications",
+    )
+    _lazy_include(
+        app,
+        "backend.routers.channel_webhooks",
+        "router",
+        required=True,
+        label="Channel webhooks",
     )
 
     # 可选路由

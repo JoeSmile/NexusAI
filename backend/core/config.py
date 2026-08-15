@@ -113,6 +113,8 @@ class SecurityConfig:
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     cors_origins: list = field(default_factory=lambda: ["*"])
+    # 评审 08-14 Minor6:内容审开关(教育版小微可开 true=自动发布;content_review 流后置)
+    auto_publish_content: bool = False
     rate_limit_enabled: bool = True
     max_requests_per_minute: int = 60
     # Wave A — human JWT (separate from secret_key)
@@ -189,6 +191,9 @@ class Config:
         
         # 安全配置
         self.security.secret_key = os.getenv("SECRET_KEY", self.security.secret_key)
+        self.security.auto_publish_content = (
+            os.getenv("AUTO_PUBLISH_CONTENT", str(self.security.auto_publish_content)).lower() == "true"
+        )
         self.security.jwt_secret = os.getenv("JWT_SECRET", self.security.jwt_secret)
         self.security.jwt_ttl_seconds = int(
             os.getenv("JWT_TTL_SECONDS", self.security.jwt_ttl_seconds)

@@ -19,12 +19,23 @@ def test_ir_empty_nodes_ok() -> None:
     assert ir.edges == []
 
 
-def test_ir_rejects_nonempty_edges() -> None:
-    with pytest.raises(ValidationError):
-        WorkflowIR(
-            nodes=[WorkflowNode(node_id="n1", capability_id="rag-ask")],
-            edges=[{"source": "n1", "target": "n2"}],
-        )
+def test_ir_accepts_nonempty_edges() -> None:
+    ir = WorkflowIR(
+        nodes=[
+            WorkflowNode(node_id="n1", capability_id="rag-ask"),
+            WorkflowNode(node_id="n2", capability_id="rag-ask"),
+        ],
+        edges=[
+            {
+                "from_node_id": "n1",
+                "from_field": "result",
+                "to_node_id": "n2",
+                "to_param": "query",
+            }
+        ],
+    )
+    assert len(ir.edges) == 1
+    assert ir.edges[0].from_node_id == "n1"
 
 
 def test_ir_rejects_duplicate_node_id() -> None:

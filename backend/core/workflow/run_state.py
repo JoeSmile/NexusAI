@@ -7,7 +7,15 @@ from typing import Literal
 RunStatus = Literal[
     "pending", "running", "succeeded", "failed", "suspended", "cancelled"
 ]
-NodeStatus = Literal["pending", "running", "succeeded", "failed", "waiting"]
+NodeStatus = Literal[
+    "pending",
+    "running",
+    "succeeded",
+    "failed",
+    "waiting",
+    "waiting_child",
+    "skipped",
+]
 
 _ALLOWED: dict[str, frozenset[str]] = {
     # failed: 并发超限/预检失败直接终态(execute_run 429 路径)
@@ -20,9 +28,11 @@ _ALLOWED: dict[str, frozenset[str]] = {
 }
 
 _NODE_ALLOWED: dict[str, frozenset[str]] = {
-    "pending": frozenset({"running", "failed", "waiting"}),
-    "running": frozenset({"succeeded", "failed", "waiting"}),
-    "waiting": frozenset({"running", "failed"}),
+    "pending": frozenset({"running", "failed", "waiting", "waiting_child", "skipped", "succeeded"}),
+    "running": frozenset({"succeeded", "failed", "waiting", "waiting_child", "skipped"}),
+    "waiting": frozenset({"running", "failed", "pending"}),
+    "waiting_child": frozenset({"running", "succeeded", "failed"}),
+    "skipped": frozenset(),
     "succeeded": frozenset(),
     "failed": frozenset(),
 }
