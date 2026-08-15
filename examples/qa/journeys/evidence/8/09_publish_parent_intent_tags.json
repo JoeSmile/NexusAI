@@ -1,0 +1,37 @@
+{
+  "id": "c4c0d383-2a28-423b-8ba9-bd1a89c1523c",
+  "tenant_id": "acme",
+  "org_unit_id": "c5fe6ff9-5819-4b33-88ac-0301dec73b26",
+  "name": "g8-parent-d5631128",
+  "status": "published",
+  "ir": {
+    "edges": [],
+    "nodes": [
+      {
+        "kind": "workflow",
+        "params": {},
+        "run_if": null,
+        "node_id": "sub",
+        "agent_id": null,
+        "requestable": "true",
+        "workflow_id": "4c75bae1-7ee9-4456-9419-b7b5e2315407",
+        "approval_note": null,
+        "capability_id": null
+      }
+    ],
+    "inputs": {},
+    "ir_schema": "1",
+    "output_node_id": null
+  },
+  "version": "V1.0.0",
+  "revision": 1,
+  "forked_from_id": null,
+  "created_by": "g8_admin_d5631128",
+  "request_policy": {
+    "scope": "recurring",
+    "default_ttl_days": 90,
+    "auto_renew": false
+  },
+  "created_at": "2026-08-15T06:40:48.775541",
+  "updated_at": "2026-08-15T06:40:48.790138"
+}

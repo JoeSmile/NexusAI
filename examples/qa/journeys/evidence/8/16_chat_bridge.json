@@ -1,0 +1,11 @@
+{
+  "trigger_message": "提醒我明天下午三点开会,帮我记一下 d5631128",
+  "response": "正在生成（run_id=afe4713f-5935-4239-a01c-259187af19cc，workflow=g8-parent-d5631128）。完成后会通知你。",
+  "trace_id": "tr_64a05711c656",
+  "finish_reason": "workflow_triggered",
+  "total_tokens": 0,
+  "total_cost": 0.0,
+  "pipeline_latency_ms": 2168.112277984619,
+  "approval_request_id": null,
+  "error_code": null
+}

@@ -1,0 +1,81 @@
+{
+  "run_id": "71f7c565-a382-4e73-8240-fd987b641486",
+  "child_run_id": "7f29c834-143b-4c4a-b76f-f8d072bb30fb",
+  "steps": {
+    "01_jwt_admin": {
+      "ok": true,
+      "detail": ""
+    },
+    "02_jwt_member": {
+      "ok": true,
+      "detail": ""
+    },
+    "02c_reload_registry": {
+      "ok": true,
+      "detail": "{\"ok\":true,\"total\":26}"
+    },
+    "03_org_unit": {
+      "ok": true,
+      "detail": "{\"id\":\"c5fe6ff9-5819-4b33-88ac-0301dec73b26\",\"tenant_id\":\"acme\",\"parent_id\":null,\"name\":\"g8-d5631128\",\"path\":\"/c5fe6ff9-5819-4b33-88ac-0301dec73b26/\",\"deleted_at\":null,\"created_at\":\"2026-08-15T06:40:4"
+    },
+    "04_bind_admin_dept_manager": {
+      "ok": true,
+      "detail": "{\"id\":\"56e18635-67d4-45f0-8c52-8d8b883eb3fb\",\"tenant_id\":\"acme\",\"user_id\":\"g8_admin_d5631128\",\"org_unit_id\":\"c5fe6ff9-5819-4b33-88ac-0301dec73b26\",\"is_primary\":true,\"business_roles\":[\"dept_manager\"],\""
+    },
+    "05_bind_member": {
+      "ok": true,
+      "detail": "{\"id\":\"e010f6cb-bf86-467a-b684-30cc95f2f2a3\",\"tenant_id\":\"acme\",\"user_id\":\"g8_member_d5631128\",\"org_unit_id\":\"c5fe6ff9-5819-4b33-88ac-0301dec73b26\",\"is_primary\":true,\"business_roles\":[\"member\"],\"creat"
+    },
+    "05b_intent_probe": {
+      "ok": true,
+      "detail": "intent=conversation conf=0.6"
+    },
+    "06_create_child_workflow": {
+      "ok": true,
+      "detail": "{\"id\":\"4c75bae1-7ee9-4456-9419-b7b5e2315407\",\"tenant_id\":\"acme\",\"org_unit_id\":\"c5fe6ff9-5819-4b33-88ac-0301dec73b26\",\"name\":\"g8-child-d5631128\",\"status\":\"draft\",\"ir\":{\"edges\":[],\"nodes\":[{\"kind\":\"capability\",\"params\":{\"query\":\"gold8\"},\"run_if\":null,\"node_id\":\"gen\",\"agent_id\":null,\"requestable\":\"true"
+    },
+    "07_publish_child": {
+      "ok": true,
+      "detail": "{\"id\":\"4c75bae1-7ee9-4456-9419-b7b5e2315407\",\"tenant_id\":\"acme\",\"org_unit_id\":\"c5fe6ff9-5819-4b33-88ac-0301dec73b26\",\"name\":\"g8-child-d5631128\",\"status\":\"published\",\"ir\":{\"edges\":[],\"nodes\":[{\"kind\":\""
+    },
+    "08_create_parent_workflow": {
+      "ok": true,
+      "detail": "{\"id\":\"c4c0d383-2a28-423b-8ba9-bd1a89c1523c\",\"tenant_id\":\"acme\",\"org_unit_id\":\"c5fe6ff9-5819-4b33-88ac-0301dec73b26\",\"name\":\"g8-parent-d5631128\",\"status\":\"draft\",\"ir\":{\"edges\":[],\"nodes\":[{\"kind\":\"workflow\",\"params\":{},\"run_if\":null,\"node_id\":\"sub\",\"agent_id\":null,\"requestable\":\"true\",\"workflow_id\":"
+    },
+    "09_publish_parent_intent_tags": {
+      "ok": true,
+      "detail": "{\"id\":\"c4c0d383-2a28-423b-8ba9-bd1a89c1523c\",\"tenant_id\":\"acme\",\"org_unit_id\":\"c5fe6ff9-5819-4b33-88ac-0301dec73b26\",\"name\":\"g8-parent-d5631128\",\"status\":\"published\",\"ir\":{\"edges\":[],\"nodes\":[{\"kind\":"
+    },
+    "10_start_root_run": {
+      "ok": true,
+      "detail": "{\"id\":\"71f7c565-a382-4e73-8240-fd987b641486\",\"status\":\"pending\",\"workflow_id\":\"c4c0d383-2a28-423b-8ba9-bd1a89c1523c\",\"org_unit_id\":\"c5fe6ff9-5819-4b33-88ac-0301dec73b26\",\"parent_run_id\":null,\"composition_depth\":0}"
+    },
+    "11_children_nonempty": {
+      "ok": true,
+      "detail": "[{\"id\": \"7f29c834-143b-4c4a-b76f-f8d072bb30fb\", \"tenant_id\": \"acme\", \"workflow_id\": \"4c75bae1-7ee9-4456-9419-b7b5e2315407\", \"workflow_name\": null, \"workflow_status\": null, \"org_unit_id\": \"c5fe6ff9-5819-4b33-88ac-0301dec73b26\", \"status\": \"suspended\", \"workflow_version\": \"V1.0.0\", \"workflow_revision\":"
+    },
+    "12_waiting_child": {
+      "ok": true,
+      "detail": "parent=running node=waiting_child child=suspended"
+    },
+    "13_find_child_request": {
+      "ok": true,
+      "detail": "[{\"id\": \"9cc1821b-3b21-4e65-8360-e600c4b7dabc\", \"tenant_id\": \"acme\", \"run_id\": \"48ede7b9-9ed1-455b-8c09-2c5826584075\", \"node_id\": \"gen\", \"applicant_user_id\": \"g8_member_0b196b97\", \"needed_perm\": \"kb:read\", \"org_unit_id\": \"4119fa50-2f13-4e1d-8110-01f1eee82fb6\", \"capability_id\": \"g8-hang-0b196b97\", \"status\": \"pending\", \"requestable_mode\": \"true\", \"approval_note\": null, \"escalated_at\": null, \"reviewe"
+    },
+    "14_approve_child_request": {
+      "ok": true,
+      "detail": "{\"ok\":true,\"request_id\":\"ebafd6f7-405a-40b3-b919-8e22b89c4471\",\"grant_id\":\"4244855c-b9ac-4ccb-9f99-484f3e2872dd\",\"run_id\":\"7f29c834-143b-4c4a-b76f-f8d072bb30fb\",\"status\":\"approved\"}"
+    },
+    "15_parent_completes_after_child": {
+      "ok": true,
+      "detail": "parent=succeeded child=succeeded"
+    },
+    "16_chat_bridge": {
+      "ok": true,
+      "detail": "finish_reason=workflow_triggered response=正在生成（run_id=afe4713f-5935-4239-a01c-259187af19cc，workflow=g8-parent-d5631128）。完成后会通知你。"
+    }
+  },
+  "started_at": "2026-08-15T06:40:47.792541+00:00",
+  "finished_at": "2026-08-15T06:40:52.718745+00:00",
+  "passed": true
+}
