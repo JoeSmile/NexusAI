@@ -346,7 +346,7 @@ class WorkflowGrant(Base):
     issued_at = Column(DateTime, default=datetime.utcnow)
     expires_at = Column(DateTime, nullable=False)
     revoked_at = Column(DateTime, nullable=True)
-    origin = Column(String(32), nullable=False, default="approval")
+    origin = Column(String(80), nullable=False, default="approval")
     __table_args__ = (
         Index(
             "ix_workflow_grants_tenant_wf",
@@ -358,6 +358,30 @@ class WorkflowGrant(Base):
             "tenant_id",
             "applicant_user_id",
             "workflow_id",
+        ),
+    )
+
+
+class ScheduledRun(Base):
+    """定时执行计划（E3.4 / alembic 017）。"""
+
+    __tablename__ = "scheduled_runs"
+    id = Column(String(36), primary_key=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    workflow_id = Column(String(36), nullable=False, index=True)
+    cron = Column(String(64), nullable=False)
+    next_run_at = Column(DateTime, nullable=False, index=True)
+    enabled = Column(Boolean, nullable=False, default=True)
+    run_inputs = Column(JSON, nullable=True)
+    org_unit_id = Column(String(64), nullable=False)  # F2(评审 08-15):创建时快照 workflow org
+    created_by = Column(String(64), nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    __table_args__ = (
+        Index(
+            "ix_scheduled_runs_due",
+            "enabled",
+            "next_run_at",
         ),
     )
 
