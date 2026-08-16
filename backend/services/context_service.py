@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""上下文服务层 — 不再依赖旧 ContextAssembler（pipeline/build_context 为主路径）"""
+"""上下文服务层 — 遗留 API 兼容；记忆检索经 UnifiedMemoryService。"""
 
 from __future__ import annotations
 
 from typing import Any
 
-from backend.services.memory_service import MemoryService
+from backend.core.memory_service import get_unified_memory_service
 
 
 class UserProfile(dict):
@@ -24,11 +24,13 @@ class ContextService:
 
     def __init__(
         self,
-        memory_service: MemoryService | None = None,
+        tenant_id: str = "default",
         enable_rot_solver: bool = True,
         rot_threshold: int = 128000,
+        **_kwargs: Any,
     ):
-        self.memory_service = memory_service or MemoryService()
+        # memory_service= 历史 kwargs 忽略，统一走 Unified
+        self.tenant_id = tenant_id
         self.enable_rot_solver = enable_rot_solver
         self.rot_threshold = rot_threshold
         self._profiles: dict[str, UserProfile] = {}
@@ -40,8 +42,10 @@ class ContextService:
         current_message: str,
         auto_reduce: bool = True,
     ) -> dict[str, Any]:
-        memories = await self.memory_service.retrieve_memories(
-            user_id=user_id, query=current_message, limit=5
+        _ = auto_reduce
+        mem = get_unified_memory_service(self.tenant_id)
+        memories = await mem.search_warm(
+            user_id, current_message, limit=5
         )
         return {
             "user_id": user_id,
@@ -77,11 +81,3 @@ class ContextService:
 
     async def offload_context(self, context: dict[str, Any], path: str) -> str:
         return path
-
-    async def load_offloaded_context(self, file_path: str) -> dict[str, Any]:
-        return {}
-
-    async def retrieve_relevant_context(
-        self, user_id: str, query: str, limit: int = 5
-    ) -> list[dict[str, Any]]:
-        return await self.memory_service.retrieve_memories(user_id, query, limit=limit)

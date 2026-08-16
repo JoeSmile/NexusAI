@@ -60,7 +60,7 @@ async def test_resume_after_grant(monkeypatch):
         )
     )
     monkeypatch.setattr(
-        "backend.core.workflow.runner.get_capability_registry", lambda: reg
+        "backend.core.workflow.node_exec.get_capability_registry", lambda: reg
     )
     tenant = TenantContext(tid, uid, "user", [], False)
     scope = OrgScope(
@@ -104,7 +104,7 @@ async def test_resume_after_grant(monkeypatch):
         wf_id = wf.id
 
     with patch(
-        "backend.core.workflow.runner.rebuild_tenant_context",
+        "backend.core.workflow.run_lifecycle.rebuild_tenant_context",
         return_value=(tenant, scope),
     ):
         await execute_run(run_id)
@@ -129,10 +129,10 @@ async def test_resume_after_grant(monkeypatch):
 
     with (
         patch(
-            "backend.core.workflow.runner.rebuild_tenant_context",
+            "backend.core.workflow.run_lifecycle.rebuild_tenant_context",
             return_value=(tenant, scope),
         ),
-        patch("backend.core.workflow.runner.invoke", _fake_invoke),
+        patch("backend.core.workflow.node_exec.invoke", _fake_invoke),
     ):
         await resume_run(run_id)
 
@@ -167,7 +167,7 @@ async def test_grant_does_not_unlock_other_capability(monkeypatch):
             )
         )
     monkeypatch.setattr(
-        "backend.core.workflow.runner.get_capability_registry", lambda: reg
+        "backend.core.workflow.node_exec.get_capability_registry", lambda: reg
     )
     tenant = TenantContext(tid, uid, "user", [], False)
     scope = OrgScope(
@@ -217,7 +217,7 @@ async def test_grant_does_not_unlock_other_capability(monkeypatch):
         wf_id = wf.id
 
     with patch(
-        "backend.core.workflow.runner.rebuild_tenant_context",
+        "backend.core.workflow.run_lifecycle.rebuild_tenant_context",
         return_value=(tenant, scope),
     ):
         await execute_run(run_id)
@@ -240,10 +240,10 @@ async def test_grant_does_not_unlock_other_capability(monkeypatch):
 
     with (
         patch(
-            "backend.core.workflow.runner.rebuild_tenant_context",
+            "backend.core.workflow.run_lifecycle.rebuild_tenant_context",
             return_value=(tenant, scope),
         ),
-        patch("backend.core.workflow.runner.invoke", _fake_invoke),
+        patch("backend.core.workflow.node_exec.invoke", _fake_invoke),
     ):
         await resume_run(run_id)
 

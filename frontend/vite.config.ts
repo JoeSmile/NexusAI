@@ -22,8 +22,6 @@ export default defineConfig({
       // admin/ab/audit/feedback/eval/personalization/rag/capabilities
       '/api': backend,
       '/chat': backend,
-      '/streaming': backend,
-      '/enhanced-chat': backend,
       '/agent': backend,
       '/memory': backend,
       '/performance': backend,

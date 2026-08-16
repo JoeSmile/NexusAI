@@ -13,6 +13,7 @@ services:
       - DB_TYPE=postgresql
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-nexusai_redis}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - LLM_API_KEY=${LLM_API_KEY:-${OPENAI_API_KEY}}
     volumes:
@@ -49,17 +50,51 @@ services:
     networks:
       - nexusai_network
 
-  # Redis缓存
+  # Redis 业务缓存/队列（G5：认证 + maxmemory + AOF；禁与 langfuse 共用）
   redis:
     image: redis:7-alpine
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-nexusai_redis}
+      --maxmemory 256mb
+      --maxmemory-policy noeviction
+      --appendonly yes
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-nexusai_redis}", "ping"]
       timeout: 3s
       retries: 5
+    restart: unless-stopped
+    networks:
+      - nexusai_network
+
+  # G2：记忆 Streams worker
+  memory-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "-m", "backend.workers.memory_worker"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import backend.workers.memory_worker"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql://nexusai:nexusai_password@postgres:5432/nexusai
+      - DB_TYPE=postgresql
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-nexusai_redis}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - nexusai_network

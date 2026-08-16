@@ -18,7 +18,6 @@ from .interfaces import (
     IContextService,
     IDatabaseService,
     ILogger,
-    IMemoryService,
     IRAGService,
     IValidationService,
 )
@@ -53,32 +52,19 @@ class ChatEngineFactory(ServiceFactory):
         return IChatEngine
 
 
-class MemoryServiceFactory(ServiceFactory):
-    """记忆服务工厂"""
-    
-    def create_service(self, *args, **kwargs) -> IMemoryService:
-        """创建记忆服务实例"""
-        try:
-            from ..services.memory_service import MemoryService
-            return MemoryService(*args, **kwargs)
-        except ImportError as e:
-            raise ConfigurationError(f"无法导入记忆服务: {e}")
-    
-    def get_service_type(self) -> type[IMemoryService]:
-        return IMemoryService
-
-
 class ContextServiceFactory(ServiceFactory):
     """上下文服务工厂"""
-    
-    def create_service(self, memory_service: IMemoryService | None = None, *args, **kwargs) -> IContextService:
-        """创建上下文服务实例"""
+
+    def create_service(self, memory_service: Any | None = None, *args, **kwargs) -> IContextService:
+        """创建上下文服务实例（memory_service 参数已废弃，忽略）。"""
         try:
             from ..services.context_service import ContextService
-            return ContextService(*args, memory_service=memory_service, **kwargs)
+
+            _ = memory_service
+            return ContextService(*args, **kwargs)
         except ImportError as e:
-            raise ConfigurationError(f"无法导入上下文服务: {e}")
-    
+            raise ConfigurationError(f"无法导入上下文服务: {e}") from e
+
     def get_service_type(self) -> type[IContextService]:
         return IContextService
 
@@ -238,8 +224,8 @@ class ApplicationContext:
         self._registry.register_factory(ILogger, LoggerFactory(), singleton=True)
         self._registry.register_factory(IDatabaseService, DatabaseServiceFactory(), singleton=True)
         self._registry.register_factory(IValidationService, ValidationServiceFactory(), singleton=True)
-        
-        self._registry.register_factory(IMemoryService, MemoryServiceFactory())
+
+        # 记忆：勿再登记 IMemoryService — 用 get_unified_memory_service()
         self._registry.register_factory(IContextService, ContextServiceFactory())
         self._registry.register_factory(IChatEngine, ChatEngineFactory())
         self._registry.register_factory(IRAGService, RAGServiceFactory())
@@ -311,11 +297,6 @@ def shutdown_app_context():
 def get_chat_engine() -> IChatEngine:
     """获取聊天引擎"""
     return get_service(IChatEngine)
-
-
-def get_memory_service() -> IMemoryService:
-    """获取记忆服务"""
-    return get_service(IMemoryService)
 
 
 def get_context_service() -> IContextService:

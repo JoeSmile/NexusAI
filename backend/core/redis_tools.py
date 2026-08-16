@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 
 RETRY_AFTER_SEC = 30.0
 
-_sync_clients: dict[bool, Any] = {}
-_sync_failed: dict[bool, float] = {}  # slot -> monotonic 失败时间戳
+_sync_clients: dict[tuple[bool, str | int | None], Any] = {}
+_sync_failed: dict[tuple[bool, str | int | None], float] = {}  # slot -> monotonic 失败时间戳
 _async_clients: dict[bool, Any] = {}
 _async_failed: dict[bool, float] = {}
 _async_lock: asyncio.Lock | None = None
@@ -76,32 +76,42 @@ def resolve_redis_url(default: str = "redis://localhost:6379") -> str:
     return default
 
 
-def _should_retry(failed: dict[bool, float], slot: bool) -> bool:
+SyncSlot = tuple[bool, str | int | None]
+
+
+def _should_retry(failed: dict[Any, float], slot: Any) -> bool:
     ts = failed.get(slot)
     return ts is None or (time.monotonic() - ts) > RETRY_AFTER_SEC
 
 
-def get_sync_redis(*, decode_responses: bool = False) -> Any | None:
-    """惰性同步客户端；按 decode_responses 分槽；失败后 TTL 内不再重试。"""
-    if not _should_retry(_sync_failed, decode_responses):
+def get_sync_redis(*, decode_responses: bool = False, db: str | int | None = None) -> Any | None:
+    """惰性同步客户端；按 (decode_responses, db) 分槽；失败后 TTL 内不再重试。
+
+    I-5(评审 08-15)：``db`` 显式指定时覆盖 REDIS_DB（队列用独立 db，与缓存/限流隔离）。
+    """
+    slot = (decode_responses, db)
+    if not _should_retry(_sync_failed, slot):
         return None
-    if decode_responses in _sync_clients:
-        return _sync_clients[decode_responses]
+    if slot in _sync_clients:
+        return _sync_clients[slot]
     try:
         import redis
 
+        url = resolve_redis_url()
+        if db is not None:
+            url = url.rsplit("/", 1)[0] + f"/{db}"
         client = redis.Redis.from_url(
-            resolve_redis_url(),
+            url,
             decode_responses=decode_responses,
             socket_connect_timeout=0.5,
         )
         client.ping()
-        _sync_clients[decode_responses] = client
-        _sync_failed.pop(decode_responses, None)
+        _sync_clients[slot] = client
+        _sync_failed.pop(slot, None)
         return client
     except Exception as e:
         logger.warning("Redis sync 不可用(降级): %s", e)
-        _sync_failed[decode_responses] = time.monotonic()
+        _sync_failed[slot] = time.monotonic()
         return None
 
 

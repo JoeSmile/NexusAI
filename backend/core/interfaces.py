@@ -57,16 +57,20 @@ class IChatEngine(ABC):
 
 
 class IMemoryService(ABC):
-    """记忆服务接口"""
-    
+    """已废弃：勿实现 / 勿工厂注入。
+
+    记忆真源：``backend.core.memory_service.UnifiedMemoryService`` /
+    ``get_unified_memory_service()``。本 ABC 仅保留以免旧 import 立刻炸。
+    """
+
     @abstractmethod
     async def extract_memories(self, text: str) -> list[dict[str, Any]]:
         """从文本中提取记忆"""
-    
+
     @abstractmethod
     async def store_memory(self, memory: dict[str, Any]) -> str:
         """存储记忆"""
-    
+
     @abstractmethod
     async def retrieve_memories(
         self,
@@ -75,15 +79,15 @@ class IMemoryService(ABC):
         limit: int = 10
     ) -> list[MemoryInfo]:
         """检索记忆"""
-    
+
     @abstractmethod
     async def update_memory(self, memory_id: str, updates: dict[str, Any]) -> bool:
         """更新记忆"""
-    
+
     @abstractmethod
     async def delete_memory(self, memory_id: str) -> bool:
         """删除记忆"""
-    
+
     @abstractmethod
     async def get_memory_stats(self, user_id: str) -> dict[str, Any]:
         """获取记忆统计信息"""

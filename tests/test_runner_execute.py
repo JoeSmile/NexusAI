@@ -51,7 +51,7 @@ async def test_execute_run_succeeds_with_evidence(monkeypatch):
         )
     )
     monkeypatch.setattr(
-        "backend.core.workflow.runner.get_capability_registry", lambda: reg
+        "backend.core.workflow.node_exec.get_capability_registry", lambda: reg
     )
 
     tenant = TenantContext(tid, uid, "tenant_admin", ["chat:write"], False)
@@ -96,9 +96,9 @@ async def test_execute_run_succeeds_with_evidence(monkeypatch):
         )
         run_id = started["id"]
 
-    with patch("backend.core.workflow.runner.invoke", _fake_invoke):
+    with patch("backend.core.workflow.node_exec.invoke", _fake_invoke):
         with patch(
-            "backend.core.workflow.runner.rebuild_tenant_context",
+            "backend.core.workflow.run_lifecycle.rebuild_tenant_context",
             return_value=(tenant, scope),
         ):
             await execute_run(run_id)

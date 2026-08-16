@@ -24,6 +24,9 @@ class ErrorCode(StrEnum):
     # ── 速率限制 (RATE_0xx) ──
     RATE_LIMITED = "RATE_001"
 
+    # ── 席位/订阅 (SEAT_0xx) ──
+    SEAT_LIMIT = "SEAT_001"
+
     # ── 安全护栏 (GUARD_0xx) ──
     PROMPT_INJECTION = "GUARD_001"
     PII_DETECTED = "GUARD_002"

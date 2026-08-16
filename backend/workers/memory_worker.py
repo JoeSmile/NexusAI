@@ -14,6 +14,8 @@ logger = logging.getLogger("memory_worker")
 @observe(name="memory.consolidation")
 def process_one(xid: str, data: dict, *, deliveries: int = 1) -> float:
     """处理单条；返回 score（1.0 成功落库 / 0.0 跳过或失败门控）。"""
+    import hashlib
+
     from backend.core.memory.memory_queue import (
         MAX_DELIVERIES,
         ack,
@@ -31,12 +33,13 @@ def process_one(xid: str, data: dict, *, deliveries: int = 1) -> float:
     score = 0.0
 
     try:
+        key_fp = hashlib.sha256(key.encode("utf-8")).hexdigest()[:16] if key else ""
         langfuse_context.update_current_observation(
             metadata={
                 "tenant_id": tenant_id,
                 "user_id": user_id,
                 "request_trace_id": trace_id,
-                "key": key[:120],
+                "key_fp": key_fp,
                 "deliveries": deliveries,
                 "score": score,
             }
@@ -74,8 +77,11 @@ def process_one(xid: str, data: dict, *, deliveries: int = 1) -> float:
 
     mem = get_unified_memory_service(tenant_id=tenant_id)
     import asyncio
+    from datetime import datetime
 
-    asyncio.run(
+    from backend.core.audit import write_audit_sync
+
+    write_result = asyncio.run(
         mem.write(
             "warm",
             user_id=user_id,
@@ -84,8 +90,36 @@ def process_one(xid: str, data: dict, *, deliveries: int = 1) -> float:
             confidence=float(data.get("confidence") or 0.5),
             source=str(data.get("source") or "async"),
             embed=bool(data.get("embed", True)),
+            enqueued_at=data.get("enqueued_at"),
         )
     )
+    # G4 3A：accepted 先审计再 ack；审计失败不 ack（可重放；dedupe_key 幂等）
+    if not (isinstance(write_result, dict) and write_result.get("skipped")):
+        msg_id = str(data.get("msg_id") or xid)
+        key_fp = hashlib.sha256(key.encode("utf-8")).hexdigest()[:32]
+        ok = write_audit_sync(
+            {
+                "tenant_id": tenant_id,
+                "user_id": user_id,
+                "action": "memory.write_async",
+                "trace_id": trace_id,
+                "input_text": f"key_sha256={key_fp}",
+                "output_text": msg_id[:64],
+                "model": "",
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cost": 0.0,
+                "latency_ms": 0.0,
+                "error_code": None,
+                "ip_address": "",
+                "user_agent": "",
+                "dedupe_key": msg_id[:64],
+                "created_at": datetime.utcnow(),
+            }
+        )
+        if not ok:
+            logger.error("memory.write_async audit failed; refuse ack xid=%s", xid)
+            return 0.0
     ack(xid)
     score = 1.0
     try:

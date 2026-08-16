@@ -49,6 +49,20 @@ async def model_router(state: PipelineState) -> PipelineState:
                 state["approval_request_id"] = result.approval_request_id
             if result.error:
                 state["error_code"] = result.error
+            # G7：短路径跳过 guardrails_output → 此处强制脱敏
+            try:
+                from backend.pipeline.nodes.guardrails_output import (
+                    apply_student_output_redaction,
+                )
+
+                apply_student_output_redaction(state)
+            except Exception:
+                # I-7(评审 08-15)：禁静默 pass——脱敏失败可观测
+                import logging
+
+                logging.getLogger(__name__).exception(
+                    "short-path student redaction failed"
+                )
             enrich_span(
                 metadata={
                     "path": "short",

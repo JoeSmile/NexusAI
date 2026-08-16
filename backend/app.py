@@ -314,12 +314,6 @@ def create_app() -> FastAPI:
     # 可选路由
     features = {
         "rag": _lazy_include(app, "backend.routers", "rag_router", label="RAG"),
-        "enhanced_chat": _lazy_include(
-            app,
-            "backend.routers.enhanced_chat",
-            "router",
-            label="增强版多轮对话",
-        ),
         "agent": _lazy_include(
             app, "backend.routers.agent", "router", label="Agent 模块"
         ),
@@ -331,12 +325,6 @@ def create_app() -> FastAPI:
             "backend.routers.performance",
             "router",
             label="性能优化",
-        ),
-        "streaming": _lazy_include(
-            app,
-            "backend.routers.streaming_chat",
-            "router",
-            label="流式聊天",
         ),
         "capabilities": _lazy_include(
             app,
@@ -368,8 +356,6 @@ def create_app() -> FastAPI:
             feature_list.append("RAG知识库")
         if features.get("performance"):
             feature_list.extend(["性能优化", "流式响应", "缓存机制", "并行处理"])
-        if features.get("enhanced_chat"):
-            feature_list.append("增强版多轮对话")
         if features.get("agent"):
             feature_list.append("Agent智能核心")
         if features.get("intent"):
@@ -394,7 +380,7 @@ def create_app() -> FastAPI:
     @app.get("/system/info")
     async def system_info():
         routers_list = ["chat", "memory", "feedback", "evaluation"]
-        services_list = ["MemoryService", "ContextService"]
+        services_list = ["UnifiedMemoryService", "ContextService"]
         if features.get("agent"):
             routers_list.append("agent")
             services_list.append("AgentService")

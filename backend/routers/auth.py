@@ -196,6 +196,23 @@ async def register(req: RegisterRequest, background_tasks: BackgroundTasks):
                     detail={"code": "AUTH_014", "message": "username_taken"},
                 )
 
+            # G1/G8：席位硬限（拍板 3B 上线闸；I-2 专用异常）
+            try:
+                from backend.core.workflow.subscription import (
+                    SeatLimitExceeded,
+                    assert_seat_available,
+                )
+
+                assert_seat_available(session, tenant_id=tenant_id, adding=1)
+            except SeatLimitExceeded:
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "code": "SEAT_LIMIT",
+                        "message": "seat_limit_exceeded_contact_admin",
+                    },
+                ) from None
+
             session.execute(
                 text(
                     """

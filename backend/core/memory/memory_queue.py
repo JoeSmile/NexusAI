@@ -22,7 +22,8 @@ MAX_DELIVERIES = int(os.getenv("MEMORY_MAX_DELIVERIES", "3") or "3")
 def _client():
     from backend.core.redis_tools import get_sync_redis
 
-    return get_sync_redis(decode_responses=True)
+    # I-5(评审 08-15)：队列独立 db(1)，与缓存/限流(db 0)隔离
+    return get_sync_redis(decode_responses=True, db=1)
 
 
 def ensure_group(redis: Any | None = None) -> bool:
@@ -64,7 +65,12 @@ def enqueue_memory_write(payload: dict[str, Any]) -> str | None:
         body.setdefault("enqueued_at", time.time())
         body.setdefault("msg_id", str(uuid.uuid4()))
         fields = {"data": json.dumps(body, ensure_ascii=False)}
-        xid = r.xadd(STREAM_KEY, fields)
+        maxlen = int(os.getenv("MEMORY_STREAM_MAXLEN", "10000") or "10000")
+        try:
+            xid = r.xadd(STREAM_KEY, fields, maxlen=maxlen, approximate=True)
+        except TypeError:
+            # older redis-py
+            xid = r.xadd(STREAM_KEY, fields, maxlen=maxlen)
         return str(xid)
     except Exception:
         logger.warning("memory enqueue failed", exc_info=True)

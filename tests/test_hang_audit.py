@@ -50,7 +50,7 @@ async def test_suspend_and_escalate_audit_fields(monkeypatch):
         )
     )
     monkeypatch.setattr(
-        "backend.core.workflow.runner.get_capability_registry", lambda: reg
+        "backend.core.workflow.node_exec.get_capability_registry", lambda: reg
     )
     tenant = TenantContext(tid, uid, "user", [], False, credential_kind="human_session")
     scope = OrgScope(
@@ -94,10 +94,10 @@ async def test_suspend_and_escalate_audit_fields(monkeypatch):
 
     with (
         patch(
-            "backend.core.workflow.runner.rebuild_tenant_context",
+            "backend.core.workflow.run_lifecycle.rebuild_tenant_context",
             return_value=(tenant, scope),
         ),
-        patch("backend.core.workflow.runner.write_audit_sync", _cap),
+        patch("backend.core.workflow.runner_shared.write_audit_sync", _cap),
         patch("backend.core.workflow.notify.write_audit_sync", _cap),
         patch("backend.core.workflow.notify.get_unit", return_value=None),
     ):

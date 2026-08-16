@@ -54,6 +54,7 @@ class PipelineState(TypedDict):
     # ── 结果 ──
     response: str
     finish_reason: str  # skill_executed | llm_generated | cache_hit | blocked
+    student_pii_redacted: bool  # G7/I-7：出口脱敏标记（可观测）
     approval_request_id: str | None
 
     # ── 观测 ──
@@ -129,6 +130,7 @@ def make_initial_state(
         "llm_tools": [],
         "response": "",
         "finish_reason": "",
+        "student_pii_redacted": False,
         "approval_request_id": None,
         "trace_id": trace_id or f"tr_{uuid.uuid4().hex[:12]}",
         "total_tokens": 0,

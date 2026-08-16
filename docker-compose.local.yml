@@ -31,6 +31,9 @@ services:
       ENVIRONMENT: development
       DEBUG: "true"
       DATABASE_URL: postgresql://nexusai:nexusai_local@postgres:5432/nexusai
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-nexusai_redis}
       LLM_MOCK: "true"
       # 默认关闭 SDK 上报；启 Langfuse 栈时再设 LANGFUSE_ENABLED=true
       LANGFUSE_ENABLED: ${LANGFUSE_ENABLED:-false}
@@ -218,20 +221,46 @@ services:
     networks:
       - nexusai_local
 
-  # Redis Stack 缓存(本地开发用;含 RedisJSON/Search/TimeSeries 模块 + RedisInsight)
-  # 与 langfuse-redis 隔离（官方队列 Redis 要求 noeviction）
+  # Redis Stack（本地）；G5：REDIS_ARGS 硬化；与 langfuse-redis 隔离
   redis:
     image: redis/redis-stack:7.4.0-v1
+    environment:
+      REDIS_ARGS: "--requirepass ${REDIS_PASSWORD:-nexusai_redis} --maxmemory 256mb --maxmemory-policy noeviction --appendonly yes"
     ports:
       - "6379:6379"   # redis
       - "8001:8001"   # RedisInsight UI
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-nexusai_redis}", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
+    restart: unless-stopped
+    networks:
+      - nexusai_local
+
+  memory-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "-m", "backend.workers.memory_worker"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import backend.workers.memory_worker"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    environment:
+      DATABASE_URL: postgresql://nexusai:nexusai_local@postgres:5432/nexusai
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-nexusai_redis}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - nexusai_local

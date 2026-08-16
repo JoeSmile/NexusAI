@@ -13,7 +13,7 @@ def test_audit_includes_run_and_node_ids():
     def _capture(record):
         captured.update(record)
 
-    with patch("backend.core.workflow.runner.write_audit_sync", _capture):
+    with patch("backend.core.workflow.runner_shared.write_audit_sync", _capture):
         _audit(
             tenant_id="t1",
             user_id="u1",

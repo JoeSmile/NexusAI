@@ -61,13 +61,13 @@ def log_audit(
     )
 
 
-def write_audit_sync(record: dict) -> None:
-    """同步写入审计（不需要 BackgroundTasks 时用）"""
-    _write_audit(record)
+def write_audit_sync(record: dict) -> bool:
+    """同步写入审计。成功或幂等命中返回 True；失败返回 False（不抛）。"""
+    return _write_audit(record)
 
 
-def _write_audit(record: dict) -> None:
-    """写入 audit_logs 表（供 BackgroundTasks 或 sync 调用）"""
+def _write_audit(record: dict) -> bool:
+    """写入 audit_logs 表（供 BackgroundTasks 或 sync 调用）。"""
     try:
         # Defaults so callers that omit Wave A fields still work
         record = {
@@ -75,10 +75,26 @@ def _write_audit(record: dict) -> None:
             "key_id": None,
             "run_id": None,
             "node_id": None,
+            "dedupe_key": None,
             **record,
         }
+        # I-1(评审 08-15)：去重键——重复投递/重放撞唯一约束 → 静默跳过（幂等）
+        dedupe_key = record.get("dedupe_key") or None
         session_factory = get_pg_session()
         with session_factory.Session() as session:
+            if dedupe_key:
+                hit = session.execute(
+                    text(
+                        """
+                        SELECT 1 FROM audit_logs
+                        WHERE tenant_id = :tid AND dedupe_key = :dk
+                        LIMIT 1
+                        """
+                    ),
+                    {"tid": record["tenant_id"], "dk": dedupe_key},
+                ).fetchone()
+                if hit:
+                    return True
             sql = text("""
                 INSERT INTO audit_logs
                     (tenant_id, user_id, action, trace_id,
@@ -86,16 +102,18 @@ def _write_audit(record: dict) -> None:
                      input_tokens, output_tokens, cost, latency_ms,
                      error_code, ip_address, user_agent,
                      credential_kind, key_id, run_id, node_id,
-                     created_at)
+                     dedupe_key, created_at)
                 VALUES
                     (:tenant_id, :user_id, :action, :trace_id,
                      :input_text, :output_text, :model,
                      :input_tokens, :output_tokens, :cost, :latency_ms,
                      :error_code, :ip_address, :user_agent,
                      :credential_kind, :key_id, :run_id, :node_id,
-                     :created_at)
+                     :dedupe_key, :created_at)
             """)
             session.execute(sql, record)
             session.commit()
+        return True
     except Exception:
         logger.exception("审计日志写入失败")
+        return False

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""记忆系统相关路由 — 鉴权 + 租户/用户作用域（防 IDOR）。"""
+"""记忆系统相关路由 — 鉴权 + 租户/用户作用域；读写经 UnifiedMemoryService。"""
 
 from __future__ import annotations
 
@@ -9,9 +9,9 @@ from pydantic import BaseModel, Field
 from backend.core.auth.models import TenantContext
 from backend.core.auth.permissions import require_permission
 from backend.core.auth.scope import assert_user_access, require_tenant_admin
+from backend.core.memory_service import get_unified_memory_service
 from backend.logging_config import get_logger
 from backend.services.context_service import ContextService
-from backend.services.memory_service import MemoryService
 
 router = APIRouter(
     prefix="/memory",
@@ -25,9 +25,12 @@ class MemoryImportanceUpdate(BaseModel):
     importance: float = Field(..., ge=0.0, le=1.0)
 
 
-def _services(tenant: TenantContext) -> tuple[MemoryService, ContextService]:
-    ms = MemoryService(tenant_id=tenant.tenant_id)
-    return ms, ContextService(memory_service=ms)
+def _mem(tenant: TenantContext):
+    return get_unified_memory_service(tenant_id=tenant.tenant_id)
+
+
+def _context() -> ContextService:
+    return ContextService()
 
 
 # 兼容旧单测名
@@ -42,10 +45,9 @@ async def get_user_memories(
     tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
     uid = assert_user_access(tenant, user_id)
-    ms, _ = _services(tenant)
     try:
-        memories = await ms.get_user_memories_list(
-            user_id=uid, memory_type=memory_type, limit=limit
+        memories = await _mem(tenant).list_warm(
+            uid, memory_type=memory_type, limit=limit
         )
         return {
             "user_id": uid,
@@ -66,9 +68,8 @@ async def get_important_memories(
     tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
     uid = assert_user_access(tenant, user_id)
-    ms, _ = _services(tenant)
     try:
-        memories = await ms.get_important_memories(uid, limit)
+        memories = await _mem(tenant).list_important_warm(uid, limit=limit)
         return {
             "user_id": uid,
             "important_memories": memories,
@@ -89,10 +90,9 @@ async def search_memories(
 ):
     _ = days_limit
     uid = assert_user_access(tenant, user_id)
-    ms, _ = _services(tenant)
     try:
-        memories = await ms.retrieve_memories(
-            user_id=uid, query=query, limit=n_results
+        memories = await _mem(tenant).search_warm(
+            uid, query, limit=n_results
         )
         return {
             "user_id": uid,
@@ -112,9 +112,8 @@ async def delete_memory(
     tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
     uid = assert_user_access(tenant, user_id)
-    ms, _ = _services(tenant)
     try:
-        success = await ms.delete_memory(uid, memory_id)
+        success = await _mem(tenant).delete_warm(user_id=uid, memory_id=memory_id)
         if not success:
             raise HTTPException(status_code=404, detail="记忆不存在")
         return {"message": "记忆删除成功", "memory_id": memory_id}
@@ -133,9 +132,8 @@ async def forget_user_memories(
     """被遗忘权：仅 tenant_admin / super_admin；作用域为调用方租户。"""
     require_tenant_admin(tenant)
     uid = assert_user_access(tenant, user_id)
-    ms, _ = _services(tenant)
     try:
-        result = await ms.forget_user(uid)
+        result = await _mem(tenant).forget_user(uid)
         return {
             "message": "用户记忆已清除",
             "tenant_id": tenant.tenant_id,
@@ -154,12 +152,9 @@ async def update_memory_importance(
     tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
     uid = assert_user_access(tenant, user_id)
-    ms, _ = _services(tenant)
     try:
-        success = await ms.update_memory_importance(
-            user_id=uid,
-            memory_id=memory_id,
-            new_importance=request.importance,
+        success = await _mem(tenant).update_warm_importance(
+            uid, memory_id, request.importance
         )
         if not success:
             raise HTTPException(status_code=404, detail="记忆不存在或更新失败")
@@ -181,9 +176,8 @@ async def get_memory_statistics(
     tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
     uid = assert_user_access(tenant, user_id)
-    ms, _ = _services(tenant)
     try:
-        stats = await ms.get_memory_statistics(uid)
+        stats = await _mem(tenant).warm_statistics(uid)
         return {"user_id": uid, "statistics": stats}
     except Exception as e:
         logger.error(f"获取记忆统计失败: {e}")
@@ -196,9 +190,8 @@ async def get_user_profile(
     tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
     uid = assert_user_access(tenant, user_id)
-    _, cs = _services(tenant)
     try:
-        profile = await cs.get_user_profile(uid)
+        profile = await _context().get_user_profile(uid)
         return {"user_id": uid, "profile": profile.to_dict()}
     except Exception as e:
         logger.error(f"获取用户画像失败: {e}")
@@ -212,9 +205,8 @@ async def update_user_profile(
     tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
     uid = assert_user_access(tenant, user_id)
-    _, cs = _services(tenant)
     try:
-        profile = await cs.update_user_profile(uid, updates)
+        profile = await _context().update_user_profile(uid, updates)
         return {
             "message": "用户画像更新成功",
             "user_id": uid,

@@ -57,6 +57,34 @@ async def create_api_key(
 
     session_factory = get_pg_session()
     with session_factory.Session() as session:
+        existing_user_key = session.execute(
+            text(
+                """
+                SELECT id FROM api_keys
+                WHERE tenant_id = :tid AND user_id = :uid
+                  AND COALESCE(is_active, true) = true
+                LIMIT 1
+                """
+            ),
+            {"tid": target_tenant, "uid": req.user_id},
+        ).fetchone()
+        if existing_user_key is None:
+            try:
+                from backend.core.workflow.subscription import (
+                    SeatLimitExceeded,
+                    assert_seat_available,
+                )
+
+                assert_seat_available(session, tenant_id=target_tenant, adding=1)
+            except SeatLimitExceeded:
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "code": "SEAT_LIMIT",
+                        "message": "seat_limit_exceeded_contact_admin",
+                    },
+                ) from None
+
         sql = text("""
             INSERT INTO api_keys
                 (tenant_id, user_id, key_hash, key_prefix, role, description,

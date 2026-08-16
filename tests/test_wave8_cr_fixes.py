@@ -122,7 +122,7 @@ def test_cancel_child_wakes_parent() -> None:
 def test_recover_waiting_child_when_child_already_terminal(monkeypatch) -> None:
     """2A: startup recover wakes parent if child finished without wake."""
     monkeypatch.setattr(
-        "backend.core.workflow.runner.schedule_resume_or_continue",
+        "backend.core.workflow.run_lifecycle.schedule_resume_or_continue",
         lambda *_a, **_k: None,
     )
     tid = f"c2a-{uuid.uuid4().hex[:8]}"

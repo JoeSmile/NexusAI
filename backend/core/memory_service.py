@@ -1,7 +1,7 @@
 """统一记忆存取层（Task 34.02 / 32.63）。
 
-与 ``backend.services.memory_service.MemoryService``（路由侧 kv 助手）并存：
-本模块是 pipeline / agent 应收敛的唯一 ``write()`` / ``read()`` 入口。
+Pipeline / agent / ``/memory`` 管理 API 的唯一入口：``write()`` / ``read()`` /
+``assemble_prompt_block()`` 以及 warm 管理方法。
 
 分层职责（不合并）:
 - hot  → ``chat_messages``（全量对话，不可删）
@@ -45,6 +45,54 @@ def _student_alias(*, tenant_id: str, name: str, key: str) -> str:
     label = f"学生{chr(ord('A') + (idx % 26))}"
     _student_alias_map[cache_key] = label
     return label
+
+
+def redact_student_names_in_text(
+    text: str,
+    *,
+    tenant_id: str,
+    names: list[str] | None = None,
+    warm: dict[str, str] | None = None,
+) -> str:
+    """G7 / 拍板 1B：F4 口播等生成输出脱敏。
+
+    优先用 ``warm`` 里 relation=学生/学员 的实体名；也可显式传 ``names``。
+    真名仅替换为稳定别名，不改变其余文案。
+    """
+    import json
+
+    if not text:
+        return text
+    targets: list[tuple[str, str]] = []
+    if names:
+        for n in names:
+            n = str(n or "").strip()
+            if n:
+                targets.append((n, _student_alias(tenant_id=tenant_id, name=n, key=f"name:{n}")))
+    for key, raw in (warm or {}).items():
+        if not str(key).startswith("entity:"):
+            continue
+        try:
+            val = json.loads(raw) if isinstance(raw, str) else raw
+        except Exception:
+            continue
+        if not isinstance(val, dict):
+            continue
+        rel = str(val.get("relation") or "")
+        if rel not in ("学生", "学员"):
+            continue
+        name = str(val.get("name") or val.get("text") or "").strip()
+        if not name:
+            continue
+        alias = _student_alias(tenant_id=tenant_id, name=name, key=str(key))
+        targets.append((name, alias))
+    # 长名优先，避免部分替换
+    targets.sort(key=lambda t: len(t[0]), reverse=True)
+    out = text
+    for name, alias in targets:
+        if name and name in out:
+            out = out.replace(name, alias)
+    return out
 
 
 _DEFAULT_HOT_LIMIT = 5
@@ -216,6 +264,28 @@ class UnifiedMemoryService:
                     )
                     .first()
                 )
+                # G3：乱序仲裁 — 消息 enqueued_at 早于现有 updated_at → 跳过
+                enqueued_at = payload.get("enqueued_at")
+                if existing is not None and enqueued_at is not None:
+                    try:
+                        msg_ts = float(enqueued_at)
+                    except (TypeError, ValueError):
+                        msg_ts = None
+                    if msg_ts is not None and existing.updated_at is not None:
+                        existing_ts = existing.updated_at.timestamp()
+                        if msg_ts < existing_ts:
+                            logger.info(
+                                "skip stale warm write tid=%s uid=%s key=%s",
+                                self.tenant_id,
+                                user_id,
+                                key,
+                            )
+                            return {
+                                "id": existing.id,
+                                "tier": "warm",
+                                "key": key,
+                                "skipped": "stale_enqueued_at",
+                            }
                 if existing:
                     existing.value = value
                     existing.confidence = confidence
@@ -854,6 +924,127 @@ class UnifiedMemoryService:
             parts.append("[最近对话]\n" + "\n".join(hot_kept))
 
         return "\n\n".join(parts)
+
+    # ── /memory 管理 API（原 services.memory_service 迁入，禁止旁路写）──
+
+    async def list_warm(
+        self,
+        user_id: str,
+        *,
+        memory_type: str | None = None,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        session_factory = get_pg_session()
+        with session_factory.Session() as session:
+            q = session.query(UserMemory).filter_by(
+                tenant_id=self.tenant_id, user_id=user_id
+            )
+            if memory_type:
+                q = q.filter(UserMemory.source == memory_type)
+            rows = q.order_by(UserMemory.updated_at.desc()).limit(limit).all()
+        return [
+            {
+                "id": str(r.id),
+                "content": f"{r.key}: {r.value}",
+                "key": r.key,
+                "value": r.value,
+                "importance": float(r.confidence or 0.5),
+                "type": r.source or "other",
+                "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+            }
+            for r in rows
+        ]
+
+    async def list_important_warm(
+        self, user_id: str, *, limit: int = 5
+    ) -> list[dict[str, Any]]:
+        session_factory = get_pg_session()
+        with session_factory.Session() as session:
+            rows = (
+                session.query(UserMemory)
+                .filter_by(tenant_id=self.tenant_id, user_id=user_id)
+                .order_by(UserMemory.confidence.desc())
+                .limit(limit)
+                .all()
+            )
+        return [
+            {
+                "id": str(r.id),
+                "content": f"{r.key}: {r.value}",
+                "key": r.key,
+                "value": r.value,
+                "importance": float(r.confidence or 0.5),
+                "type": r.source or "other",
+            }
+            for r in rows
+        ]
+
+    async def search_warm(
+        self,
+        user_id: str,
+        query: str,
+        *,
+        limit: int = 5,
+        memory_type: str | None = None,
+    ) -> list[dict[str, Any]]:
+        from backend.database.vector_ops import search_user_memories
+
+        results = search_user_memories(
+            tenant_id=self.tenant_id,
+            user_id=user_id,
+            query=query,
+            limit=limit,
+        )
+        if memory_type:
+            results = [r for r in results if r.get("type") == memory_type]
+        return results
+
+    async def update_warm_importance(
+        self, user_id: str, memory_id: str, new_importance: float
+    ) -> bool:
+        if not 0.0 <= new_importance <= 1.0:
+            raise ValueError("new_importance must be between 0 and 1")
+        session_factory = get_pg_session()
+        with session_factory.Session() as session:
+            row = (
+                session.query(UserMemory)
+                .filter_by(
+                    tenant_id=self.tenant_id, user_id=user_id, id=int(memory_id)
+                )
+                .first()
+            )
+            if not row:
+                return False
+            row.confidence = new_importance
+            session.commit()
+            return True
+
+    async def warm_statistics(self, user_id: str) -> dict[str, Any]:
+        from sqlalchemy import text
+
+        session_factory = get_pg_session()
+        with session_factory.Session() as session:
+            total = (
+                session.query(UserMemory)
+                .filter_by(tenant_id=self.tenant_id, user_id=user_id)
+                .count()
+            )
+            by_source = session.execute(
+                text(
+                    """
+                    SELECT COALESCE(source, 'other') AS src, COUNT(*) AS n
+                    FROM user_memories
+                    WHERE tenant_id = :tid AND user_id = :uid
+                    GROUP BY src
+                    """
+                ),
+                {"tid": self.tenant_id, "uid": user_id},
+            ).fetchall()
+        return {
+            "user_id": user_id,
+            "total": total,
+            "by_type": {r.src: r.n for r in by_source},
+        }
 
 
 def get_unified_memory_service(tenant_id: str = "default") -> UnifiedMemoryService:

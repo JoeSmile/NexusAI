@@ -60,7 +60,7 @@ async def test_succeeded_node_skips_invoke():
             business_roles=frozenset(),
         )
         with patch(
-            "backend.core.workflow.runner.invoke", new_callable=AsyncMock
+            "backend.core.workflow.node_exec.invoke", new_callable=AsyncMock
         ) as inv:
             await _execute_node(
                 session,

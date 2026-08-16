@@ -101,6 +101,8 @@ class AuditLog(Base):
     ip_address = Column(String(50), default="")
     user_agent = Column(Text, default="")
     created_at = Column(DateTime, default=datetime.utcnow)
+    # I-1(评审 08-15)：异步记忆审计去重键（唯一索引见 alembic 018）
+    dedupe_key = Column(String(64), nullable=True)
     # Wave A scaffold (nullable; no backfill)
     credential_kind = Column(String(32), nullable=True)
     key_id = Column(String(100), nullable=True)

@@ -15,17 +15,39 @@ services:
       retries: 5
     restart: always
 
+  redis:
+    image: redis:7-alpine
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:?set REDIS_PASSWORD}
+      --maxmemory 512mb
+      --maxmemory-policy noeviction
+      --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+
   nexusai:
     build: .
     ports: ["8000:8000"]
     env_file: config.env
     environment:
       DATABASE_URL: postgresql://nexusai:${DB_PASSWORD}@postgres:5432/nexusai
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
       LANGFUSE_ENABLED: ${LANGFUSE_ENABLED:-false}
       LANGFUSE_HOST: ${LANGFUSE_HOST:-http://langfuse-web:3000}
       LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-http://langfuse-web:3000}
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: always
     healthcheck:
@@ -39,6 +61,28 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  memory-worker:
+    build: .
+    command: ["python", "-m", "backend.workers.memory_worker"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import backend.workers.memory_worker"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    env_file: config.env
+    environment:
+      DATABASE_URL: postgresql://nexusai:${DB_PASSWORD}@postgres:5432/nexusai
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: always
 
   # Langfuse OSS v4 — 默认不启动（profiles: langfuse）
   # 开启：COMPOSE_PROFILES=langfuse ... 且 LANGFUSE_ENABLED=true
@@ -196,6 +240,7 @@ services:
 
 volumes:
   pgdata:
+  redis_data:
   langfuse_pgdata:
   langfuse_redis_data:
   langfuse_clickhouse_data:
