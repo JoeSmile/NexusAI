@@ -8,8 +8,8 @@ import pytest
 
 from backend.pipeline.intent_path import (
     resolve_short_path_skill,
-    should_task_plan,
     short_path_predicate,
+    should_task_plan,
     skill_to_state,
 )
 from backend.pipeline.nodes.task_plan import (
@@ -88,6 +88,59 @@ async def test_task_plan_skips_short_path(fake_skill, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_task_plan_skips_streaming_path(monkeypatch):
+    """A(08-16): stream_mode=True 时跳过规划——plan 无消费方,不调 LLM。"""
+    called = {"n": 0}
+
+    async def boom(*a, **k):
+        called["n"] += 1
+        raise AssertionError("should not call llm on streaming path")
+
+    monkeypatch.setattr(
+        "backend.pipeline.nodes.task_plan.harness.generate", boom
+    )
+    monkeypatch.setattr(
+        "backend.pipeline.intent_path.registry.get_skill_for_intent",
+        lambda *a, **k: None,
+    )
+    state = make_initial_state("t", "u", "s", "stream this")
+    state["stream_mode"] = True
+    state["intent"] = "complex"
+    state["intent_confidence"] = 0.4
+    out = await task_plan(state)
+    assert out.get("task_plan") is None
+    assert called["n"] == 0
+
+
+@pytest.mark.asyncio
+async def test_task_plan_skips_without_bridge_target(monkeypatch):
+    """B(08-16): 租户无已发布带 intent_tags 的 workflow 时跳过——plan 无消费方。"""
+    called = {"n": 0}
+
+    async def boom(*a, **k):
+        called["n"] += 1
+        raise AssertionError("should not call llm without bridge target")
+
+    monkeypatch.setattr(
+        "backend.pipeline.nodes.task_plan.harness.generate", boom
+    )
+    monkeypatch.setattr(
+        "backend.pipeline.nodes.task_plan._tenant_has_bridge_targets",
+        lambda tid: False,
+    )
+    monkeypatch.setattr(
+        "backend.pipeline.intent_path.registry.get_skill_for_intent",
+        lambda *a, **k: None,
+    )
+    state = make_initial_state("t", "u", "s", "no bridge here")
+    state["intent"] = "complex"
+    state["intent_confidence"] = 0.4
+    out = await task_plan(state)
+    assert out.get("task_plan") is None
+    assert called["n"] == 0
+
+
+@pytest.mark.asyncio
 async def test_task_plan_produces_plan_on_long_path(monkeypatch):
     plan = {
         "steps": [
@@ -120,6 +173,10 @@ async def test_task_plan_produces_plan_on_long_path(monkeypatch):
 
     state = make_initial_state("t", "u", "s", "plan this")
     state["intent"] = "complex"
+    monkeypatch.setattr(
+        "backend.pipeline.nodes.task_plan._tenant_has_bridge_targets",
+        lambda tid: True,
+    )
     state["intent_confidence"] = 0.4
     out = await task_plan(state)
     assert out["task_plan"] is not None
@@ -143,6 +200,10 @@ async def test_task_plan_degrades_on_bad_json(monkeypatch):
     monkeypatch.setattr(
         "backend.pipeline.nodes.task_plan._list_visible_capabilities",
         lambda state: [],
+    )
+    monkeypatch.setattr(
+        "backend.pipeline.nodes.task_plan._tenant_has_bridge_targets",
+        lambda tid: True,
     )
     monkeypatch.setattr(
         "backend.pipeline.intent_path.registry.get_skill_for_intent",
@@ -210,6 +271,10 @@ async def test_task_plan_blocks_on_output_guard(monkeypatch):
     )
     monkeypatch.setattr(
         "backend.pipeline.nodes.task_plan.check_output", blocked
+    )
+    monkeypatch.setattr(
+        "backend.pipeline.nodes.task_plan._tenant_has_bridge_targets",
+        lambda tid: True,
     )
     monkeypatch.setattr(
         "backend.pipeline.intent_path.registry.get_skill_for_intent",

@@ -209,6 +209,37 @@ def audit_task_plan_on_success(state: PipelineState) -> None:
         logger.debug("chat.task_plan audit failed", exc_info=True)
 
 
+def _tenant_has_bridge_targets(tenant_id: str) -> bool:
+    """快速预判: 租户是否有已发布且带 intent_tags 的 workflow(bridge 匹配前提)。
+
+    08-16 性能修复: 无则 task_plan 产出无消费方,跳过规划 LLM 与检索,
+    非流式长路径不再白烧一次 LLM(首 token 延迟主因之一)。
+    """
+    if not tenant_id:
+        return False
+    try:
+        from backend.database.pgvector_session import Workflow, get_pg_session
+
+        sf = get_pg_session()
+        with sf.Session() as session:
+            rows = (
+                session.query(Workflow.intent_tags)
+                .filter(
+                    Workflow.tenant_id == tenant_id,
+                    Workflow.status == "published",
+                )
+                .limit(5)
+                .all()
+            )
+        return any(bool(tags) for (tags,) in rows)
+    except Exception:
+        logging.getLogger(__name__).debug(
+            "bridge target precheck failed; fallback to original path",
+            exc_info=True,
+        )
+        return True  # 保守: 预判失败按原逻辑跑,不改变行为
+
+
 @observe(name="pipeline.task_plan")
 async def task_plan(state: PipelineState) -> PipelineState:
     """analyze → task_plan → build_context；短路径空跑；失败 → task_plan=None。"""
@@ -220,6 +251,18 @@ async def task_plan(state: PipelineState) -> PipelineState:
         state["short_path_skill"] = skill_to_state(skill)
         if not should_task_plan(state):
             enrich_span(metadata={"task_plan": "skipped_short_path"})
+            return state
+
+        # A(08-16 性能修复): 流式路径跳过规划——plan 无消费方(bridge/审计均为旁路),
+        # 规划 LLM 是首 token 延迟主因(长路径每条消息白烧一次 5-10s)。
+        if state.get("stream_mode"):
+            enrich_span(metadata={"task_plan": "skipped_streaming"})
+            return state
+
+        # B(08-16 性能修复): 非流式——租户无已发布带 intent_tags 的 workflow 时,
+        # bridge 永不命中,plan 无消费方,跳过规划 LLM 与 skill_assets 检索。
+        if not _tenant_has_bridge_targets(state.get("tenant_id") or ""):
+            enrich_span(metadata={"task_plan": "skipped_no_bridge_target"})
             return state
 
         try:
