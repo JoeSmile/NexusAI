@@ -442,6 +442,35 @@ async def _execute_node(
                 elif ev == "done":
                     done_meta = dict(frame.get("data") or {})
         answer = "".join(text_parts)
+        # G7: script.gen / 口播类出口脱敏（fail-open）
+        if cap_id in ("script.gen", "content.script_gen") or str(
+            done_meta.get("op") or ""
+        ) in ("script.gen", "content.script_gen"):
+            try:
+                from backend.core.memory_service import redact_student_names_in_text
+
+                names = params.get("student_names")
+                if isinstance(names, str):
+                    names = [names]
+                if not isinstance(names, list):
+                    names = None
+                warm = params.get("warm") if isinstance(params.get("warm"), dict) else None
+                before = answer
+                answer = redact_student_names_in_text(
+                    answer,
+                    tenant_id=run.tenant_id,
+                    names=names,
+                    warm=warm,
+                )
+                if answer != before:
+                    done_meta = dict(done_meta)
+                    done_meta["student_pii_redacted"] = True
+                    if isinstance(done_meta.get("result"), dict):
+                        done_meta["result"] = dict(done_meta["result"])
+                        done_meta["result"]["script"] = answer
+                        done_meta["result"]["student_pii_redacted"] = True
+            except Exception:
+                logger.debug("runner G7 redaction skipped", exc_info=True)
         sources = done_meta.get("sources")
         if not isinstance(sources, list):
             sources = []

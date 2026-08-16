@@ -297,6 +297,13 @@ def create_app() -> FastAPI:
     )
     _lazy_include(
         app,
+        "backend.routers.content_ops",
+        "router",
+        required=True,
+        label="Content ops / offerings",
+    )
+    _lazy_include(
+        app,
         "backend.routers.notifications",
         "router",
         prefix="/api",

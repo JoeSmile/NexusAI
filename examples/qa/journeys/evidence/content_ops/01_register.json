@@ -1,0 +1,4 @@
+{
+  "status": 200,
+  "body": "{\"access_token\":\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjb250ZW50X29wc19jMzQ1MTY2ZTlmIiwidGlkIjoiYWNtZSIsInJvbGUiOiJ0ZW5hbnRfYWRtaW4iLCJqdGkiOiIwNDM0ODY1OC04MzlmLTQzNmMtOTNlMS1lYWM4ZGI5MzU1MzgiLCJpYXQiOjE3ODY4NTk5ODQsImV4cCI6MTc4Njg2MzU4NH0.kLlYEO62Ye983MvrriCEnvpCW6XyyHsGgjsaLLhcZGA\",\"token_type\":\"bearer\",\"expires_in\":3600,\"role\":\"tenant_admin\",\"tenant_id\":\"acme\",\"user_id\":\"content_ops_c345166e9f\"}"
+}

@@ -219,6 +219,19 @@ export async function apiPost<T>(
   return readJson<T>(res)
 }
 
+export async function apiPut<T>(
+  path: string,
+  body?: unknown,
+  init?: ApiFetchInit,
+): Promise<T> {
+  const res = await apiFetch(path, {
+    ...init,
+    method: 'PUT',
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  return readJson<T>(res)
+}
+
 export async function apiPatch<T>(
   path: string,
   body?: unknown,

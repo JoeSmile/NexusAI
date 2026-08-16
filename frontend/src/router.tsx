@@ -10,6 +10,7 @@ import AdminPanel from '@/pages/panels/admin'
 import AgentPanel from '@/pages/panels/agent'
 import AuditPanel from '@/pages/panels/audit'
 import ChatPanel from '@/pages/panels/chat'
+import ContentStudioPage from '@/pages/content/ContentStudio'
 import EvalPanel from '@/pages/panels/eval'
 import CapabilitiesPanel from '@/pages/panels/capabilities'
 import PerformancePanel from '@/pages/panels/performance'
@@ -51,6 +52,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <Navigate to={HOME_PATH} replace /> },
           { path: 'workspace/chat', element: <ChatPanel /> },
+          { path: 'workspace/content', element: <ContentStudioPage /> },
           { path: 'workspace/agent', element: <AgentPanel /> },
           { path: 'workspace/eval', element: <EvalPanel /> },
           { path: 'workflows', element: <WorkflowListPage /> },

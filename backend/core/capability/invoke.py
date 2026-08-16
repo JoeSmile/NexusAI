@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 # tool 叶子 executor → 真实执行器（不按 capability id 硬编码）
 _TOOL_EXECUTOR_MODEL = frozenset({"model", "chat", "llm"})
 _TOOL_EXECUTOR_RAG = frozenset({"rag", "rag_ask", "rag-ask"})
+_TOOL_EXECUTOR_CONTENT_OPS = frozenset({"content_ops", "content-ops", "contentops"})
 
 
 def _messages_from_payload(payload: dict[str, Any]) -> list[dict[str, str]]:
@@ -273,6 +274,12 @@ async def _invoke_tool(
         return
     if executor in _TOOL_EXECUTOR_RAG:
         async for frame in _invoke_rag(spec, payload, tenant):
+            yield frame
+        return
+    if executor in _TOOL_EXECUTOR_CONTENT_OPS:
+        from backend.core.content_ops.invoke_exec import invoke_content_ops
+
+        async for frame in invoke_content_ops(spec, payload, tenant):
             yield frame
         return
     raise CapabilityNotFoundError(

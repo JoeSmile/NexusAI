@@ -29,6 +29,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: '工作台',
     items: [
       { to: '/workspace/chat', label: '对话' },
+      { to: '/workspace/content', label: '内容运营' },
       { to: '/workspace/agent', label: 'Agent' },
       { to: '/workspace/eval', label: '评估' },
     ],

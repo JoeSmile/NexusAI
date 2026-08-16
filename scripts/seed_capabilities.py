@@ -98,6 +98,73 @@ SEED_CAPS: list[dict] = [
         },
         "cost_model": {"cost_per_1k": 0.08},
     },
+    {
+        "id": "hotspot.dig",
+        "name": "相关热点挖掘",
+        "kind": "tool",
+        "provider": "nexusai",
+        "permission": "chat:write",
+        "tenant_id": "*",
+        "spec": {
+            "governance": True,
+            "leaf": True,
+            "executor": "content_ops",
+            "op": "hotspot.dig",
+        },
+        "param_spec": {
+            "adapter": {
+                "type": "string",
+                "required": False,
+                "default": "topic_agent",
+                "description": "topic_agent | paste | seed",
+            },
+            "categories": {"type": "array", "required": False},
+            "keywords": {"type": "string", "required": False},
+            "paste_text": {"type": "string", "required": False},
+        },
+        "cost_model": {"cost_per_1k": 0.01},
+    },
+    {
+        "id": "script.gen",
+        "name": "风格化口播生成",
+        "kind": "tool",
+        "provider": "nexusai",
+        "permission": "chat:write",
+        "tenant_id": "*",
+        "spec": {
+            "governance": True,
+            "leaf": True,
+            "executor": "content_ops",
+            "op": "script.gen",
+        },
+        "param_spec": {
+            "creator_id": {"type": "string", "required": False, "default": "default"},
+            "hotspots": {"type": "array", "required": False},
+            "duration_sec": {"type": "number", "required": False, "default": 60},
+            "platform": {"type": "string", "required": False},
+        },
+        "cost_model": {"cost_per_1k": 0.02},
+    },
+    {
+        "id": "style.extract",
+        "name": "主讲风格提取",
+        "kind": "tool",
+        "provider": "nexusai",
+        "permission": "chat:write",
+        "tenant_id": "*",
+        "spec": {
+            "governance": True,
+            "leaf": True,
+            "executor": "content_ops",
+            "op": "style.extract",
+        },
+        "param_spec": {
+            "creator_id": {"type": "string", "required": False, "default": "default"},
+            "text": {"type": "string", "required": True, "description": "演讲/口播逐字稿"},
+            "save": {"type": "boolean", "required": False, "default": True},
+        },
+        "cost_model": {"cost_per_1k": 0.01},
+    },
 ]
 
 

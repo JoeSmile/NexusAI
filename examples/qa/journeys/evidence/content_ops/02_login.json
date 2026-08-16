@@ -1,0 +1,4 @@
+{
+  "status": 422,
+  "body": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"username\"],\"msg\":\"Field required\",\"input\":{\"email\":\"content_ops_d10c89f7e5@example.com\",\"password\":\"password123\"}}]}"
+}

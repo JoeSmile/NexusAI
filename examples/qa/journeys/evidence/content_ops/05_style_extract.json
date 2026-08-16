@@ -1,0 +1,32 @@
+{
+  "status": 200,
+  "json": {
+    "style": {
+      "creator_id": "default",
+      "display_name": "默认主讲",
+      "persona": "从稿件启发式提取的口语风格（可再编辑）",
+      "addressing": [
+        "同学们",
+        "家长朋友们"
+      ],
+      "catchphrases": [],
+      "avg_sentence_len": "短句为主，约15字",
+      "structure_habits": [
+        "先抛痛点",
+        "给方法",
+        "结尾行动号召"
+      ],
+      "taboos": [
+        "不承诺提分",
+        "不提竞品名",
+        "不出现学员真名"
+      ],
+      "sample_openers": [
+        "先问你一个问题……"
+      ],
+      "extracted_at": "2026-08-16T05:59:44.129846+00:00",
+      "source_doc_ids": [],
+      "is_default": false
+    }
+  }
+}

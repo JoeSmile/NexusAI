@@ -494,6 +494,45 @@ class OrgMembership(Base):
     )
 
 
+class Offering(Base):
+    """Catalog offerings — pointer to capability/workflow (Task 45 / alembic 019)."""
+
+    __tablename__ = "offerings"
+    id = Column(String(64), primary_key=True)
+    tenant_id = Column(String(64), nullable=False, default="*", index=True)
+    dept = Column(String(64), nullable=False, default="content_growth", index=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=False, default="")
+    status = Column(String(32), nullable=False, default="placeholder")
+    # implemented | placeholder | unimplemented
+    target_kind = Column(String(32), nullable=False, default="capability")
+    # capability | workflow | agent
+    target_id = Column(String(128), nullable=False, default="")
+    sort_order = Column(Integer, nullable=False, default=0)
+    meta = Column(JSON, nullable=False, default=dict)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ContentArtifact(Base):
+    """Hotspot / script outputs for content library (Task 45)."""
+
+    __tablename__ = "content_artifacts"
+    id = Column(String(36), primary_key=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    kind = Column(String(32), nullable=False, default="hotspot")
+    # hotspot | script
+    title = Column(String(255), nullable=False, default="")
+    body = Column(JSON, nullable=False, default=dict)
+    content_hash = Column(String(64), nullable=True)
+    run_id = Column(String(36), nullable=True)
+    creator_id = Column(String(64), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    __table_args__ = (
+        Index("ix_content_artifacts_tenant_kind_created", "tenant_id", "kind", "created_at"),
+    )
+
+
 class PGVectorSession:
     """pgvector 数据库会话管理器"""
 
