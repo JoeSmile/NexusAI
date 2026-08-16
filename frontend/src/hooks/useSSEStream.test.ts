@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useAuthStore } from '@/stores/authStore'
 
-import { consumeSSEBuffer, dispatchSSEData } from './sseParse'
+import { createEventParser, dispatchSSEData } from './sseParse'
 import { useSSEStream } from './useSSEStream'
 
 function encodeChunks(parts: string[]): ReadableStream<Uint8Array> {
@@ -24,11 +24,9 @@ describe('SSE parse frames', () => {
   it('ignores : ping comment lines', () => {
     const onToken = vi.fn()
     const onError = vi.fn()
-    const { stopped } = consumeSSEBuffer(': ping\n\ndata: {"token":"hi"}\n\n', {
-      onToken,
-      onError,
-    })
-    expect(stopped).toBe(false)
+    const parser = createEventParser({ onToken, onError })
+    parser.feed(': ping\n\ndata: {"token":"hi"}\n\n')
+    expect(parser.stopped()).toBe(false)
     expect(onToken).toHaveBeenCalledWith('hi')
     expect(onError).not.toHaveBeenCalled()
   })
@@ -36,11 +34,11 @@ describe('SSE parse frames', () => {
   it('handles abort and stops before later tokens', () => {
     const onAbort = vi.fn()
     const onToken = vi.fn()
-    const { stopped } = consumeSSEBuffer(
+    const parser = createEventParser({ onAbort, onToken })
+    parser.feed(
       'data: {"type":"abort","reason":"content_filter"}\n\ndata: {"token":"x"}\n\n',
-      { onAbort, onToken },
     )
-    expect(stopped).toBe(true)
+    expect(parser.stopped()).toBe(true)
     expect(onAbort).toHaveBeenCalledWith('content_filter')
     expect(onToken).not.toHaveBeenCalled()
   })
@@ -48,11 +46,11 @@ describe('SSE parse frames', () => {
   it('handles retraction without stopping', () => {
     const onRetraction = vi.fn()
     const onToken = vi.fn()
-    const { stopped } = consumeSSEBuffer(
+    const parser = createEventParser({ onRetraction, onToken })
+    parser.feed(
       'data: {"type":"retraction","reason":"revise"}\n\ndata: {"token":"ok"}\n\n',
-      { onRetraction, onToken },
     )
-    expect(stopped).toBe(false)
+    expect(parser.stopped()).toBe(false)
     expect(onRetraction).toHaveBeenCalledWith('revise')
     expect(onToken).toHaveBeenCalledWith('ok')
   })
@@ -156,6 +154,33 @@ describe('useSSEStream dual format', () => {
     expect(onToken.mock.calls.map((c) => c[0]).join('')).toBe('hello')
     expect(onDone).toHaveBeenCalled()
     expect(onError).not.toHaveBeenCalled()
+  })
+
+  it('JSON error body (LLM_KEY) calls onError not onDone', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: async () => ({
+          type: 'error',
+          code: 'LLM_KEY_001',
+          message: 'tenant_llm_key_missing',
+        }),
+      }),
+    )
+    const { result } = renderHook(() => useSSEStream())
+    const onError = vi.fn()
+    const onDone = vi.fn()
+    await act(async () => {
+      await result.current.start('/chat/streaming', { method: 'POST', body: '{}' }, {
+        onError,
+        onDone,
+      })
+    })
+    expect(onError).toHaveBeenCalledWith('LLM_KEY_001', 'tenant_llm_key_missing')
+    expect(onDone).not.toHaveBeenCalled()
   })
 
   it('SSE error frame triggers onError', async () => {

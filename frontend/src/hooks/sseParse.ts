@@ -1,4 +1,11 @@
-/** SSE 帧解析纯函数（useSSEStream 配套）。 */
+/**
+ * SSE 事件分发（后端 /chat/streaming 协议）+ eventsource-parser 封装。
+ *
+ * 解析层用标准库 eventsource-parser（处理多行 data / CRLF / 帧边界），
+ * dispatchSSEData 保留为后端协议适配（token/abort/retraction/error/done JSON）。
+ */
+import { createParser, type EventSourceMessage } from 'eventsource-parser'
+
 export type SSEHandlers = {
   onToken?: (text: string) => void
   onAbort?: (reason: string) => void
@@ -44,18 +51,24 @@ export function dispatchSSEData(raw: string, h: SSEHandlers): 'done' | 'continue
   return 'continue'
 }
 
-export function consumeSSEBuffer(buffer: string, h: SSEHandlers) {
-  const parts = buffer.split('\n\n')
-  const rest = parts.pop() ?? ''
-  for (const block of parts) {
-    for (const line of block.split('\n')) {
-      const s = line.trimEnd()
-      if (!s || s.startsWith(':')) continue // : ping
-      if (!s.startsWith('data:')) continue
-      if (dispatchSSEData(s.slice(5).trimStart(), h) === 'done') {
-        return { rest: '', stopped: true as const }
-      }
-    }
+export type SSEParserHandle = {
+  feed: (chunk: string) => void
+  stopped: () => boolean
+}
+
+/** 流式喂块；任一终态事件（abort/error/done）后 stopped() 为 true。 */
+export function createEventParser(h: SSEHandlers): SSEParserHandle {
+  let stopped = false
+  const parser = createParser({
+    onEvent(event: EventSourceMessage) {
+      if (stopped) return
+      if (dispatchSSEData(event.data, h) === 'done') stopped = true
+    },
+  })
+  return {
+    feed: (chunk: string) => {
+      if (!stopped) parser.feed(chunk)
+    },
+    stopped: () => stopped,
   }
-  return { rest, stopped: false as const }
 }

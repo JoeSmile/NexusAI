@@ -16,6 +16,7 @@ import { StatusBadge, type StatusKind } from '@/components/ui/StatusBadge'
 import { Badge } from '@/components/ui/badge'
 import { useSSEStream } from '@/hooks/useSSEStream'
 import { useAuthStore } from '@/stores/authStore'
+import ReactMarkdown from 'react-markdown'
 
 /** Chat 面板 — /chat JSON + /chat/streaming 双格式（Task 30.16）。 */
 export default function ChatPanel() {
@@ -158,8 +159,12 @@ export default function ChatPanel() {
             </Button>
           </div>
           <p className="text-muted-foreground text-xs">{hint}</p>
-          <div className="min-h-28 whitespace-pre-wrap rounded-lg border border-border bg-background p-3 font-mono text-sm">
-            {text || <span className="text-muted-foreground">（等待响应…）</span>}
+          <div className="min-h-28 rounded-lg border border-border bg-background p-3 text-sm">
+            {text ? (
+              <ReactMarkdown>{text}</ReactMarkdown>
+            ) : (
+              <span className="text-muted-foreground">（等待响应…）</span>
+            )}
             {status === 'pending' ? (
               <span className="animate-pulse text-primary">▍</span>
             ) : null}
