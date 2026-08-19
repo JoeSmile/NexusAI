@@ -339,17 +339,176 @@ async def request_permission(
     return {"status": "pending", "request_id": row.id}
 
 
-# ── LLM API Key 管理 ──
+# ── LLM API Key 管理（单模型 + purpose=chat|embedding）──
 
 
 class CreateLlmKeyRequest(BaseModel):
     tenant_id: str | None = None
     key_alias: str
-    provider: str = "deepseek"
-    base_url: str = ""
+    provider: str = "chat"  # purpose: chat | embedding（兼容旧 deepseek/qwen → chat）
+    base_url: str
     api_key_plaintext: str
+    model: str | None = None
+    allowed_models: list[str] | None = None
     expires_in_days: int | None = None
     description: str = ""
+
+
+class PatchLlmKeyRequest(BaseModel):
+    key_alias: str | None = None
+    model: str | None = None
+    allowed_models: list[str] | None = None
+    base_url: str | None = None
+    api_key_plaintext: str | None = None
+    is_active: bool | None = None
+
+
+def _normalize_single_model(
+    *,
+    model: str | None = None,
+    allowed_models: list[str] | None = None,
+) -> list[str]:
+    candidates: list[str] = []
+    if isinstance(model, str) and model.strip():
+        candidates.append(model.strip())
+    if allowed_models:
+        candidates.extend(
+            m.strip() for m in allowed_models if isinstance(m, str) and m.strip()
+        )
+    # de-dupe preserve order
+    seen: set[str] = set()
+    models: list[str] = []
+    for m in candidates:
+        if m not in seen:
+            seen.add(m)
+            models.append(m)
+    if len(models) != 1:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "REQ_001",
+                "message": "exactly_one_model_required",
+            },
+        )
+    return models
+
+
+def _normalize_purpose(raw: str) -> str:
+    from backend.core.llm_credentials import normalize_purpose
+
+    try:
+        return normalize_purpose(raw)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "REQ_001", "message": "unsupported_provider"},
+        ) from exc
+
+
+def _mask_api_key(plaintext: str, *, edge: int = 8) -> str:
+    """前后各 edge 位，中间 ***；永不回传明文。"""
+    s = (plaintext or "").strip()
+    if not s:
+        return ""
+    if len(s) <= edge * 2:
+        return f"{s[:1]}***{s[-1:]}"
+    return f"{s[:edge]}***{s[-edge:]}"
+
+
+def _llm_key_row_dict(r) -> dict:
+    allowed = r.allowed_models if hasattr(r, "allowed_models") else []
+    if isinstance(allowed, str):
+        try:
+            allowed = json.loads(allowed)
+        except json.JSONDecodeError:
+            allowed = []
+    allowed_list = allowed or []
+    model = next(
+        (m for m in allowed_list if isinstance(m, str) and m.strip()),
+        None,
+    )
+    purpose = str(r.provider)
+    try:
+        from backend.core.llm_credentials import normalize_purpose
+
+        purpose = normalize_purpose(purpose)
+    except ValueError:
+        purpose = "chat" if purpose != "embedding" else "embedding"
+
+    key_preview = ""
+    enc = getattr(r, "encrypted_key", None)
+    if enc:
+        try:
+            from backend.core.key_manager import KeyManager
+
+            key_preview = _mask_api_key(KeyManager().decrypt(enc), edge=8)
+        except Exception:
+            key_preview = ""
+
+    return {
+        "id": r.id,
+        "tenant_id": r.tenant_id,
+        "key_alias": r.key_alias,
+        "provider": purpose,
+        "purpose": purpose,
+        "base_url": getattr(r, "base_url", None),
+        "model": model,
+        "allowed_models": allowed_list,
+        "key_preview": key_preview,
+        "owner_user_id": getattr(r, "owner_user_id", None),
+        "key_version": r.key_version,
+        "is_active": r.is_active,
+        "last_verified_ok": r.last_verified_ok,
+        "created_at": r.created_at.isoformat() if r.created_at else None,
+        "embedding_dimensions": 1536 if purpose == "embedding" else None,
+    }
+
+
+def _check_duplicate_active_model(
+    session,
+    *,
+    tenant_id: str,
+    purpose: str,
+    model: str,
+    exclude_id: int | None = None,
+) -> None:
+    """Same tenant + purpose + model name among active keys → 409."""
+    from backend.core.llm_credentials import is_chat_purpose, is_embedding_purpose
+
+    sql = text(
+        """
+        SELECT id, provider, allowed_models FROM llm_api_keys
+        WHERE tenant_id = :tid AND is_active = true
+          AND owner_user_id IS NULL
+          AND (:exclude_id IS NULL OR id != :exclude_id)
+        """
+    )
+    rows = session.execute(
+        sql,
+        {"tid": tenant_id, "exclude_id": exclude_id},
+    ).fetchall()
+    for row in rows:
+        prov = str(row.provider)
+        if purpose == "embedding":
+            if not is_embedding_purpose(prov):
+                continue
+        else:
+            if not is_chat_purpose(prov):
+                continue
+        allowed = row.allowed_models or []
+        if isinstance(allowed, str):
+            try:
+                allowed = json.loads(allowed)
+            except json.JSONDecodeError:
+                allowed = []
+        if not isinstance(allowed, list):
+            continue
+        for raw in allowed:
+            if isinstance(raw, str) and raw.strip() == model:
+                raise HTTPException(
+                    status_code=409,
+                    detail={"code": "LLM_KEY_003", "message": "duplicate_model"},
+                )
 
 
 @router.post("/llm-keys")
@@ -357,8 +516,24 @@ async def create_llm_key(
     req: CreateLlmKeyRequest,
     tenant: TenantContext = Depends(require_permission("admin:llm_key")),
 ):
-    """创建 LLM API Key（明文传入，加密存储）"""
+    """创建单条凭证：备注名 + Key + 模型名 + Base URL；provider=chat|embedding。"""
     from backend.core.key_manager import KeyManager
+
+    purpose = _normalize_purpose(req.provider)
+    allowed_models = _normalize_single_model(
+        model=req.model, allowed_models=req.allowed_models
+    )
+    base_url = (req.base_url or "").strip()
+    if not base_url:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "REQ_001", "message": "base_url_required"},
+        )
+    if not (req.api_key_plaintext or "").strip():
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "REQ_001", "message": "api_key_required"},
+        )
 
     km = KeyManager()
     encrypted = km.encrypt(req.api_key_plaintext)
@@ -366,14 +541,21 @@ async def create_llm_key(
 
     session_factory = get_pg_session()
     with session_factory.Session() as session:
+        _check_duplicate_active_model(
+            session,
+            tenant_id=target_tenant,
+            purpose=purpose,
+            model=allowed_models[0],
+        )
         sql = text(
             """
             INSERT INTO llm_api_keys
                 (tenant_id, key_alias, provider, base_url, encrypted_key,
-                 description, created_by, expires_at)
+                 allowed_models, owner_user_id, description, created_by, expires_at)
             VALUES
                 (:tid, :alias, :prov, :url, :enc,
-                 :desc, :by, now() + (:days * interval '1 day'))
+                 CAST(:models AS jsonb), NULL, :desc, :by,
+                 now() + (:days * interval '1 day'))
             RETURNING id, created_at
             """
         )
@@ -382,9 +564,10 @@ async def create_llm_key(
             {
                 "tid": target_tenant,
                 "alias": req.key_alias,
-                "prov": req.provider,
-                "url": req.base_url,
+                "prov": purpose,
+                "url": base_url,
                 "enc": encrypted,
+                "models": json.dumps(allowed_models),
                 "desc": req.description,
                 "by": tenant.user_id,
                 "days": req.expires_in_days or 365,
@@ -392,7 +575,12 @@ async def create_llm_key(
         ).fetchone()
         session.commit()
 
-    return {"id": row.id, "key_alias": req.key_alias, "status": "created"}
+    return {
+        "id": row.id,
+        "key_alias": req.key_alias,
+        "provider": purpose,
+        "status": "created",
+    }
 
 
 @router.get("/llm-keys")
@@ -406,8 +594,9 @@ async def list_llm_keys(
             sql = text(
                 """
                 SELECT id, tenant_id, key_alias, provider, base_url,
-                       key_version, is_active, expires_at, last_verified_ok,
-                       description, created_at, rotated_at
+                       allowed_models, owner_user_id, key_version, is_active,
+                       expires_at, last_verified_ok, description, created_at, rotated_at,
+                       encrypted_key
                 FROM llm_api_keys
                 ORDER BY created_at DESC
                 """
@@ -417,27 +606,142 @@ async def list_llm_keys(
             sql = text(
                 """
                 SELECT id, tenant_id, key_alias, provider, base_url,
-                       key_version, is_active, expires_at, last_verified_ok,
-                       description, created_at, rotated_at
+                       allowed_models, owner_user_id, key_version, is_active,
+                       expires_at, last_verified_ok, description, created_at, rotated_at,
+                       encrypted_key
                 FROM llm_api_keys
                 WHERE tenant_id = :tid
                 ORDER BY created_at DESC
                 """
             )
             rows = session.execute(sql, {"tid": tenant.tenant_id}).fetchall()
-    return [
-        {
-            "id": r.id,
-            "tenant_id": r.tenant_id,
-            "key_alias": r.key_alias,
-            "provider": r.provider,
-            "key_version": r.key_version,
-            "is_active": r.is_active,
-            "last_verified_ok": r.last_verified_ok,
-            "created_at": r.created_at.isoformat() if r.created_at else None,
-        }
-        for r in rows
-    ]
+    return [_llm_key_row_dict(r) for r in rows]
+
+
+@router.patch("/llm-keys/{key_id}")
+async def patch_llm_key(
+    key_id: int,
+    req: PatchLlmKeyRequest,
+    tenant: TenantContext = Depends(require_permission("admin:llm_key")),
+):
+    """更新凭证元数据（可选轮换明文 key）；不可改 purpose。"""
+    from backend.core.key_manager import KeyManager
+
+    params: dict[str, object] = {"id": key_id}
+
+    if req.model is not None or req.allowed_models is not None:
+        params["models"] = json.dumps(
+            _normalize_single_model(model=req.model, allowed_models=req.allowed_models)
+        )
+
+    if req.base_url is not None:
+        url = req.base_url.strip()
+        if not url:
+            raise HTTPException(
+                status_code=400,
+                detail={"code": "REQ_001", "message": "base_url_required"},
+            )
+        params["url"] = url
+
+    if req.key_alias is not None:
+        alias = req.key_alias.strip()
+        if not alias:
+            raise HTTPException(
+                status_code=400,
+                detail={"code": "REQ_001", "message": "key_alias_required"},
+            )
+        params["alias"] = alias
+
+    if req.api_key_plaintext is not None:
+        if not req.api_key_plaintext.strip():
+            raise HTTPException(
+                status_code=400,
+                detail={"code": "REQ_001", "message": "api_key_required"},
+            )
+        km = KeyManager()
+        params["enc"] = km.encrypt(req.api_key_plaintext)
+
+    if req.is_active is not None:
+        params["active"] = req.is_active
+
+    if len(params) == 1:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "REQ_001", "message": "no_fields_to_update"},
+        )
+
+    session_factory = get_pg_session()
+    with session_factory.Session() as session:
+        lookup_sql = text(
+            """
+            SELECT id, tenant_id, provider, is_active, allowed_models
+            FROM llm_api_keys
+            WHERE id = :id
+              AND (:cross OR tenant_id = :tid)
+            """
+        )
+        existing = session.execute(
+            lookup_sql,
+            {
+                "id": key_id,
+                "cross": tenant.is_cross_tenant,
+                "tid": tenant.tenant_id,
+            },
+        ).fetchone()
+        if existing is None:
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "AUTH_004", "message": "llm_key_not_found"},
+            )
+
+        purpose = _normalize_purpose(str(existing.provider))
+        model_for_dup: str | None = None
+        if "models" in params:
+            model_for_dup = json.loads(str(params["models"]))[0]
+        else:
+            allowed = existing.allowed_models or []
+            if isinstance(allowed, str):
+                try:
+                    allowed = json.loads(allowed)
+                except json.JSONDecodeError:
+                    allowed = []
+            if isinstance(allowed, list):
+                for raw in allowed:
+                    if isinstance(raw, str) and raw.strip():
+                        model_for_dup = raw.strip()
+                        break
+
+        activating = req.is_active is True or (
+            req.is_active is None and existing.is_active
+        )
+        if activating and model_for_dup:
+            _check_duplicate_active_model(
+                session,
+                tenant_id=str(existing.tenant_id),
+                purpose=purpose,
+                model=model_for_dup,
+                exclude_id=key_id,
+            )
+
+        set_parts: list[str] = []
+        if "models" in params:
+            set_parts.append("allowed_models = CAST(:models AS jsonb)")
+        if "url" in params:
+            set_parts.append("base_url = :url")
+        if "enc" in params:
+            set_parts.append("encrypted_key = :enc")
+        if "active" in params:
+            set_parts.append("is_active = :active")
+        if "alias" in params:
+            set_parts.append("key_alias = :alias")
+
+        sql = text(
+            f"UPDATE llm_api_keys SET {', '.join(set_parts)} WHERE id = :id"
+        )
+        session.execute(sql, params)
+        session.commit()
+
+    return {"status": "updated", "id": key_id}
 
 
 @router.delete("/llm-keys/{key_id}")

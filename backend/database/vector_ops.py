@@ -37,7 +37,7 @@ def add_chat_turn(
     """写入一轮对话并生成 embedding（替代 VectorStore.add_conversation）"""
     session_factory = get_pg_session()
     combined = f"用户: {user_message}\n助手: {assistant_message}"
-    emb = embed_text(combined)
+    emb = embed_text(combined, tenant_id=tenant_id)
     with session_factory.Session() as session:
         session.add(
             ChatMessage(
@@ -46,7 +46,7 @@ def add_chat_turn(
                 user_id=user_id,
                 role="user",
                 content=user_message,
-                embedding=embed_text(user_message),
+                embedding=embed_text(user_message, tenant_id=tenant_id),
             )
         )
         session.add(
@@ -96,20 +96,20 @@ def search_similar_conversations(
     min_score: float = 0.3,
 ) -> dict:
     """Chroma-compatible 返回结构: documents/metadatas/ids/distances"""
-    vec = embed_text(query)
+    vec = embed_text(query, tenant_id=tenant_id)
     session_factory = get_pg_session()
     vec_str = "[" + ",".join(str(v) for v in vec) + "]"
     with session_factory.Session() as session:
         sql = text(
             """
             SELECT id, session_id, content, created_at,
-                   1 - (embedding <=> :vec::vector) AS similarity
+                   1 - (embedding <=> CAST(:vec AS vector)) AS similarity
             FROM chat_messages
             WHERE tenant_id = :tid
               AND embedding IS NOT NULL
               AND (:sid IS NULL OR session_id = :sid)
-              AND 1 - (embedding <=> :vec::vector) >= :min_score
-            ORDER BY embedding <=> :vec::vector
+              AND 1 - (embedding <=> CAST(:vec AS vector)) >= :min_score
+            ORDER BY embedding <=> CAST(:vec AS vector)
             LIMIT :lim
             """
         )
@@ -156,7 +156,7 @@ def store_user_memory(
     embed: bool = True,
 ) -> int | None:
     """写入 UserMemory。``embed=False`` 跳过 embedding（pending 中间态，R5）。"""
-    emb = embed_text(f"{key} {value}") if embed else None
+    emb = embed_text(f"{key} {value}", tenant_id=tenant_id) if embed else None
     session_factory = get_pg_session()
     with session_factory.Session() as session:
         existing = (
@@ -237,7 +237,7 @@ def search_user_memories(
     domains: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     """检索用户长期记忆（Task 41 S2a：domains 过滤 + 排除 pending:*）。"""
-    vec = embed_text(query)
+    vec = embed_text(query, tenant_id=tenant_id)
     vec_str = "[" + ",".join(str(v) for v in vec) + "]"
     domain_clauses: list[str] = []
     params: dict[str, Any] = {
@@ -262,15 +262,15 @@ def search_user_memories(
         sql = text(
             f"""
             SELECT id, key, value, confidence, source, created_at,
-                   1 - (embedding <=> :vec::vector) AS similarity
+                   1 - (embedding <=> CAST(:vec AS vector)) AS similarity
             FROM user_memories
             WHERE tenant_id = :tid
               AND user_id = :uid
               AND embedding IS NOT NULL
               AND key NOT LIKE 'pending:%'
-              AND 1 - (embedding <=> :vec::vector) >= :min_score
+              AND 1 - (embedding <=> CAST(:vec AS vector)) >= :min_score
               {domain_sql}
-            ORDER BY embedding <=> :vec::vector
+            ORDER BY embedding <=> CAST(:vec AS vector)
             LIMIT :lim
             """
         )
@@ -300,7 +300,7 @@ def add_knowledge(
     source_type: str = "text",
     org_unit_id: str | None = None,
 ) -> int:
-    emb = embed_text(text)
+    emb = embed_text(text, tenant_id=tenant_id)
     meta = dict(metadata or {})
     if org_unit_id:
         meta.setdefault("org_unit_id", org_unit_id)
@@ -327,7 +327,7 @@ def search_knowledge(
     n_results: int = 5,
     min_score: float = 0.3,
 ) -> dict:
-    vec = embed_text(query)
+    vec = embed_text(query, tenant_id=tenant_id)
     vec_str = "[" + ",".join(str(v) for v in vec) + "]"
     session_factory = get_pg_session()
     with session_factory.Session() as session:
@@ -335,14 +335,14 @@ def search_knowledge(
             """
             SELECT kc.id, kc.category, kc.content, kc.meta, kc.org_unit_id,
                    ou.path AS org_path,
-                   1 - (kc.embedding <=> :vec::vector) AS similarity
+                   1 - (kc.embedding <=> CAST(:vec AS vector)) AS similarity
             FROM knowledge_chunks kc
             LEFT JOIN org_units ou
               ON ou.id = kc.org_unit_id AND ou.tenant_id = kc.tenant_id
             WHERE kc.tenant_id = :tid
               AND kc.embedding IS NOT NULL
-              AND 1 - (kc.embedding <=> :vec::vector) >= :min_score
-            ORDER BY kc.embedding <=> :vec::vector
+              AND 1 - (kc.embedding <=> CAST(:vec AS vector)) >= :min_score
+            ORDER BY kc.embedding <=> CAST(:vec AS vector)
             LIMIT :lim
             """
         )

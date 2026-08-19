@@ -85,13 +85,17 @@ function parseErrorPayload(data: unknown): {
 export type ApiFetchInit = RequestInit & {
   /** 跳过自动附 key / 401 跳转（如登录探活） */
   skipAuth?: boolean
+  /** 401 时不 clear / 不跳登录（轮询类接口） */
+  softAuth?: boolean
+  /** 403 时仍抛错，但不写 ForbiddenBanner（预期无权限的探活） */
+  quietForbidden?: boolean
 }
 
 export async function apiFetch(
   path: string,
   init: ApiFetchInit = {},
 ): Promise<Response> {
-  const { skipAuth, headers: initHeaders, ...rest } = init
+  const { skipAuth, softAuth, quietForbidden, headers: initHeaders, ...rest } = init
   const headers = new Headers(initHeaders)
 
   if (!skipAuth) {
@@ -101,7 +105,9 @@ export async function apiFetch(
       return keys[activeRole] || ''
     })()
     if (!token && !key) {
-      redirectToLogin()
+      if (!softAuth) {
+        redirectToLogin()
+      }
       throw new ApiError({
         status: 401,
         code: 'AUTH_001',
@@ -127,8 +133,10 @@ export async function apiFetch(
   const res = await fetch(path, { ...rest, headers })
 
   if (res.status === 401 && !skipAuth) {
-    useAuthStore.getState().clear()
-    redirectToLogin()
+    if (!softAuth) {
+      useAuthStore.getState().clear()
+      redirectToLogin()
+    }
     let body: unknown
     try {
       body = await res.clone().json()
@@ -153,13 +161,15 @@ export async function apiFetch(
     }
     const parsed = parseErrorPayload(body)
     const needed = parsed.needed || parsed.message
-    useForbiddenStore.getState().setForbidden({
-      code: parsed.code || 'AUTH_002',
-      needed,
-      message: parsed.message || 'forbidden',
-      path,
-      at: Date.now(),
-    })
+    if (!quietForbidden) {
+      useForbiddenStore.getState().setForbidden({
+        code: parsed.code || 'AUTH_002',
+        needed,
+        message: parsed.message || 'forbidden',
+        path,
+        at: Date.now(),
+      })
+    }
     throw new ApiError({
       status: 403,
       code: parsed.code || 'AUTH_002',

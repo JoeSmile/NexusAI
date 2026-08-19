@@ -24,6 +24,14 @@ from backend.core.harness.provider import (
 )
 
 
+async def _budget_allows(tenant_id: str, estimated: float) -> bool:
+    """mock/replay 不花钱,跳过预算检查(本地 demo/测试不被拦);
+    真实 provider(record/openai)保留预算拦截。"""
+    if get_llm_provider() in ("mock", "replay"):
+        return True
+    return await check_budget(tenant_id, estimated)
+
+
 class LLMHarness(Harness):
     """LLM 调用入口"""
 
@@ -40,7 +48,7 @@ class LLMHarness(Harness):
         **kwargs: Any,
     ) -> HarnessResult:
         estimated = estimate_cost(model, kwargs.get("max_tokens", 1000))
-        if not await check_budget(tenant_id, estimated):
+        if not await _budget_allows(tenant_id, estimated):
             return HarnessResult(
                 output="预算超限，请求被拒绝。",
                 type="llm",
@@ -146,7 +154,7 @@ class LLMHarness(Harness):
     ) -> AsyncIterator[str]:
         """真流式主体（已在并发槽内）。"""
         estimated = estimate_cost(model, kwargs.get("max_tokens", 1000))
-        if not await check_budget(tenant_id, estimated):
+        if not await _budget_allows(tenant_id, estimated):
             yield "预算超限，请求被拒绝。"
             return
 

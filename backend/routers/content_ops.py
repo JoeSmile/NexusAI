@@ -10,7 +10,8 @@ from pydantic import BaseModel, Field
 
 from backend.core.auth.dual_auth import verify_human_or_legacy_key
 from backend.core.auth.models import TenantContext
-from backend.core.content_ops.hotspot import dig_hotspots
+from backend.core.content_ops.dig_persist import persist_dig_result
+from backend.core.content_ops.hotspot import HotspotCrawlError, dig_hotspots
 from backend.core.content_ops.offerings import get_offering, list_offerings
 from backend.core.content_ops.script_gen import generate_script
 from backend.core.content_ops.style import (
@@ -22,6 +23,7 @@ from backend.core.content_ops.style import (
     set_org_content_profile,
     upsert_content_style,
 )
+from backend.core.content_ops.workflow_seed import ensure_builtin_hotspot_workflow
 from backend.database.pgvector_session import ContentArtifact, get_pg_session
 
 router = APIRouter(tags=["content-ops"])
@@ -52,7 +54,12 @@ class HotspotBody(BaseModel):
     adapter: str = "topic_agent"
     categories: list[str] | None = None
     keywords: str | None = None
+    exclude_keywords: str | None = None
     paste_text: str | None = None
+    industry: str | None = None
+    region: str | None = None
+    use_org_profile: bool = True
+    user_note: str | None = None
     save: bool = True
 
 
@@ -253,31 +260,45 @@ async def api_dig_hotspots(
     body: HotspotBody,
     tenant: TenantContext = Depends(verify_human_or_legacy_key),
 ) -> dict[str, Any]:
+    """Dig + 归一化合并进今日合集；同 content_hash 抓取记录幂等不重复落库。"""
     sf = get_pg_session()
     with sf.Session() as session:
-        org = get_org_content_profile(session, tenant.tenant_id)
-        result = dig_hotspots(
-            adapter=body.adapter,  # type: ignore[arg-type]
-            categories=body.categories,
-            keywords=body.keywords,
-            paste_text=body.paste_text,
-            org_profile=org,
+        ensure_builtin_hotspot_workflow(
+            session,
+            tenant_id=tenant.tenant_id,
+            created_by=tenant.user_id,
         )
-        artifact_id = None
-        if body.save:
-            artifact_id = str(uuid.uuid4())
-            session.add(
-                ContentArtifact(
-                    id=artifact_id,
-                    tenant_id=tenant.tenant_id,
-                    kind="hotspot",
-                    title=f"热点 {result.get('count', 0)} 条",
-                    body=result,
-                    content_hash=result.get("content_hash"),
-                )
+        org = get_org_content_profile(session, tenant.tenant_id)
+        try:
+            result = dig_hotspots(
+                adapter=body.adapter or "topic_agent",  # type: ignore[arg-type]
+                categories=body.categories,
+                keywords=body.keywords,
+                exclude_keywords=body.exclude_keywords,
+                paste_text=body.paste_text,
+                org_profile=org,
+                industry=body.industry,
+                region=body.region,
+                use_org_profile=body.use_org_profile,
+                user_note=body.user_note,
             )
+        except HotspotCrawlError as e:
+            raise HTTPException(
+                status_code=502,
+                detail={
+                    "code": "HOTSPOT_CRAWL_FAILED",
+                    "message": str(e),
+                    "crawl": e.crawl_meta,
+                },
+            ) from e
+        out = persist_dig_result(
+            session,
+            tenant_id=tenant.tenant_id,
+            result=result,
+            save=body.save,
+        )
         session.commit()
-    return {**result, "artifact_id": artifact_id}
+    return out
 
 
 @router.post("/api/content/scripts/generate")
@@ -285,12 +306,47 @@ async def api_generate_script(
     body: ScriptBody,
     tenant: TenantContext = Depends(verify_human_or_legacy_key),
 ) -> dict[str, Any]:
+    if not body.hotspots:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "REQ_001",
+                "message": "hotspots_required",
+            },
+        )
     sf = get_pg_session()
     with sf.Session() as session:
         style = resolve_style_for_generate(
             session, tenant.tenant_id, body.creator_id
         )
         org = get_org_content_profile(session, tenant.tenant_id)
+        from backend.core.content_ops.script_gen import build_script_prompt
+        from backend.logging_config import get_logger
+
+        _log = get_logger(__name__)
+        _prompt = build_script_prompt(
+            style=style or {},
+            org_profile=org or {},
+            hotspots=body.hotspots,
+            duration_sec=body.duration_sec,
+            platform=body.platform,
+            extra_instruction=body.extra_instruction,
+        )
+        _log.info(
+            "script.gen context tenant=%s creator=%s style_keys=%s org_keys=%s "
+            "hotspots=%s duration=%s extra=%s\nprompt:\n%s",
+            tenant.tenant_id,
+            body.creator_id,
+            list((style or {}).keys()),
+            list((org or {}).keys()),
+            [
+                {"title": h.get("title"), "summary": (h.get("summary") or "")[:80]}
+                for h in (body.hotspots or [])[:5]
+            ],
+            body.duration_sec,
+            (body.extra_instruction or "")[:200],
+            _prompt,
+        )
         out = await generate_script(
             tenant_id=tenant.tenant_id,
             style=style,
@@ -317,6 +373,64 @@ async def api_generate_script(
             )
         session.commit()
     return {**out, "artifact_id": artifact_id}
+
+
+
+class HotspotExcludeBody(BaseModel):
+    title: str = Field(..., min_length=1)
+
+
+@router.post("/api/content/hotspots/exclude")
+async def exclude_hotspot_from_day(
+    body: HotspotExcludeBody,
+    tenant: TenantContext = Depends(verify_human_or_legacy_key),
+) -> dict[str, Any]:
+    """Soft-delete a title from today\'s hotspot pool; dig will skip it later."""
+    from datetime import date
+
+    from backend.core.content_ops.dig_persist import _title_excluded
+    from backend.core.content_ops.hotspot import day_collection_hash
+
+    day = date.today().isoformat()
+    day_hash = day_collection_hash(tenant.tenant_id, day)
+    sf = get_pg_session()
+    with sf.Session() as session:
+        day_row = (
+            session.query(ContentArtifact)
+            .filter(
+                ContentArtifact.tenant_id == tenant.tenant_id,
+                ContentArtifact.kind == "hotspot_day",
+                ContentArtifact.content_hash == day_hash,
+            )
+            .one_or_none()
+        )
+        if day_row is None:
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "HOTSPOT_DAY_EMPTY", "message": "no_day_collection"},
+            )
+        body_obj = dict(day_row.body or {}) if isinstance(day_row.body, dict) else {}
+        items = list(body_obj.get("items") or [])
+        excluded = [str(x) for x in (body_obj.get("excluded") or []) if x]
+        title = body.title.strip()
+        kept = [
+            it
+            for it in items
+            if not _title_excluded(str(it.get("title") or ""), [title])
+        ]
+        if title and not _title_excluded(title, excluded):
+            excluded.append(title)
+        body_obj["items"] = kept
+        body_obj["count"] = len(kept)
+        body_obj["excluded"] = excluded
+        day_row.body = body_obj
+        session.commit()
+    return {
+        "ok": True,
+        "title": title,
+        "remaining": len(kept),
+        "excluded_count": len(excluded),
+    }
 
 
 @router.get("/api/content/artifacts")

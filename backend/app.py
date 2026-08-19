@@ -250,6 +250,13 @@ def create_app() -> FastAPI:
     _lazy_include(
         app, "backend.pipeline.router", "router", required=True, label="LangGraph 管线"
     )
+    _lazy_include(
+        app,
+        "backend.routers.chat_history",
+        "router",
+        required=True,
+        label="Chat 历史",
+    )
     _lazy_include(app, "backend.routers", "memory_router", required=True)
     _lazy_include(app, "backend.routers", "feedback_router", required=True)
     _lazy_include(app, "backend.routers", "evaluation_router", required=True)
@@ -301,6 +308,21 @@ def create_app() -> FastAPI:
         "router",
         required=True,
         label="Content ops / offerings",
+    )
+    _lazy_include(
+        app,
+        "backend.routers.social",
+        "router",
+        required=True,
+        label="Social benchmark (TikHub)",
+    )
+    _lazy_include(
+        app,
+        "backend.routers.llm_public",
+        "router",
+        prefix="/api",
+        required=True,
+        label="LLM public models",
     )
     _lazy_include(
         app,

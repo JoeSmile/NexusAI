@@ -86,6 +86,12 @@ def list_offerings(
     dept: str | None = None,
 ) -> list[dict[str, Any]]:
     ensure_default_offerings(session)
+    try:
+        from backend.core.content_ops.workflow_seed import ensure_builtin_hotspot_workflow
+
+        ensure_builtin_hotspot_workflow(session, tenant_id=tenant_id)
+    except Exception:
+        pass
     q = session.query(Offering).filter(
         (Offering.tenant_id == "*") | (Offering.tenant_id == tenant_id)
     )

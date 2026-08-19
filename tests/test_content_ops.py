@@ -29,7 +29,7 @@ def test_resolve_style_defaults_without_row():
 
 
 def test_hotspot_seed_and_paste():
-    seeded = dig_hotspots(adapter="seed", categories=["教育"])
+    seeded = dig_hotspots(adapter="seed", categories=["K12"])
     assert seeded["count"] >= 1
     assert seeded["content_hash"]
     pasted = dig_hotspots(
@@ -40,15 +40,46 @@ def test_hotspot_seed_and_paste():
     assert "开学焦虑" in pasted["items"][0]["title"]
 
 
-def test_hotspot_topic_agent_uses_org():
+def test_hotspot_exclude_keywords():
     out = dig_hotspots(
-        adapter="topic_agent",
-        org_profile={"industry": "K12", "product_focus": "口才课", "target_audience": "小学生家长"},
-        keywords="习惯",
+        adapter="seed",
+        exclude_keywords="AI,晚托",
     )
-    assert out["count"] >= 1
-    titles = " ".join(i["title"] for i in out["items"])
-    assert "口才课" in titles or "习惯" in titles or out["items"]
+    blob = " ".join(f"{i['title']}{i['summary']}" for i in out["items"])
+    assert "AI" not in blob
+    assert "晚托" not in blob
+
+
+def test_normalize_title_token_order_and_near_miss():
+    from backend.core.content_ops.hotspot import (
+        annotate_similar_to_previous,
+        merge_hotspot_pool,
+        titles_are_duplicate,
+    )
+
+    assert titles_are_duplicate("北京社保", "社保北京")
+    assert not titles_are_duplicate("社保新规", "社保新政")
+
+    pool, new_n, skipped = merge_hotspot_pool(
+        [{"title": "北京社保", "summary": "a", "score": 80}],
+        [{"title": "社保北京", "summary": "b", "score": 90}],
+    )
+    assert new_n == 0 and skipped == 1
+    assert len(pool) == 1
+    assert pool[0]["score"] == 90
+
+    marked = annotate_similar_to_previous(
+        [{"title": "社保新政", "summary": ""}],
+        [{"title": "社保新规", "summary": ""}],
+    )
+    # 规/政 差一字 → Jaccard < 0.9，不标近似
+    assert marked[0]["similar_to_previous"] is False
+
+    marked2 = annotate_similar_to_previous(
+        [{"title": "一二三四五六七八九", "summary": ""}],
+        [{"title": "一二三四五六七八九十", "summary": ""}],
+    )
+    assert marked2[0]["similar_to_previous"] is True
 
 
 def test_script_prompt_includes_style_and_org():

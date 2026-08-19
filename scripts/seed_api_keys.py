@@ -6,6 +6,12 @@
 - 因此重复 seed 不会 SKIPPED,每次跑完都有一套可用 key。
 同时 upsert 同名测试账号(users 表,密码统一 bcrypt("123456")),供密码登录使用。
 明文 key 仍只存 stdout(数据库只存 SHA256 哈希,丢了不可恢复)。
+
+--- 上线开户(方案 2 · sales-led)---
+产品侧已关闭公开注册。给客户开租户 = 往 KEYS_TO_CREATE 追加一行
+  {tenant_id, user_id, role: tenant_admin, description}
+再跑本脚本;客户用 username=user_id / 密码=123456(或改 TEST_PASSWORD)登录。
+勿依赖 POST /api/auth/register 当入驻入口(全员会掉进 acme)。
 """
 
 import hashlib

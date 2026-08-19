@@ -4,11 +4,9 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![CI](https://github.com/JoeSmile/NexusAI/actions/workflows/ci.yml/badge.svg)](https://github.com/JoeSmile/NexusAI/actions/workflows/ci.yml)
 
-**The Governance Hub for Enterprise AI** — 企业 AI 中台的治理入口。
+**The Intelligent Gateway for LLM Context Management** — 企业 AI 中台的治理入口。
 
-企业已有业务中台与数据中台，缺的是 **AI 中台**。
-NexusAI 补上这一层：统一接入、能力编排、数据连接、合规兜底。
-编排可来自 Dify/Coze/自研，**执行与数据调用经治理入口**——不另造通用拖拽引擎，也不替代业务/数据中台。
+企业已有业务中台与数据中台，缺的是 **AI 中台**。NexusAI 补上这一层：统一接入、能力编排、数据连接、合规兜底。编排可来自 Dify/Coze/自研，**执行与数据调用经治理入口**——不另造通用拖拽引擎，也不替代业务/数据中台。私有化可部署，面向数据不出域的多租户场景。
 
 [简体中文](README.md) · [English](README.en.md)
 
@@ -19,8 +17,9 @@ NexusAI 补上这一层：统一接入、能力编排、数据连接、合规兜
 | 我们做 | 我们不做 |
 |--------|----------|
 | 认证 / 多租户 RBAC / 审计 / 护栏 / 预算与密钥治理 | 再造一个通用 Agent 拖拽编排器 |
-| Chat 管线 + Capability Hub + RAG，私有化可部署 | 替代业务中台 / 数据中台 |
+| Chat 管线 + Capability Hub + RAG + 内容运营，私有化可部署 | 替代业务中台 / 数据中台 |
 | 模型可换（OpenAI 兼容 + mock/record/replay） | 绑定单一云厂商模型 |
+| 租户自带模型 Key（BYOK），公司统一兜底 | 锁死在平台方模型账号 |
 
 完整定位与五层推导见 [`docs/strategy/AI_MIDDLE_PLATFORM.md`](docs/strategy/AI_MIDDLE_PLATFORM.md)。
 
@@ -37,6 +36,10 @@ NexusAI 补上这一层：统一接入、能力编排、数据连接、合规兜
 | Guardrails | ✅ | Injection block · PII redact · output checks · circuit breaker |
 | Observability | ✅ | LangFuse traces · Prometheus `/metrics` |
 | LLM key governance | ✅ | Encrypted keys · failover chain · harness providers |
+| Tenant LLM credentials (BYOK) | 🚧 | Per-tenant keys + provider failover (Task 49) |
+| Content ops APIs | 🚧 | Hotspot / script-gen / offerings / style assets (Task 45) |
+| App Shell frontend | 🚧 | Marketing `/` · login · workspace · admin (Task 47) |
+| Social benchmark (TikHub) | 🚧 | `/api/social` — account probe / analysis / export (Task 52) |
 | Password login (test FE) | ✅ | Issues `cg_` API keys (Task 38) |
 | Workbench buttons / OA connectors | ⏳ | Planned — IT-orchestrated chains first |
 | Self-serve workflow canvas | ⏸ | V2 — not in current scope |
@@ -46,7 +49,7 @@ NexusAI 补上这一层：统一接入、能力编排、数据连接、合规兜
 ```text
 Access          Chat · API (X-API-Key / HMAC) · Capability invoke · (workbench planned)
 Orchestration   Capability registry / chains · LangGraph chat DAG · short/long path
-Data            RAG / pgvector · (OA & finance connectors planned)
+Data            RAG / pgvector · content ops (hotspot / script) · (OA & finance connectors planned)
 Governance      RBAC · audit · guardrails · rate limit · budget hooks
 Cross-cutting   LangFuse · Prometheus · model registry · LLMHarness · Redis cache
 ```
@@ -89,7 +92,7 @@ uv run uvicorn backend.app:app --reload --port 8000
 # 5. Smoke
 curl -s http://localhost:8000/health
 curl -s -X POST http://localhost:8000/chat \
-  -H "X-API-Key: <paste-key-from-seed>" \
+  -H "X-API-Key: <paste...ed>" \
   -H "Content-Type: application/json" \
   -d '{"message":"你好","session_id":"demo","user_id":"alice"}'
 ```
@@ -113,13 +116,13 @@ Copy `config.env.example` → `config.env` for LangFuse / LLM provider settings.
 ## Project layout
 
 ```text
-backend/          FastAPI app, pipeline, core auth/harness, modules (rag/intent/llm)
-frontend/         Vite test console (panels for chat, RAG, admin, audit, …)
+backend/          FastAPI app, pipeline, core auth/harness, modules (rag/intent/llm/content_ops/social)
+frontend/         App Shell (marketing + workspace + admin, SSE chat)
 scripts/          seed, audit consistency, service helpers
 examples/qa/      Manual QA scripts & journeys
 learning/         Interview-oriented module deep-dives
 docs/             Architecture, deployment, strategy, manual test
-tasks/            Active design notes (e.g. Task 39 preprocess)
+tasks/            Active design notes (e.g. Task 45 content ops / Task 47 app shell)
 ```
 
 ## Documentation

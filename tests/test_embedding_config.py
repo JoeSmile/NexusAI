@@ -232,3 +232,101 @@ def test_dashscope_ignores_llm_api_key_alone(monkeypatch):
     assert called["n"] == 0
     assert emb.embedding_uses_hash_fallback() is True
     assert emb.embedding_model_label().endswith("(hash)")
+
+
+def test_embed_text_uses_tenant_embedding_credential(monkeypatch):
+    import backend.database.embeddings as emb
+    from backend.core.key_repository import LLMKey
+
+    monkeypatch.setenv("QWEN_API_KEY", "sk-should-not-use")
+    monkeypatch.setenv("EMBEDDING_DIMENSIONS", "768")
+
+    key = LLMKey(
+        id="9",
+        tenant_id="acme",
+        provider="embedding",
+        base_url="https://tenant.embed.example/v1",
+        api_key="sk-tenant-embed",
+        key_version=1,
+        is_active=True,
+        expires_at=None,
+    )
+
+    monkeypatch.setattr(
+        "backend.core.llm_credentials.resolve_embedding_credential_sync",
+        lambda tid: (key, "text-embedding-3-small"),
+    )
+
+    created: dict = {}
+    client_kwargs: dict = {}
+
+    class _Resp:
+        data = [SimpleNamespace(embedding=[0.2] * 1536)]
+
+    class _Embeddings:
+        def create(self, **kwargs):
+            created.update(kwargs)
+            return _Resp()
+
+    class _Client:
+        def __init__(self, **k):
+            client_kwargs.update(k)
+            self.embeddings = _Embeddings()
+
+    monkeypatch.setattr("openai.OpenAI", _Client)
+
+    vec = emb.embed_text("tenant path", tenant_id="acme")
+    assert created["model"] == "text-embedding-3-small"
+    assert created["dimensions"] == 1536
+    assert client_kwargs.get("api_key") == "sk-tenant-embed"
+    assert "tenant.embed.example" in str(client_kwargs.get("base_url") or "")
+    assert len(vec) == emb.EMBED_DIM
+
+
+def test_embed_text_tenant_missing_falls_back_to_registry(monkeypatch):
+    """未配租户 embedding 凭证时必须回退 env/registry，禁止静默哈希废检索。"""
+    import backend.core.model_registry as mr
+    import backend.database.embeddings as emb
+    from backend.core.errors import NexusAIException
+
+    monkeypatch.setenv(
+        "MODEL_REGISTRY_JSON",
+        '[{"name":"text-embedding-v3","provider":"qwen",'
+        '"base_url":"https://dashscope.example/v1",'
+        '"api_key_ref":"QWEN_API_KEY","capability":"embedding",'
+        '"cost_per_1k":0.0001}]',
+    )
+    monkeypatch.setenv("QWEN_API_KEY", "sk-registry")
+    monkeypatch.setenv("EMBEDDING_DIMENSIONS", "768")
+    mr.reload_registry()
+
+    def _missing(_tid: str):
+        raise NexusAIException("LLM_KEY_001", "tenant_embedding_key_missing")
+
+    monkeypatch.setattr(
+        "backend.core.llm_credentials.resolve_embedding_credential_sync",
+        _missing,
+    )
+
+    created: dict = {}
+    client_kwargs: dict = {}
+
+    class _Resp:
+        data = [SimpleNamespace(embedding=[0.1] * 768)]
+
+    class _Embeddings:
+        def create(self, **kwargs):
+            created.update(kwargs)
+            return _Resp()
+
+    class _Client:
+        def __init__(self, **k):
+            client_kwargs.update(k)
+            self.embeddings = _Embeddings()
+
+    monkeypatch.setattr("openai.OpenAI", _Client)
+
+    vec = emb.embed_text("fallback path", tenant_id="acme-no-embed")
+    assert created["model"] == "text-embedding-v3"
+    assert client_kwargs.get("api_key") == "sk-registry"
+    assert len(vec) == emb.EMBED_DIM

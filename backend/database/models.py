@@ -167,15 +167,17 @@ class SystemLog(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class UserFeedback(Base):
-    """用户反馈表"""
+    """用户反馈表（47b：评价一行 U1 + bookmark 一行；含 tenant / client_message_id）"""
     __tablename__ = "user_feedback"
     
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, default="", index=True)
     session_id = Column(String(100), index=True)
     user_id = Column(String(100), index=True)
     message_id = Column(BigInteger, index=True)  # 关联到chat_messages.id
-    feedback_type = Column(String(50))  # irrelevant(答非所问), overstepping(越界建议), helpful(有帮助), other
-    rating = Column(Integer)  # 1-5分评分
+    client_message_id = Column(String(64), nullable=True, index=True)
+    feedback_type = Column(String(50))  # helpful / irrelevant / bookmark / overstepping / other
+    rating = Column(Integer)  # 1-5；bookmark 允许 NULL
     comment = Column(Text)  # 用户的详细评论
     user_message = Column(Text)  # 用户消息内容（快照）
     bot_response = Column(Text)  # 机器人回复内容（快照）
@@ -555,63 +557,235 @@ class DatabaseManager:
             self.db.rollback()
             raise e
     
-    def save_feedback(self, session_id, user_id, message_id, feedback_type, rating, comment, user_message, bot_response):
-        """保存用户反馈"""
-        feedback = UserFeedback(
-            session_id=session_id,
-            user_id=user_id,
-            message_id=message_id,
-            feedback_type=feedback_type,
-            rating=rating,
-            comment=comment,
-            user_message=user_message,
-            bot_response=bot_response
-        )
+    def save_feedback(
+        self,
+        session_id,
+        user_id,
+        message_id,
+        feedback_type,
+        rating,
+        comment,
+        user_message,
+        bot_response,
+        *,
+        tenant_id: str = "",
+        client_message_id: str | None = None,
+    ):
+        """Upsert 用户反馈（U1：评价一行；bookmark 另条；PG ON CONFLICT）。"""
+        from sqlalchemy import text
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+        tid = tenant_id or ""
+        cid = (client_message_id or "").strip() or None
+        ftype = (feedback_type or "").strip()
+        values = {
+            "tenant_id": tid,
+            "session_id": session_id,
+            "user_id": user_id,
+            "message_id": message_id,
+            "client_message_id": cid,
+            "feedback_type": ftype,
+            "rating": rating,
+            "comment": comment or "",
+            "user_message": user_message or "",
+            "bot_response": bot_response or "",
+        }
+
+        bind = self.db.get_bind()
+        dialect = getattr(bind.dialect, "name", "") if bind is not None else ""
+
+        if dialect == "postgresql" and cid:
+            reaction = ftype in ("helpful", "irrelevant")
+            bookmark = ftype == "bookmark"
+            if reaction or bookmark:
+                stmt = pg_insert(UserFeedback).values(**values)
+                where = (
+                    text(
+                        "client_message_id IS NOT NULL AND "
+                        "feedback_type IN ('helpful', 'irrelevant')"
+                    )
+                    if reaction
+                    else text(
+                        "client_message_id IS NOT NULL AND feedback_type = 'bookmark'"
+                    )
+                )
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=["tenant_id", "user_id", "client_message_id"],
+                    index_where=where,
+                    set_={
+                        "feedback_type": ftype,
+                        "rating": rating,
+                        "comment": values["comment"],
+                        "user_message": values["user_message"],
+                        "bot_response": values["bot_response"],
+                        "session_id": session_id,
+                        "message_id": message_id,
+                    },
+                ).returning(UserFeedback.id)
+                row_id = self.db.execute(stmt).scalar_one()
+                self.db.commit()
+                return (
+                    self.db.query(UserFeedback)
+                    .filter(UserFeedback.id == row_id)
+                    .one()
+                )
+
+        # 非 PG / 无 client_message_id：兼容路径（测试或旧调用）
+        if cid and ftype in ("helpful", "irrelevant"):
+            existing = (
+                self.db.query(UserFeedback)
+                .filter(
+                    UserFeedback.tenant_id == tid,
+                    UserFeedback.user_id == user_id,
+                    UserFeedback.client_message_id == cid,
+                    UserFeedback.feedback_type.in_(("helpful", "irrelevant")),
+                )
+                .first()
+            )
+            if existing:
+                existing.feedback_type = ftype
+                existing.rating = rating
+                existing.comment = values["comment"]
+                existing.user_message = values["user_message"]
+                existing.bot_response = values["bot_response"]
+                existing.session_id = session_id
+                existing.message_id = message_id
+                self.db.commit()
+                self.db.refresh(existing)
+                return existing
+        if cid and ftype == "bookmark":
+            existing = (
+                self.db.query(UserFeedback)
+                .filter(
+                    UserFeedback.tenant_id == tid,
+                    UserFeedback.user_id == user_id,
+                    UserFeedback.client_message_id == cid,
+                    UserFeedback.feedback_type == "bookmark",
+                )
+                .first()
+            )
+            if existing:
+                existing.rating = rating
+                existing.comment = values["comment"]
+                existing.user_message = values["user_message"]
+                existing.bot_response = values["bot_response"]
+                existing.session_id = session_id
+                existing.message_id = message_id
+                self.db.commit()
+                self.db.refresh(existing)
+                return existing
+
+        feedback = UserFeedback(**values)
         self.db.add(feedback)
         self.db.commit()
         self.db.refresh(feedback)
         return feedback
-    
-    def get_all_feedback(self, feedback_type=None, limit=1000):
-        """获取所有反馈"""
+
+    def get_all_feedback(self, feedback_type=None, limit=1000, tenant_id: str | None = None):
+        """获取反馈列表（可选租户过滤；空 tenant_id 行不进租户视图）。"""
         query = self.db.query(UserFeedback)
+        if tenant_id is not None:
+            query = query.filter(
+                UserFeedback.tenant_id == tenant_id,
+                UserFeedback.tenant_id != "",
+            )
         if feedback_type:
             query = query.filter(UserFeedback.feedback_type == feedback_type)
         return query.order_by(UserFeedback.created_at.desc()).limit(limit).all()
-    
-    def get_feedback_by_session(self, session_id):
+
+    def list_my_feedback(
+        self,
+        *,
+        tenant_id: str,
+        user_id: str,
+        feedback_type: str | None = None,
+        session_id: str | None = None,
+        limit: int = 50,
+    ):
+        query = self.db.query(UserFeedback).filter(
+            UserFeedback.tenant_id == tenant_id,
+            UserFeedback.user_id == user_id,
+        )
+        if feedback_type:
+            query = query.filter(UserFeedback.feedback_type == feedback_type)
+        if session_id:
+            query = query.filter(UserFeedback.session_id == session_id)
+        total = query.count()
+        items = (
+            query.order_by(UserFeedback.created_at.desc()).limit(limit).all()
+        )
+        return items, total
+
+    def get_feedback_owned(
+        self, *, feedback_id: int, tenant_id: str, user_id: str
+    ):
+        return (
+            self.db.query(UserFeedback)
+            .filter(
+                UserFeedback.id == feedback_id,
+                UserFeedback.tenant_id == tenant_id,
+                UserFeedback.user_id == user_id,
+            )
+            .first()
+        )
+
+    def delete_feedback_owned(
+        self, *, feedback_id: int, tenant_id: str, user_id: str
+    ) -> bool:
+        row = self.get_feedback_owned(
+            feedback_id=feedback_id, tenant_id=tenant_id, user_id=user_id
+        )
+        if not row:
+            return False
+        self.db.delete(row)
+        self.db.commit()
+        return True
+
+    def get_feedback_by_session(self, session_id, tenant_id: str | None = None):
         """获取特定会话的反馈"""
-        return self.db.query(UserFeedback)\
-            .filter(UserFeedback.session_id == session_id)\
-            .order_by(UserFeedback.created_at.desc())\
-            .all()
-    
-    def get_feedback_statistics(self):
-        """获取反馈统计信息"""
+        q = self.db.query(UserFeedback).filter(UserFeedback.session_id == session_id)
+        if tenant_id is not None:
+            q = q.filter(UserFeedback.tenant_id == tenant_id)
+        return q.order_by(UserFeedback.created_at.desc()).all()
+
+    def get_feedback_statistics(self, tenant_id: str | None = None):
+        """获取反馈统计信息（排除 bookmark；可选租户）。"""
         from sqlalchemy import func
-        
-        # 按类型统计
-        type_stats = self.db.query(
-            UserFeedback.feedback_type,
-            func.count(UserFeedback.id).label('count'),
-            func.avg(UserFeedback.rating).label('avg_rating')
-        ).group_by(UserFeedback.feedback_type).all()
-        
-        # 总体统计
-        total_count = self.db.query(func.count(UserFeedback.id)).scalar()
-        avg_rating = self.db.query(func.avg(UserFeedback.rating)).scalar()
-        
+
+        filters = [UserFeedback.feedback_type != "bookmark"]
+        if tenant_id is not None:
+            filters.append(UserFeedback.tenant_id == tenant_id)
+            filters.append(UserFeedback.tenant_id != "")
+
+        type_stats = (
+            self.db.query(
+                UserFeedback.feedback_type,
+                func.count(UserFeedback.id).label("count"),
+                func.avg(UserFeedback.rating).label("avg_rating"),
+            )
+            .filter(*filters)
+            .group_by(UserFeedback.feedback_type)
+            .all()
+        )
+
+        total_count = (
+            self.db.query(func.count(UserFeedback.id)).filter(*filters).scalar()
+        )
+        avg_rating = (
+            self.db.query(func.avg(UserFeedback.rating)).filter(*filters).scalar()
+        )
+
         return {
-            'total_count': total_count or 0,
-            'avg_rating': float(avg_rating) if avg_rating else 0.0,
-            'by_type': [
+            "total_count": total_count or 0,
+            "avg_rating": float(avg_rating) if avg_rating else 0.0,
+            "by_type": [
                 {
-                    'type': stat.feedback_type,
-                    'count': stat.count,
-                    'avg_rating': float(stat.avg_rating) if stat.avg_rating else 0.0
+                    "type": stat.feedback_type,
+                    "count": stat.count,
+                    "avg_rating": float(stat.avg_rating) if stat.avg_rating else 0.0,
                 }
                 for stat in type_stats
-            ]
+            ],
         }
     
     def mark_feedback_resolved(self, feedback_id):

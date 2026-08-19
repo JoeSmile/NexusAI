@@ -25,6 +25,9 @@ class PipelineState(TypedDict):
     assembled_prompt: str | None
     gate_reason: str | None
     cache_bypass: bool  # Task 39 GAP-2 / 40.86：触发型消息不查不写 exact
+    # 47b I1 — FE bubble UUIDs persisted on write_memory
+    user_client_message_id: str | None
+    assistant_client_message_id: str | None
 
     # ── 记忆 ──
     hot_memory: list[dict]
@@ -48,6 +51,7 @@ class PipelineState(TypedDict):
 
     # ── 路由 ──
     selected_model: str
+    preferred_model: str | None  # 用户在壳内显式选择；优先于 intent 路由
     estimated_cost: float
     llm_tools: list[dict]
 
@@ -94,6 +98,9 @@ def make_initial_state(
     message: str,
     user_context: dict | None = None,
     trace_id: str | None = None,
+    preferred_model: str | None = None,
+    user_client_message_id: str | None = None,
+    assistant_client_message_id: str | None = None,
 ) -> PipelineState:
     """创建初始 PipelineState"""
     return {
@@ -113,6 +120,9 @@ def make_initial_state(
         "assembled_prompt": None,
         "gate_reason": None,
         "cache_bypass": False,
+        "user_client_message_id": (user_client_message_id or "").strip() or None,
+        "assistant_client_message_id": (assistant_client_message_id or "").strip()
+        or None,
         "hot_memory": [],
         "warm_memory": {},
         "cold_memory": [],
@@ -126,6 +136,7 @@ def make_initial_state(
         "prompt_injection_detected": False,
         "guardrails_passed": True,
         "selected_model": "deepseek-v4-flash",
+        "preferred_model": (preferred_model or "").strip() or None,
         "estimated_cost": 0.0,
         "llm_tools": [],
         "response": "",

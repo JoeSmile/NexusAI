@@ -12,12 +12,15 @@ from datetime import datetime
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     Column,
     DateTime,
     Float,
+    ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -27,6 +30,9 @@ from sqlalchemy import (
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 Base = declarative_base()
+
+# BigInteger PK on PG; Integer+autoincrement on SQLite (unit tests)
+_PK = BigInteger().with_variant(Integer, "sqlite")
 
 
 class ChatSession(Base):
@@ -49,6 +55,8 @@ class ChatMessage(Base):
     user_id = Column(String(100), nullable=False, index=True)
     role = Column(String(20), nullable=False)
     content = Column(Text, nullable=False)
+    # 47b I1: FE UUID; history returns as-is for feedback hydrate
+    client_message_id = Column(String(64), nullable=True, index=True)
     embedding = Column(Vector(1536), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -212,6 +220,8 @@ class LlmApiKey(Base):
     consecutive_failures = Column(Integer, default=0, nullable=False)  # Task 27: 摘除依据
     description = Column(Text, default="")
     created_by = Column(String(128))
+    allowed_models = Column(JSON, default=list, nullable=False)
+    owner_user_id = Column(String(64), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     rotated_at = Column(DateTime, nullable=True)
     __table_args__ = (
@@ -515,13 +525,19 @@ class Offering(Base):
 
 
 class ContentArtifact(Base):
-    """Hotspot / script outputs for content library (Task 45)."""
+    """Hotspot / script outputs for content library (Task 45 / 45b).
+
+    kind:
+      - hotspot_day — 租户当日合集（归一化去重）
+      - hotspot_run — 单次抓取记录（同 content_hash 幂等）
+      - hotspot — 旧版单次抓取（兼容展示）
+      - script — 口播稿
+    """
 
     __tablename__ = "content_artifacts"
     id = Column(String(36), primary_key=True)
     tenant_id = Column(String(64), nullable=False, index=True)
     kind = Column(String(32), nullable=False, default="hotspot")
-    # hotspot | script
     title = Column(String(255), nullable=False, default="")
     body = Column(JSON, nullable=False, default=dict)
     content_hash = Column(String(64), nullable=True)
@@ -531,6 +547,151 @@ class ContentArtifact(Base):
     __table_args__ = (
         Index("ix_content_artifacts_tenant_kind_created", "tenant_id", "kind", "created_at"),
     )
+
+
+class SocialAccount(Base):
+    """Global platform account cache (Task 52) — no tenant_id."""
+
+    __tablename__ = "social_accounts"
+    id = Column(_PK, primary_key=True, autoincrement=True)
+    platform = Column(Text, nullable=False)
+    account_key = Column(Text, nullable=False)
+    external_id = Column(Text, nullable=True)
+    nickname = Column(Text, nullable=True)
+    avatar_url = Column(Text, nullable=True)
+    follower_count = Column(BigInteger, nullable=True)
+    total_favorited = Column(BigInteger, nullable=True)
+    content_count = Column(BigInteger, nullable=True)
+    last_fetched_at = Column(DateTime(timezone=True), nullable=True)
+    extra_json = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    __table_args__ = (
+        UniqueConstraint("platform", "account_key", name="uq_social_accounts_platform_key"),
+    )
+
+
+class SocialFollow(Base):
+    """Tenant follow list for social accounts (Task 52). Accounts stay global."""
+
+    __tablename__ = "social_follows"
+    id = Column(_PK, primary_key=True, autoincrement=True)
+    tenant_id = Column(Text, nullable=False)
+    account_id = Column(_PK, ForeignKey("social_accounts.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "account_id", name="uq_social_follows_tenant_account"),
+        Index("ix_social_follows_tenant", "tenant_id"),
+    )
+
+
+class SocialContent(Base):
+    """Global content cache (Task 52)."""
+
+    __tablename__ = "social_contents"
+    id = Column(_PK, primary_key=True, autoincrement=True)
+    platform = Column(Text, nullable=False)
+    account_id = Column(_PK, ForeignKey("social_accounts.id"), nullable=False)
+    external_id = Column(Text, nullable=False)
+    content_type = Column(Text, nullable=False, default="video")
+    title = Column(Text, nullable=True)
+    content = Column(Text, nullable=True)
+    content_source = Column(Text, nullable=False, default="desc")
+    duration_s = Column(Integer, nullable=True)
+    like_count = Column(Integer, nullable=True)
+    comment_count = Column(Integer, nullable=True)
+    share_count = Column(Integer, nullable=True)
+    collect_count = Column(Integer, nullable=True)
+    published_at = Column(DateTime(timezone=True), nullable=True)
+    fetched_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    raw_json = Column(JSON, nullable=True)
+    __table_args__ = (
+        UniqueConstraint(
+            "platform", "external_id", name="uq_social_contents_platform_external"
+        ),
+        Index("ix_social_contents_account_id", "account_id"),
+    )
+
+
+class SocialTask(Base):
+    """Tenant analysis task queue row (Task 52) — SKIP LOCKED claim target."""
+
+    __tablename__ = "social_tasks"
+    id = Column(_PK, primary_key=True, autoincrement=True)
+    tenant_id = Column(Text, nullable=False)
+    user_id = Column(Text, nullable=False)
+    platform = Column(Text, nullable=False)
+    account_id = Column(_PK, ForeignKey("social_accounts.id"), nullable=False)
+    status = Column(Text, nullable=False, default="pending")
+    progress = Column(Integer, nullable=False, default=0)
+    total_count = Column(Integer, nullable=False, default=0)
+    new_count = Column(Integer, nullable=False, default=0)
+    skipped = Column(Integer, nullable=False, default=0)
+    error = Column(Text, nullable=True)
+    leased_at = Column(DateTime(timezone=True), nullable=True)
+    retry_count = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    finished_at = Column(DateTime(timezone=True), nullable=True)
+    __table_args__ = (
+        Index("ix_social_tasks_tenant_user", "tenant_id", "user_id"),
+        Index("ix_social_tasks_status", "status"),
+    )
+
+
+class SocialTemplate(Base):
+    """Tenant-scoped script templates (Task 52)."""
+
+    __tablename__ = "social_templates"
+    id = Column(_PK, primary_key=True, autoincrement=True)
+    tenant_id = Column(Text, nullable=False)
+    platform = Column(Text, nullable=False)
+    template_key = Column(Text, nullable=False)
+    template_type = Column(Text, nullable=True)
+    structure_json = Column(JSON, nullable=True)
+    sample_count = Column(Integer, nullable=False, default=1)
+    usage_count = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "platform",
+            "template_key",
+            name="uq_social_templates_tenant_platform_key",
+        ),
+        Index("ix_social_templates_tenant_platform", "tenant_id", "platform"),
+    )
+
+
+class SocialResult(Base):
+    """Per-task analysis / replica output (Task 52)."""
+
+    __tablename__ = "social_results"
+    id = Column(_PK, primary_key=True, autoincrement=True)
+    task_id = Column(_PK, ForeignKey("social_tasks.id"), nullable=False)
+    content_id = Column(_PK, ForeignKey("social_contents.id"), nullable=False)
+    template_id = Column(_PK, ForeignKey("social_templates.id"), nullable=True)
+    structure_json = Column(JSON, nullable=True)
+    replica_json = Column(JSON, nullable=True)
+    __table_args__ = (
+        UniqueConstraint("task_id", "content_id", name="uq_social_results_task_content"),
+        Index("ix_social_results_task_id", "task_id"),
+    )
+
+
+class SocialUsage(Base):
+    """Developer cost ledger (Task 52) — not exposed as public API."""
+
+    __tablename__ = "social_usage"
+    id = Column(_PK, primary_key=True, autoincrement=True)
+    tenant_id = Column(Text, nullable=False)
+    user_id = Column(Text, nullable=False)
+    platform = Column(Text, nullable=True)
+    operation = Column(Text, nullable=False)
+    item_count = Column(Integer, nullable=False, default=0)
+    cost_usd = Column(Numeric(10, 4), nullable=True)
+    price_usd = Column(Numeric(10, 4), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    __table_args__ = (Index("ix_social_usage_created_at", "created_at"),)
 
 
 class PGVectorSession:

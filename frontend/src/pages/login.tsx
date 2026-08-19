@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import { BrandMark } from '@/components/brand/BrandMark'
 import { RoleSwitcher } from '@/components/role/RoleSwitcher'
@@ -143,13 +143,7 @@ export default function LoginPage() {
                   {pwBusy ? '登录中…' : '登录'}
                 </Button>
                 <div className="text-muted-foreground text-center text-xs">
-                  没有账号？
-                  <Link
-                    to="/register"
-                    className="text-primary ml-1 underline-offset-2 hover:underline"
-                  >
-                    前往注册
-                  </Link>
+                  账号由管理员开通，请使用已发放的账号登录
                 </div>
               </form>
             </TabsContent>

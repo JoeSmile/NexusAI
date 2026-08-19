@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from backend.core.audit import log_audit
 from backend.core.auth.models import TenantContext
 from backend.core.auth.permissions import require_permission
-from backend.core.errors import NexusAIException
+from backend.core.errors import ErrorCode, NexusAIException
 from backend.core.guardrails.output_guard import DRIFT_PATTERNS, VIOLATION_PATTERNS
 from backend.observability.decorators import observe
 from backend.pipeline.graph import compiled_graph
@@ -32,7 +32,22 @@ _STREAM_FILTER = re.compile(
 class ChatRequest(BaseModel):
     message: str
     session_id: str = "default"
-    user_id: str = "anonymous"
+    # deprecated: ignored — identity comes from TenantContext only
+    user_id: str | None = None
+    # Homepage context panel: optional registry model id
+    model: str | None = None
+    # 47b I1 — FE bubble UUIDs (persisted on write_memory)
+    user_client_message_id: str | None = None
+    assistant_client_message_id: str | None = None
+
+
+def _require_chat_model(body: ChatRequest) -> None:
+    if not (body.model or "").strip():
+        raise NexusAIException(
+            ErrorCode.LLM_MODEL_REQUIRED.value,
+            "model_required",
+            detail="Pick a model in the UI",
+        )
 
 
 class ChatResponse(BaseModel):
@@ -81,9 +96,11 @@ async def _run_chat_pipeline(
     start = time.time()
     finish_reason = "error"
 
+    _require_chat_model(body)
+
     initial = make_initial_state(
         tenant_id=tenant.tenant_id,
-        user_id=body.user_id or tenant.user_id,
+        user_id=tenant.user_id,
         session_id=body.session_id,
         message=body.message,
         user_context={
@@ -93,6 +110,9 @@ async def _run_chat_pipeline(
             "role": tenant.role,
         },
         trace_id=getattr(request.state, "trace_id", None),
+        preferred_model=body.model,
+        user_client_message_id=body.user_client_message_id,
+        assistant_client_message_id=body.assistant_client_message_id,
     )
     _inject_langfuse_parent(initial)
 
@@ -224,9 +244,11 @@ async def chat_streaming(
 
     logger = logging.getLogger(__name__)
 
+    _require_chat_model(body)
+
     initial = make_initial_state(
         tenant_id=tenant.tenant_id,
-        user_id=body.user_id or tenant.user_id,
+        user_id=tenant.user_id,
         session_id=body.session_id,
         message=body.message,
         user_context={
@@ -236,6 +258,9 @@ async def chat_streaming(
             "role": tenant.role,
         },
         trace_id=getattr(request.state, "trace_id", None),
+        preferred_model=body.model,
+        user_client_message_id=body.user_client_message_id,
+        assistant_client_message_id=body.assistant_client_message_id,
     )
     initial["stream_mode"] = True
     _inject_langfuse_parent(initial)

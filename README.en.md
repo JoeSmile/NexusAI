@@ -4,11 +4,9 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![CI](https://github.com/JoeSmile/NexusAI/actions/workflows/ci.yml/badge.svg)](https://github.com/JoeSmile/NexusAI/actions/workflows/ci.yml)
 
-**The Governance Hub for Enterprise AI.**
+**The Intelligent Gateway for LLM Context Management** — the governance entry of the enterprise AI middle platform.
 
-Enterprises already have business and data platforms. What’s missing is an **AI middle platform**.
-NexusAI fills that layer: unified access, capability orchestration, data connectivity, and compliance guardrails.
-Orchestration may come from Dify, Coze, or custom stacks; **execution and data calls go through the governance entry** — we don’t ship another general-purpose drag-and-drop engine, and we don’t replace existing business/data platforms.
+Enterprises already have business and data platforms. What's missing is an **AI middle platform**. NexusAI fills that layer: unified access, capability orchestration, data connectivity, and compliance guardrails. Orchestration may come from Dify, Coze, or custom stacks; **execution and data calls go through the governance entry** — we don't ship another general-purpose drag-and-drop engine, and we don't replace existing business/data platforms. Privatizable for multi-tenant scenarios with strict data-residency requirements.
 
 [简体中文](README.md) · [English](README.en.md)
 
@@ -16,11 +14,12 @@ Orchestration may come from Dify, Coze, or custom stacks; **execution and data c
 
 ## Why NexusAI
 
-| We build | We don’t |
+| We build | We don't |
 |----------|----------|
 | Auth, multi-tenant RBAC, audit, guardrails, key & cost controls | Another general-purpose agent drag-and-drop studio |
-| Chat pipeline + Capability Hub + RAG, privatizable | A replacement for existing business/data platforms |
+| Chat pipeline + Capability Hub + RAG + content ops, privatizable | A replacement for existing business/data platforms |
 | Swappable models (OpenAI-compatible + mock/record/replay) | Lock-in to a single cloud LLM |
+| Tenant-owned model keys (BYOK) with platform fallback | Lock-in to the platform's own model account |
 
 Full positioning: [`docs/strategy/AI_MIDDLE_PLATFORM.md`](docs/strategy/AI_MIDDLE_PLATFORM.md).
 
@@ -37,6 +36,10 @@ Full positioning: [`docs/strategy/AI_MIDDLE_PLATFORM.md`](docs/strategy/AI_MIDDL
 | Guardrails | ✅ | Injection · PII · output checks · circuit breaker |
 | Observability | ✅ | LangFuse · Prometheus `/metrics` |
 | LLM key governance | ✅ | Encrypted keys · failover · harness providers |
+| Tenant LLM credentials (BYOK) | 🚧 | Per-tenant keys + provider failover (Task 49) |
+| Content ops APIs | 🚧 | Hotspot / script-gen / offerings / style assets (Task 45) |
+| App Shell frontend | 🚧 | Marketing `/` · login · workspace · admin (Task 47) |
+| Social benchmark (TikHub) | 🚧 | `/api/social` — account probe / analysis / export (Task 52) |
 | Password login (test FE) | ✅ | Issues `cg_` API keys |
 | Workbench / OA connectors | ⏳ | Planned |
 | Self-serve workflow canvas | ⏸ | V2 — out of current scope |
@@ -46,7 +49,7 @@ Full positioning: [`docs/strategy/AI_MIDDLE_PLATFORM.md`](docs/strategy/AI_MIDDL
 ```text
 Access          Chat · API (X-API-Key / HMAC) · Capability invoke · (workbench planned)
 Orchestration   Capability registry / chains · LangGraph chat DAG · short/long path
-Data            RAG / pgvector · (OA & finance planned)
+Data            RAG / pgvector · content ops (hotspot / script) · (OA & finance planned)
 Governance      RBAC · audit · guardrails · rate limit · budget hooks
 Cross-cutting   LangFuse · Prometheus · model registry · LLMHarness · Redis cache
 ```
@@ -89,7 +92,7 @@ uv run uvicorn backend.app:app --reload --port 8000
 # 5. Smoke
 curl -s http://localhost:8000/health
 curl -s -X POST http://localhost:8000/chat \
-  -H "X-API-Key: <paste-key-from-seed>" \
+  -H "X-API-Key: <paste...ed>" \
   -H "Content-Type: application/json" \
   -d '{"message":"hello","session_id":"demo","user_id":"alice"}'
 ```
@@ -112,8 +115,8 @@ Copy `config.env.example` → `config.env` for LangFuse / LLM settings.
 ## Project layout
 
 ```text
-backend/       FastAPI, pipeline, auth/harness, modules (rag/intent/llm)
-frontend/      Vite test console
+backend/       FastAPI, pipeline, auth/harness, modules (rag/intent/llm/content_ops/social)
+frontend/      App Shell (marketing + workspace + admin, SSE chat)
 scripts/       Seed & helpers
 examples/qa/   Manual QA
 learning/      Module deep-dives

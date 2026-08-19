@@ -65,6 +65,7 @@ dependencies = [
     "redis>=4.5.0",
     "bcrypt>=5.0.0",
     "pyjwt>=2.13.0",
+    "openpyxl>=3.1.5",
 ]
 
 [project.optional-dependencies]
@@ -161,6 +162,7 @@ files = [
   "backend/core/auth",
   "backend/core/guardrails",
   "backend/core/harness",
+  "backend/core/social",
   "backend/core/rate_limiter.py",
   "backend/core/metrics.py",
   "backend/core/cost_manager.py",
@@ -181,6 +183,7 @@ files = [
   "backend/routers/performance.py",
   "backend/routers/memory.py",
   "backend/routers/feedback.py",
+  "backend/routers/social.py",
   "backend/modules/intent",
   "backend/modules/rag",
   "backend/modules/llm",

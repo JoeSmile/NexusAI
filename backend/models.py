@@ -54,10 +54,12 @@ class MultimodalResponse(BaseModel):
 
 class FeedbackRequest(BaseModel):
     session_id: str
+    # deprecated: ignored; server uses TenantContext.user_id
     user_id: str | None = None
     message_id: int | None = None
-    feedback_type: str  # irrelevant, overstepping, helpful, other
-    rating: int  # 1-5
+    client_message_id: str | None = None
+    feedback_type: str  # helpful | irrelevant | bookmark | overstepping | other
+    rating: int | None = None  # bookmark → NULL; helpful 5 / irrelevant 1
     comment: str | None = None
     user_message: str | None = None
     bot_response: str | None = None
@@ -66,9 +68,25 @@ class FeedbackResponse(BaseModel):
     feedback_id: int
     session_id: str
     feedback_type: str
-    rating: int
+    rating: int | None = None
+    client_message_id: str | None = None
     created_at: datetime
     message: str = "Feedback received successfully"
+
+class FeedbackMineItem(BaseModel):
+    id: int
+    session_id: str | None = None
+    client_message_id: str | None = None
+    feedback_type: str
+    rating: int | None = None
+    comment: str | None = None
+    user_message: str | None = None
+    bot_response: str | None = None
+    created_at: str | None = None
+
+class FeedbackMineResponse(BaseModel):
+    items: list[FeedbackMineItem]
+    total: int
 
 class FeedbackStatistics(BaseModel):
     total_count: int

@@ -33,6 +33,8 @@ async def write_memory(state: PipelineState) -> PipelineState:
         user_message=message or "",
         assistant_message=response or "",
         title=(message or "")[:80],
+        user_client_message_id=state.get("user_client_message_id"),
+        assistant_client_message_id=state.get("assistant_client_message_id"),
     )
     cold = await mem.maybe_cold_summarize(user_id=user_id, session_id=session_id)
     if cold:

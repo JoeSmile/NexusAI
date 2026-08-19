@@ -66,7 +66,8 @@ def create_draft(
         if embed:
             try:
                 row.embedding = embed_text(
-                    f"{row.name}\n{row.description}\n{row.cot_template[:500]}"
+                    f"{row.name}\n{row.description}\n{row.cot_template[:500]}",
+                    tenant_id=tenant_id,
                 )
             except Exception:
                 logger.debug("skill_asset embed failed", exc_info=True)
@@ -231,7 +232,7 @@ def search_published(
       撞部分唯一索引 (tenant_id, name) WHERE status='published'）。
     """
     threshold = _hit_threshold() if min_score is None else float(min_score)
-    vec = embed_text(query or "")
+    vec = embed_text(query or "", tenant_id=tenant_id)
     vec_str = "[" + ",".join(str(v) for v in vec) + "]"
     sf = get_pg_session()
     with sf.Session() as session:

@@ -44,6 +44,8 @@ def _org_block(org: dict[str, Any]) -> str:
         ("productFocus", "产品"),
         ("target_audience", "受众"),
         ("targetAudience", "受众"),
+        ("target_region", "地域"),
+        ("targetRegion", "地域"),
     )
     seen: set[str] = set()
     lines = []
@@ -57,6 +59,36 @@ def _org_block(org: dict[str, Any]) -> str:
     return "\n".join(lines) if lines else "（机构画像较空）"
 
 
+_METHODOLOGY = """【写作方法论 — 短视频口播核心,必须遵守】
+这是短视频口播稿,不是文章、不是说明书。按"黄金结构"写:
+
+① 钩子(前 3 秒,决定生死):第一句必须抓住人,四选一:
+   - 痛点提问:"你家孩子是不是又拖到11点才写完作业?"
+   - 反常识/冲突:"90%的人复习考研,第一步就错了"
+   - 数字冲击:"考研报名438万,录取率不到3成"
+   - 身份代入:"在职考研的姐妹,这条视频一定看完"
+   禁止平淡开场("大家好/今天我们来聊聊/今天讲一下……")。
+
+② 痛点放大(1-2 句):把观众的具体困境说透,让人点头。
+   要场景化("深夜一边刷手机一边焦虑""报了班不敢跟老板说请假"),
+   不要空喊("很多家长很焦虑")。
+
+③ 方法干货(2-3 点,主体):每点 = 一句结论 + 一句怎么做。
+   用"第一/第二/第三"或"记住这3步"带出,每点 15-25 字说清。
+   必须具体可操作,禁止空话("要重视/要选对方法")。
+
+④ 行动号召(结尾 1-2 句):软转化,不硬广。
+   示例:"评论区扣'考研',我把时间表发你""关注我,下期讲择校避坑"。
+   禁止"快来报名,限时优惠"式叫卖。
+
+【语言节奏 — 防划走】
+- 口语化,像跟熟人聊天;书面语("此外/综上所述/值得注意的是")全删
+- 短句为主,8-15 字一句,有停顿感,一句话一行
+- 每 10-15 秒一个信息点或转折,拉回注意力
+- 适当用数字、反问、情绪词,但不贩卖焦虑
+- 整篇按口播节奏分段(钩子一段 / 痛点一段 / 方法几点 / 号召一段)"""
+
+
 def build_script_prompt(
     *,
     style: dict[str, Any],
@@ -66,22 +98,36 @@ def build_script_prompt(
     platform: str = "短视频",
     extra_instruction: str = "",
 ) -> str:
-    return f"""你是教培机构内容运营助手。请写一篇约{duration_sec}秒的{platform}口播稿。
-必须服务本公司内容（勿写成无关个人号）。遵守禁说与合规。
+    return f"""你是教培机构短视频内容主编,专写能留住人的口播稿。约{duration_sec}秒,{platform}。
+必须服务本公司业务(勿写成无关个人号),遵守合规红线。
 
-【风格】
+{_METHODOLOGY}
+
+【风格 — 本机构主讲人设,方法论的个性化外壳】
 {_style_block(style)}
 
-【机构】
+【机构 — 内容必须围绕它】
 {_org_block(org_profile)}
 
-【热点/选题】
+【热点/选题 — 从中选或结合】
 {_hotspot_block(hotspots)}
 
-【附加】
+【附加要求】
 {extra_instruction or '无'}
 
-直接输出口播正文，不要标题栏解释。""".strip()
+【输出格式】
+直接输出口播正文(钩子一行/痛点一行/方法各一行/号召一行),不要标题、不要"好的/以下是"等前缀、不要解释。""".strip()
+
+
+def _default_chat_model() -> str:
+    """默认聊天模型(registry), 替代开发残留的 mock-local——record/openai 下
+    mock-local 的占位成本(0.999/1k)会打爆预算检查。"""
+    try:
+        from backend.core.model_registry import select_model_for_intent
+
+        return select_model_for_intent("default").name
+    except Exception:
+        return "deepseek-v4-flash"
 
 
 async def generate_script(
@@ -111,7 +157,7 @@ async def generate_script(
         from backend.core.harness import LLMHarness
 
         harness = LLMHarness()
-        model_name = (model or "").strip() or "mock-local"
+        model_name = (model or "").strip() or _default_chat_model()
         chunks: list[str] = []
         async for token in harness.stream(
             model=model_name,

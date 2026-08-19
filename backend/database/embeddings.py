@@ -1,4 +1,4 @@
-"""Embedding：registry 选模型 + OpenAI 兼容 API；失败回退确定性哈希向量 (1536 维存储)。"""
+"""Embedding：租户凭证优先 + registry/env 回退；失败回退确定性哈希向量 (1536 维存储)。"""
 
 from __future__ import annotations
 
@@ -14,17 +14,21 @@ EMBED_DIM = 1536  # pgvector 列维度；API 返回更短时补零
 
 EmbedMode = Literal["api", "hash", "api-error", "cache", "unconfigured"]
 _last_embed_mode: EmbedMode | None = None
+_last_embed_model: str | None = None
 
 
-def _set_embed_mode(mode: EmbedMode) -> None:
-    global _last_embed_mode
+def _set_embed_mode(mode: EmbedMode, model: str | None = None) -> None:
+    global _last_embed_mode, _last_embed_model
     _last_embed_mode = mode
+    if model is not None:
+        _last_embed_model = model
 
 
 def reset_embed_mode_for_tests() -> None:
     """测试用:清空上次调用结果缓存。"""
-    global _last_embed_mode
+    global _last_embed_mode, _last_embed_model
     _last_embed_mode = None
+    _last_embed_model = None
 
 
 def _hash_embed(text: str, dim: int = EMBED_DIM) -> list[float]:
@@ -61,8 +65,47 @@ def _is_dashscope_url(base_url: str) -> bool:
     return "dashscope" in u or "aliyuncs" in u
 
 
-def _resolve_embedding_endpoint() -> tuple[object, str, str]:
-    """返回 (spec, api_key, base_url)。"""
+class _EmbedEndpoint:
+    __slots__ = ("model", "api_key", "base_url", "dimensions", "source")
+
+    def __init__(
+        self,
+        *,
+        model: str,
+        api_key: str,
+        base_url: str,
+        dimensions: int,
+        source: str,
+    ) -> None:
+        self.model = model
+        self.api_key = api_key
+        self.base_url = base_url
+        self.dimensions = dimensions
+        self.source = source
+
+
+def _resolve_tenant_embedding(tenant_id: str) -> _EmbedEndpoint | None:
+    from backend.core.errors import NexusAIException
+    from backend.core.llm_credentials import (
+        EMBEDDING_DIMENSIONS,
+        resolve_embedding_credential_sync,
+    )
+
+    try:
+        key, model = resolve_embedding_credential_sync(tenant_id)
+    except NexusAIException:
+        return None
+    return _EmbedEndpoint(
+        model=model,
+        api_key=key.api_key,
+        base_url=(key.base_url or "").rstrip("/"),
+        dimensions=EMBEDDING_DIMENSIONS,
+        source="tenant",
+    )
+
+
+def _resolve_registry_embedding() -> _EmbedEndpoint:
+    """返回 registry/env 端点（无租户凭证时）。"""
     from backend.core.model_registry import select_embedding_model
 
     spec = select_embedding_model()
@@ -73,7 +116,27 @@ def _resolve_embedding_endpoint() -> tuple[object, str, str]:
         or ""
     ).rstrip("/")
     api_key = _resolve_api_key(spec.api_key_ref, base_url)
-    return spec, api_key, base_url
+    dims = int(os.getenv("EMBEDDING_DIMENSIONS", "768") or "768")
+    return _EmbedEndpoint(
+        model=spec.name,
+        api_key=api_key,
+        base_url=base_url,
+        dimensions=dims,
+        source="registry",
+    )
+
+
+def _resolve_embedding_endpoint(tenant_id: str | None = None) -> _EmbedEndpoint:
+    """解析顺序：租户 Embedding 凭证 → registry/env（保持旧行为，避免无凭证租户检索静默废掉）。"""
+    if tenant_id:
+        tenant_ep = _resolve_tenant_embedding(tenant_id)
+        if tenant_ep is not None:
+            return tenant_ep
+        logger.debug(
+            "tenant=%s 未配置 embedding 凭证，回退 registry/env",
+            tenant_id,
+        )
+    return _resolve_registry_embedding()
 
 
 def _resolve_api_key(api_key_ref: str, base_url: str = "") -> str:
@@ -88,7 +151,6 @@ def _resolve_api_key(api_key_ref: str, base_url: str = "") -> str:
 
     qwen = os.getenv("QWEN_API_KEY") or ""
     if _is_dashscope_url(base_url):
-        # Task 28 review Important #2: 禁止用 deepseek LLM_API_KEY 打 dashscope
         return qwen
 
     if qwen:
@@ -96,20 +158,20 @@ def _resolve_api_key(api_key_ref: str, base_url: str = "") -> str:
     return os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or ""
 
 
-def embedding_uses_hash_fallback() -> bool:
+def embedding_uses_hash_fallback(tenant_id: str | None = None) -> bool:
     """True = 当前配置不足以打真实 embedding API(缺 key/url)。"""
-    _spec, api_key, base_url = _resolve_embedding_endpoint()
-    return not (api_key and base_url)
+    ep = _resolve_embedding_endpoint(tenant_id)
+    return not (ep.api_key and ep.base_url)
 
 
-def embedding_model_label() -> str:
+def embedding_model_label(tenant_id: str | None = None) -> str:
     """供 /status、get_stats:反映配置 + 最近一次 embed 结果。"""
-    from backend.core.model_registry import select_embedding_model
-
-    name = select_embedding_model().name
+    name = _last_embed_model
+    if not name:
+        name = _resolve_embedding_endpoint(tenant_id).model
     mode = _last_embed_mode
     if mode is None:
-        if embedding_uses_hash_fallback():
+        if embedding_uses_hash_fallback(tenant_id):
             return f"{name}(hash)"
         return name
     if mode == "api":
@@ -118,12 +180,11 @@ def embedding_model_label() -> str:
         return f"{name}(api-error)"
     if mode == "cache":
         return f"{name}(cache)"
-    # hash / unconfigured
     return f"{name}(hash)"
 
 
-def embed_text(text: str) -> list[float]:
-    """生成 embedding。优先 registry embedding 模型;无 key/失败则哈希兜底。
+def embed_text(text: str, tenant_id: str | None = None) -> list[float]:
+    """生成 embedding。优先租户 Embedding 凭证；未配置则回退 registry/env；再失败才哈希兜底。
 
     L2 缓存(Task 29):归一化文本 → redis `rag:e:{model}:{hash}`;命中补零到 1536。
     """
@@ -135,21 +196,21 @@ def embed_text(text: str) -> list[float]:
         record_l2_miss,
     )
 
-    # 与 L1/L2 key 一致:归一化后文本作为 embed 输入
     norm = normalize(text or "")
-    spec, api_key, base_url = _resolve_embedding_endpoint()
-    dims = int(os.getenv("EMBEDDING_DIMENSIONS", "768") or "768")
+    ep = _resolve_embedding_endpoint(tenant_id)
+    dims = ep.dimensions
 
-    cached = l2_get(spec.name, norm)
+    cached = l2_get(ep.model, norm)
     if cached is not None:
-        _set_embed_mode("cache")  # L2 命中:非真实 API 调用(仅此前已成功过)
+        _set_embed_mode("cache", ep.model)
         return _pad_or_trim(cached)
 
-    if not api_key or not base_url:
+    if not ep.api_key or not ep.base_url:
         logger.debug(
-            "未配置 embedding API key/base_url，使用哈希 embedding（非语义，仅本地联通）"
+            "未配置 embedding API key/base_url（source=%s），使用哈希 embedding",
+            ep.source,
         )
-        _set_embed_mode("unconfigured")
+        _set_embed_mode("unconfigured", ep.model)
         return _hash_embed(norm)
 
     if get_redis() is not None:
@@ -157,10 +218,10 @@ def embed_text(text: str) -> list[float]:
     try:
         from openai import OpenAI
 
-        client = OpenAI(api_key=api_key, base_url=base_url)
+        client = OpenAI(api_key=ep.api_key, base_url=ep.base_url)
         try:
             resp = client.embeddings.create(
-                model=spec.name,
+                model=ep.model,
                 input=norm[:8000],
                 dimensions=dims,
             )
@@ -172,19 +233,19 @@ def embed_text(text: str) -> list[float]:
                     e,
                 )
                 resp = client.embeddings.create(
-                    model=spec.name,
+                    model=ep.model,
                     input=norm[:8000],
                 )
             else:
                 raise
         vec = list(resp.data[0].embedding)
-        _set_embed_mode("api")
+        _set_embed_mode("api", ep.model)
         try:
-            l2_set(spec.name, norm, vec)
+            l2_set(ep.model, norm, vec)
         except Exception:
             pass
         return _pad_or_trim(vec)
     except Exception as e:
         logger.warning("API embedding 失败，回退哈希向量（非语义）: %s", e)
-        _set_embed_mode("api-error")
+        _set_embed_mode("api-error", ep.model)
         return _hash_embed(norm)

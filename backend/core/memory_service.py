@@ -240,7 +240,7 @@ class UnifiedMemoryService:
             from backend.database.pgvector_session import UserMemory, get_pg_session
 
             embed = bool(payload.get("embed", True))
-            emb = embed_text(f"{key} {value}") if embed else None
+            emb = embed_text(f"{key} {value}", tenant_id=self.tenant_id) if embed else None
             confidence = float(payload.get("confidence") or 0.5)
             source = str(payload.get("source") or "unified")
             session_factory = get_pg_session()
@@ -337,6 +337,8 @@ class UnifiedMemoryService:
         user_message: str,
         assistant_message: str,
         title: str | None = None,
+        user_client_message_id: str | None = None,
+        assistant_client_message_id: str | None = None,
     ) -> dict[str, Any]:
         """写入一轮对话到 ``chat_messages``（+ 确保 session 行）。"""
         if not session_id:
@@ -364,6 +366,7 @@ class UnifiedMemoryService:
                         user_id=user_id,
                         role="user",
                         content=user_message,
+                        client_message_id=(user_client_message_id or None),
                     )
                 )
             if assistant_message:
@@ -374,6 +377,7 @@ class UnifiedMemoryService:
                         user_id=user_id,
                         role="assistant",
                         content=assistant_message,
+                        client_message_id=(assistant_client_message_id or None),
                     )
                 )
             session.commit()

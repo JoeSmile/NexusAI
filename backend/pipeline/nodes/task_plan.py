@@ -253,6 +253,24 @@ async def task_plan(state: PipelineState) -> PipelineState:
             enrich_span(metadata={"task_plan": "skipped_short_path"})
             return state
 
+        message_early = state.get("raw_input") or state.get("message") or ""
+        # 45b: 旁路 / 关键词 bridge — 流式也要能触发（不依赖规划 LLM）
+        try:
+            from backend.pipeline.chat_workflow_bridge import (
+                should_skip_workflow_bridge,
+                try_bridge_start_run,
+            )
+
+            if should_skip_workflow_bridge(message_early):
+                enrich_span(metadata={"task_plan": "bridge_bypassed"})
+            else:
+                state = try_bridge_start_run(state)
+                if state.get("triggered_run"):
+                    enrich_span(metadata={"task_plan": "bridge_triggered_early"})
+                    return state
+        except Exception:
+            logger.debug("early chat workflow bridge skipped", exc_info=True)
+
         # A(08-16 性能修复): 流式路径跳过规划——plan 无消费方(bridge/审计均为旁路),
         # 规划 LLM 是首 token 延迟主因(长路径每条消息白烧一次 5-10s)。
         if state.get("stream_mode"):

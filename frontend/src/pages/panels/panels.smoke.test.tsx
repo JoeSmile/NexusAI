@@ -56,7 +56,7 @@ describe('panel smoke (empty / idle)', () => {
 
   it('RagPanel renders title and ask controls', () => {
     wrap(<RagPanel />)
-    expect(screen.getByRole('heading', { name: 'RAG' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '知识库' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Ask' })).toBeInTheDocument()
   })
 

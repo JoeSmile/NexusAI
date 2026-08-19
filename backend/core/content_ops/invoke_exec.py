@@ -8,7 +8,7 @@ from typing import Any
 
 from backend.core.auth.models import TenantContext
 from backend.core.capability.models import CapabilitySpec
-from backend.core.content_ops.hotspot import dig_hotspots
+from backend.core.content_ops.hotspot import HotspotCrawlError, dig_hotspots
 from backend.core.content_ops.script_gen import generate_script
 from backend.core.content_ops.style import (
     get_org_content_profile,
@@ -40,16 +40,44 @@ async def invoke_content_ops(
             categories = [categories]
         if not isinstance(categories, list):
             categories = None
+        save = payload.get("save")
+        if save is None:
+            save = True
         sf = get_pg_session()
         with sf.Session() as session:
             org = get_org_content_profile(session, tid)
-        result = dig_hotspots(
-            adapter=adapter,  # type: ignore[arg-type]
-            categories=categories,
-            keywords=payload.get("keywords"),
-            paste_text=payload.get("paste_text") or payload.get("paste"),
-            org_profile=org,
-        )
+            try:
+                result = dig_hotspots(
+                    adapter=adapter,  # type: ignore[arg-type]
+                    categories=categories,
+                    keywords=payload.get("keywords"),
+                    paste_text=payload.get("paste_text") or payload.get("paste"),
+                    org_profile=org,
+                    industry=payload.get("industry"),
+                    region=payload.get("region"),
+                    use_org_profile=bool(payload.get("use_org_profile", True)),
+                    user_note=payload.get("user_note"),
+                )
+            except HotspotCrawlError as e:
+                yield {
+                    "event": "error",
+                    "data": {
+                        "code": "HOTSPOT_CRAWL_FAILED",
+                        "message": str(e),
+                        "crawl": e.crawl_meta,
+                    },
+                    "cost_source": "invoke",
+                }
+                return
+            from backend.core.content_ops.dig_persist import persist_dig_result
+
+            result = persist_dig_result(
+                session,
+                tenant_id=tid,
+                result=result,
+                save=bool(save),
+            )
+            session.commit()
         text = json.dumps(result, ensure_ascii=False)
         yield {"event": "token", "data": text, "cost_source": "invoke"}
         yield {

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from backend.core.cost_manager import estimate_cost
+from backend.core.llm_credentials import resolve_tenant_credential
 from backend.core.model_registry import get_model, select_model_for_intent
 from backend.observability.decorators import enrich_span, observe
 from backend.observability.sampling import set_tracing_enabled, should_sample
@@ -79,41 +80,30 @@ async def model_router(state: PipelineState) -> PipelineState:
             state["error_code"] = "SKILL_001"
             return state
 
-    # A/B 变体可覆盖模型名
-    override = (state.get("ab_variant_config") or {}).get("model")
+    # A/B 或用户显式选择可覆盖模型名
+    preferred = (state.get("preferred_model") or "").strip()
+    override = preferred or (state.get("ab_variant_config") or {}).get("model")
     if override:
         spec = get_model(str(override)) or select_model_for_intent(intent)
     else:
         spec = select_model_for_intent(intent)
 
-    state["selected_model"] = spec.name
-    state["estimated_cost"] = estimate_cost(spec.name, spec.max_tokens)
+    preferred = (state.get("preferred_model") or "").strip() or spec.name
+    state["selected_model"] = preferred
+    state["estimated_cost"] = estimate_cost(preferred, spec.max_tokens)
     state["finish_reason"] = "routed_to_llm"
     state["llm_key_provider"] = spec.provider or "default"
 
     if spec.base_url:
         state["llm_base_url"] = spec.base_url
 
-    # 注入租户级 LLM API Key（DB 加密 → 运行时解密；无则走 env fallback）
-    try:
-        from backend.core.key_repository import LLMKeyRepository
-
-        key_data = await LLMKeyRepository().get_key(state["tenant_id"], spec.provider)
-        if key_data:
-            state["llm_api_key"] = key_data.api_key
-            state["llm_base_url"] = key_data.base_url or spec.base_url or state.get(
-                "llm_base_url"
-            )
-            state["llm_key_id"] = key_data.id
-            state["llm_key_version"] = key_data.key_version
-        elif spec.api_key_ref:
-            import os
-
-            env_key = os.getenv(spec.api_key_ref, "")
-            if env_key:
-                state["llm_api_key"] = env_key
-    except Exception:
-        pass
+    key_data = await resolve_tenant_credential(state["tenant_id"], preferred)
+    state["llm_api_key"] = key_data.api_key
+    state["llm_base_url"] = (
+        key_data.base_url or spec.base_url or state.get("llm_base_url") or ""
+    )
+    state["llm_key_id"] = key_data.id
+    state["llm_key_version"] = key_data.key_version
 
     return state
 

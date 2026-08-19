@@ -1,17 +1,22 @@
 import { Navigate, Outlet, createBrowserRouter, useLocation } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 
 import { RequireRoles } from '@/components/auth/RequireRoles'
-import { AppShell } from '@/components/layout/AppShell'
+import {
+  AgentAdminShell,
+  AgentHomeShell,
+} from '@/layouts/AgentShell'
 import { KEYS_ROLES, ORG_ROLES } from '@/lib/navAccess'
 import { HOME_PATH, PANEL_REDIRECTS } from '@/lib/routes'
-import LoginPage from '@/pages/login'
-import RegisterPage from '@/pages/register'
-import AdminPanel from '@/pages/panels/admin'
-import AgentPanel from '@/pages/panels/agent'
-import AuditPanel from '@/pages/panels/audit'
-import ChatPanel from '@/pages/panels/chat'
+import AgentLoginPage from '@/pages/agent/LoginPage'
+import AdminHomePage from '@/pages/agent/AdminHome'
+import HomeChatPage from '@/pages/agent/HomeChat'
+import RootLanding from '@/pages/marketing/Landing'
+import ContentLibraryPage from '@/pages/content/ContentLibrary'
 import ContentStudioPage from '@/pages/content/ContentStudio'
-import EvalPanel from '@/pages/panels/eval'
+import SocialBenchmarkPage from '@/pages/content/SocialBenchmark'
+import AdminPanel from '@/pages/panels/admin'
+import AuditPanel from '@/pages/panels/audit'
 import CapabilitiesPanel from '@/pages/panels/capabilities'
 import PerformancePanel from '@/pages/panels/performance'
 import OrgTreePage from '@/pages/admin/OrgTree'
@@ -28,6 +33,23 @@ function RequireAuth() {
   const key = useAuthStore((s) => s.keys[s.activeRole])
   const accessToken = useAuthStore((s) => s.accessToken)
   const location = useLocation()
+  const [hydrated, setHydrated] = useState(() => useAuthStore.persist.hasHydrated())
+
+  useEffect(() => {
+    if (hydrated) return
+    const unsub = useAuthStore.persist.onFinishHydration(() => setHydrated(true))
+    if (useAuthStore.persist.hasHydrated()) setHydrated(true)
+    return unsub
+  }, [hydrated])
+
+  if (!hydrated) {
+    return (
+      <div className="flex min-h-svh items-center justify-center text-sm text-slate-500">
+        加载会话…
+      </div>
+    )
+  }
+
   if (!key && !accessToken) {
     const next = encodeURIComponent(location.pathname + location.search)
     return <Navigate to={`/login?next=${next}`} replace />
@@ -35,26 +57,37 @@ function RequireAuth() {
   return <Outlet />
 }
 
-function PanelRedirect({ from }: { from: string }) {
+function LegacyRedirect({ from }: { from: string }) {
   const to = PANEL_REDIRECTS[from] ?? HOME_PATH
   return <Navigate to={to} replace />
 }
 
 export const router = createBrowserRouter([
-  { path: '/login', element: <LoginPage /> },
-  { path: '/register', element: <RegisterPage /> },
+  { path: '/', element: <RootLanding /> },
+  { path: '/login', element: <AgentLoginPage /> },
+  // Sales-led: no public self-register; accounts provisioned by ops
+  { path: '/register', element: <Navigate to="/login" replace /> },
   {
     element: <RequireAuth />,
     children: [
       {
-        path: '/',
-        element: <AppShell />,
+        path: '/workspace',
+        element: <AgentHomeShell />,
         children: [
-          { index: true, element: <Navigate to={HOME_PATH} replace /> },
-          { path: 'workspace/chat', element: <ChatPanel /> },
-          { path: 'workspace/content', element: <ContentStudioPage /> },
-          { path: 'workspace/agent', element: <AgentPanel /> },
-          { path: 'workspace/eval', element: <EvalPanel /> },
+          { index: true, element: <HomeChatPage /> },
+          { path: 'knowledge', element: <RagPanel /> },
+          { path: 'dashboard', element: <Navigate to="/workspace/knowledge" replace /> },
+          { path: 'content', element: <ContentStudioPage /> },
+          { path: 'social', element: <SocialBenchmarkPage /> },
+          { path: 'library', element: <ContentLibraryPage /> },
+        ],
+      },
+      {
+        path: '/admin',
+        element: <AgentAdminShell />,
+        children: [
+          { index: true, element: <AdminHomePage /> },
+          { path: 'knowledge', element: <Navigate to="/workspace/knowledge" replace /> },
           { path: 'workflows', element: <WorkflowListPage /> },
           { path: 'workflows/:id/edit', element: <WorkflowEditorPage /> },
           { path: 'workflows/:id/runs', element: <RunListPage /> },
@@ -62,40 +95,24 @@ export const router = createBrowserRouter([
           { path: 'runs/:runId', element: <RunDetailPage /> },
           { path: 'approvals', element: <ApprovalInboxPage /> },
           { path: 'notifications', element: <NotificationsPage /> },
-          { path: 'knowledge', element: <RagPanel /> },
           {
             element: <RequireRoles allow={ORG_ROLES} />,
-            children: [
-              { path: 'governance/org', element: <OrgTreePage /> },
-            ],
+            children: [{ path: 'org', element: <OrgTreePage /> }],
           },
-          { path: 'governance/audit', element: <AuditPanel /> },
-          { path: 'governance/capabilities', element: <CapabilitiesPanel /> },
-          { path: 'governance/performance', element: <PerformancePanel /> },
+          { path: 'audit', element: <AuditPanel /> },
+          { path: 'capabilities', element: <CapabilitiesPanel /> },
+          { path: 'performance', element: <PerformancePanel /> },
           {
             element: <RequireRoles allow={KEYS_ROLES} />,
-            children: [
-              { path: 'governance/keys', element: <AdminPanel /> },
-            ],
-          },
-          // 旧 /panels/* 兼容（目标路径仍经上表守卫）
-          { path: 'panels/chat', element: <PanelRedirect from="/panels/chat" /> },
-          { path: 'panels/agent', element: <PanelRedirect from="/panels/agent" /> },
-          { path: 'panels/eval', element: <PanelRedirect from="/panels/eval" /> },
-          { path: 'panels/rag', element: <PanelRedirect from="/panels/rag" /> },
-          { path: 'panels/admin', element: <PanelRedirect from="/panels/admin" /> },
-          { path: 'panels/audit', element: <PanelRedirect from="/panels/audit" /> },
-          {
-            path: 'panels/capabilities',
-            element: <PanelRedirect from="/panels/capabilities" />,
-          },
-          {
-            path: 'panels/performance',
-            element: <PanelRedirect from="/panels/performance" />,
+            children: [{ path: 'keys', element: <AdminPanel /> }],
           },
         ],
       },
+      { path: 'panels/chat', element: <LegacyRedirect from="/panels/chat" /> },
+      { path: 'knowledge', element: <Navigate to="/workspace/knowledge" replace /> },
+      { path: 'workflows/*', element: <Navigate to="/admin/workflows" replace /> },
+      { path: 'governance/*', element: <Navigate to="/admin" replace /> },
     ],
   },
-  { path: '*', element: <Navigate to="/" replace /> },
+  { path: '*', element: <Navigate to={HOME_PATH} replace /> },
 ])

@@ -29,7 +29,9 @@ export function listNotificationInbox(params?: { limit?: number; offset?: number
 }
 
 export function getNotificationUnreadCount() {
-  return apiGet<{ unread: number }>('/api/notifications/unread-count')
+  return apiGet<{ unread: number }>('/api/notifications/unread-count', {
+    softAuth: true,
+  })
 }
 
 export function markNotificationRead(id: string) {

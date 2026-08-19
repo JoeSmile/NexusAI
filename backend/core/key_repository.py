@@ -166,6 +166,7 @@ class LLMKeyRepository:
             """
             SELECT * FROM llm_api_keys
             WHERE tenant_id = :tid AND provider = :p AND is_active = true
+              AND owner_user_id IS NULL
               AND (expires_at IS NULL OR expires_at > now())
               AND (
                 last_failed_at IS NULL
@@ -192,21 +193,30 @@ class LLMKeyRepository:
         tenant_id: str,
         provider: str = "default",
         limit: int = 3,
+        *,
+        allow_env_fallback: bool = True,
+        tenant_only: bool = False,
     ) -> list[LLMKey]:
         """
         候选链: active + 未过期 + 不在冷却中,按 key_version DESC。
 
         回退顺序与 get_key 一致: tenant+provider → *+provider →
         tenant+default → *+default → env fallback。
+
+        tenant_only=True: 仅查 tenant_id, 不回退 tenant_id='*' (Task 49 chat)。
         """
         lim = max(1, min(int(limit), 3))
         cooldown = _cooldown_seconds()
         collected: list[LLMKey] = []
         seen_ids: set[str] = set()
 
-        pairs: list[tuple[str, str]] = [(tenant_id, provider), ("*", provider)]
+        pairs: list[tuple[str, str]] = [(tenant_id, provider)]
+        if not tenant_only:
+            pairs.append(("*", provider))
         if provider != "default":
-            pairs.extend([(tenant_id, "default"), ("*", "default")])
+            pairs.append((tenant_id, "default"))
+            if not tenant_only:
+                pairs.append(("*", "default"))
 
         session_factory = get_pg_session()
         with session_factory.Session() as session:
@@ -225,22 +235,33 @@ class LLMKeyRepository:
                     if len(collected) >= lim:
                         break
 
-        if not collected:
+        if not collected and allow_env_fallback:
             fb = self._env_fallback(tenant_id, provider)
             if fb:
                 return [fb]
         return collected
 
     async def get_key(
-        self, tenant_id: str, provider: str = "default"
+        self,
+        tenant_id: str,
+        provider: str = "default",
+        *,
+        allow_env_fallback: bool = True,
+        tenant_only: bool = False,
     ) -> LLMKey | None:
         """薄封装:取候选链第一个(行为与改造前「最新 active」一致,另排除冷却中 key)。"""
-        cache_key = f"{tenant_id}:{provider}"
+        cache_key = f"{tenant_id}:{provider}:t{int(tenant_only)}:e{int(allow_env_fallback)}"
         cached = self._cache.get(cache_key)
         if cached:
             return cached
 
-        chain = await self.get_key_chain(tenant_id, provider, limit=1)
+        chain = await self.get_key_chain(
+            tenant_id,
+            provider,
+            limit=1,
+            allow_env_fallback=allow_env_fallback,
+            tenant_only=tenant_only,
+        )
         if not chain:
             return None
         key_obj = chain[0]

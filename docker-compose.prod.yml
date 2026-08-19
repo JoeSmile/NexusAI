@@ -84,6 +84,31 @@ services:
         condition: service_healthy
     restart: always
 
+  social-worker:
+    build: .
+    command: ["python", "-m", "backend.workers.social_worker"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import backend.workers.social_worker"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    env_file: config.env
+    environment:
+      DATABASE_URL: postgresql://nexusai:${DB_PASSWORD}@postgres:5432/nexusai
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      TIKHUB_API_KEY: ${TIKHUB_API_KEY:-}
+      SOCIAL_TIKHUB_QPS: ${SOCIAL_TIKHUB_QPS:-2}
+      SOCIAL_TIKHUB_BURST: ${SOCIAL_TIKHUB_BURST:-4}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: always
+
   # Langfuse OSS v4 — 默认不启动（profiles: langfuse）
   # 开启：COMPOSE_PROFILES=langfuse ... 且 LANGFUSE_ENABLED=true
   langfuse-postgres:

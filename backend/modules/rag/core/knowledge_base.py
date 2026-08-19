@@ -252,11 +252,24 @@ class KnowledgeBaseManager:
                 clean_meta = {
                     k: v for k, v in meta.items() if isinstance(v, (str, int, float, bool))
                 }
+                src = str(
+                    meta.get("source")
+                    or meta.get("filename")
+                    or meta.get("file_name")
+                    or ""
+                )[:256]
+                st = str(
+                    meta.get("source_type")
+                    or meta.get("file_type")
+                    or ("pdf" if src.lower().endswith(".pdf") else "text")
+                )[:32]
                 vector_ops.add_knowledge(
                     text=chunk.page_content,
                     category=str(meta.get("category", "general")),
                     tenant_id=self.tenant_id,
                     metadata=clean_meta,
+                    source=src,
+                    source_type=st,
                     org_unit_id=org_unit_id,
                 )
             self.vectorstore = "pgvector"
@@ -466,12 +479,15 @@ class EnterpriseKnowledgeLoader:
                 return line
         return "未知主题"
     
-    def load_from_pdf(self, pdf_path: str) -> int:
+    def load_from_pdf(
+        self, pdf_path: str, *, display_name: str | None = None
+    ) -> int:
         """
         从PDF文件加载知识;返回提取到文本的页数。
 
         扫描件/无文本层 PDF(整份提取为空)→ 抛 NexusAIException(RAG_002),
         不再静默返回"上传成功";空页(图片页)自动跳过。
+        display_name: 入库 source（原始文件名）；缺省则退回路径 basename。
         """
         try:
             logger.info(f"从PDF加载知识: {pdf_path}")
@@ -492,6 +508,14 @@ class EnterpriseKnowledgeLoader:
                     "PDF %s: %d/%d 页无文本(扫描页?),已跳过空页",
                     pdf_path, len(documents) - len(non_empty), len(documents),
                 )
+
+            label = (display_name or os.path.basename(pdf_path) or "document.pdf").strip()
+            for d in non_empty:
+                meta = dict(d.metadata or {})
+                meta["source"] = label
+                meta["filename"] = label
+                meta["source_type"] = "pdf"
+                d.metadata = meta
 
             # 添加到知识库
             self.kb_manager.add_documents(non_empty)

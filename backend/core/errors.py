@@ -36,6 +36,10 @@ class ErrorCode(StrEnum):
     LLM_TIMEOUT = "LLM_001"
     LLM_UNAVAILABLE = "LLM_002"
     LLM_NO_KEY = "LLM_003"
+    LLM_KEY_MISSING = "LLM_KEY_001"
+    LLM_MODEL_NOT_ALLOWED = "LLM_KEY_002"
+    LLM_KEY_DUPLICATE_SERIES = "LLM_KEY_003"
+    LLM_MODEL_REQUIRED = "LLM_KEY_004"
     LLM_BUDGET_EXCEEDED = "COST_001"
 
     # ── 文件 (FILE_0xx) ──
@@ -165,5 +169,7 @@ def _code_to_status(code: str) -> int:
             "CAP_005": 429,
         }.get(code, 400)
     if code.startswith("REQ_"):
+        return 400
+    if code.startswith("LLM_KEY_"):
         return 400
     return 500

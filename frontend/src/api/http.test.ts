@@ -33,11 +33,42 @@ describe('api http', () => {
     expect(headers.get('X-API-Key')).toBe('test-key')
   })
 
-  it('401 clears active key and redirects to login', async () => {
-    useAuthStore.getState().setKey('user', 'dead')
+  it('softAuth 401 does not clear credentials or redirect', async () => {
+    useAuthStore.getState().setKey('user', 'alive-key')
+    useAuthStore.setState({ accessToken: 'jwt-alive' })
     const assign = vi.fn()
     vi.stubGlobal('location', {
-      pathname: '/panels/chat',
+      pathname: '/workspace',
+      search: '',
+      assign,
+    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        clone: () => ({
+          json: async () => ({
+            detail: { code: 'AUTH_001', message: 'unauthorized' },
+          }),
+        }),
+      }),
+    )
+
+    await expect(apiGet('/api/notifications/unread-count', { softAuth: true })).rejects.toMatchObject({
+      status: 401,
+    })
+    expect(useAuthStore.getState().keys.user).toBe('alive-key')
+    expect(useAuthStore.getState().accessToken).toBe('jwt-alive')
+    expect(assign).not.toHaveBeenCalled()
+  })
+
+  it('401 clears active key and redirects to login', async () => {
+    useAuthStore.getState().setKey('user', 'dead')
+    useAuthStore.setState({ accessToken: '' })
+    const assign = vi.fn()
+    vi.stubGlobal('location', {
+      pathname: '/workspace',
       search: '',
       assign,
     })

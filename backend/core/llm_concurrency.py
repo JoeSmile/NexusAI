@@ -95,7 +95,14 @@ def llm_slot_sync(
     try:
         yield
     finally:
-        _held.reset(token)
+        try:
+            _held.reset(token)
+        except ValueError:
+            # StreamingResponse / async gen 可能在不同 Context 里退出
+            try:
+                _held.set(False)
+            except Exception:
+                pass
         sem.release()
 
 
@@ -120,5 +127,12 @@ async def llm_slot(
     try:
         yield
     finally:
-        _held.reset(token)
+        try:
+            _held.reset(token)
+        except ValueError:
+            # async generator 跨 Context 退出时 Token.reset 会失败；仍须释放槽位
+            try:
+                _held.set(False)
+            except Exception:
+                pass
         sem.release()

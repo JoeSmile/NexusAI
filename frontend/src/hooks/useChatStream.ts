@@ -1,5 +1,5 @@
 /**
- * Chat 面板流式发送 → 消息列表（Task 30.12）。
+ * Chat 面板流式发送 → 消息列表（Task 30.12 / 47b slice0 + 历史分页）。
  */
 import { useCallback, useState } from 'react'
 
@@ -12,24 +12,62 @@ export interface ChatMessage {
   role: ChatRole
   content: string
   status?: 'streaming' | 'done' | 'error' | 'aborted'
+  /** DB chat_messages.id — history rows only; used as pagination cursor */
+  dbId?: number
 }
 
-function mid(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+/** I1: stable UUID for feedback hydrate across refresh. */
+export function newClientMessageId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 }
 
 export function useChatStream(endpoint = '/chat/streaming') {
-  const { start, abort } = useSSEStream()
+  const { start, abort: abortFetch } = useSSEStream()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [streaming, setStreaming] = useState(false)
+  const [hasMore, setHasMore] = useState(false)
+
+  const abort = useCallback(() => {
+    abortFetch()
+    setStreaming(false)
+  }, [abortFetch])
+
+  /** Initial page: always replace (empty list or re-entry). */
+  const replaceHistory = useCallback((items: ChatMessage[], more: boolean) => {
+    setMessages(items)
+    setHasMore(more)
+  }, [])
+
+  /** Older page: prepend, dedupe by message id. */
+  const prependHistory = useCallback((items: ChatMessage[], more: boolean) => {
+    setMessages((prev) => {
+      const seen = new Set(prev.map((m) => m.id))
+      const older = items.filter((m) => !seen.has(m.id))
+      return older.length ? [...older, ...prev] : prev
+    })
+    setHasMore(more)
+  }, [])
+
+  /** @deprecated prefer replaceHistory — kept for callers that only fill empty */
+  const loadHistory = useCallback((items: ChatMessage[]) => {
+    setMessages((prev) => (prev.length > 0 ? prev : items))
+  }, [])
 
   const send = useCallback(
     async (text: string, extra?: Record<string, unknown>) => {
       const trimmed = text.trim()
-      if (!trimmed || streaming) return
+      if (!trimmed) return
+      if (streaming) {
+        abortFetch()
+        setStreaming(false)
+      }
 
-      const userMsg: ChatMessage = { id: mid(), role: 'user', content: trimmed }
-      const asstId = mid()
+      const userId = newClientMessageId()
+      const asstId = newClientMessageId()
+      const userMsg: ChatMessage = { id: userId, role: 'user', content: trimmed }
       setMessages((m) => [
         ...m,
         userMsg,
@@ -51,7 +89,12 @@ export function useChatStream(endpoint = '/chat/streaming') {
         endpoint,
         {
           method: 'POST',
-          body: JSON.stringify({ message: trimmed, ...extra }),
+          body: JSON.stringify({
+            message: trimmed,
+            user_client_message_id: userId,
+            assistant_client_message_id: asstId,
+            ...extra,
+          }),
         },
         {
           onToken: (t) => patch((c) => c + t),
@@ -63,7 +106,20 @@ export function useChatStream(endpoint = '/chat/streaming') {
             patch((c) => `${c}\n\n[retracted: ${reason}]`, 'done')
           },
           onError: (code, message) => {
-            patch((c) => c || `[${code}] ${message}`, 'error')
+            setMessages((msgs) =>
+              msgs.map((msg) => {
+                if (msg.id !== asstId) return msg
+                // 已有流式正文 = LLM 已通；事后槽位/写记忆错误不当成整单失败
+                if (msg.content.trim()) {
+                  return { ...msg, status: 'done' }
+                }
+                return {
+                  ...msg,
+                  content: `[${code}] ${message}`,
+                  status: 'error',
+                }
+              }),
+            )
             setStreaming(false)
           },
           onDone: () => {
@@ -74,14 +130,46 @@ export function useChatStream(endpoint = '/chat/streaming') {
       )
       setStreaming(false)
     },
-    [endpoint, start, streaming],
+    [endpoint, start, streaming, abortFetch],
   )
 
   const reset = useCallback(() => {
     abort()
     setMessages([])
     setStreaming(false)
+    setHasMore(false)
   }, [abort])
 
-  return { messages, streaming, send, abort, reset }
+  const appendLocal = useCallback(
+    (role: ChatRole, content: string, status: ChatMessage['status'] = 'done') => {
+      const id = newClientMessageId()
+      setMessages((m) => [...m, { id, role, content, status }])
+      return id
+    },
+    [],
+  )
+
+  const patchLocal = useCallback((id: string, content: string, status?: ChatMessage['status']) => {
+    setMessages((msgs) =>
+      msgs.map((msg) =>
+        msg.id === id
+          ? { ...msg, content, ...(status ? { status } : {}) }
+          : msg,
+      ),
+    )
+  }, [])
+
+  return {
+    messages,
+    streaming,
+    hasMore,
+    send,
+    abort,
+    reset,
+    appendLocal,
+    patchLocal,
+    loadHistory,
+    replaceHistory,
+    prependHistory,
+  }
 }

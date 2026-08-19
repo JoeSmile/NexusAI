@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from '@/api/http'
+import { apiDelete, apiGet, apiPost } from '@/api/http'
 
 export type RagAskData = {
   answer?: string
@@ -49,4 +49,28 @@ export async function ragUploadPdf(file: File) {
     message: string
     data: RagStatusData
   }>('/api/rag/upload/pdf', fd)
+}
+
+export type RagDocumentItem = {
+  source: string
+  name: string
+  source_type: string
+  chunk_count: number
+  created_at?: string | null
+}
+
+export async function ragListDocuments() {
+  return apiGet<{
+    success: boolean
+    data: { items: RagDocumentItem[]; count: number }
+  }>('/api/rag/documents')
+}
+
+export async function ragDeleteDocument(source: string) {
+  const q = `?source=${encodeURIComponent(source)}`
+  return apiDelete<{
+    success: boolean
+    message: string
+    data: { deleted: number; source: string }
+  }>(`/api/rag/documents${q}`)
 }

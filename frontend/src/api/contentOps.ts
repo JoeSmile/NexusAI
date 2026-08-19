@@ -1,4 +1,4 @@
-"""Frontend API — Task 45 content ops / offerings."""
+/** Frontend API — Task 45 content ops / offerings. */
 
 import { apiDelete, apiGet, apiPost, apiPut } from '@/api/http'
 
@@ -33,6 +33,46 @@ export type HotspotItem = {
   summary?: string
   category?: string
   score?: number
+  similar_to_previous?: boolean
+  /** rich schema (45 enrich) */
+  hot_id?: string
+  source?: string
+  crawl_time?: string
+  valid_expire_time?: string
+  rank?: number
+  hot_score?: number
+  hot_trend?: 'up' | 'down' | 'stable' | string | null
+  core_topic?: string
+  short_desc?: string
+  full_summary?: string | null
+  main_keywords?: string[]
+  extend_keywords?: string[]
+  exclude_keywords?: string[]
+  target_audience?: {
+    primary?: string
+    secondary?: string
+    age_range?: string
+    pain_points?: string[]
+  }
+  emotion_tag?: string[]
+  content_position?: string | null
+  suitable_content_type?: string[]
+  competition_level?: 'high' | 'medium' | 'low' | string | null
+  competitor_angle?: string[]
+  differentiate_angle?: string | null
+  risk_tag?: string[]
+  suggest_limit?: string | null
+  reference_material_links?: string[]
+  data_support?: string[]
+  suggested_opening_hook?: string | null
+  /** 顶层中文别名，与 evidence.raw_excerpt 同值 */
+  原文摘录?: string
+  evidence?: {
+    source_kind?: string
+    source_label?: string
+    raw_excerpt?: string
+    crawl_note?: string
+  }
 }
 
 export async function listOfferings(dept?: string) {
@@ -93,7 +133,12 @@ export async function digHotspots(body: {
   adapter?: string
   categories?: string[]
   keywords?: string
+  exclude_keywords?: string
   paste_text?: string
+  industry?: string
+  region?: string
+  use_org_profile?: boolean
+  user_note?: string
   save?: boolean
 }) {
   return apiPost<{
@@ -102,6 +147,13 @@ export async function digHotspots(body: {
     content_hash: string
     count: number
     artifact_id?: string
+    day_artifact_id?: string
+    run_artifact_id?: string
+    new_count?: number
+    skipped_duplicates?: number
+    idempotent?: boolean
+    day?: string
+    dig_evidence?: Record<string, unknown>
   }>('/api/content/hotspots/dig', body)
 }
 
@@ -131,7 +183,17 @@ export async function listArtifacts(kind?: string) {
       title: string
       body: unknown
       created_at?: string
+      creator_id?: string | null
     }>
     count: number
   }>(`/api/content/artifacts${q}`)
+}
+
+export async function excludeHotspot(title: string) {
+  return apiPost<{
+    ok: boolean
+    title: string
+    remaining: number
+    excluded_count: number
+  }>('/api/content/hotspots/exclude', { title })
 }

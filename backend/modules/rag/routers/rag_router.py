@@ -8,7 +8,7 @@ import asyncio
 import os
 import tempfile
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, ConfigDict
 
 from backend.core.auth.models import TenantContext
@@ -308,7 +308,7 @@ async def upload_pdf(
         kb_manager.tenant_id = tid
         kb_manager.org_unit_id = org_unit_id
         loader = EnterpriseKnowledgeLoader(kb_manager)
-        pages = loader.load_from_pdf(tmp_path)
+        pages = loader.load_from_pdf(tmp_path, display_name=file.filename)
         bump_epoch(tid)
         
         # 获取统计信息
@@ -319,6 +319,7 @@ async def upload_pdf(
             "message": f"PDF文档 {file.filename} 已成功添加到知识库({pages} 页有文本)",
             "data": stats,
             "pages_extracted": pages,
+            "filename": file.filename,
         }
     finally:
         # 清理临时文件
@@ -365,7 +366,7 @@ async def upload_multimodal(
             kb_manager.tenant_id = tenant_id
             kb_manager.org_unit_id = org_unit_id
             loader = EnterpriseKnowledgeLoader(kb_manager)
-            pages = loader.load_from_pdf(tmp_path)
+            pages = loader.load_from_pdf(tmp_path, display_name=filename)
             bump_epoch(tenant_id)
             return {
                 "success": True,
@@ -547,6 +548,77 @@ async def search_knowledge(
             "count": len(results)
         }
     }
+
+@router.get("/documents")
+@_rag_errors
+async def list_documents(
+    tenant: TenantContext = Depends(_rag_guard),
+):
+    """按 source 聚合列出本租户已入库文档（chunk 计数）。"""
+    from sqlalchemy import func
+
+    from backend.database.pgvector_session import KnowledgeChunk, get_pg_session
+
+    tid = tenant.tenant_id
+    kb_manager = get_kb_manager()
+    kb_manager.tenant_id = tid
+    sf = get_pg_session()
+    with sf.Session() as session:
+        rows = (
+            session.query(
+                KnowledgeChunk.source,
+                KnowledgeChunk.source_type,
+                func.count(KnowledgeChunk.id),
+                func.max(KnowledgeChunk.created_at),
+            )
+            .filter(KnowledgeChunk.tenant_id == tid)
+            .group_by(KnowledgeChunk.source, KnowledgeChunk.source_type)
+            .order_by(func.max(KnowledgeChunk.created_at).desc())
+            .all()
+        )
+    items = []
+    for source, source_type, chunk_count, created_at in rows:
+        name = (source or "").strip() or "未命名文档"
+        items.append(
+            {
+                "source": source or "",
+                "name": name,
+                "source_type": source_type or "text",
+                "chunk_count": int(chunk_count or 0),
+                "created_at": created_at.isoformat() if created_at else None,
+            }
+        )
+    return {"success": True, "data": {"items": items, "count": len(items)}}
+
+
+@router.delete("/documents")
+@_rag_errors
+async def delete_document(
+    source: str = Query(..., min_length=1, description="入库 source / 文件名"),
+    tenant: TenantContext = Depends(_rag_guard),
+):
+    """按 source 删除本租户下该文档的全部 chunk。"""
+    from backend.database.pgvector_session import KnowledgeChunk, get_pg_session
+
+    tid = tenant.tenant_id
+    sf = get_pg_session()
+    with sf.Session() as session:
+        deleted = (
+            session.query(KnowledgeChunk)
+            .filter(
+                KnowledgeChunk.tenant_id == tid,
+                KnowledgeChunk.source == source,
+            )
+            .delete(synchronize_session=False)
+        )
+        session.commit()
+    bump_epoch(tid)
+    return {
+        "success": True,
+        "message": f"已删除「{source}」共 {deleted} 块",
+        "data": {"deleted": int(deleted or 0), "source": source},
+    }
+
 
 @router.delete("/reset")
 @_rag_errors

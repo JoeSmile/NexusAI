@@ -1,17 +1,24 @@
-/** Wave S 产品路径与旧 /panels/* 兼容映射 */
+/** Frontend route constants — AgentUI product shell */
 
-export const HOME_PATH = '/workspace/chat'
+export const HOME_PATH = '/workspace'
 
-/** 旧书签 → 新产品路径 */
+/** Legacy bookmarks → current shell */
 export const PANEL_REDIRECTS: Record<string, string> = {
-  '/panels/chat': '/workspace/chat',
-  '/panels/agent': '/workspace/agent',
-  '/panels/eval': '/workspace/eval',
-  '/panels/rag': '/knowledge',
-  '/panels/admin': '/governance/keys',
-  '/panels/audit': '/governance/audit',
-  '/panels/capabilities': '/governance/capabilities',
-  '/panels/performance': '/governance/performance',
+  '/panels/chat': '/workspace',
+  '/panels/agent': '/admin',
+  '/panels/eval': '/admin',
+  '/panels/rag': '/workspace/knowledge',
+  '/panels/admin': '/admin/keys',
+  '/panels/audit': '/admin/audit',
+  '/panels/capabilities': '/admin/capabilities',
+  '/panels/performance': '/admin/performance',
+  '/knowledge': '/workspace/knowledge',
+  '/workflows': '/admin/workflows',
+  '/governance/org': '/admin/org',
+  '/governance/audit': '/admin/audit',
+  '/governance/capabilities': '/admin/capabilities',
+  '/governance/performance': '/admin/performance',
+  '/governance/keys': '/admin/keys',
 }
 
 export function resolvePostLoginPath(next: string | null): string {
