@@ -551,11 +551,12 @@ async def create_llm_key(
             """
             INSERT INTO llm_api_keys
                 (tenant_id, key_alias, provider, base_url, encrypted_key,
-                 allowed_models, owner_user_id, description, created_by, expires_at)
+                 allowed_models, owner_user_id, description, created_by, expires_at,
+                 is_active)
             VALUES
                 (:tid, :alias, :prov, :url, :enc,
                  CAST(:models AS jsonb), NULL, :desc, :by,
-                 now() + (:days * interval '1 day'))
+                 now() + (:days * interval '1 day'), true)
             RETURNING id, created_at
             """
         )
