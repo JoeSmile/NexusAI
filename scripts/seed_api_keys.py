@@ -119,7 +119,7 @@ def seed_users(entries: list[dict]) -> None:
                 },
             )
         session.commit()
-    print(f"  ✅ 测试账号已同步 ({len(entries)} 个,密码统一 {TEST_PASSWORD})")
+    print(f"  [OK] test accounts synced ({len(entries)}, password={TEST_PASSWORD})")
 
 
 def main():

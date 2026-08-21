@@ -76,6 +76,41 @@ def test_submit_ignores_body_user_id(tenant: TenantContext) -> None:
     assert r.json()["feedback_id"] == 9
 
 
+def test_dislike_comment_persisted(tenant: TenantContext) -> None:
+    saved: dict[str, Any] = {}
+
+    def _save(**kwargs: Any) -> SimpleNamespace:
+        saved.update(kwargs)
+        return SimpleNamespace(
+            id=12,
+            session_id=kwargs["session_id"],
+            feedback_type=kwargs["feedback_type"],
+            rating=kwargs["rating"],
+            client_message_id=kwargs.get("client_message_id"),
+            created_at=datetime(2026, 8, 20),
+        )
+
+    db = MagicMock()
+    db.save_feedback.side_effect = lambda **kw: _save(**kw)
+    db.__enter__ = MagicMock(return_value=db)
+    db.__exit__ = MagicMock(return_value=False)
+    app = _app(tenant)
+    with patch.object(feedback_mod, "DatabaseManager", return_value=db):
+        r = TestClient(app).post(
+            "/feedback/",
+            json={
+                "session_id": "workspace-chat",
+                "client_message_id": "cid-d",
+                "feedback_type": "irrelevant",
+                "comment": "答非所问 | 补充：偏题",
+            },
+        )
+    assert r.status_code == 200
+    assert saved["comment"] == "答非所问 | 补充：偏题"
+    assert saved["rating"] == 1
+    assert saved["feedback_type"] == "irrelevant"
+
+
 def test_bookmark_requires_bot_response(tenant: TenantContext) -> None:
     app = _app(tenant)
     client = TestClient(app)
@@ -104,6 +139,7 @@ def test_mine_and_delete(tenant: TenantContext) -> None:
     )
     db = MagicMock()
     db.list_my_feedback.return_value = ([row], 1)
+    db.get_feedback_owned.return_value = row
     db.delete_feedback_owned.return_value = True
     db.__enter__ = MagicMock(return_value=db)
     db.__exit__ = MagicMock(return_value=False)
@@ -126,6 +162,7 @@ def test_mine_and_delete(tenant: TenantContext) -> None:
 
 def test_delete_missing_404(tenant: TenantContext) -> None:
     db = MagicMock()
+    db.get_feedback_owned.return_value = None
     db.delete_feedback_owned.return_value = False
     db.__enter__ = MagicMock(return_value=db)
     db.__exit__ = MagicMock(return_value=False)
@@ -241,3 +278,61 @@ def test_u1_reaction_switch_single_row() -> None:
     assert a is b
     assert b.feedback_type == "irrelevant"
     assert len([r for r in sess.rows if r.feedback_type in ("helpful", "irrelevant")]) == 1
+
+
+def _bookmark_db() -> MagicMock:
+    db = MagicMock()
+
+    def _save(**kwargs: Any) -> SimpleNamespace:
+        return SimpleNamespace(
+            id=11,
+            session_id=kwargs["session_id"],
+            feedback_type=kwargs["feedback_type"],
+            rating=kwargs["rating"],
+            client_message_id=kwargs.get("client_message_id"),
+            created_at=datetime(2026, 8, 20),
+        )
+
+    db.save_feedback.side_effect = lambda **kw: _save(**kw)
+    db.__enter__ = MagicMock(return_value=db)
+    db.__exit__ = MagicMock(return_value=False)
+    return db
+
+
+def test_bookmark_stays_on_feedback_table(tenant: TenantContext) -> None:
+    """Slice 1 SoT: bookmark writes user_feedback only; warm dual-write is slice 4."""
+    app = _app(tenant)
+    with patch.object(feedback_mod, "DatabaseManager", return_value=_bookmark_db()):
+        r = TestClient(app).post(
+            "/feedback/",
+            json={
+                "session_id": "workspace-chat",
+                "client_message_id": "cid-b",
+                "feedback_type": "bookmark",
+                "bot_response": "口播里要强调入学适应",
+                "user_message": "帮我写口播",
+            },
+        )
+    assert r.status_code == 200
+    assert r.json()["feedback_type"] == "bookmark"
+
+
+def test_bookmark_does_not_call_memory_service(tenant: TenantContext) -> None:
+    app = _app(tenant)
+    with (
+        patch.object(feedback_mod, "DatabaseManager", return_value=_bookmark_db()),
+        patch(
+            "backend.core.memory_service.get_unified_memory_service",
+            side_effect=AssertionError("bookmark must not touch warm"),
+        ),
+    ):
+        r = TestClient(app).post(
+            "/feedback/",
+            json={
+                "session_id": "workspace-chat",
+                "client_message_id": "cid-b",
+                "feedback_type": "bookmark",
+                "bot_response": "x",
+            },
+        )
+    assert r.status_code == 200

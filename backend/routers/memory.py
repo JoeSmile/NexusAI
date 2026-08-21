@@ -3,9 +3,10 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from backend.core.audit import log_audit
 from backend.core.auth.models import TenantContext
 from backend.core.auth.permissions import require_permission
 from backend.core.auth.scope import assert_user_access, require_tenant_admin
@@ -25,6 +26,10 @@ class MemoryImportanceUpdate(BaseModel):
     importance: float = Field(..., ge=0.0, le=1.0)
 
 
+class MemoryValueUpdate(BaseModel):
+    value: str = Field(..., min_length=1, max_length=8000)
+
+
 def _mem(tenant: TenantContext):
     return get_unified_memory_service(tenant_id=tenant.tenant_id)
 
@@ -35,6 +40,69 @@ def _context() -> ContextService:
 
 # 兼容旧单测名
 _require_memory_admin = require_tenant_admin
+
+
+@router.get("/me/memories")
+async def get_my_memories(
+    memory_type: str | None = None,
+    limit: int = Query(200, ge=1, le=200),
+    tenant: TenantContext = Depends(require_permission("chat:write")),
+):
+    """Current user's warm memories (47b slice 3)."""
+    memories = await _mem(tenant).list_warm(
+        tenant.user_id, memory_type=memory_type, limit=limit
+    )
+    return {
+        "user_id": tenant.user_id,
+        "memories": memories,
+        "total": len(memories),
+        "tenant_id": tenant.tenant_id,
+    }
+
+
+@router.patch("/me/memories/{memory_id}")
+async def patch_my_memory(
+    memory_id: str,
+    request: MemoryValueUpdate,
+    background_tasks: BackgroundTasks,
+    tenant: TenantContext = Depends(require_permission("chat:write")),
+):
+    ok = await _mem(tenant).update_warm_value(
+        tenant.user_id, memory_id, request.value
+    )
+    if not ok:
+        raise HTTPException(status_code=404, detail="记忆不存在")
+    log_audit(
+        background_tasks,
+        tenant_id=tenant.tenant_id,
+        user_id=tenant.user_id,
+        action="memory.update",
+        trace_id="",
+        input_text=memory_id,
+    )
+    return {"message": "记忆已更新", "memory_id": memory_id}
+
+
+@router.delete("/me/memories/{memory_id}")
+async def delete_my_memory(
+    memory_id: str,
+    background_tasks: BackgroundTasks,
+    tenant: TenantContext = Depends(require_permission("chat:write")),
+):
+    ok = await _mem(tenant).delete_warm(
+        user_id=tenant.user_id, memory_id=memory_id
+    )
+    if not ok:
+        raise HTTPException(status_code=404, detail="记忆不存在")
+    log_audit(
+        background_tasks,
+        tenant_id=tenant.tenant_id,
+        user_id=tenant.user_id,
+        action="memory.delete",
+        trace_id="",
+        input_text=memory_id,
+    )
+    return {"message": "记忆删除成功", "memory_id": memory_id}
 
 
 @router.get("/users/{user_id}/memories")

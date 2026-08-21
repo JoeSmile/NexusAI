@@ -11,6 +11,7 @@ import { HOME_PATH, PANEL_REDIRECTS } from '@/lib/routes'
 import AgentLoginPage from '@/pages/agent/LoginPage'
 import AdminHomePage from '@/pages/agent/AdminHome'
 import HomeChatPage from '@/pages/agent/HomeChat'
+import WorkspaceDashboard from '@/pages/agent/WorkspaceDashboard'
 import RootLanding from '@/pages/marketing/Landing'
 import ContentLibraryPage from '@/pages/content/ContentLibrary'
 import ContentStudioPage from '@/pages/content/ContentStudio'
@@ -75,8 +76,8 @@ export const router = createBrowserRouter([
         element: <AgentHomeShell />,
         children: [
           { index: true, element: <HomeChatPage /> },
+          { path: 'dashboard', element: <WorkspaceDashboard /> },
           { path: 'knowledge', element: <RagPanel /> },
-          { path: 'dashboard', element: <Navigate to="/workspace/knowledge" replace /> },
           { path: 'content', element: <ContentStudioPage /> },
           { path: 'social', element: <SocialBenchmarkPage /> },
           { path: 'library', element: <ContentLibraryPage /> },

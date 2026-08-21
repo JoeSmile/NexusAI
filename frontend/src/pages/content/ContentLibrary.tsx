@@ -74,6 +74,7 @@ export default function ContentLibraryPage() {
   const [busy, setBusy] = useState(false)
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState<ArtifactRow | null>(null)
+  const [view, setView] = useState<'list' | 'grid'>('grid')
 
   const refresh = useCallback(async () => {
     setBusy(true)
@@ -117,6 +118,22 @@ export default function ContentLibraryPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <div className="view-toggle" role="group" aria-label="视图">
+            <button
+              type="button"
+              className={cn('view-toggle-btn', view === 'list' && 'active')}
+              onClick={() => setView('list')}
+            >
+              表
+            </button>
+            <button
+              type="button"
+              className={cn('view-toggle-btn', view === 'grid' && 'active')}
+              onClick={() => setView('grid')}
+            >
+              格
+            </button>
+          </div>
           <Button type="button" variant="outline" disabled={busy} onClick={() => void refresh()}>
             刷新
           </Button>
@@ -150,6 +167,46 @@ export default function ContentLibraryPage() {
         ))}
       </div>
 
+      {filtered.length === 0 ? (
+        <p className="rounded-2xl border border-[#E2E8F0] bg-white px-4 py-10 text-center text-sm text-[#64748B]">
+          {busy
+            ? '加载中…'
+            : tab === 'day'
+              ? '暂无今日合集 — 去内容运营抓取热点'
+              : tab === 'scripts'
+                ? '暂无口播稿'
+                : '暂无抓取记录'}
+        </p>
+      ) : view === 'grid' ? (
+        <div className="content-grid">
+          {filtered.map((row) => {
+            const hs = asHotspots(row.body)
+            const summary =
+              row.kind === 'script'
+                ? `${asScript(row.body).slice(0, 72)}${asScript(row.body).length > 72 ? '…' : ''}`
+                : `${hs.length} 条热点`
+            return (
+              <button
+                key={row.id}
+                type="button"
+                className="content-card text-left"
+                onClick={() => openRow(row)}
+              >
+                <div className="content-thumb">
+                  <span className="content-thumb-icon">{kindLabel(row.kind)}</span>
+                </div>
+                <div style={{ padding: '12px 14px' }}>
+                  <div className="mb-1 text-sm font-semibold text-[#0F172A]">{row.title}</div>
+                  <div className="line-clamp-2 text-xs text-[#64748B]">{summary}</div>
+                  <div className="mt-2 text-xs text-[#94A3B8]">
+                    {row.created_at?.replace('T', ' ').slice(0, 19) || '—'}
+                  </div>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      ) : (
       <div className="overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white shadow-sm">
         <table className="w-full text-left text-sm">
           <thead className="bg-[#F8FAFC] text-xs tracking-wide text-[#64748B] uppercase">
@@ -201,6 +258,7 @@ export default function ContentLibraryPage() {
           </tbody>
         </table>
       </div>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent

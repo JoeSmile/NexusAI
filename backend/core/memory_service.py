@@ -36,6 +36,13 @@ REDACTED_MESSAGE = "[REDACTED]"
 _student_alias_map: dict[str, str] = {}
 
 
+def _parse_warm_id(memory_id: str) -> int | None:
+    try:
+        return int(memory_id)
+    except (TypeError, ValueError):
+        return None
+
+
 def _student_alias(*, tenant_id: str, name: str, key: str) -> str:
     """P0-12 展示层脱敏：学生真名 → 学生A/B…（进程内按租户稳定映射）。"""
     cache_key = f"{tenant_id}:{key}:{name}"
@@ -659,12 +666,15 @@ class UnifiedMemoryService:
 
     async def delete_warm(self, *, user_id: str, memory_id: str) -> bool:
         """删除单条 warm（user_memories）；不级联 cold/画像全集。禁删 forget 闸门。"""
+        row_id = _parse_warm_id(memory_id)
+        if row_id is None:
+            return False
         session_factory = get_pg_session()
         with session_factory.Session() as session:
             row = (
                 session.query(UserMemory)
                 .filter_by(
-                    tenant_id=self.tenant_id, user_id=user_id, id=int(memory_id)
+                    tenant_id=self.tenant_id, user_id=user_id, id=row_id
                 )
                 .first()
             )
@@ -679,6 +689,29 @@ class UnifiedMemoryService:
                 )
                 return False
             session.delete(row)
+            session.commit()
+            return True
+
+    async def update_warm_value(
+        self, user_id: str, memory_id: str, new_value: str
+    ) -> bool:
+        """Edit warm value in place (47b slice 3)."""
+        text = (new_value or "").strip()
+        row_id = _parse_warm_id(memory_id)
+        if not text or row_id is None:
+            return False
+        session_factory = get_pg_session()
+        with session_factory.Session() as session:
+            row = (
+                session.query(UserMemory)
+                .filter_by(
+                    tenant_id=self.tenant_id, user_id=user_id, id=row_id
+                )
+                .first()
+            )
+            if not row or row.key == "__forgotten__":
+                return False
+            row.value = text
             session.commit()
             return True
 
@@ -835,11 +868,18 @@ class UnifiedMemoryService:
         entity_lines: list[str] = []
 
         for key, raw in (bundle.warm or {}).items():
-            if key.startswith("pending:"):
+            if key.startswith("pending:") or key.startswith("bookmark:"):
                 continue
             val = _parse_val(str(raw))
             if key.startswith(
-                ("fact:", "preference:", "identity:", "user:", "profile:")
+                (
+                    "fact:",
+                    "preference:",
+                    "identity:",
+                    "user:",
+                    "profile:",
+                    "style:",
+                )
             ):
                 display = val if isinstance(val, str) else (val.get("text") or raw)
                 user_lines.append(f"- {key}: {display}")
@@ -885,6 +925,7 @@ class UnifiedMemoryService:
             user_lines.append(f"- {key}: {display}")
 
         # 优先级：todo > decision > error > entity > 用户画像 > cold > hot
+        # 收藏注入推迟到切片 4（事务内 warm 双写）；本轮只走 user_feedback
         parts: list[str] = [MEMORY_ISOLATION_HEADER]
         if todo_lines:
             parts.append("[活跃待办]\n" + "\n".join(todo_lines[:10]))
@@ -940,8 +981,11 @@ class UnifiedMemoryService:
     ) -> list[dict[str, Any]]:
         session_factory = get_pg_session()
         with session_factory.Session() as session:
-            q = session.query(UserMemory).filter_by(
-                tenant_id=self.tenant_id, user_id=user_id
+            q = (
+                session.query(UserMemory)
+                .filter_by(tenant_id=self.tenant_id, user_id=user_id)
+                .filter(UserMemory.key != "__forgotten__")
+                .filter(~UserMemory.key.like("pending:%"))
             )
             if memory_type:
                 q = q.filter(UserMemory.source == memory_type)

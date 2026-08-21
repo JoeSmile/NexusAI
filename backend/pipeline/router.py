@@ -10,7 +10,7 @@ from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from backend.core.audit import log_audit
 from backend.core.auth.models import TenantContext
@@ -36,6 +36,8 @@ class ChatRequest(BaseModel):
     user_id: str | None = None
     # Homepage context panel: optional registry model id
     model: str | None = None
+    temperature: float | None = Field(default=None, ge=0.0, le=2.0)
+    max_tokens: int | None = Field(default=None, ge=16, le=8192)
     # 47b I1 — FE bubble UUIDs (persisted on write_memory)
     user_client_message_id: str | None = None
     assistant_client_message_id: str | None = None
@@ -113,6 +115,8 @@ async def _run_chat_pipeline(
         preferred_model=body.model,
         user_client_message_id=body.user_client_message_id,
         assistant_client_message_id=body.assistant_client_message_id,
+        llm_temperature=body.temperature,
+        llm_max_tokens=body.max_tokens,
     )
     _inject_langfuse_parent(initial)
 
@@ -261,6 +265,8 @@ async def chat_streaming(
         preferred_model=body.model,
         user_client_message_id=body.user_client_message_id,
         assistant_client_message_id=body.assistant_client_message_id,
+        llm_temperature=body.temperature,
+        llm_max_tokens=body.max_tokens,
     )
     initial["stream_mode"] = True
     _inject_langfuse_parent(initial)
@@ -310,6 +316,10 @@ async def chat_streaming(
             api_key=final.get("llm_api_key") or "",
             base_url=final.get("llm_base_url") or "",
             provider=final.get("llm_key_provider") or "default",
+            max_tokens=final.get("llm_max_tokens"),
+            temperature=final.get("llm_temperature")
+            if final.get("llm_temperature") is not None
+            else 0.7,
         ).__aiter__()
 
         try:

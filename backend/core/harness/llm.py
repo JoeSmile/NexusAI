@@ -32,6 +32,26 @@ async def _budget_allows(tenant_id: str, estimated: float) -> bool:
     return await check_budget(tenant_id, estimated)
 
 
+def _completion_kwargs(
+    *,
+    model: str,
+    messages: list[dict],
+    temperature: float,
+    max_tokens: int | None,
+    stream: bool = False,
+) -> dict[str, Any]:
+    params: dict[str, Any] = {
+        "model": model,
+        "messages": messages,
+        "temperature": float(temperature),
+    }
+    if stream:
+        params["stream"] = True
+    if max_tokens:
+        params["max_tokens"] = int(max_tokens)
+    return params
+
+
 class LLMHarness(Harness):
     """LLM 调用入口"""
 
@@ -47,7 +67,7 @@ class LLMHarness(Harness):
         base_url: str | None = None,
         **kwargs: Any,
     ) -> HarnessResult:
-        estimated = estimate_cost(model, kwargs.get("max_tokens", 1000))
+        estimated = estimate_cost(model, kwargs.get("max_tokens") or 1000)
         if not await _budget_allows(tenant_id, estimated):
             return HarnessResult(
                 output="预算超限，请求被拒绝。",
@@ -80,7 +100,8 @@ class LLMHarness(Harness):
                     base_url,
                     tenant_id=tenant_id,
                     key_provider=str(kwargs.get("provider") or "default"),
-                    max_tokens=int(kwargs.get("max_tokens", 1000)),
+                    max_tokens=kwargs.get("max_tokens"),
+                    temperature=float(kwargs.get("temperature", 0.7)),
                 )
 
             result = await self.wrap(
@@ -153,7 +174,7 @@ class LLMHarness(Harness):
         **kwargs: Any,
     ) -> AsyncIterator[str]:
         """真流式主体（已在并发槽内）。"""
-        estimated = estimate_cost(model, kwargs.get("max_tokens", 1000))
+        estimated = estimate_cost(model, kwargs.get("max_tokens") or 1000)
         if not await _budget_allows(tenant_id, estimated):
             yield "预算超限，请求被拒绝。"
             return
@@ -189,10 +210,13 @@ class LLMHarness(Harness):
                     base_url=base_url or os.getenv("LLM_BASE_URL") or None,
                 )
                 stream = await client.chat.completions.create(
-                    model=model,
-                    messages=messages,  # type: ignore[arg-type]
-                    stream=True,
-                    max_tokens=int(kwargs.get("max_tokens", 1000)),
+                    **_completion_kwargs(
+                        model=model,
+                        messages=messages,
+                        temperature=float(kwargs.get("temperature", 0.7)),
+                        max_tokens=kwargs.get("max_tokens"),
+                        stream=True,
+                    )
                 )
                 task = asyncio.current_task()
                 async for chunk in stream:  # type: ignore[union-attr]
@@ -246,7 +270,8 @@ class LLMHarness(Harness):
         *,
         tenant_id: str = "default",
         key_provider: str = "default",
-        max_tokens: int = 1000,
+        max_tokens: int | None = 1000,
+        temperature: float = 0.7,
     ) -> str:
         """真实调用 OpenAI-compatible API;429/401 沿候选链切 key。"""
         from openai import AsyncOpenAI
@@ -284,9 +309,12 @@ class LLMHarness(Harness):
                 base_url=url or base_url or os.getenv("LLM_BASE_URL") or None,
             )
             resp = await client.chat.completions.create(
-                model=model,
-                messages=messages,  # type: ignore[arg-type]
-                max_tokens=max_tokens,
+                **_completion_kwargs(
+                    model=model,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
             )
             text = (resp.choices[0].message.content or "").strip()
             if llm_mode == "record" and text:

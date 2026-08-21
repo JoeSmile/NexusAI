@@ -52,6 +52,20 @@ def test_assemble_world_miss_without_query_hit():
     assert "李四" not in block
 
 
+def test_assemble_does_not_inject_bookmark_keys_this_round():
+    svc = UnifiedMemoryService(tenant_id="t")
+    warm = {
+        "fact:星火": "项目代号星火",
+        "bookmark:cid-9": json.dumps(
+            {"text": "口播里要强调入学适应", "session_id": "workspace-chat"}
+        ),
+    }
+    block = svc.assemble_prompt_block(MemoryBundle(warm=warm, hot=[], cold=[]))
+    assert "[用户收藏]" not in block
+    assert "入学适应" not in block
+    assert "[用户背景]" in block
+
+
 def test_half_structured_no_role_drift():
     text = (
         f"{MEMORY_ISOLATION_HEADER}\n\n"

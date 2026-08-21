@@ -43,7 +43,7 @@ up:
 	cd $(ROOT_DIR) && $(COMPOSE_LOCAL) up -d postgres redis
 
 up-langfuse:
-	cd $(ROOT_DIR) && $(COMPOSE_LOCAL) up -d postgres redis langfuse
+	cd $(ROOT_DIR) && $(COMPOSE_LOCAL) --profile langfuse up -d postgres redis langfuse-web langfuse-worker langfuse-postgres langfuse-redis langfuse-clickhouse langfuse-minio
 
 up-all docker-up:
 	cd $(ROOT_DIR) && $(COMPOSE_LOCAL) up -d --build

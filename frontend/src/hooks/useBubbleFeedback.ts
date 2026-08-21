@@ -10,6 +10,7 @@ import {
 } from '@/api/feedback'
 import { formatApiError } from '@/api/http'
 import { WORKSPACE_CHAT_SESSION } from '@/api/chat'
+import { formatDislikeComment } from '@/lib/dislikeReasons'
 
 export type BubbleFeedbackState = {
   reaction?: { id: number; type: 'helpful' | 'irrelevant' }
@@ -61,7 +62,7 @@ export function useBubbleFeedback() {
     async (
       clientMessageId: string,
       type: 'helpful' | 'irrelevant',
-      botRaw: string,
+      _botRaw: string,
       userMessage?: string,
     ) => {
       const key = `${clientMessageId}:reaction`
@@ -100,6 +101,50 @@ export function useBubbleFeedback() {
       }
     },
     [busy, byMsg],
+  )
+
+  const submitDislike = useCallback(
+    async (
+      clientMessageId: string,
+      reasonIds: string[],
+      note: string,
+      userMessage?: string,
+    ) => {
+      const comment = formatDislikeComment(reasonIds, note)
+      if (!comment) {
+        toast.error('请选择差评理由，或填写补充说明')
+        return false
+      }
+      const key = `${clientMessageId}:reaction`
+      if (busy) return false
+      setBusy(key)
+      try {
+        const res = await submitFeedback({
+          session_id: WORKSPACE_CHAT_SESSION,
+          client_message_id: clientMessageId,
+          feedback_type: 'irrelevant',
+          rating: 1,
+          comment,
+          user_message: userMessage || '',
+          bot_response: '',
+        })
+        setByMsg((m) => ({
+          ...m,
+          [clientMessageId]: {
+            ...(m[clientMessageId] ?? {}),
+            reaction: { id: res.feedback_id, type: 'irrelevant' },
+          },
+        }))
+        toast.success('已提交差评')
+        return true
+      } catch (e) {
+        toast.error(formatApiError(e))
+        return false
+      } finally {
+        setBusy(null)
+      }
+    },
+    [busy],
   )
 
   const toggleBookmark = useCallback(
@@ -147,7 +192,7 @@ export function useBubbleFeedback() {
     [busy, byMsg],
   )
 
-  return { byMsg, hydrate, copyText, toggleReaction, toggleBookmark, busy }
+  return { byMsg, hydrate, copyText, toggleReaction, submitDislike, toggleBookmark, busy }
 }
 
 export type { FeedbackType }

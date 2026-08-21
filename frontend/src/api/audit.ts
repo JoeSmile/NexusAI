@@ -41,6 +41,20 @@ export async function fetchAuditLogs(q: AuditQuery = {}) {
   return apiGet<AuditLogRow[]>(`/api/audit/logs${toQs(q)}`)
 }
 
+export type UsageSummary = {
+  period: string
+  calls: number
+  input_tokens: number
+  output_tokens: number
+  tokens: number
+  cost: number
+  daily_limit: number
+}
+
+export async function fetchUsageSummary() {
+  return apiGet<UsageSummary>('/api/audit/usage-summary')
+}
+
 /** 下载 CSV（blob）；成功时触发浏览器保存。 */
 export async function exportAuditCsv(q: Omit<AuditQuery, 'limit' | 'offset'> = {}) {
   const res = await apiFetch(`/api/audit/export${toQs(q)}`)

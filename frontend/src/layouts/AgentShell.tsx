@@ -5,12 +5,14 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 
+import { TokenUsageBar } from '@/components/agent/TokenUsageBar'
 import { useAuthStore } from '@/stores/authStore'
 import { useChatPrefsStore } from '@/stores/chatPrefsStore'
 import { cn } from '@/lib/utils'
 
 const TABS = [
   { to: '/workspace', end: true, label: '对话' },
+  { to: '/workspace/dashboard', label: '工作台' },
   { to: '/workspace/knowledge', label: '知识库' },
   { to: '/workspace/content', label: '内容运营' },
   { to: '/workspace/social', label: '社媒对标' },
@@ -78,6 +80,7 @@ export function AgentHomeShell() {
             </nav>
           </div>
           <div className="topbar-right">
+            <TokenUsageBar />
             <button
               type="button"
               className="icon-btn context-config-btn"

@@ -72,6 +72,7 @@ export type HotspotItem = {
     source_label?: string
     raw_excerpt?: string
     crawl_note?: string
+    source_url?: string
   }
 }
 

@@ -35,12 +35,10 @@ services:
       REDIS_PORT: "6379"
       REDIS_PASSWORD: ${REDIS_PASSWORD:-nexusai_redis}
       LLM_MOCK: "true"
-      # 默认关闭 SDK 上报；启 Langfuse 栈时再设 LANGFUSE_ENABLED=true
-      LANGFUSE_ENABLED: ${LANGFUSE_ENABLED:-false}
-      LANGFUSE_HOST: ${LANGFUSE_HOST:-http://langfuse-web:3000}
-      LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-http://langfuse-web:3000}
-      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-local-nexusai}
-      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-local-nexusai}
+      # HOST 必须用 docker DNS；开关/key 走 env_file（config.env），勿在此写死 false
+      # 否则 compose 插值会覆盖 config.env 的 LANGFUSE_ENABLED=true
+      LANGFUSE_HOST: http://langfuse-web:3000
+      LANGFUSE_BASE_URL: http://langfuse-web:3000
     volumes:
       - .:/app
       - /app/.venv
@@ -62,8 +60,9 @@ services:
       - nexusai_local
 
   # ── Langfuse OSS v4（默认不启动；见 profiles: langfuse）──
-  # 开启：COMPOSE_PROFILES=langfuse docker compose -f docker-compose.local.yml up -d
-  # 并设 LANGFUSE_ENABLED=true。扩展说明见 docs/superpowers/specs/2026-08-07-langfuse-v4-upgrade-design.md §5
+  # 开启：docker compose -f docker-compose.local.yml --profile langfuse up -d
+  # 并在 config.env 设 LANGFUSE_ENABLED=true。镜像钉 4.6（与本地已拉 tag 对齐；:4 会漂）
+  # 起步拓扑 ≠ 生产伸缩。说明见 docs/superpowers/specs/2026-08-07-langfuse-v4-upgrade-design.md §5-6
   langfuse-postgres:
     profiles: ["langfuse"]
     image: docker.io/postgres:17
@@ -146,7 +145,7 @@ services:
 
   langfuse-worker:
     profiles: ["langfuse"]
-    image: docker.io/langfuse/langfuse-worker:4
+    image: docker.io/langfuse/langfuse-worker:4.6
     depends_on:
       langfuse-postgres:
         condition: service_healthy
@@ -191,7 +190,7 @@ services:
 
   langfuse-web:
     profiles: ["langfuse"]
-    image: docker.io/langfuse/langfuse:4
+    image: docker.io/langfuse/langfuse:4.6
     ports:
       - "3001:3000"
     depends_on:
@@ -216,7 +215,8 @@ services:
       LANGFUSE_INIT_PROJECT_SECRET_KEY: sk-lf-local-nexusai
       LANGFUSE_INIT_USER_EMAIL: admin@nexusai.local
       LANGFUSE_INIT_USER_NAME: admin
-      LANGFUSE_INIT_USER_PASSWORD: nexusai
+      # v4 要求 init 密码 ≥ 8；LANGFUSE_INIT_* 仅首次建库生效
+      LANGFUSE_INIT_USER_PASSWORD: nexusai-local
     restart: unless-stopped
     networks:
       - nexusai_local

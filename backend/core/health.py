@@ -1,8 +1,10 @@
-"""深度健康检查 — 数据库 / pgvector / LLM / LangFuse"""
+"""深度健康检查 — 数据库 / pgvector / LLM / LangFuse（LangFuse 外呼不走本路径）"""
 
 from __future__ import annotations
 
 import time
+import urllib.error
+import urllib.request
 
 from fastapi import APIRouter
 from sqlalchemy import text
@@ -11,6 +13,36 @@ from starlette.responses import JSONResponse
 from backend.database.pgvector_session import get_pg_session
 
 router = APIRouter(tags=["system"])
+
+
+def langfuse_local_status() -> dict:
+    """进程内开关/SDK 状态，无出站 HTTP。供 GET /health 使用。"""
+    from backend.observability.langfuse_client import (  # type: ignore
+        _base_url,
+        get_langfuse,
+        langfuse_enabled,
+    )
+
+    if not langfuse_enabled():
+        return {"status": "disabled"}
+    if get_langfuse() is None:
+        return {"status": "not_configured"}
+    return {"status": "configured", "host": _base_url()}
+
+
+def langfuse_status() -> dict:
+    """可选远端探测。不要挂在同步 /health 上（urlopen 最多 2s）。"""
+    local = langfuse_local_status()
+    if local.get("status") != "configured":
+        return local
+    host = local.get("host") or ""
+    try:
+        req = urllib.request.Request(f"{host}/api/public/health", method="GET")
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            ok = 200 <= getattr(resp, "status", 200) < 300
+        return {"status": "up" if ok else "down", "host": host}
+    except (urllib.error.URLError, TimeoutError, OSError):
+        return {"status": "down", "host": host}
 
 
 @router.get("/health")
@@ -69,22 +101,9 @@ async def health_check():
     except Exception:
         checks["cache"] = {"status": "down"}
 
-    # 5. LangFuse（可选）
+    # 5. LangFuse（可选；仅本地 SDK 状态，不出站）
     try:
-        from backend.observability.langfuse_client import (  # type: ignore
-            get_langfuse,
-            langfuse_enabled,
-        )
-
-        if not langfuse_enabled():
-            checks["langfuse"] = {"status": "disabled"}
-        elif get_langfuse() is not None:
-            checks["langfuse"] = {
-                "status": "configured",
-                "host": __import__("os").getenv("LANGFUSE_HOST", ""),
-            }
-        else:
-            checks["langfuse"] = {"status": "not_configured"}
+        checks["langfuse"] = langfuse_local_status()
     except Exception:
         checks["langfuse"] = {"status": "not_configured"}
 

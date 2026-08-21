@@ -79,13 +79,13 @@ async def submit_feedback(
             )
 
             return FeedbackResponse(
-                feedback_id=feedback.id,
-                session_id=feedback.session_id,
-                feedback_type=feedback.feedback_type,
-                rating=feedback.rating,
-                client_message_id=feedback.client_message_id,
-                created_at=feedback.created_at,
-            )
+            feedback_id=feedback.id,
+            session_id=feedback.session_id,
+            feedback_type=feedback.feedback_type,
+            rating=feedback.rating,
+            client_message_id=feedback.client_message_id,
+            created_at=feedback.created_at,
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -137,7 +137,7 @@ async def delete_my_feedback(
     feedback_id: int,
     tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
-    """取消赞/踩/收藏；非本人或跨租户 → 404。"""
+    """取消赞/踩/收藏；非本人或跨租户 → 404。切片 4 再挂 warm 删除。"""
     try:
         with DatabaseManager() as db:
             ok = db.delete_feedback_owned(

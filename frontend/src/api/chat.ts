@@ -40,6 +40,23 @@ export type ChatHistoryResponse = {
   has_more: boolean
 }
 
+export type ChatTimelineGroup = {
+  date: string
+  count: number
+  preview: string
+  items: ChatHistoryItem[]
+}
+
+export type ChatTimelineResponse = {
+  groups: ChatTimelineGroup[]
+  empty_hint: string
+  has_more?: boolean
+}
+
+export type ChatSearchResponse = {
+  items: ChatHistoryItem[]
+}
+
 /** GET /api/chat/history — 47b slice0 + 游标分页 */
 export async function fetchChatHistory(
   sessionId: string,
@@ -54,6 +71,29 @@ export async function fetchChatHistory(
     q.set('before_id', String(beforeId))
   }
   return apiGet<ChatHistoryResponse>(`/api/chat/history?${q.toString()}`)
+}
+
+/** GET /api/chat/timeline — 47b slice2 按天分组 */
+export async function fetchChatTimeline(
+  sessionId: string,
+  opts?: { limit?: number; beforeId?: number },
+): Promise<ChatTimelineResponse> {
+  const q = new URLSearchParams({ session_id: sessionId })
+  if (opts?.limit != null) q.set('limit', String(opts.limit))
+  if (opts?.beforeId != null) q.set('before_id', String(opts.beforeId))
+  return apiGet<ChatTimelineResponse>(`/api/chat/timeline?${q.toString()}`)
+}
+
+/** GET /api/chat/search — 47b slice2 关键词/语义检索 */
+export async function searchChatHistory(
+  sessionId: string,
+  query: string,
+): Promise<ChatSearchResponse> {
+  const q = new URLSearchParams({
+    session_id: sessionId,
+    q: query,
+  })
+  return apiGet<ChatSearchResponse>(`/api/chat/search?${q.toString()}`)
 }
 
 /** Persist workspace dig/script bubble into chat history */

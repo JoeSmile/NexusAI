@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from typing import Any
 
 _lf: Any | None = None
 _init_attempted = False
+_log = logging.getLogger(__name__)
 
 try:
     from dotenv import load_dotenv
@@ -62,14 +64,18 @@ def get_langfuse():
     try:
         from langfuse import Langfuse
 
-        _lf = Langfuse(
-            public_key=public_key,
-            secret_key=secret_key,
-            base_url=_base_url(),
-            host=_base_url(),
-        )
+        kwargs: dict[str, Any] = {
+            "public_key": public_key,
+            "secret_key": secret_key,
+            "base_url": _base_url(),
+        }
+        try:
+            _lf = Langfuse(**kwargs, host=_base_url())
+        except TypeError:
+            _lf = Langfuse(**kwargs)
         return _lf
     except Exception:
+        _log.warning("LangFuse client init failed; tracing disabled", exc_info=True)
         _lf = None
         return None
 

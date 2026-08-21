@@ -75,6 +75,8 @@ class PipelineState(TypedDict):
     llm_key_id: str | None
     llm_key_version: int | None
     llm_key_provider: str | None  # model registry provider, for key chain failover
+    llm_temperature: float | None  # 壳内偏好；None = harness 默认
+    llm_max_tokens: int | None  # 壳内偏好；None = 模型 registry / harness 默认
 
     # ── 流式（07.07e）──
     stream_mode: bool
@@ -101,6 +103,8 @@ def make_initial_state(
     preferred_model: str | None = None,
     user_client_message_id: str | None = None,
     assistant_client_message_id: str | None = None,
+    llm_temperature: float | None = None,
+    llm_max_tokens: int | None = None,
 ) -> PipelineState:
     """创建初始 PipelineState"""
     return {
@@ -154,6 +158,8 @@ def make_initial_state(
         "llm_key_id": None,
         "llm_key_version": None,
         "llm_key_provider": None,
+        "llm_temperature": llm_temperature,
+        "llm_max_tokens": llm_max_tokens,
         "stream_mode": False,
         "ab_experiment_id": None,
         "ab_variant": None,

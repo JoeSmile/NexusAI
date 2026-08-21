@@ -74,6 +74,12 @@ async def llm_generate(state: PipelineState) -> PipelineState:
             max_tokens = int(spec.max_tokens)
     except Exception:
         pass
+    if state.get("llm_max_tokens"):
+        max_tokens = int(state["llm_max_tokens"])
+
+    temperature = state.get("llm_temperature")
+    if temperature is None:
+        temperature = 0.7
 
     key_provider = state.get("llm_key_provider") or "default"
     if key_provider == "default":
@@ -93,6 +99,7 @@ async def llm_generate(state: PipelineState) -> PipelineState:
         api_key=api_key,
         base_url=base_url,
         max_tokens=max_tokens,
+        temperature=float(temperature),
         provider=key_provider,
     )
 

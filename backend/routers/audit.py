@@ -110,6 +110,70 @@ async def query_audit_logs(
     ]
 
 
+@router.get("/usage-summary")
+async def usage_summary(
+    tenant: TenantContext = Depends(verify_human_or_legacy_key),
+):
+    """今日用量（audit_logs 中 action=chat 的聚合；经 OrgScope 收窄）。不返回对话正文。"""
+    from fastapi import HTTPException
+
+    if not _can_query_audit(tenant):
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "AUDIT_001", "message": "audit_read_denied"},
+        )
+
+    from datetime import UTC, datetime
+
+    start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    tid = tenant.tenant_id
+    session_factory = get_pg_session()
+    conditions = ["tenant_id = :tid", "created_at >= :start", "action = :chat_action"]
+    params: dict = {"tid": tid, "start": start.isoformat(), "chat_action": "chat"}
+
+    daily_limit = 10.0
+    with session_factory.Session() as session:
+        frag, extra = audit_user_filter(session, tenant)
+        if frag:
+            conditions.append(frag)
+            params.update(extra)
+        row = session.execute(
+            text(
+                f"""
+                SELECT COUNT(*) AS calls,
+                       COALESCE(SUM(input_tokens), 0) AS input_tokens,
+                       COALESCE(SUM(output_tokens), 0) AS output_tokens,
+                       COALESCE(SUM(cost), 0) AS cost
+                FROM audit_logs
+                WHERE {' AND '.join(conditions)}
+                """
+            ),
+            params,
+        ).fetchone()
+        cfg = session.execute(
+            text("SELECT config FROM tenant_config WHERE tenant_id = :tid"),
+            {"tid": tid},
+        ).fetchone()
+        if cfg and isinstance(cfg.config, dict):
+            daily_limit = float(
+                (cfg.config.get("budget") or {}).get("daily_limit") or daily_limit
+            )
+
+    calls = int(row.calls or 0) if row else 0
+    inp = int(row.input_tokens or 0) if row else 0
+    out = int(row.output_tokens or 0) if row else 0
+    cost = float(row.cost or 0.0) if row else 0.0
+    return {
+        "period": "today_utc",
+        "calls": calls,
+        "input_tokens": inp,
+        "output_tokens": out,
+        "tokens": inp + out,
+        "cost": cost,
+        "daily_limit": daily_limit,
+    }
+
+
 @router.get("/export")
 async def export_audit_csv(
     tenant_id: str | None = Query(None),

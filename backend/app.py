@@ -121,6 +121,18 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Skill discovery failed: %s", e)
 
+    try:
+        from backend.observability.langfuse_client import get_langfuse, langfuse_enabled
+
+        if not langfuse_enabled():
+            logger.info("LangFuse disabled")
+        elif get_langfuse() is not None:
+            logger.info("✓ LangFuse client ready")
+        else:
+            logger.warning("LangFuse enabled but client init failed")
+    except Exception as e:
+        logger.warning("LangFuse init skipped: %s", e)
+
     logger.info("═" * 40)
     logger.info("NexusAI 就绪")
     logger.info("═" * 40)

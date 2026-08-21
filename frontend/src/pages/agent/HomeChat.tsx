@@ -21,6 +21,8 @@ import {
 import { formatApiError } from '@/api/http'
 import { ContextPanel } from '@/components/agent/ContextPanel'
 import { BookmarksDrawer } from '@/components/agent/BookmarksDrawer'
+import { DislikeReasonDialog } from '@/components/agent/DislikeReasonDialog'
+import { HistoryDrawer } from '@/components/agent/HistoryDrawer'
 import { HotspotDayCollectionDialog } from '@/components/agent/HotspotDayCollectionDialog'
 import {
   HotspotDigDialog,
@@ -54,7 +56,9 @@ export default function HomeChatPage() {
     hydrate: hydrateFeedback,
     copyText,
     toggleReaction,
+    submitDislike,
     toggleBookmark,
+    busy: feedbackBusy,
   } = useBubbleFeedback()
   const [input, setInput] = useState('')
   const [digOpen, setDigOpen] = useState(false)
@@ -65,7 +69,9 @@ export default function HomeChatPage() {
   const [expandedDig, setExpandedDig] = useState<Record<string, boolean>>({})
   const [wfToast, setWfToast] = useState<string | null>(null)
   const [bookmarksOpen, setBookmarksOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const [dayCollectionOpen, setDayCollectionOpen] = useState(false)
+  const [dislikeCid, setDislikeCid] = useState<string | null>(null)
   /** 历史首屏加载完成后强制滚底（内容运营切回对话） */
   const [historyScrollNonce, setHistoryScrollNonce] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -96,6 +102,8 @@ export default function HomeChatPage() {
   )
 
   const modelId = useChatPrefsStore((s) => s.modelId)
+  const temperature = useChatPrefsStore((s) => s.temperature)
+  const maxTokens = useChatPrefsStore((s) => s.maxTokens)
   const contextOpen = useChatPrefsStore((s) => s.contextOpen)
   const setContextOpen = useChatPrefsStore((s) => s.setContextOpen)
   const triggerKind = useWorkflowTriggerStore((s) => s.kind)
@@ -410,6 +418,8 @@ export default function HomeChatPage() {
     await send(text, {
       session_id: WORKSPACE_CHAT_SESSION,
       ...(modelId ? { model: modelId } : {}),
+      temperature,
+      ...(maxTokens > 0 ? { max_tokens: maxTokens } : {}),
     })
   }
 
@@ -562,7 +572,13 @@ export default function HomeChatPage() {
                 title="不太对"
                 aria-label="不太对"
                 aria-pressed={disliked}
-                onClick={() => void toggleReaction(cid, 'irrelevant', text)}
+                onClick={() => {
+                  if (disliked) {
+                    void toggleReaction(cid, 'irrelevant', text)
+                    return
+                  }
+                  setDislikeCid(cid)
+                }}
               >
                 <ThumbsDown size={15} strokeWidth={1.75} fill={disliked ? 'currentColor' : 'none'} />
               </button>
@@ -606,7 +622,7 @@ export default function HomeChatPage() {
                 开始一段新对话
               </div>
               <div style={{ fontSize: 13, color: 'var(--color-gray-500)' }}>
-                可用「模型/画像」配置上下文，或「收藏」查看已收藏的回答
+                可用「记忆」查看生效记忆与画像，或「收藏」查看已收藏的回答
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
                 {!contextOpen ? (
@@ -618,7 +634,7 @@ export default function HomeChatPage() {
                       setContextOpen(true)
                     }}
                   >
-                    打开配置
+                    打开记忆面板
                   </button>
                 ) : null}
                 {!bookmarksOpen ? (
@@ -627,10 +643,24 @@ export default function HomeChatPage() {
                     className="nav-tab"
                     onClick={() => {
                       setContextOpen(false)
+                      setHistoryOpen(false)
                       setBookmarksOpen(true)
                     }}
                   >
                     我的收藏
+                  </button>
+                ) : null}
+                {!historyOpen ? (
+                  <button
+                    type="button"
+                    className="nav-tab"
+                    onClick={() => {
+                      setContextOpen(false)
+                      setBookmarksOpen(false)
+                      setHistoryOpen(true)
+                    }}
+                  >
+                    对话历史
                   </button>
                 ) : null}
               </div>
@@ -730,11 +760,12 @@ export default function HomeChatPage() {
                       setContextOpen(false)
                     } else {
                       setBookmarksOpen(false)
+                      setHistoryOpen(false)
                       setContextOpen(true)
                     }
                   }}
                 >
-                  {contextOpen ? '收起配置' : '模型/画像'}
+                  {contextOpen ? '收起记忆' : '记忆'}
                 </button>
                 <button
                   type="button"
@@ -744,11 +775,27 @@ export default function HomeChatPage() {
                       setBookmarksOpen(false)
                     } else {
                       setContextOpen(false)
+                      setHistoryOpen(false)
                       setBookmarksOpen(true)
                     }
                   }}
                 >
                   {bookmarksOpen ? '收起收藏' : '收藏'}
+                </button>
+                <button
+                  type="button"
+                  className="input-action-btn with-label"
+                  onClick={() => {
+                    if (historyOpen) {
+                      setHistoryOpen(false)
+                    } else {
+                      setContextOpen(false)
+                      setBookmarksOpen(false)
+                      setHistoryOpen(true)
+                    }
+                  }}
+                >
+                  {historyOpen ? '收起历史' : '历史'}
                 </button>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -794,6 +841,10 @@ export default function HomeChatPage() {
         onClose={() => setBookmarksOpen(false)}
         onChanged={() => void hydrateFeedback(WORKSPACE_CHAT_SESSION)}
       />
+      <HistoryDrawer
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+      />
       <HotspotDayCollectionDialog
         open={dayCollectionOpen}
         onOpenChange={setDayCollectionOpen}
@@ -814,6 +865,19 @@ export default function HomeChatPage() {
         onConfirm={(values) => {
           setScriptOpen(false)
           startScriptGen(values)
+        }}
+      />
+      <DislikeReasonDialog
+        open={dislikeCid != null}
+        submitting={feedbackBusy != null && dislikeCid != null}
+        onOpenChange={(open) => {
+          if (!open) setDislikeCid(null)
+        }}
+        onSubmit={(reasonIds, note) => {
+          if (!dislikeCid) return
+          void submitDislike(dislikeCid, reasonIds, note).then((ok) => {
+            if (ok) setDislikeCid(null)
+          })
         }}
       />
     </>

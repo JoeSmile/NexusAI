@@ -1,19 +1,59 @@
 /**
- * AgentUI — 上下文与配置（画像 / RAG / 模型）.
+ * AgentUI — 记忆面板（画像 / 风格 / 生效记忆 / RAG / 模型）.
  * Overlay drawer — does not squeeze chat. Separate from BookmarksDrawer.
  */
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { listAvailableModels, type AvailableModelItem } from '@/api/llm'
-import { getOrgProfile, putOrgProfile } from '@/api/contentOps'
+import { getOrgProfile, listStyles, putOrgProfile } from '@/api/contentOps'
 import { formatApiError } from '@/api/http'
+import {
+  deleteMyMemory,
+  listMyMemories,
+  patchMyMemory,
+  type WarmMemory,
+} from '@/api/memory'
 import { ragStatus } from '@/api/rag'
 import { RightDrawer } from '@/components/agent/RightDrawer'
 import { useChatPrefsStore } from '@/stores/chatPrefsStore'
 import { cn } from '@/lib/utils'
 
-type SectionKey = 'profile' | 'rag' | 'model'
+type SectionKey = 'memory' | 'profile' | 'style' | 'rag' | 'model'
+
+const EMPTY_MEMORY = '暂无记忆,多聊聊自动积累'
+
+function memoryText(m: WarmMemory): string {
+  const raw = (m.value || '').trim()
+  if (!raw) return m.content || m.key
+  try {
+    const obj = JSON.parse(raw) as { text?: string }
+    if (obj && typeof obj.text === 'string' && obj.text.trim()) return obj.text
+  } catch {
+    /* plain text */
+  }
+  return raw
+}
+
+/** Keep bookmark JSON envelope (`text` + session_id / user_message) on edit. */
+export function memoryPatchPayload(existing: WarmMemory | undefined, text: string): string {
+  if (!existing?.value) return text
+  try {
+    const obj = JSON.parse(existing.value) as Record<string, unknown>
+    if (obj && typeof obj === 'object' && typeof obj.text === 'string') {
+      return JSON.stringify({ ...obj, text })
+    }
+  } catch {
+    /* plain text */
+  }
+  return text
+}
+
+function sourceLabel(m: WarmMemory): string {
+  if (m.key.startsWith('bookmark:') || m.type === 'bookmark') return '收藏'
+  if (m.type === 'extracted') return '自动'
+  return '手动'
+}
 
 export function ContextPanel({
   open,
@@ -23,14 +63,20 @@ export function ContextPanel({
   onClose: () => void
 }) {
   const [sections, setSections] = useState<Record<SectionKey, boolean>>({
+    memory: true,
     profile: true,
-    rag: true,
-    model: true,
+    style: true,
+    rag: false,
+    model: false,
   })
   const [orgName, setOrgName] = useState('')
   const [orgFocus, setOrgFocus] = useState('')
   const [orgAudience, setOrgAudience] = useState('')
   const [orgIndustry, setOrgIndustry] = useState('')
+  const [styleSummary, setStyleSummary] = useState('')
+  const [memories, setMemories] = useState<WarmMemory[]>([])
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [draft, setDraft] = useState('')
   const [docCount, setDocCount] = useState<number | null>(null)
   const [ragHint, setRagHint] = useState('')
   const [models, setModels] = useState<AvailableModelItem[]>([])
@@ -40,8 +86,10 @@ export function ContextPanel({
 
   const modelId = useChatPrefsStore((s) => s.modelId)
   const temperature = useChatPrefsStore((s) => s.temperature)
+  const maxTokens = useChatPrefsStore((s) => s.maxTokens)
   const setModelId = useChatPrefsStore((s) => s.setModelId)
   const setTemperature = useChatPrefsStore((s) => s.setTemperature)
+  const setMaxTokens = useChatPrefsStore((s) => s.setMaxTokens)
 
   const toggle = (k: SectionKey) =>
     setSections((s) => ({ ...s, [k]: !s[k] }))
@@ -50,12 +98,14 @@ export function ContextPanel({
     setHint('')
     setModelsLoaded(false)
     try {
-      const [profile, rag, available] = await Promise.all([
-        getOrgProfile().catch(() => ({ profile: {} })),
+      const [profile, rag, available, styleRes, memRes] = await Promise.all([
+        getOrgProfile().catch(() => ({ profile: {} as Record<string, string> })),
         ragStatus().catch(() => null),
         listAvailableModels().catch(() => ({ items: [] })),
+        listStyles().catch(() => ({ items: [], default_creator_id: 'default' })),
+        listMyMemories().catch(() => ({ memories: [] as WarmMemory[], total: 0 })),
       ])
-      const p = profile.profile || {}
+      const p = (profile.profile ?? {}) as Record<string, unknown>
       setOrgName(String(p.name || ''))
       setOrgFocus(String(p.product_focus || p.productFocus || ''))
       setOrgAudience(String(p.target_audience || p.targetAudience || ''))
@@ -72,6 +122,28 @@ export function ContextPanel({
       } else if (current && items.length > 0 && !items.some((m) => m.model === current)) {
         setModelId(items[0].model)
       }
+      const styles = styleRes.items ?? []
+      const defId = styleRes.default_creator_id
+      const st =
+        styles.find((s) => s.is_default) ||
+        styles.find((s) => s.creator_id === defId) ||
+        styles[0]
+      if (st) {
+        const bits = [st.display_name, st.persona, (st.catchphrases || []).slice(0, 2).join('、')]
+        setStyleSummary(bits.filter(Boolean).join(' · ') || '已配置默认风格')
+      } else {
+        setStyleSummary('未配置主讲风格（生成时用默认口吻）')
+      }
+      setMemories(
+        (memRes.memories ?? []).filter(
+          (m) =>
+            m.key &&
+            m.key !== '__forgotten__' &&
+            !m.key.startsWith('pending:') &&
+            !m.key.startsWith('bookmark:'),
+        ),
+      )
+      setEditingId(null)
     } catch (e) {
       setModelsLoaded(true)
       setHint(formatApiError(e))
@@ -101,15 +173,149 @@ export function ContextPanel({
     }
   }
 
+  const saveMemory = async (id: string) => {
+    const text = draft.trim()
+    if (!text) return
+    setSaving(true)
+    setHint('')
+    try {
+      const existing = memories.find((m) => m.id === id)
+      await patchMyMemory(id, memoryPatchPayload(existing, text))
+      setHint('记忆已更新')
+      await refresh()
+    } catch (e) {
+      setHint(formatApiError(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const removeMemory = async (id: string) => {
+    setSaving(true)
+    setHint('')
+    try {
+      await deleteMyMemory(id)
+      setHint('记忆已删除')
+      await refresh()
+    } catch (e) {
+      setHint(formatApiError(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const configured = Boolean(orgName || orgFocus)
 
   return (
-    <RightDrawer open={open} title="上下文与配置" onClose={onClose}>
+    <RightDrawer open={open} title="记忆面板" onClose={onClose}>
       {hint ? (
         <div style={{ fontSize: 12, color: 'var(--color-gray-500)', padding: '0 4px 8px' }}>
           {hint}
         </div>
       ) : null}
+
+      <div className="collapsible-section">
+        <button type="button" className="section-header" onClick={() => toggle('memory')}>
+          <div className="section-header-title">生效记忆</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className="badge badge-gray">{memories.length} 条</span>
+            <span className={cn('section-chevron', sections.memory && 'open')}>›</span>
+          </div>
+        </button>
+        {sections.memory ? (
+          <div className="section-body">
+            {memories.length === 0 ? (
+              <p className="bookmarks-hint">{EMPTY_MEMORY}</p>
+            ) : (
+              <ul className="memory-list">
+                {memories.map((m) => (
+                  <li key={m.id} className="memory-row">
+                    <div className="memory-row-head">
+                      <span className="badge badge-gray">{sourceLabel(m)}</span>
+                      <span className="memory-key">{m.key}</span>
+                    </div>
+                    {editingId === m.id ? (
+                      <>
+                        <textarea
+                          className="select-field"
+                          rows={3}
+                          value={draft}
+                          onChange={(e) => setDraft(e.target.value)}
+                        />
+                        <div className="memory-actions">
+                          <button
+                            type="button"
+                            className="btn-primary btn-sm"
+                            disabled={saving}
+                            onClick={() => void saveMemory(m.id)}
+                          >
+                            保存
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-secondary btn-sm"
+                            onClick={() => setEditingId(null)}
+                          >
+                            取消
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p className="memory-text">{memoryText(m)}</p>
+                        <div className="memory-actions">
+                          <button
+                            type="button"
+                            className="btn-secondary btn-sm"
+                            disabled={saving}
+                            onClick={() => {
+                              setEditingId(m.id)
+                              setDraft(memoryText(m))
+                            }}
+                          >
+                            编辑
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-secondary btn-sm"
+                            disabled={saving}
+                            onClick={() => void removeMemory(m.id)}
+                          >
+                            删除
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="bookmarks-hint">
+              收藏请用顶栏「收藏」管理；暂不写入对话记忆、也不注入生成。
+            </p>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="collapsible-section">
+        <button type="button" className="section-header" onClick={() => toggle('style')}>
+          <div className="section-header-title">风格摘要</div>
+          <span className={cn('section-chevron', sections.style && 'open')}>›</span>
+        </button>
+        {sections.style ? (
+          <div className="section-body">
+            <p style={{ fontSize: 12, color: 'var(--color-gray-600)', margin: 0 }}>
+              {styleSummary || '加载中…'}
+            </p>
+            <Link
+              to="/workspace/content"
+              style={{ fontSize: 12, color: 'var(--color-primary-600)' }}
+            >
+              去内容运营管理主讲风格 →
+            </Link>
+          </div>
+        ) : null}
+      </div>
 
       <div className="collapsible-section">
         <button type="button" className="section-header" onClick={() => toggle('profile')}>
@@ -257,7 +463,27 @@ export function ContextPanel({
                     onChange={(e) => setTemperature(parseFloat(e.target.value))}
                   />
                   <div style={{ fontSize: 11, color: 'var(--color-gray-400)' }}>
-                    默认 0.3；不限制 max tokens（走模型默认）。
+                    默认 0.3，会随每次对话请求发给模型。
+                  </div>
+                </div>
+                <div className="slider-wrap">
+                  <div className="slider-label">
+                    <span>Max tokens</span>
+                    <span className="slider-value">
+                      {maxTokens > 0 ? String(maxTokens) : '模型默认'}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    className="slider"
+                    min={0}
+                    max={4096}
+                    step={256}
+                    value={maxTokens}
+                    onChange={(e) => setMaxTokens(parseInt(e.target.value, 10))}
+                  />
+                  <div style={{ fontSize: 11, color: 'var(--color-gray-400)' }}>
+                    0 = 不传 max_tokens，交给模型默认上限。
                   </div>
                 </div>
               </>

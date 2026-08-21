@@ -366,6 +366,90 @@
   cursor: pointer;
 }
 
+.history-search {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.history-search-input {
+  flex: 1;
+  min-width: 140px;
+  height: 32px;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 8px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+.history-day-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.history-day-date {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-gray-800);
+}
+.history-day-meta {
+  font-size: 12px;
+  color: var(--color-gray-500);
+}
+.history-day-msg {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--color-gray-700);
+  white-space: pre-wrap;
+}
+.history-day-role {
+  display: inline-block;
+  margin-right: 6px;
+  font-size: 11px;
+  color: var(--color-gray-400);
+}
+
+.memory-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.memory-row {
+  border: 1px solid var(--color-gray-200);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.memory-row-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.memory-key {
+  font-size: 11px;
+  color: var(--color-gray-500);
+  word-break: break-all;
+}
+.memory-text {
+  font-size: 13px;
+  color: var(--color-gray-800);
+  margin: 0 0 6px;
+  white-space: pre-wrap;
+}
+.memory-actions {
+  display: flex;
+  gap: 8px;
+}
+
 /* legacy class names kept for any leftover refs */
 .context-panel {
   display: none;
@@ -2057,6 +2141,12 @@
 .select-field:focus {
   border-color: var(--color-primary-500);
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.topbar-right .token-usage {
+  min-width: 132px;
+  max-width: 180px;
+  margin-right: 8px;
 }
 
 .token-usage {

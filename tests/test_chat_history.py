@@ -336,6 +336,174 @@ def test_history_limit(tenant_a: TenantContext) -> None:
             pass
 
 
+def test_timeline_has_more_like_history(tenant_a: TenantContext) -> None:
+    rows = [
+        _row(
+            id=i,
+            tenant_id="t-a",
+            user_id="u1",
+            session_id="workspace-chat",
+            role="user",
+            content=f"m{i}",
+            client_message_id=f"c{i}",
+        )
+        for i in range(1, 12)
+    ]
+    gen = _client(rows, tenant_a)
+    client = next(gen)
+    try:
+        r = client.get(
+            "/api/chat/timeline",
+            params={"session_id": "workspace-chat", "limit": 10},
+        )
+        assert r.status_code == 200
+        body = r.json()
+        ids = [it["id"] for g in body["groups"] for it in g["items"]]
+        assert sorted(ids) == list(range(2, 12))
+        assert body["has_more"] is True
+        r2 = client.get(
+            "/api/chat/timeline",
+            params={"session_id": "workspace-chat", "limit": 10, "before_id": min(ids)},
+        )
+        assert r2.status_code == 200
+        older = [it["id"] for g in r2.json()["groups"] for it in g["items"]]
+        assert older == [1]
+        assert r2.json()["has_more"] is False
+    finally:
+        try:
+            next(gen)
+        except StopIteration:
+            pass
+    gen = _client([], tenant_a)
+    client = next(gen)
+    try:
+        r = client.get("/api/chat/timeline", params={"session_id": "workspace-chat"})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["groups"] == []
+        assert "empty_hint" in body
+    finally:
+        try:
+            next(gen)
+        except StopIteration:
+            pass
+
+
+def test_timeline_empty_is_200(tenant_a: TenantContext) -> None:
+    gen = _client([], tenant_a)
+    client = next(gen)
+    try:
+        r = client.get("/api/chat/timeline", params={"session_id": "workspace-chat"})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["groups"] == []
+        assert "empty_hint" in body
+        assert body["has_more"] is False
+    finally:
+        try:
+            next(gen)
+        except StopIteration:
+            pass
+
+
+def test_timeline_groups_by_day(tenant_a: TenantContext) -> None:
+    rows = [
+        _row(
+            id=1,
+            tenant_id="t-a",
+            user_id="u1",
+            session_id="workspace-chat",
+            role="user",
+            content="day1",
+            client_message_id="c1",
+        ),
+        _row(
+            id=2,
+            tenant_id="t-a",
+            user_id="u1",
+            session_id="workspace-chat",
+            role="assistant",
+            content="reply",
+            client_message_id="c2",
+        ),
+    ]
+    rows[0].created_at = datetime(2026, 8, 18, 10, 0, 0)
+    rows[1].created_at = datetime(2026, 8, 19, 11, 0, 0)
+    gen = _client(rows, tenant_a)
+    client = next(gen)
+    try:
+        r = client.get("/api/chat/timeline", params={"session_id": "workspace-chat"})
+        assert r.status_code == 200
+        groups = r.json()["groups"]
+        dates = [g["date"] for g in groups]
+        assert dates == ["2026-08-19", "2026-08-18"]
+        assert groups[0]["items"][0]["content"] == "reply"
+        assert groups[1]["count"] == 1
+    finally:
+        try:
+            next(gen)
+        except StopIteration:
+            pass
+
+
+def test_search_empty_query_is_200(tenant_a: TenantContext) -> None:
+    gen = _client([], tenant_a)
+    client = next(gen)
+    try:
+        r = client.get(
+            "/api/chat/search",
+            params={"session_id": "workspace-chat", "q": "   "},
+        )
+        assert r.status_code == 200
+        assert r.json() == {"items": []}
+    finally:
+        try:
+            next(gen)
+        except StopIteration:
+            pass
+
+
+def test_search_keyword_returns_snippet(tenant_a: TenantContext) -> None:
+    rows = [
+        _row(
+            id=1,
+            tenant_id="t-a",
+            user_id="u1",
+            session_id="workspace-chat",
+            role="user",
+            content="北京社保新规怎么解读",
+            client_message_id="c1",
+        ),
+        _row(
+            id=2,
+            tenant_id="t-a",
+            user_id="u1",
+            session_id="workspace-chat",
+            role="assistant",
+            content="无关闲聊",
+            client_message_id="c2",
+        ),
+    ]
+    gen = _client(rows, tenant_a)
+    client = next(gen)
+    try:
+        r = client.get(
+            "/api/chat/search",
+            params={"session_id": "workspace-chat", "q": "社保"},
+        )
+        assert r.status_code == 200
+        items = r.json()["items"]
+        assert len(items) == 1
+        assert items[0]["id"] == 1
+        assert "社保" in items[0]["content"]
+        assert items[0]["created_at"]
+    finally:
+        try:
+            next(gen)
+        except StopIteration:
+            pass
+
+
 def test_history_filters_by_tenant_user_in_query(tenant_a: TenantContext) -> None:
     """Router must pass tenant_id + user_id into filter (cross-tenant not returned)."""
     captured: dict[str, Any] = {}
