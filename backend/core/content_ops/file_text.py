@@ -3,6 +3,75 @@
 from __future__ import annotations
 
 import io
+import uuid
+import zipfile
+
+STYLE_MAX_BYTES = 5 * 1024 * 1024
+_ALLOWED_CONTENT_TYPES = frozenset(
+    {
+        "application/pdf",
+        "text/plain",
+        "text/markdown",
+        "text/x-markdown",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/octet-stream",
+        "",
+    }
+)
+
+
+class StyleUploadRejected(Exception):
+    def __init__(self, status_code: int, code: str, message: str) -> None:
+        self.status_code = status_code
+        self.code = code
+        self.message = message
+        super().__init__(message)
+
+
+def _sniff_kind(data: bytes) -> str | None:
+    if not data:
+        return None
+    if data.startswith(b"MZ") or data.startswith(b"\x7fELF"):
+        return None
+    if data.startswith(b"%PDF"):
+        return "pdf"
+    head = data[:512].lstrip().lower()
+    if head.startswith((b"<html", b"<!doctype html", b"<?php", b"<script")):
+        return None
+    if data.startswith(b"PK"):
+        try:
+            with zipfile.ZipFile(io.BytesIO(data)) as zf:
+                names = zf.namelist()
+            if any(n.startswith("word/") for n in names):
+                return "docx"
+        except zipfile.BadZipFile:
+            return None
+        return None
+    return "txt"
+
+
+def validate_style_upload(
+    *, filename: str, content_type: str | None, data: bytes
+) -> str:
+    """Return UUID storage name (with sniffed suffix). Raises StyleUploadRejected."""
+    if len(data) > STYLE_MAX_BYTES:
+        raise StyleUploadRejected(413, "STYLE_FILE_TOO_LARGE", "file_exceeds_5mb")
+    if not data:
+        raise StyleUploadRejected(400, "STYLE_FILE_EMPTY", "empty_file")
+    ctype = (content_type or "").split(";")[0].strip().lower()
+    if ctype not in _ALLOWED_CONTENT_TYPES:
+        raise StyleUploadRejected(415, "STYLE_FILE_TYPE", "unsupported_content_type")
+    kind = _sniff_kind(data)
+    if kind is None:
+        raise StyleUploadRejected(415, "STYLE_FILE_TYPE", "unsupported_magic")
+    suffix = (filename or "").rsplit(".", 1)[-1].lower() if filename else ""
+    if kind == "txt" and suffix not in ("txt", "md", ""):
+        raise StyleUploadRejected(415, "STYLE_FILE_TYPE", "suffix_magic_mismatch")
+    if kind == "pdf" and suffix not in ("pdf", ""):
+        raise StyleUploadRejected(415, "STYLE_FILE_TYPE", "suffix_magic_mismatch")
+    if kind == "docx" and suffix not in ("docx", ""):
+        raise StyleUploadRejected(415, "STYLE_FILE_TYPE", "suffix_magic_mismatch")
+    return f"{uuid.uuid4().hex}.{kind}"
 
 
 def extract_text_from_bytes(*, filename: str, data: bytes) -> str:

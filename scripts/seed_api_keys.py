@@ -26,8 +26,20 @@ from sqlalchemy import text
 from backend.core.auth.password import hash_password
 from backend.database.pgvector_session import get_pg_session
 
-# 测试账号统一密码(Task 38 拍板:方便测试)
-TEST_PASSWORD = "123456"
+# 测试账号统一密码(本地方便);生产 seed 必须设强 TEST_PASSWORD
+# 拍板 2026-08-21 A：本地默认 123456；不强制首次改密；交接后人工改密
+TEST_PASSWORD = os.getenv("TEST_PASSWORD", "123456")
+
+
+def _password_policy_ok(password: str) -> bool:
+    p = password or ""
+    return (
+        len(p) >= 12
+        and any(c.islower() for c in p)
+        and any(c.isupper() for c in p)
+        and any(c.isdigit() for c in p)
+        and any(not c.isalnum() for c in p)
+    )
 
 KEYS_TO_CREATE = [
     {"tenant_id": "acme", "user_id": "alice", "role": "user", "description": "Acme 租户用户 Alice"},
@@ -123,6 +135,12 @@ def seed_users(entries: list[dict]) -> None:
 
 
 def main():
+    env = (os.getenv("ENVIRONMENT") or os.getenv("APP_ENV") or "").strip().lower()
+    if env == "production" and not _password_policy_ok(TEST_PASSWORD):
+        print(
+            "production seed refused: set TEST_PASSWORD ≥12 with upper/lower/digit/symbol"
+        )
+        sys.exit(2)
     print("=" * 70)
     print("  NexusAI — Seed API Keys")
     print("=" * 70)

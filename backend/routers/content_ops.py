@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 
+from backend.core.audit import write_audit_sync
 from backend.core.auth.dual_auth import verify_human_or_legacy_key
 from backend.core.auth.models import TenantContext
 from backend.core.content_ops.dig_persist import persist_dig_result
@@ -24,9 +25,23 @@ from backend.core.content_ops.style import (
     upsert_content_style,
 )
 from backend.core.content_ops.workflow_seed import ensure_builtin_hotspot_workflow
+from backend.core.rate_limiter import check_endpoint_rate_limit
 from backend.database.pgvector_session import ContentArtifact, get_pg_session
 
 router = APIRouter(tags=["content-ops"])
+
+_DIG_PER_MIN = 30
+_UPLOAD_PER_MIN = 10
+
+
+def _enforce_rate(tenant_id: str, endpoint: str, per_min: int) -> None:
+    retry = check_endpoint_rate_limit(tenant_id, endpoint, limit_per_min=per_min)
+    if retry is not None:
+        raise HTTPException(
+            status_code=429,
+            detail={"code": "RATE_001", "message": "rate_limited"},
+            headers={"Retry-After": str(retry)},
+        )
 
 
 class StyleBody(BaseModel):
@@ -165,28 +180,27 @@ async def api_upload_style_speech(
     Not RAG / company knowledge ingest — separate button, separate path.
     """
     from backend.core.content_ops.file_text import (
-        allowed_style_suffix,
+        StyleUploadRejected,
         extract_text_from_bytes,
+        validate_style_upload,
     )
     from backend.core.content_ops.style_extract import extract_style_from_text
 
-    fname = file.filename or "upload.bin"
-    if not allowed_style_suffix(fname):
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "code": "STYLE_FILE_TYPE",
-                "message": "style_upload_txt_pdf_docx_only",
-            },
-        )
     data = await file.read()
-    if not data:
-        raise HTTPException(
-            status_code=400,
-            detail={"code": "STYLE_FILE_EMPTY", "message": "empty_file"},
-        )
+    _enforce_rate(tenant.tenant_id, "content_upload", _UPLOAD_PER_MIN)
     try:
-        text = extract_text_from_bytes(filename=fname, data=data)
+        stored_name = validate_style_upload(
+            filename=file.filename or "",
+            content_type=file.content_type,
+            data=data,
+        )
+    except StyleUploadRejected as e:
+        raise HTTPException(
+            status_code=e.status_code,
+            detail={"code": e.code, "message": e.message},
+        ) from e
+    try:
+        text = extract_text_from_bytes(filename=stored_name, data=data)
     except ValueError as e:
         raise HTTPException(
             status_code=400,
@@ -202,15 +216,25 @@ async def api_upload_style_speech(
         creator_id=creator_id,
         text=text,
     )
-    extracted["source_doc_ids"] = [fname]
+    extracted["source_doc_ids"] = [stored_name]
     sf = get_pg_session()
     with sf.Session() as session:
         saved = upsert_content_style(session, tenant.tenant_id, creator_id, extracted)
         session.commit()
+    write_audit_sync(
+        {
+            "tenant_id": tenant.tenant_id,
+            "user_id": tenant.user_id,
+            "action": "content_upload",
+            "trace_id": "",
+            "input_text": "",
+            "output_text": stored_name,
+        }
+    )
     return {
         "style": saved,
         "chars": len(text),
-        "filename": fname,
+        "filename": stored_name,
         "reparsed": True,
     }
 
@@ -226,6 +250,16 @@ async def api_delete_style(
         session.commit()
     if not ok:
         raise HTTPException(status_code=404, detail="style_not_found")
+    write_audit_sync(
+        {
+            "tenant_id": tenant.tenant_id,
+            "user_id": tenant.user_id,
+            "action": "content_style_delete",
+            "trace_id": "",
+            "input_text": "",
+            "output_text": creator_id,
+        }
+    )
     return {"deleted": True, "creator_id": creator_id}
 
 
@@ -261,6 +295,7 @@ async def api_dig_hotspots(
     tenant: TenantContext = Depends(verify_human_or_legacy_key),
 ) -> dict[str, Any]:
     """Dig + 归一化合并进今日合集；同 content_hash 抓取记录幂等不重复落库。"""
+    _enforce_rate(tenant.tenant_id, "content_dig", _DIG_PER_MIN)
     sf = get_pg_session()
     with sf.Session() as session:
         ensure_builtin_hotspot_workflow(
@@ -306,6 +341,7 @@ async def api_generate_script(
     body: ScriptBody,
     tenant: TenantContext = Depends(verify_human_or_legacy_key),
 ) -> dict[str, Any]:
+    _enforce_rate(tenant.tenant_id, "content_generate", _DIG_PER_MIN)
     if not body.hotspots:
         raise HTTPException(
             status_code=400,

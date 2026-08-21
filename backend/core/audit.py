@@ -76,6 +76,18 @@ def _write_audit(record: dict) -> bool:
             "run_id": None,
             "node_id": None,
             "dedupe_key": None,
+            "model": "",
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "cost": 0.0,
+            "latency_ms": 0.0,
+            "error_code": None,
+            "ip_address": "",
+            "user_agent": "",
+            "input_text": "",
+            "output_text": "",
+            "trace_id": "",
+            "created_at": datetime.utcnow(),
             **record,
         }
         # I-1(评审 08-15)：去重键——重复投递/重放撞唯一约束 → 静默跳过（幂等）

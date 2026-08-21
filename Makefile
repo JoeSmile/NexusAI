@@ -1,4 +1,4 @@
-.PHONY: help sync lock install up up-langfuse up-all down db-init run lint typecheck test check verify seed fmt docker-up docker-down clean
+.PHONY: help sync lock install up up-langfuse up-all down db-init run lint typecheck test check verify seed fmt docker-up docker-down clean backup audit
 
 ROOT_DIR := $(patsubst %/,%,$(dir $(abspath $(firstword $(MAKEFILE_LIST)))))
 UV := $(shell command -v uv 2> /dev/null)
@@ -27,7 +27,8 @@ help:
 	@echo "  make typecheck       mypy backend/"
 	@echo "  make test            pytest"
 	@echo "  make fmt             ruff format"
-	@echo "  make clean           清理 __pycache__"
+	@echo "  make backup          pg_dump → data/backups/ (keep 14)"
+	@echo "  make audit           uv pip audit (high/critical fail)"
 	@echo ""
 	@echo "典型流程: make up && make sync && make db-init && make seed && make run"
 
@@ -102,6 +103,13 @@ test:
 		uv run --no-sync pytest tests/ -v
 
 check: lint typecheck
+
+backup:
+	bash $(ROOT_DIR)/deploy/backup.sh
+
+audit:
+	$(require_uv)
+	cd $(ROOT_DIR) && uvx pip-audit
 
 clean:
 	find $(ROOT_DIR) -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true

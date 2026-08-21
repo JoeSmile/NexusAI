@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from backend.core.cost_manager import estimate_cost
+from backend.core.errors import NexusAIException
 from backend.core.llm_credentials import resolve_tenant_credential
 from backend.core.model_registry import get_model, select_model_for_intent
 from backend.observability.decorators import enrich_span, observe
@@ -97,7 +98,19 @@ async def model_router(state: PipelineState) -> PipelineState:
     if spec.base_url:
         state["llm_base_url"] = spec.base_url
 
-    key_data = await resolve_tenant_credential(state["tenant_id"], preferred)
+    try:
+        key_data = await resolve_tenant_credential(state["tenant_id"], preferred)
+    except NexusAIException as e:
+        state["finish_reason"] = "error"
+        state["error_code"] = e.code or "LLM_KEY_001"
+        state["response"] = "请在设置中配置公司 Key 后再发起对话"
+        return state
+    except Exception:
+        state["finish_reason"] = "error"
+        state["error_code"] = "LLM_KEY_001"
+        state["response"] = "请在设置中配置公司 Key 后再发起对话"
+        return state
+
     state["llm_api_key"] = key_data.api_key
     state["llm_base_url"] = (
         key_data.base_url or spec.base_url or state.get("llm_base_url") or ""

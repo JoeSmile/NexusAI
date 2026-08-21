@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from backend.core.auth.models import TenantContext
 from backend.core.auth.permissions import require_permission
 from backend.core.auth.scope import require_tenant_admin
+from backend.core.rate_limiter import check_endpoint_rate_limit
 from backend.database import DatabaseManager
 from backend.logging_config import get_logger
 from backend.models import (
@@ -50,6 +51,15 @@ async def submit_feedback(
     tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
     """提交用户反馈（user_id / tenant_id 只信服务端）。"""
+    retry = check_endpoint_rate_limit(
+        tenant.tenant_id, "feedback", limit_per_min=30
+    )
+    if retry is not None:
+        raise HTTPException(
+            status_code=429,
+            detail="rate_limited",
+            headers={"Retry-After": str(retry)},
+        )
     ftype = (request.feedback_type or "").strip()
     if ftype not in ALLOWED_TYPES:
         raise HTTPException(status_code=422, detail="invalid_feedback_type")

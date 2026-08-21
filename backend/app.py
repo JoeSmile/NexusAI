@@ -15,6 +15,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 # 添加项目根目录到 Python 路径
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -206,6 +207,10 @@ def _lazy_include(
 
 def create_app() -> FastAPI:
     """创建并配置 FastAPI 应用实例。"""
+    from backend.core.production_guard import assert_production_security
+
+    assert_production_security()
+
     app = FastAPI(
         title="NexusAI API",
         description="The Intelligent Gateway for LLM Context Management",
@@ -218,10 +223,12 @@ def create_app() -> FastAPI:
     from backend.core.errors import (
         NexusAIException,
         global_exception_handler,
+        http_exception_audit_handler,
         nexusai_exception_handler,
     )
 
     app.add_exception_handler(NexusAIException, nexusai_exception_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(StarletteHTTPException, http_exception_audit_handler)  # type: ignore[arg-type]
     app.add_exception_handler(Exception, global_exception_handler)
 
     _cors_all = os.getenv("CORS_ALLOW_ALL", "").strip().lower() in ("1", "true", "yes")
@@ -229,8 +236,7 @@ def create_app() -> FastAPI:
         _origins = ["*"]
         _creds = False
     else:
-        # React/Vite 前端已移除,允许来源由 FRONTEND_ORIGINS 环境变量配置
-        _extra = os.getenv("FRONTEND_ORIGINS", "")
+        _extra = os.getenv("CORS_ALLOW_ORIGINS") or os.getenv("FRONTEND_ORIGINS", "")
         _origins = [o.strip() for o in _extra.split(",") if o.strip()]
         _creds = True
     app.add_middleware(

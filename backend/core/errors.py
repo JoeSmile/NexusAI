@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from enum import StrEnum
 
 from starlette.requests import Request
@@ -105,6 +106,8 @@ async def nexusai_exception_handler(
     request: Request, exc: NexusAIException
 ) -> JSONResponse:
     """全局业务异常处理器"""
+    if exc.code.startswith("AUTH_"):
+        _audit_auth_failure(request, exc.code, exc.message)
     return JSONResponse(
         status_code=_code_to_status(exc.code),
         content={
@@ -118,18 +121,59 @@ async def nexusai_exception_handler(
     )
 
 
+def _expose_internal_detail() -> bool:
+    env = (os.getenv("ENVIRONMENT") or os.getenv("APP_ENV") or "").strip().lower()
+    if env == "production":
+        return False
+    return (os.getenv("DEBUG") or "").strip().lower() in ("1", "true", "yes")
+
+
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """兜底异常处理器"""
+    """兜底异常处理器；生产不回堆栈 / 内部路径。"""
+    detail = str(exc) if _expose_internal_detail() else None
     return JSONResponse(
         status_code=500,
         content={
             "error": {
                 "code": ErrorCode.INTERNAL_ERROR.value,
                 "message": "internal_error",
-                "detail": str(exc) if __debug__ else None,
+                "detail": detail,
                 "trace_id": getattr(request.state, "trace_id", ""),
             }
         },
+    )
+
+
+def _audit_auth_failure(request: Request, code: str, message: str) -> None:
+    try:
+        from backend.core.audit import write_audit_sync
+
+        tenant = getattr(request.state, "tenant_context", None)
+        write_audit_sync(
+            {
+                "tenant_id": getattr(tenant, "tenant_id", None) or "unknown",
+                "user_id": getattr(tenant, "user_id", None) or "anonymous",
+                "action": "auth_denied",
+                "trace_id": str(getattr(request.state, "trace_id", "") or ""),
+                "input_text": "",
+                "output_text": "",
+                "error_code": code,
+                "ip_address": request.client.host if request.client else "",
+                "user_agent": request.headers.get("User-Agent", ""),
+            }
+        )
+    except Exception:
+        pass
+
+
+async def http_exception_audit_handler(request: Request, exc: Exception) -> JSONResponse:
+    status = int(getattr(exc, "status_code", 500) or 500)
+    if status in (401, 403):
+        _audit_auth_failure(request, f"HTTP_{status}", str(getattr(exc, "detail", "")))
+    return JSONResponse(
+        status_code=status,
+        content={"detail": getattr(exc, "detail", "error")},
+        headers=dict(getattr(exc, "headers", None) or {}),
     )
 
 

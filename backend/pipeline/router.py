@@ -292,6 +292,15 @@ async def chat_streaming(
             },
         )
 
+    if final.get("error_code"):
+        return JSONResponse(
+            status_code=400,
+            content={
+                "type": "error",
+                "code": final.get("error_code"),
+                "message": final.get("response") or "request_failed",
+            },
+        )
     if final.get("finish_reason") != "routed_to_llm":
         return JSONResponse({"response": final.get("response", "")})
 
