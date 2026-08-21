@@ -17,6 +17,18 @@ RetrievalMode = Literal["keyword", "semantic"]
 # 世界域按需召回（todo 常驻高优先级，不经本选择器过滤）
 WORLD_PREFIXES: tuple[str, ...] = ("entity:", "decision:", "error:")
 
+_DEFAULT_SMALL_WORLD_THRESHOLD = 20
+
+
+def _small_world_threshold() -> int:
+    raw = (os.getenv("MEMORY_SMALL_WORLD_THRESHOLD") or "").strip()
+    if raw:
+        try:
+            return max(0, int(raw))
+        except ValueError:
+            pass
+    return _DEFAULT_SMALL_WORLD_THRESHOLD
+
 # 按域相似度阈值（env 可调；P1 写死默认）
 _DOMAIN_MIN_SCORE: dict[str, float] = {
     "entity": 0.55,
@@ -91,6 +103,14 @@ def select_world_items(
 
     if mode != "semantic":
         return keyword_select(query, world)
+
+    # Task 51: 小世界全量注入，跳过 embedding API
+    if len(world) <= _small_world_threshold():
+        logger.debug(
+            "memory_retrieval_mode=full reason=small_world n=%d",
+            len(world),
+        )
+        return list(world.keys())
 
     try:
         from backend.database.embeddings import embedding_uses_hash_fallback

@@ -11,6 +11,7 @@ Pipeline / agent / ``/memory`` 管理 API 的唯一入口：``write()`` / ``read
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from dataclasses import dataclass, field
@@ -110,6 +111,8 @@ _DEFAULT_COLD_HEAD_K = 25
 _DEFAULT_COLD_TAIL_K = 25
 _DEFAULT_DECAY_RATE = 0.9
 _DEFAULT_WARM_MIN_WEIGHT = 0.05
+_DEFAULT_BUNDLE_CACHE_TTL = 30
+_DEFAULT_WARM_INJECT_CAP = 30
 
 
 def decay_score(
@@ -117,6 +120,26 @@ def decay_score(
 ) -> float:
     """记忆衰减：``score * (decay_rate ** days)``（与 enhanced 路径同构）。"""
     return float(original_score) * (float(decay_rate) ** float(days_ago))
+
+
+def _bundle_cache_ttl() -> int:
+    raw = (os.getenv("MEMORY_BUNDLE_CACHE_TTL") or "").strip()
+    if raw:
+        try:
+            return max(1, int(raw))
+        except ValueError:
+            pass
+    return _DEFAULT_BUNDLE_CACHE_TTL
+
+
+def _warm_inject_cap() -> int:
+    raw = (os.getenv("MEMORY_WARM_INJECT_CAP") or "").strip()
+    if raw:
+        try:
+            return max(1, int(raw))
+        except ValueError:
+            pass
+    return _DEFAULT_WARM_INJECT_CAP
 
 
 def _days_ago(dt: datetime | None) -> float:
@@ -179,6 +202,117 @@ class UnifiedMemoryService:
 
     def __init__(self, tenant_id: str = "default") -> None:
         self.tenant_id = tenant_id or "default"
+
+    def _mem_bundle_key(
+        self,
+        user_id: str,
+        session_id: str | None,
+        *,
+        hot_limit: int,
+        include_warm: bool,
+        include_cold: bool,
+        cold_limit: int,
+    ) -> str:
+        """``mem:bundle:{tid}:{uid}:{session}:{hot}:{warm}:{cold}:{cold_limit}``.
+
+        视图参数必须进 key：load_memory 与 hydrate 的 hot/cold 开关不同，
+        短 key 会 30s 串包（拍板 2026-08-21 A）。失效仍扫 ``uid:*``。
+        """
+        from backend.core.redis_tools import cache_key
+
+        view = (
+            f"{session_id or '-'}:{int(hot_limit)}:"
+            f"{int(include_warm)}:{int(include_cold)}:{int(cold_limit)}"
+        )
+        return cache_key("mem", "bundle", self.tenant_id, f"{user_id}:{view}")
+
+    def _invalidate_mem_bundle(self, user_id: str) -> None:
+        from backend.core.redis_tools import cache_key, get_sync_redis
+
+        client = get_sync_redis(decode_responses=True)
+        if client is None:
+            return
+        try:
+            pattern = cache_key("mem", "bundle", self.tenant_id, f"{user_id}:*")
+            keys = list(client.scan_iter(match=pattern, count=50))
+            if keys:
+                client.delete(*keys)
+        except Exception:
+            logger.debug("mem bundle cache invalidate skipped", exc_info=True)
+
+    def _cached_bundle(
+        self,
+        user_id: str,
+        session_id: str | None,
+        *,
+        hot_limit: int,
+        include_warm: bool,
+        include_cold: bool,
+        cold_limit: int,
+    ) -> MemoryBundle | None:
+        from backend.core.redis_tools import get_sync_redis
+
+        client = get_sync_redis(decode_responses=True)
+        if client is None:
+            return None
+        try:
+            raw = client.get(
+                self._mem_bundle_key(
+                    user_id,
+                    session_id,
+                    hot_limit=hot_limit,
+                    include_warm=include_warm,
+                    include_cold=include_cold,
+                    cold_limit=cold_limit,
+                )
+            )
+            if not raw:
+                return None
+            data = json.loads(raw)
+            return MemoryBundle(
+                hot=list(data.get("hot") or []),
+                warm=dict(data.get("warm") or {}),
+                cold=list(data.get("cold") or []),
+            )
+        except Exception:
+            logger.debug("mem bundle cache get skipped", exc_info=True)
+            return None
+
+    def _store_bundle(
+        self,
+        user_id: str,
+        session_id: str | None,
+        bundle: MemoryBundle,
+        *,
+        hot_limit: int,
+        include_warm: bool,
+        include_cold: bool,
+        cold_limit: int,
+    ) -> None:
+        from backend.core.redis_tools import get_sync_redis
+
+        client = get_sync_redis(decode_responses=True)
+        if client is None:
+            return
+        try:
+            payload = json.dumps(
+                {"hot": bundle.hot, "warm": bundle.warm, "cold": bundle.cold},
+                ensure_ascii=False,
+            )
+            client.set(
+                self._mem_bundle_key(
+                    user_id,
+                    session_id,
+                    hot_limit=hot_limit,
+                    include_warm=include_warm,
+                    include_cold=include_cold,
+                    cold_limit=cold_limit,
+                ),
+                payload,
+                ex=_bundle_cache_ttl(),
+            )
+        except Exception:
+            logger.debug("mem bundle cache set skipped", exc_info=True)
 
     # ── write ──────────────────────────────────────────────────────────
 
@@ -322,6 +456,7 @@ class UnifiedMemoryService:
                     await cache_manager.bump_epoch(self.tenant_id)
                 except Exception:
                     logger.debug("cache epoch bump skipped", exc_info=True)
+            self._invalidate_mem_bundle(user_id)
             return {
                 "id": mid,
                 "tier": "warm",
@@ -388,6 +523,7 @@ class UnifiedMemoryService:
                     )
                 )
             session.commit()
+        self._invalidate_mem_bundle(user_id)
         return {
             "tier": "hot",
             "session_id": session_id,
@@ -544,6 +680,7 @@ class UnifiedMemoryService:
             session.add(row)
             session.commit()
             rid = row.id
+        self._invalidate_mem_bundle(user_id)
         return {
             "tier": "cold",
             "id": rid,
@@ -565,8 +702,18 @@ class UnifiedMemoryService:
         cold_limit: int = 5,
     ) -> MemoryBundle:
         """读取三档视图；失败时返回空包（不阻断调用方）。"""
+        hit = self._cached_bundle(
+            user_id,
+            session_id,
+            hot_limit=hot_limit,
+            include_warm=include_warm,
+            include_cold=include_cold,
+            cold_limit=cold_limit,
+        )
+        if hit is not None:
+            return hit
         try:
-            return self._read_sync(
+            bundle = self._read_sync(
                 user_id=user_id,
                 session_id=session_id,
                 hot_limit=hot_limit,
@@ -574,6 +721,16 @@ class UnifiedMemoryService:
                 include_cold=include_cold,
                 cold_limit=cold_limit,
             )
+            self._store_bundle(
+                user_id,
+                session_id,
+                bundle,
+                hot_limit=hot_limit,
+                include_warm=include_warm,
+                include_cold=include_cold,
+                cold_limit=cold_limit,
+            )
+            return bundle
         except Exception:
             logger.warning(
                 "UnifiedMemoryService.read failed tid=%s uid=%s",
@@ -690,7 +847,8 @@ class UnifiedMemoryService:
                 return False
             session.delete(row)
             session.commit()
-            return True
+        self._invalidate_mem_bundle(user_id)
+        return True
 
     async def update_warm_value(
         self, user_id: str, memory_id: str, new_value: str
@@ -713,7 +871,8 @@ class UnifiedMemoryService:
                 return False
             row.value = text
             session.commit()
-            return True
+        self._invalidate_mem_bundle(user_id)
+        return True
 
     async def forget_user(self, user_id: str) -> dict[str, Any]:
         """被遗忘权：删除该用户全部 warm+cold（含 hub:*）；chat_messages 脱敏保留。
@@ -772,6 +931,7 @@ class UnifiedMemoryService:
                     )
                 )
             session.commit()
+        self._invalidate_mem_bundle(user_id)
         logger.info(
             "forget_user tid=%s uid=%s warm=%s cold=%s redacted_msgs=%s",
             self.tenant_id,
@@ -821,8 +981,6 @@ class UnifiedMemoryService:
         返回含隔离标记的文本，供 system 段拼接（不得当 user role）。
         ``pending:*`` 永不注入。世界域选择走 ``select_world_items``（Task 41 S2a）。
         """
-        import json
-
         from backend.core.memory.select_world_items import select_world_items
 
         window = context_window_tokens or int(
@@ -926,17 +1084,32 @@ class UnifiedMemoryService:
 
         # 优先级：todo > decision > error > entity > 用户画像 > cold > hot
         # 收藏注入推迟到切片 4（事务内 warm 双写）；本轮只走 user_feedback
+        cap = _warm_inject_cap()
+
+        def _clip(lines: list[str], section_max: int) -> list[str]:
+            nonlocal cap
+            if cap <= 0 or not lines:
+                return []
+            n = min(len(lines), section_max, cap)
+            cap -= n
+            return lines[:n]
+
         parts: list[str] = [MEMORY_ISOLATION_HEADER]
-        if todo_lines:
-            parts.append("[活跃待办]\n" + "\n".join(todo_lines[:10]))
-        if decision_lines:
-            parts.append("[近期决策]\n" + "\n".join(decision_lines[:8]))
-        if error_lines:
-            parts.append("[相关错误码]\n" + "\n".join(error_lines[:8]))
-        if entity_lines:
-            parts.append("[用户提到的对象]\n" + "\n".join(entity_lines[:8]))
-        if user_lines:
-            parts.append("[用户背景]\n" + "\n".join(user_lines[:20]))
+        todo_keep = _clip(todo_lines, 10)
+        if todo_keep:
+            parts.append("[活跃待办]\n" + "\n".join(todo_keep))
+        decision_keep = _clip(decision_lines, 8)
+        if decision_keep:
+            parts.append("[近期决策]\n" + "\n".join(decision_keep))
+        error_keep = _clip(error_lines, 8)
+        if error_keep:
+            parts.append("[相关错误码]\n" + "\n".join(error_keep))
+        entity_keep = _clip(entity_lines, 8)
+        if entity_keep:
+            parts.append("[用户提到的对象]\n" + "\n".join(entity_keep))
+        user_keep = _clip(user_lines, len(user_lines) or 0)
+        if user_keep:
+            parts.append("[用户背景]\n" + "\n".join(user_keep))
 
         cold_blocks = [
             f"- {c.get('summary')}" for c in bundle.cold if c.get("summary")

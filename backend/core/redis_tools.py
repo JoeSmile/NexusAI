@@ -193,7 +193,7 @@ CACHE_KEY_DOMAINS: dict[str, str] = {
     "chat": "对话与 PerformanceOptimizer (chat:v / chat:epoch / chat:lock)",
     "ctx": "能力/上下文缓存 (预留)",
     "rl": "限流桶 (rl:cap / rl:rag / …)",
-    "mem": "记忆热缓存 (预留，与 Task 34 呼应)",
+    "mem": "记忆热缓存 (mem:bundle 读结果 TTL 30s)",
 }
 
 

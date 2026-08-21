@@ -41,14 +41,25 @@ def test_assemble_skips_pending_and_filters_world_by_query():
 
 
 def test_assemble_world_miss_without_query_hit():
+    """Large world + keyword miss → 不注入无关 entity（小世界全量注入见 Task 51）。"""
+    from unittest.mock import patch
+
     svc = UnifiedMemoryService(tenant_id="t")
     warm = {
         "entity:李四": json.dumps({"name": "李四", "relation": "客户", "text": "李四"}),
     }
-    block = svc.assemble_prompt_block(
-        MemoryBundle(warm=warm),
-        query="今天天气",
-    )
+    for i in range(25):
+        warm[f"entity:pad-{i}"] = json.dumps(
+            {"name": f"p{i}", "text": f"p{i}", "type": "entity"}
+        )
+    with patch(
+        "backend.database.embeddings.embedding_uses_hash_fallback",
+        return_value=True,
+    ):
+        block = svc.assemble_prompt_block(
+            MemoryBundle(warm=warm),
+            query="今天天气",
+        )
     assert "李四" not in block
 
 
