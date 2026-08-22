@@ -35,11 +35,28 @@ export function ExecutionPanel({ execution, className = '' }: Props) {
   const [open, setOpen] = useState(true)
   if (!execution || execution.steps.length === 0) return null
 
+  const active = execution.activeTool
+
   return (
     <section
       className={`mb-3 rounded-lg border border-border/70 bg-muted/30 text-sm ${className}`}
       data-testid="execution-panel"
     >
+      {active ? (
+        <div
+          className="flex items-center gap-2 border-b border-border/60 bg-blue-50/80 px-3 py-2 text-blue-900"
+          data-testid="execution-active-tool"
+        >
+          <Loader2 size={14} className="animate-spin shrink-0" />
+          <span>
+            正在调用 <strong>{active.label}</strong>
+            {active.capabilityId && active.capabilityId !== active.label
+              ? ` (${active.capabilityId})`
+              : ''}
+            …
+          </span>
+        </div>
+      ) : null}
       <button
         type="button"
         className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left font-medium"

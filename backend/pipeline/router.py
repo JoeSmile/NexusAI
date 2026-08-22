@@ -14,12 +14,18 @@ from pydantic import BaseModel, Field
 
 from backend.core.audit import log_audit
 from backend.core.audit_context import bind_audit_lineage
-from backend.core.billing.context import bind_billing_context
 from backend.core.auth.models import TenantContext
 from backend.core.auth.permissions import require_permission
+from backend.core.billing.context import bind_billing_context
 from backend.core.errors import ErrorCode, NexusAIException
 from backend.core.guardrails.output_guard import DRIFT_PATTERNS, VIOLATION_PATTERNS
 from backend.core.plan.event_bus import event_to_sse_payload, get_run_bus_optional
+from backend.core.plan.run_cancel import (
+    clear_cancel,
+    is_cancelled,
+    register_run,
+    unregister_run,
+)
 from backend.observability.decorators import observe
 from backend.pipeline.graph import compiled_graph
 from backend.pipeline.state import make_initial_state
@@ -183,6 +189,8 @@ async def _run_chat_pipeline(
     bind_audit_lineage(trace_id=initial["trace_id"])
     bind_billing_context(user_id=tenant.user_id, trace_id=initial["trace_id"])
     _inject_langfuse_parent(initial)
+    trace_id = initial["trace_id"]
+    register_run(trace_id)
 
     try:
         final = await compiled_graph.ainvoke(initial)
@@ -262,13 +270,14 @@ async def _run_chat_pipeline(
             error_code="SYS_001",
         )
     finally:
+        unregister_run(trace_id)
+        clear_cancel(trace_id)
         # 与 model_router 短路径降采样共用同一决策（should_sample 幂等）
         keep = should_sample(finish_reason) and tracing_enabled()
         if keep:
             background_tasks.add_task(flush_langfuse)
         else:
             background_tasks.add_task(discard_langfuse_buffer)
-
 
 
 def _inject_langfuse_parent(initial: Any) -> None:
@@ -371,10 +380,17 @@ async def chat_streaming(
     bind_audit_lineage(trace_id=initial["trace_id"])
     bind_billing_context(user_id=tenant.user_id, trace_id=initial["trace_id"])
     _inject_langfuse_parent(initial)
+    trace_id = initial["trace_id"]
+    register_run(trace_id)
+
+    def _release_run() -> None:
+        unregister_run(trace_id)
+        clear_cancel(trace_id)
 
     try:
         final = await _ainvoke_streaming(initial)
     except NexusAIException as e:
+        _release_run()
         return JSONResponse(
             status_code=400,
             content={
@@ -384,6 +400,7 @@ async def chat_streaming(
             },
         )
     except Exception as e:
+        _release_run()
         return JSONResponse(
             status_code=500,
             content={
@@ -394,6 +411,7 @@ async def chat_streaming(
         )
 
     if final.get("error_code"):
+        _release_run()
         return JSONResponse(
             status_code=400,
             content={
@@ -403,13 +421,13 @@ async def chat_streaming(
             },
         )
     if final.get("finish_reason") != "routed_to_llm":
+        _release_run()
         return JSONResponse(_chat_json_payload(final))
 
+    from backend.core.billing.context import bind_billing_from_pipeline_state
     from backend.core.harness import LLMHarness
     from backend.pipeline.nodes.conversion_hook import conversion_hook
     from backend.pipeline.nodes.write_memory import write_memory
-
-    from backend.core.billing.context import bind_billing_from_pipeline_state
 
     bind_billing_from_pipeline_state(final)
     harness = LLMHarness()
@@ -439,6 +457,11 @@ async def chat_streaming(
 
         try:
             while True:
+                if is_cancelled(final.get("trace_id")):
+                    logger.info("SSE cancelled via DELETE — stop generation")
+                    yield _sse_data({"type": "cancelled", "reason": "user_request"})
+                    yield "data: [DONE]\n\n"
+                    return
                 if await request.is_disconnected():
                     logger.info("SSE client disconnected — stop generation")
                     break
@@ -486,6 +509,8 @@ async def chat_streaming(
                 }
             )
             yield "data: [DONE]\n\n"
+        finally:
+            _release_run()
 
     return StreamingResponse(
         event_stream(),

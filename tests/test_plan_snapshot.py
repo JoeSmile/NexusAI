@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from backend.core.auth.models import TenantContext
 from backend.core.auth.dual_auth import verify_human_or_legacy_key
 from backend.core.plan.event_bus import get_run_bus, release_run_bus
+from backend.core.plan.run_cancel import clear_cancel, register_run, unregister_run
 from backend.routers.plan_snapshot import router
 
 
@@ -42,6 +43,31 @@ def test_snapshot_endpoint_returns_events():
     assert len(body["events"]) >= 1
     app.dependency_overrides.clear()
     release_run_bus("tr_api")
+
+
+def test_cancel_active_run():
+    release_run_bus("tr_cancel")
+    register_run("tr_cancel")
+    bus = get_run_bus("tr_cancel")
+
+    app = FastAPI()
+    app.include_router(router)
+
+    async def _auth() -> TenantContext:
+        return _tenant()
+
+    app.dependency_overrides[verify_human_or_legacy_key] = _auth
+    client = TestClient(app)
+    res = client.delete("/api/chat/streaming/tr_cancel")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["cancelled"] is True
+    events = [e.type for e in bus.events_all()]
+    assert "cancelled" in events
+    app.dependency_overrides.clear()
+    unregister_run("tr_cancel")
+    clear_cancel("tr_cancel")
+    release_run_bus("tr_cancel")
 
 
 def test_snapshot_not_found():

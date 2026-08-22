@@ -66,6 +66,27 @@ describe('SSE parse frames', () => {
     expect(onDone).toHaveBeenCalledWith({ path: 'long' })
   })
 
+  it('handles tool_call and cancelled events', () => {
+    const onToolCall = vi.fn()
+    const onCancelled = vi.fn()
+    const onStreamAlert = vi.fn()
+    dispatchSSEData(
+      '{"type":"tool_call","step_id":"s1","capability_id":"hotspot.dig","label":"hotspot.dig"}',
+      { onToolCall },
+    )
+    expect(onToolCall).toHaveBeenCalled()
+    expect(
+      dispatchSSEData('{"type":"cancelled","reason":"user_request"}', {
+        onCancelled,
+        onStreamAlert,
+      }),
+    ).toBe('done')
+    expect(onCancelled).toHaveBeenCalledWith('user_request')
+    expect(onStreamAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'cancelled' }),
+    )
+  })
+
   it('handles type=done with call_chain meta', () => {
     const onDone = vi.fn()
     dispatchSSEData(

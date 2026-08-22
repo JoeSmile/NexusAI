@@ -1,13 +1,16 @@
 /**
  * Chat 面板流式发送 → 消息列表（Task 30.12 / 47b slice0 + 历史分页）。
  */
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 
+import { cancelChatStream } from '@/api/chat'
 import {
   applyExecutionEvent,
   executionFromSnapshot,
   type ExecutionState,
+  type StreamAlert,
 } from '@/hooks/sseParse'
+import { pollRunSnapshot } from '@/hooks/streamReconnect'
 import { useSSEStream } from '@/hooks/useSSEStream'
 import { isRenderDirective, type RenderDirective } from '@/types/render'
 
@@ -40,8 +43,15 @@ export function useChatStream(endpoint = '/chat/streaming') {
   const [streaming, setStreaming] = useState(false)
   const [hasMore, setHasMore] = useState(false)
   const [execution, setExecution] = useState<ExecutionState | null>(null)
+  const [streamAlert, setStreamAlert] = useState<StreamAlert | null>(null)
+  const activeTraceRef = useRef<string | null>(null)
+  const reconnectAbortRef = useRef<AbortController | null>(null)
 
   const abort = useCallback(() => {
+    const tid = activeTraceRef.current
+    if (tid) void cancelChatStream(tid).catch(() => undefined)
+    reconnectAbortRef.current?.abort()
+    reconnectAbortRef.current = null
     abortFetch()
     setStreaming(false)
   }, [abortFetch])
@@ -85,6 +95,8 @@ export function useChatStream(endpoint = '/chat/streaming') {
         { id: asstId, role: 'assistant', content: '', status: 'streaming' },
       ])
       setExecution(null)
+      setStreamAlert(null)
+      activeTraceRef.current = null
       setStreaming(true)
 
       const mergeExecution = (event: Record<string, unknown>) => {
@@ -101,6 +113,14 @@ export function useChatStream(endpoint = '/chat/streaming') {
         )
       }
 
+      const finishAssistant = (status: ChatMessage['status'] = 'done') => {
+        setMessages((msgs) =>
+          msgs.map((msg) => (msg.id === asstId ? { ...msg, status } : msg)),
+        )
+        setStreaming(false)
+        activeTraceRef.current = null
+      }
+
       await start(
         endpoint,
         {
@@ -113,39 +133,110 @@ export function useChatStream(endpoint = '/chat/streaming') {
           }),
         },
         {
+          onTraceId: (tid) => {
+            activeTraceRef.current = tid
+          },
           onToken: (t) => patch((c) => c + t),
           onPlan: (p) => mergeExecution({ ...p, type: 'plan' }),
           onStep: (p) => mergeExecution({ ...p, type: 'step' }),
+          onToolCall: (p) => mergeExecution({ ...p, type: 'tool_call' }),
+          onToolResult: (p) => mergeExecution({ ...p, type: 'tool_result' }),
           onRetry: () => undefined,
           onReplan: (p) => mergeExecution({ ...p, type: 'replan' }),
+          onStreamAlert: (alert) => setStreamAlert(alert),
           onAbort: () => {
-            patch((c) => c, 'aborted')
-            setStreaming(false)
+            finishAssistant('aborted')
           },
-          onRetraction: (reason) => {
-            patch((c) => `${c}\n\n[retracted: ${reason}]`, 'done')
+          onCancelled: () => {
+            finishAssistant('aborted')
+          },
+          onRetraction: () => {
+            finishAssistant('done')
           },
           onError: (code, message) => {
             setMessages((msgs) =>
               msgs.map((msg) => {
                 if (msg.id !== asstId) return msg
-                // 已有流式正文 = LLM 已通；事后槽位/写记忆错误不当成整单失败
-                if (msg.content.trim()) {
-                  return { ...msg, status: 'done' }
-                }
+                if (msg.content.trim()) return { ...msg, status: 'done' }
                 return {
                   ...msg,
-                  content: `[${code}] ${message}`,
+                  content: message ? `（${message}）` : '',
                   status: 'error',
                 }
               }),
             )
-            setStreaming(false)
+            setStreamAlert((prev) =>
+              prev ?? {
+                kind: 'error',
+                title: '请求失败',
+                message,
+                code,
+              },
+            )
+            finishAssistant('error')
+          },
+          onNetworkError: () => {
+            const tid = activeTraceRef.current
+            if (!tid) {
+              setStreamAlert({
+                kind: 'error',
+                title: '网络错误',
+                message: '连接中断，且无法识别 trace，请重试。',
+                code: 'NET_DISCONNECT',
+              })
+              finishAssistant('error')
+              return
+            }
+            setStreamAlert({
+              kind: 'reconnect',
+              title: '连接中断',
+              message: '正在通过快照恢复执行进度…',
+              code: 'NET_RECONNECT',
+            })
+            reconnectAbortRef.current?.abort()
+            const ac = new AbortController()
+            reconnectAbortRef.current = ac
+            void pollRunSnapshot({
+              traceId: tid,
+              onProgress: setExecution,
+              signal: ac.signal,
+            }).then(({ result }) => {
+              if (ac.signal.aborted) return
+              reconnectAbortRef.current = null
+              if (result === 'complete') {
+                setStreamAlert({
+                  kind: 'info',
+                  title: '进度已恢复',
+                  message: '编排步骤已从快照对齐；文本流可能不完整。',
+                })
+                finishAssistant('done')
+              } else if (result === 'cancelled') {
+                setStreamAlert({
+                  kind: 'cancelled',
+                  title: '已取消',
+                  message: '本次任务在恢复前已被取消。',
+                  code: 'CHAT_CANCELLED',
+                })
+                finishAssistant('aborted')
+              } else if (result === 'not_found') {
+                finishAssistant('done')
+              } else {
+                setStreamAlert({
+                  kind: 'error',
+                  title: '恢复超时',
+                  message: '无法从快照恢复完整进度，请查看执行面板或重试。',
+                  code: 'RECONNECT_TIMEOUT',
+                })
+                finishAssistant('error')
+              }
+            })
           },
           onDone: (meta) => {
+            const tid = meta?.trace_id ? String(meta.trace_id) : activeTraceRef.current
+            if (tid) activeTraceRef.current = tid
             const snap = executionFromSnapshot(
               meta?.execution_snapshot as Record<string, unknown> | undefined,
-              meta?.trace_id ? String(meta.trace_id) : undefined,
+              tid || undefined,
             )
             if (snap) setExecution(snap)
             const renderRaw = meta?.render
@@ -162,11 +253,10 @@ export function useChatStream(endpoint = '/chat/streaming') {
                   : msg,
               ),
             )
-            setStreaming(false)
+            finishAssistant('done')
           },
         },
       )
-      setStreaming(false)
     },
     [endpoint, start, streaming, abortFetch],
   )
@@ -177,6 +267,7 @@ export function useChatStream(endpoint = '/chat/streaming') {
     setStreaming(false)
     setHasMore(false)
     setExecution(null)
+    setStreamAlert(null)
   }, [abort])
 
   const appendLocal = useCallback(
@@ -203,11 +294,14 @@ export function useChatStream(endpoint = '/chat/streaming') {
     )
   }, [])
 
+  const dismissStreamAlert = useCallback(() => setStreamAlert(null), [])
+
   return {
     messages,
     streaming,
     hasMore,
     execution,
+    streamAlert,
     send,
     abort,
     reset,
@@ -216,5 +310,6 @@ export function useChatStream(endpoint = '/chat/streaming') {
     loadHistory,
     replaceHistory,
     prependHistory,
+    dismissStreamAlert,
   }
 }

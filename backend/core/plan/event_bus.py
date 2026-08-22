@@ -155,6 +155,25 @@ class PlanEventBus:
             status=status,
             summary=summary[:500],
         )
+        if status == "running":
+            self.emit(
+                "tool_call",
+                {
+                    "step_id": step_id,
+                    "capability_id": capability_id,
+                    "label": capability_id or step_id,
+                },
+            )
+        elif status in ("succeeded", "failed", "skipped"):
+            self.emit(
+                "tool_result",
+                {
+                    "step_id": step_id,
+                    "capability_id": capability_id,
+                    "status": status,
+                    "summary": summary[:500],
+                },
+            )
         return self.emit(
             "step",
             {

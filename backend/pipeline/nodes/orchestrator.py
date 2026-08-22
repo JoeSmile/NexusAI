@@ -18,6 +18,7 @@ from backend.core.plan.llm_output_guard import prevalidate_llm_plan
 from backend.core.plan.loop_guard import LoopGuard, LoopGuardError
 from backend.core.plan.models import OnFailMode, PlanIR, PlanStep
 from backend.core.plan.params_resolve import resolve_step_params
+from backend.core.plan.run_cancel import RunCancelledError, check_cancelled
 from backend.core.plan.spawn_budget import SpawnBudget, resolve_spawn_budget
 from backend.core.plan.tool_output_guard import sanitize_tool_output
 from backend.core.plan.validator import topological_sort_steps, validate_plan_ir
@@ -274,6 +275,7 @@ async def execute_plan_ir(
     loop_guard = LoopGuard.from_pipeline(state)
 
     while True:
+        check_cancelled(str(state.get("trace_id") or ""))
         executed_ids = set(step_results.keys())
         steps_dicts = [s.model_dump(mode="json") for s in current_plan.steps]
         pending = [s for s in current_plan.steps if s.id not in executed_ids]
@@ -297,6 +299,7 @@ async def execute_plan_ir(
 
             async def _execute_step(step: PlanStep) -> None:
                 nonlocal current_plan, replanned
+                check_cancelled(str(state.get("trace_id") or ""))
                 if step.id in step_results:
                     return
                 if bus is not None:
@@ -485,6 +488,15 @@ async def orchestrator(state: PipelineState) -> PipelineState:
             execute_plan_ir(state, plan),
             timeout=timeout,
         )
+    except RunCancelledError:
+        bus = bus_for_state(state)
+        if bus is not None:
+            bus.emit("cancelled", {"reason": "user_request"})
+        state["finish_reason"] = "cancelled"
+        state["error_code"] = "CHAT_CANCELLED"
+        state["response"] = "请求已取消。"
+        enrich_span(metadata={"path": "orchestrator_cancelled"})
+        return state
     except OrchestratorError as e:
         if state.get("finish_reason") == "routed_to_llm":
             enrich_span(metadata={"path": "orchestrator_replan_fallback"})

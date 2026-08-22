@@ -17,9 +17,15 @@ def test_emit_order_and_snapshot() -> None:
     bus.publish_step("s1", capability_id="cap.a", status="running")
     bus.publish_step("s1", capability_id="cap.a", status="succeeded", summary="ok")
     events = bus.events_all()
-    assert [e.type for e in events] == ["plan", "step", "step"]
+    assert [e.type for e in events] == [
+        "plan",
+        "tool_call",
+        "step",
+        "tool_result",
+        "step",
+    ]
     assert events[0].seq == 1
-    assert events[-1].seq == 3
+    assert events[-1].seq == 5
     snap = bus.snapshot()
     assert snap.goal == "demo"
     assert len(snap.nodes) == 2

@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from '@/api/http'
+import { apiGet, apiPost, apiDelete } from '@/api/http'
 
 /** POST /chat 非流式 JSON。 */
 export type ChatJsonResponse = {
@@ -57,6 +57,10 @@ export type ChatTimelineResponse = {
 
 export type ChatSearchResponse = {
   items: ChatHistoryItem[]
+}
+
+export async function cancelChatStream(traceId: string): Promise<{ ok: boolean; trace_id: string }> {
+  return apiDelete(`/api/chat/streaming/${encodeURIComponent(traceId)}`)
 }
 
 /** GET /api/chat/run/{trace_id}/snapshot — Task 56 执行图快照 */

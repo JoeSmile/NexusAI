@@ -19,6 +19,8 @@ export function useSSEStream() {
       abortRef.current = ac
       try {
         const res = await apiFetch(url, { ...init, signal: ac.signal })
+        const traceHeader = res.headers.get('X-Trace-Id')
+        if (traceHeader) h.onTraceId?.(traceHeader.trim())
         const ct = (res.headers.get('content-type') || '').toLowerCase()
         if (ct.includes('application/json')) {
           const body = (await res.json()) as {
@@ -57,7 +59,12 @@ export function useSSEStream() {
           h.onAbort?.('client_abort')
           return
         }
-        h.onError?.('SYS_001', e instanceof Error ? e.message : String(e))
+        const err = e instanceof Error ? e : new Error(String(e))
+        if (h.onNetworkError) {
+          h.onNetworkError(err)
+          return
+        }
+        h.onError?.('SYS_001', err.message)
       } finally {
         if (abortRef.current === ac) abortRef.current = null
       }

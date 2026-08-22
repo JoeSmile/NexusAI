@@ -43,6 +43,7 @@ import { useChatPrefsStore } from '@/stores/chatPrefsStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useWorkflowTriggerStore } from '@/stores/workflowTriggerStore'
 import { TermsAcceptanceDialog } from '@/components/legal/TermsAcceptanceDialog'
+import { StreamAlertBanner } from '@/components/agent/StreamAlert'
 import { RenderHost } from '@/components/dynamic/RenderHost'
 import type { TermsDoc } from '@/api/terms'
 import type { RenderAction } from '@/types/render'
@@ -53,8 +54,10 @@ export default function HomeChatPage() {
     streaming,
     hasMore,
     execution,
+    streamAlert,
     send,
     abort,
+    dismissStreamAlert,
     appendLocal,
     patchLocal,
     replaceHistory,
@@ -775,6 +778,7 @@ export default function HomeChatPage() {
             >
               {/* PullToRefresh requires a single child (Children.only) */}
               <div className="chat-messages-inner">
+                <StreamAlertBanner alert={streamAlert} onDismiss={dismissStreamAlert} />
                 <ExecutionPanel execution={execution} />
                 {messages.map((msg) => (
                   <Message
