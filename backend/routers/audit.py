@@ -53,6 +53,7 @@ async def query_audit_logs(
     start: str | None = Query(None, description="开始时间 ISO"),
     end: str | None = Query(None, description="结束时间 ISO"),
     action: str | None = Query(None, description="按操作筛选"),
+    trace_id: str | None = Query(None, description="按 trace_id 筛选（Task 63）"),
     limit: int = Query(50, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     tenant: TenantContext = Depends(verify_human_or_legacy_key),
@@ -83,6 +84,9 @@ async def query_audit_logs(
     if action:
         conditions.append("action = :action")
         params["action"] = action
+    if trace_id:
+        conditions.append("trace_id = :trace_id")
+        params["trace_id"] = trace_id.strip()
 
     with session_factory.Session() as session:
         frag, extra = audit_user_filter(session, tenant)
@@ -190,6 +194,7 @@ async def export_audit(
     start: str | None = Query(None),
     end: str | None = Query(None),
     action: str | None = Query(None, description="按操作筛选"),
+    trace_id: str | None = Query(None, description="按 trace_id 筛选（Task 63）"),
     format: str = Query("csv", description="csv | ndjson"),
     tenant: TenantContext = Depends(verify_human_or_legacy_key),
 ):
@@ -221,6 +226,9 @@ async def export_audit(
     if action:
         conditions.append("action = :action")
         params["action"] = action
+    if trace_id:
+        conditions.append("trace_id = :trace_id")
+        params["trace_id"] = trace_id.strip()
 
     with session_factory.Session() as session:
         frag, extra = audit_user_filter(session, tenant)

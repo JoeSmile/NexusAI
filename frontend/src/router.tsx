@@ -10,6 +10,7 @@ import { KEYS_ROLES, ORG_ROLES } from '@/lib/navAccess'
 import { HOME_PATH, PANEL_REDIRECTS } from '@/lib/routes'
 import AgentLoginPage from '@/pages/agent/LoginPage'
 import AdminHomePage from '@/pages/agent/AdminHome'
+import TraceConsole from '@/pages/agent/TraceConsole'
 import HomeChatPage from '@/pages/agent/HomeChat'
 import WorkspaceDashboard from '@/pages/agent/WorkspaceDashboard'
 import RootLanding from '@/pages/marketing/Landing'
@@ -106,6 +107,7 @@ export const router = createBrowserRouter([
             children: [{ path: 'org', element: <OrgTreePage /> }],
           },
           { path: 'audit', element: <AuditPanel /> },
+          { path: 'traces', element: <TraceConsole /> },
           { path: 'billing', element: <BillingPanel /> },
           { path: 'capabilities', element: <CapabilitiesPanel /> },
           { path: 'performance', element: <PerformancePanel /> },
