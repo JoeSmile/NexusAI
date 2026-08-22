@@ -21,6 +21,7 @@ from backend.core.plan.params_resolve import resolve_step_params
 from backend.core.plan.spawn_budget import SpawnBudget, resolve_spawn_budget
 from backend.core.plan.tool_output_guard import sanitize_tool_output
 from backend.core.plan.validator import topological_sort_steps, validate_plan_ir
+from backend.core.render.directive import extract_render_directive, render_directive_to_dict
 from backend.observability.decorators import enrich_span, observe
 from backend.pipeline.nodes.task_plan import _list_visible_capabilities, _tenant_from_state
 from backend.pipeline.state import PipelineState
@@ -501,6 +502,9 @@ async def orchestrator(state: PipelineState) -> PipelineState:
         partial = state.get("step_results") or {}
         bb = Blackboard.from_state(state)
         state["response"] = _synthesize_response(plan, partial, blackboard=bb)
+        directive = extract_render_directive(partial)
+        if directive is not None:
+            state["render_directive"] = render_directive_to_dict(directive)
         state["finish_reason"] = "orchestrated"
         state["orchestrator_timeout"] = True  # type: ignore[typeddict-item]
         enrich_span(metadata={"path": "orchestrator_timeout"})
@@ -522,6 +526,9 @@ async def orchestrator(state: PipelineState) -> PipelineState:
     state["response"] = _synthesize_response(
         final_plan, step_results, blackboard=blackboard
     )
+    directive = extract_render_directive(step_results)
+    if directive is not None:
+        state["render_directive"] = render_directive_to_dict(directive)
     state["finish_reason"] = "orchestrated"
     enrich_span(
         metadata={

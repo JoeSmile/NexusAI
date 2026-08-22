@@ -4,6 +4,13 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
+class RenderDirective(BaseModel):
+    """Agent-driven UI component instruction (Task 63)."""
+
+    component: str
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
 class Message(BaseModel):
     role: str  # "user" or "assistant"
     content: str

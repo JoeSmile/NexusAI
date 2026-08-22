@@ -99,6 +99,8 @@ class PipelineState(TypedDict):
     loop_guard_streak_count: int
     loop_guard_invoke_total: int
     blackboard: list[dict]
+    render_directive: dict | None  # Task 63 — {component, payload}
+    render_action: dict | None  # Task 63 — FE component callback context
     short_path_skill: dict | None  # {id, name} — Chat skills registry
     skill_asset_hit: dict | None  # skill_assets CoT template hit
     triggered_run: dict | None  # 40.86 {run_id, workflow_id, ...}
@@ -187,6 +189,8 @@ def make_initial_state(
         "loop_guard_streak_count": 0,
         "loop_guard_invoke_total": 0,
         "blackboard": [],
+        "render_directive": None,
+        "render_action": None,
         "short_path_skill": None,
         "skill_asset_hit": None,
         "triggered_run": None,

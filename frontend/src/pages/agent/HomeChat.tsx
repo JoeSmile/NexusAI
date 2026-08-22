@@ -43,7 +43,9 @@ import { useChatPrefsStore } from '@/stores/chatPrefsStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useWorkflowTriggerStore } from '@/stores/workflowTriggerStore'
 import { TermsAcceptanceDialog } from '@/components/legal/TermsAcceptanceDialog'
+import { RenderHost } from '@/components/dynamic/RenderHost'
 import type { TermsDoc } from '@/api/terms'
+import type { RenderAction } from '@/types/render'
 
 export default function HomeChatPage() {
   const {
@@ -488,6 +490,23 @@ export default function HomeChatPage() {
     abort()
   }
 
+  const handleRenderAction = useCallback(
+    async (action: RenderAction) => {
+      if (action.action !== 'script.gen') return
+      await send('为选中热点生成口播脚本', {
+        session_id: WORKSPACE_CHAT_SESSION,
+        ...(modelId ? { model: modelId } : {}),
+        temperature,
+        ...(maxTokens > 0 ? { max_tokens: maxTokens } : {}),
+        render_action: {
+          action: 'script.gen',
+          hotspots: 'hotspots' in action ? action.hotspots : [],
+        },
+      })
+    },
+    [send, modelId, temperature, maxTokens],
+  )
+
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.nativeEvent.isComposing || e.keyCode === 229) return
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -583,6 +602,7 @@ export default function HomeChatPage() {
       const cid = String(msg._id)
       const localMsg = messages.find((m) => m.id === cid)
       const imagePreview = localMsg?.imagePreview
+      const render = localMsg?.render
       const st = feedbackByMsg[cid]
       const liked = st?.reaction?.type === 'helpful'
       const disliked = st?.reaction?.type === 'irrelevant'
@@ -604,7 +624,16 @@ export default function HomeChatPage() {
               </div>
             ) : (
               <div className="chat-bubble-md">
-                {body.includes('<<<DIG>>>') ||
+                {render ? (
+                  <>
+                    {body.trim() ? (
+                      <div className="chat-bubble-plain mb-2">
+                        <ReactMarkdown>{body}</ReactMarkdown>
+                      </div>
+                    ) : null}
+                    <RenderHost directive={render} onAction={handleRenderAction} />
+                  </>
+                ) : body.includes('<<<DIG>>>') ||
                 body.includes('<<<SCRIPT>>>') ||
                 body.includes('[查看明细]') ? (
                   <div className="chat-bubble-plain">{renderDigBody(body, cid)}</div>
@@ -673,7 +702,7 @@ export default function HomeChatPage() {
         </div>
       )
     },
-    [expandedDig, feedbackByMsg, messages, copyText, toggleReaction, toggleBookmark],
+    [expandedDig, feedbackByMsg, messages, copyText, toggleReaction, toggleBookmark, handleRenderAction],
   )
 
   return (

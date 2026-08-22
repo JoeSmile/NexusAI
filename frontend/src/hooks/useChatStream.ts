@@ -9,6 +9,7 @@ import {
   type ExecutionState,
 } from '@/hooks/sseParse'
 import { useSSEStream } from '@/hooks/useSSEStream'
+import { isRenderDirective, type RenderDirective } from '@/types/render'
 
 export type ChatRole = 'user' | 'assistant' | 'system'
 
@@ -17,6 +18,8 @@ export interface ChatMessage {
   role: ChatRole
   content: string
   status?: 'streaming' | 'done' | 'error' | 'aborted'
+  /** Task 63 — agent-driven component mount */
+  render?: RenderDirective | null
   /** Local preview URL for attached images */
   imagePreview?: string
   /** DB chat_messages.id — history rows only; used as pagination cursor */
@@ -145,7 +148,20 @@ export function useChatStream(endpoint = '/chat/streaming') {
               meta?.trace_id ? String(meta.trace_id) : undefined,
             )
             if (snap) setExecution(snap)
-            patch((c) => c, 'done')
+            const renderRaw = meta?.render
+            const render = isRenderDirective(renderRaw) ? renderRaw : null
+            setMessages((msgs) =>
+              msgs.map((msg) =>
+                msg.id === asstId
+                  ? {
+                      ...msg,
+                      content: msg.content,
+                      status: 'done',
+                      ...(render ? { render } : {}),
+                    }
+                  : msg,
+              ),
+            )
             setStreaming(false)
           },
         },

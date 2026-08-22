@@ -44,6 +44,46 @@ class ChatRequest(BaseModel):
     # 47b I1 — FE bubble UUIDs (persisted on write_memory)
     user_client_message_id: str | None = None
     assistant_client_message_id: str | None = None
+    # Task 63 — component interaction callback (e.g. hotspot_table → script.gen)
+    render_action: dict[str, Any] | None = None
+
+
+def _apply_render_action_message(body: ChatRequest) -> str:
+    """Turn structured component callbacks into a planner-friendly user message."""
+    base = (body.message or "").strip()
+    ra = body.render_action
+    if not isinstance(ra, dict) or not ra:
+        return body.message
+    action = str(ra.get("action") or "")
+    if action == "script.gen":
+        hotspots = ra.get("hotspots")
+        if not isinstance(hotspots, list):
+            payload = ra.get("payload")
+            hotspots = payload.get("hotspots") if isinstance(payload, dict) else []
+        if isinstance(hotspots, list) and hotspots:
+            blob = json.dumps(hotspots[:20], ensure_ascii=False)
+            prefix = base or "请为以下热点生成口播脚本"
+            return f"{prefix}\n{blob}"
+    return body.message
+
+
+def _bind_chat_request_to_state(body: ChatRequest, initial: dict) -> None:
+    message = _apply_render_action_message(body)
+    if message != body.message:
+        initial["message"] = message
+        initial["raw_input"] = message
+    if body.render_action:
+        initial["render_action"] = body.render_action
+
+
+def _render_from_final(final: dict) -> RenderDirectiveOut | None:
+    raw = final.get("render_directive")
+    if not isinstance(raw, dict) or not raw.get("component"):
+        return None
+    return RenderDirectiveOut(
+        component=str(raw["component"]),
+        payload=dict(raw.get("payload") or {}),
+    )
 
 
 def _require_chat_model(body: ChatRequest) -> None:
@@ -66,6 +106,11 @@ def _enforce_terms(request: Request, tenant: TenantContext) -> None:
     )
 
 
+class RenderDirectiveOut(BaseModel):
+    component: str
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
 class ChatResponse(BaseModel):
     response: str
     trace_id: str
@@ -75,6 +120,7 @@ class ChatResponse(BaseModel):
     pipeline_latency_ms: float
     approval_request_id: str | None = None
     error_code: str | None = None
+    render: RenderDirectiveOut | None = None
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -133,6 +179,7 @@ async def _run_chat_pipeline(
         llm_temperature=body.temperature,
         llm_max_tokens=body.max_tokens,
     )
+    _bind_chat_request_to_state(body, initial)
     bind_audit_lineage(trace_id=initial["trace_id"])
     bind_billing_context(user_id=tenant.user_id, trace_id=initial["trace_id"])
     _inject_langfuse_parent(initial)
@@ -197,6 +244,7 @@ async def _run_chat_pipeline(
             pipeline_latency_ms=latency,
             approval_request_id=final.get("approval_request_id"),
             error_code=final.get("error_code"),
+            render=_render_from_final(final),
         )
 
     except NexusAIException:
@@ -274,6 +322,9 @@ def _chat_json_payload(final: dict) -> dict:
     snap = _execution_snapshot(final.get("trace_id"))
     if snap is not None:
         payload["execution_snapshot"] = snap
+    render = _render_from_final(final)
+    if render is not None:
+        payload["render"] = render.model_dump(mode="json")
     return payload
 
 
@@ -315,6 +366,7 @@ async def chat_streaming(
         llm_temperature=body.temperature,
         llm_max_tokens=body.max_tokens,
     )
+    _bind_chat_request_to_state(body, initial)
     initial["stream_mode"] = True
     bind_audit_lineage(trace_id=initial["trace_id"])
     bind_billing_context(user_id=tenant.user_id, trace_id=initial["trace_id"])

@@ -6,6 +6,7 @@ export type ChatJsonResponse = {
   trace_id?: string
   finish_reason?: string
   execution_snapshot?: Record<string, unknown>
+  render?: { component: string; payload: Record<string, unknown> }
   total_tokens?: number
   total_cost?: number
   pipeline_latency_ms?: number
