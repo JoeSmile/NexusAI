@@ -33,6 +33,7 @@ class PipelineState(TypedDict):
     hot_memory: list[dict]
     warm_memory: dict[str, str]
     cold_memory: list[dict]
+    rag_retrieved_ids: list[str]  # Task 61 — sanitized recall lineage
 
     # ── 分析结果 ──
     intent: str | None
@@ -134,6 +135,7 @@ def make_initial_state(
         "hot_memory": [],
         "warm_memory": {},
         "cold_memory": [],
+        "rag_retrieved_ids": [],
         "intent": None,
         "intent_confidence": 0.0,
         "entities": {},

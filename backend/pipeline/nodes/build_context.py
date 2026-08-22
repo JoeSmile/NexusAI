@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import json
+
+from backend.core.audit import write_audit_sync
 from backend.core.guardrails.output_guard import check_role_drift
+from backend.core.guardrails.rag_sanitize import sanitize_memory_bundle
 from backend.core.memory_service import (
     MEMORY_ISOLATION_HEADER,
     MemoryBundle,
@@ -21,6 +25,8 @@ async def build_context(state: PipelineState) -> PipelineState:
         warm=dict(state.get("warm_memory") or {}),
         cold=list(state.get("cold_memory") or []),
     )
+    bundle, sanitize_report = sanitize_memory_bundle(bundle)
+    state["rag_retrieved_ids"] = list(sanitize_report.retrieved_ids)
     memory_block = mem.assemble_prompt_block(
         bundle,
         query=str(state.get("message") or ""),
@@ -36,6 +42,25 @@ async def build_context(state: PipelineState) -> PipelineState:
     parts = [memory_block] if memory_block else []
     parts.append(f"user: {state['message']}")
     state["assembled_prompt"] = "\n\n".join(parts)
+    if sanitize_report.retrieved_ids or sanitize_report.flags:
+        write_audit_sync(
+            {
+                "tenant_id": state["tenant_id"],
+                "user_id": state["user_id"],
+                "action": "memory.rag_sanitize",
+                "trace_id": str(state.get("trace_id") or ""),
+                "input_text": str(state.get("message") or "")[:200],
+                "output_text": json.dumps(
+                    {
+                        "rag_retrieved_ids": sanitize_report.retrieved_ids,
+                        "flags": sanitize_report.flag_summary(),
+                        "redacted_fragments": sanitize_report.redacted_fragments,
+                    },
+                    ensure_ascii=False,
+                )[:4000],
+                "model": "memory",
+            }
+        )
     enrich_span(
         input_data={"message": state.get("message")},
         output_data={"assembled_prompt_len": len(state["assembled_prompt"] or "")},
@@ -44,6 +69,8 @@ async def build_context(state: PipelineState) -> PipelineState:
             "cold_count": len(bundle.cold),
             "hot_count": len(bundle.hot),
             "memory_drift_blocked": drift_blocked,
+            "rag_retrieved_ids": sanitize_report.retrieved_ids,
+            "rag_sanitize_flags": sanitize_report.flag_summary(),
         },
     )
     return state
