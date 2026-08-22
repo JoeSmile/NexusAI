@@ -61,6 +61,7 @@ class ErrorCode(StrEnum):
     CAP_UPSTREAM_ERROR = "CAP_003"
     CAP_GOVERNANCE_REQUIRED = "CAP_004"
     CAP_QUOTA_EXCEEDED = "CAP_005"
+    CAP_CONTRACT_INVALID = "CAP_006"
 
     # ── 请求校验 (REQ_0xx) ──
     REQ_INVALID = "REQ_001"
@@ -211,6 +212,7 @@ def _code_to_status(code: str) -> int:
             "CAP_003": 502,
             "CAP_004": 403,
             "CAP_005": 429,
+            "CAP_006": 422,
         }.get(code, 400)
     if code.startswith("REQ_"):
         return 400

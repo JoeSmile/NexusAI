@@ -80,6 +80,21 @@ describe('SSE parse frames', () => {
       }),
     )
   })
+
+  it('handles plan and step execution events', () => {
+    const onPlan = vi.fn()
+    const onStep = vi.fn()
+    const parser = createEventParser({ onPlan, onStep })
+    parser.feed(
+      'data: {"type":"plan","goal":"demo","steps":[{"id":"s1","capability_id":"cap.a"}]}\n\n',
+    )
+    parser.feed(
+      'data: {"type":"step","id":"s1","capability_id":"cap.a","status":"running"}\n\n',
+    )
+    expect(onPlan).toHaveBeenCalled()
+    expect(onStep).toHaveBeenCalled()
+    expect(parser.stopped()).toBe(false)
+  })
 })
 
 describe('useSSEStream dual format', () => {

@@ -20,6 +20,7 @@ import {
 } from '@/api/chat'
 import { formatApiError } from '@/api/http'
 import { ContextPanel } from '@/components/agent/ContextPanel'
+import { ExecutionPanel } from '@/components/agent/ExecutionPanel'
 import { BookmarksDrawer } from '@/components/agent/BookmarksDrawer'
 import { DislikeReasonDialog } from '@/components/agent/DislikeReasonDialog'
 import { HistoryDrawer } from '@/components/agent/HistoryDrawer'
@@ -44,6 +45,7 @@ export default function HomeChatPage() {
     messages,
     streaming,
     hasMore,
+    execution,
     send,
     abort,
     appendLocal,
@@ -674,6 +676,7 @@ export default function HomeChatPage() {
             >
               {/* PullToRefresh requires a single child (Children.only) */}
               <div className="chat-messages-inner">
+                <ExecutionPanel execution={execution} />
                 {messages.map((msg) => (
                   <Message
                     key={msg.id}

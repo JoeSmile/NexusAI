@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from backend.core.capability.contract import ToolContract
 
 
 class CapabilityKind(StrEnum):
@@ -46,6 +49,8 @@ class CapabilitySpec:
     tenant_id: str = "*"
     # Wave C0: { param_name: {type, required, description?, default?, enum_values?} }
     param_spec: dict[str, Any] | None = None
+    # Task 56: 运行时缓存的 ToolContract（从 spec["tool_contract"] 解析）
+    contract: ToolContract | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.kind, str):

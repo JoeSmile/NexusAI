@@ -3,6 +3,11 @@
  */
 import { useCallback, useState } from 'react'
 
+import {
+  applyExecutionEvent,
+  executionFromSnapshot,
+  type ExecutionState,
+} from '@/hooks/sseParse'
 import { useSSEStream } from '@/hooks/useSSEStream'
 
 export type ChatRole = 'user' | 'assistant' | 'system'
@@ -29,6 +34,7 @@ export function useChatStream(endpoint = '/chat/streaming') {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [streaming, setStreaming] = useState(false)
   const [hasMore, setHasMore] = useState(false)
+  const [execution, setExecution] = useState<ExecutionState | null>(null)
 
   const abort = useCallback(() => {
     abortFetch()
@@ -73,7 +79,12 @@ export function useChatStream(endpoint = '/chat/streaming') {
         userMsg,
         { id: asstId, role: 'assistant', content: '', status: 'streaming' },
       ])
+      setExecution(null)
       setStreaming(true)
+
+      const mergeExecution = (event: Record<string, unknown>) => {
+        setExecution((prev) => applyExecutionEvent(prev, event))
+      }
 
       const patch = (fn: (c: string) => string, status?: ChatMessage['status']) => {
         setMessages((msgs) =>
@@ -98,6 +109,10 @@ export function useChatStream(endpoint = '/chat/streaming') {
         },
         {
           onToken: (t) => patch((c) => c + t),
+          onPlan: (p) => mergeExecution({ ...p, type: 'plan' }),
+          onStep: (p) => mergeExecution({ ...p, type: 'step' }),
+          onRetry: () => undefined,
+          onReplan: (p) => mergeExecution({ ...p, type: 'replan' }),
           onAbort: () => {
             patch((c) => c, 'aborted')
             setStreaming(false)
@@ -122,7 +137,12 @@ export function useChatStream(endpoint = '/chat/streaming') {
             )
             setStreaming(false)
           },
-          onDone: () => {
+          onDone: (meta) => {
+            const snap = executionFromSnapshot(
+              meta?.execution_snapshot as Record<string, unknown> | undefined,
+              meta?.trace_id ? String(meta.trace_id) : undefined,
+            )
+            if (snap) setExecution(snap)
             patch((c) => c, 'done')
             setStreaming(false)
           },
@@ -138,6 +158,7 @@ export function useChatStream(endpoint = '/chat/streaming') {
     setMessages([])
     setStreaming(false)
     setHasMore(false)
+    setExecution(null)
   }, [abort])
 
   const appendLocal = useCallback(
@@ -163,6 +184,7 @@ export function useChatStream(endpoint = '/chat/streaming') {
     messages,
     streaming,
     hasMore,
+    execution,
     send,
     abort,
     reset,

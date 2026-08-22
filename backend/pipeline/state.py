@@ -88,6 +88,10 @@ class PipelineState(TypedDict):
 
     # ── Task 43 task_plan / skill ──
     task_plan: dict | None
+    query_rewrite: dict | None
+    step_results: dict | None
+    orchestrator_replan_count: int
+    orchestrator_spawn_total: int
     short_path_skill: dict | None  # {id, name} — Chat skills registry
     skill_asset_hit: dict | None  # skill_assets CoT template hit
     triggered_run: dict | None  # 40.86 {run_id, workflow_id, ...}
@@ -165,6 +169,10 @@ def make_initial_state(
         "ab_variant": None,
         "ab_variant_config": {},
         "task_plan": None,
+        "query_rewrite": None,
+        "step_results": None,
+        "orchestrator_replan_count": 0,
+        "orchestrator_spawn_total": 0,
         "short_path_skill": None,
         "skill_asset_hit": None,
         "triggered_run": None,

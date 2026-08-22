@@ -12,6 +12,7 @@ from backend.pipeline.intent_path import (
     should_task_plan,
     skill_to_state,
 )
+from backend.core.plan.validator import PlanValidationError
 from backend.pipeline.nodes.task_plan import (
     audit_task_plan_on_success,
     plan_for_audit,
@@ -181,6 +182,51 @@ async def test_task_plan_produces_plan_on_long_path(monkeypatch):
     out = await task_plan(state)
     assert out["task_plan"] is not None
     assert out["task_plan"]["steps"][0]["capability_id"] == "cap.a"
+    assert out["task_plan"]["steps"][0]["id"] == "s1"
+    assert out.get("query_rewrite") is not None
+
+
+@pytest.mark.asyncio
+async def test_task_plan_runs_on_stream_when_forced(monkeypatch):
+    plan = {
+        "steps": [{"capability_id": "cap.a", "params": {}, "decision": None}],
+    }
+    called = {"n": 0}
+
+    async def fake_gen(*a, **k):
+        called["n"] += 1
+        return SimpleNamespace(
+            success=True,
+            output=__import__("json").dumps(plan),
+            error=None,
+            metadata={},
+            latency_ms=1.0,
+        )
+
+    monkeypatch.setenv("FORCE_TASK_PLAN_ON_STREAM", "1")
+    monkeypatch.setattr(
+        "backend.pipeline.nodes.task_plan.harness.generate", fake_gen
+    )
+    monkeypatch.setattr(
+        "backend.pipeline.nodes.task_plan._list_visible_capabilities",
+        lambda state: [
+            {"id": "cap.a", "name": "A", "permission": "chat:write", "param_spec": {}}
+        ],
+    )
+    monkeypatch.setattr(
+        "backend.pipeline.nodes.task_plan._tenant_has_bridge_targets",
+        lambda tid: True,
+    )
+    monkeypatch.setattr(
+        "backend.pipeline.intent_path.registry.get_skill_for_intent",
+        lambda *a, **k: None,
+    )
+    state = make_initial_state("t", "u", "s", "stream plan")
+    state["stream_mode"] = True
+    state["intent_confidence"] = 0.2
+    out = await task_plan(state)
+    assert called["n"] >= 1
+    assert out["task_plan"] is not None
 
 
 @pytest.mark.asyncio
@@ -217,7 +263,7 @@ async def test_task_plan_degrades_on_bad_json(monkeypatch):
 
 
 def test_validate_task_plan_rejects_forbidden_keys():
-    with pytest.raises(ValueError, match="forbidden"):
+    with pytest.raises(PlanValidationError, match="forbidden"):
         validate_task_plan(
             {
                 "steps": [
@@ -226,7 +272,8 @@ def test_validate_task_plan_rejects_forbidden_keys():
                         "params": {"api_key": "x"},
                     }
                 ]
-            }
+            },
+            caps_by_id={"c1": {"param_spec": {}}},
         )
 
 

@@ -91,6 +91,36 @@ def flush_langfuse() -> None:
         pass
 
 
+def current_langfuse_trace_ids() -> dict[str, str | None]:
+    """当前 LangFuse trace/observation id — 供 audit 血缘互查。"""
+    try:
+        from backend.observability.decorators import langfuse_context
+
+        return {
+            "langfuse_trace_id": langfuse_context.get_current_trace_id(),
+            "langfuse_observation_id": langfuse_context.get_current_observation_id(),
+        }
+    except Exception:
+        return {"langfuse_trace_id": None, "langfuse_observation_id": None}
+
+
+def audit_span_metadata(
+    *,
+    trace_id: str | None = None,
+    tool_use_id: str | None = None,
+    run_id: str | None = None,
+) -> dict[str, str]:
+    """写入 LangFuse span metadata，与 audit_logs 字段对齐。"""
+    meta: dict[str, str] = {}
+    if trace_id:
+        meta["audit_trace_id"] = trace_id
+    if tool_use_id:
+        meta["tool_use_id"] = tool_use_id
+    if run_id:
+        meta["run_id"] = run_id
+    return meta
+
+
 def discard_langfuse_buffer() -> None:
     """丢弃未 flush 的缓冲（短路径未命中采样时用）。"""
     global _lf, _init_attempted

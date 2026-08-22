@@ -14,6 +14,36 @@ from sqlalchemy import text
 
 from backend.database.pgvector_session import get_pg_session
 
+
+def _tool_contract(
+    cap_id: str,
+    *,
+    description: str,
+    input_schema: dict,
+    output_schema: dict,
+    examples: list[dict],
+    idempotency_key_args: list[str] | None = None,
+    retryable: bool = True,
+    idempotent: bool = False,
+) -> dict:
+    """Task 56 ToolContract 片段（写入 spec.tool_contract）。"""
+    return {
+        "name": cap_id,
+        "version": "v1",
+        "description": description,
+        "input_schema": input_schema,
+        "output_schema": output_schema,
+        "failure_semantics": {
+            "retryable": retryable,
+            "idempotent": idempotent,
+            "requires_compensation": False,
+            "failure_codes": ["CAP_003", "CAP_005"],
+        },
+        "idempotency_key_args": list(idempotency_key_args or []),
+        "examples": examples,
+    }
+
+
 # 叶子 + 嵌套 Agent（vendor-risk → contract-query → rag-ask）
 # leaf=true：仅 LEAF_STUB_MODE=true 时降级 stub；默认经 executor 走真实 invoke（Task 30b）
 SEED_CAPS: list[dict] = [
@@ -110,6 +140,35 @@ SEED_CAPS: list[dict] = [
             "leaf": True,
             "executor": "content_ops",
             "op": "hotspot.dig",
+            "tool_contract": _tool_contract(
+                "hotspot.dig",
+                description="挖掘相关热点列表，供口播与选题使用",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "adapter": {"type": "string"},
+                        "categories": {"type": "array"},
+                        "keywords": {"type": "string"},
+                        "paste_text": {"type": "string"},
+                    },
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "items": {"type": "array"},
+                        "adapter": {"type": "string"},
+                    },
+                    "required": ["items"],
+                },
+                examples=[
+                    {
+                        "input": {"adapter": "topic_agent", "keywords": "AI"},
+                        "output": {"items": [{"title": "示例热点"}], "adapter": "topic_agent"},
+                    }
+                ],
+                idempotency_key_args=["adapter", "keywords"],
+                idempotent=True,
+            ),
         },
         "param_spec": {
             "adapter": {
@@ -136,6 +195,34 @@ SEED_CAPS: list[dict] = [
             "leaf": True,
             "executor": "content_ops",
             "op": "script.gen",
+            "tool_contract": _tool_contract(
+                "script.gen",
+                description="按主讲风格生成口播稿，可引用热点输入",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "creator_id": {"type": "string"},
+                        "hotspots": {"type": "array"},
+                        "duration_sec": {"type": "number"},
+                        "platform": {"type": "string"},
+                    },
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "script": {"type": "string"},
+                        "creator_id": {"type": "string"},
+                    },
+                    "required": ["script"],
+                },
+                examples=[
+                    {
+                        "input": {"creator_id": "default", "duration_sec": 60},
+                        "output": {"script": "大家好……", "creator_id": "default"},
+                    }
+                ],
+                idempotency_key_args=["creator_id", "duration_sec"],
+            ),
         },
         "param_spec": {
             "creator_id": {"type": "string", "required": False, "default": "default"},
@@ -157,6 +244,35 @@ SEED_CAPS: list[dict] = [
             "leaf": True,
             "executor": "content_ops",
             "op": "style.extract",
+            "tool_contract": _tool_contract(
+                "style.extract",
+                description="从口播逐字稿提取主讲风格画像并可选落库",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "creator_id": {"type": "string"},
+                        "text": {"type": "string"},
+                        "save": {"type": "boolean"},
+                    },
+                    "required": ["text"],
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "style": {"type": "object"},
+                        "creator_id": {"type": "string"},
+                    },
+                    "required": ["style"],
+                },
+                examples=[
+                    {
+                        "input": {"text": "大家好我是……", "creator_id": "default"},
+                        "output": {"style": {"tone": "亲和"}, "creator_id": "default"},
+                    }
+                ],
+                idempotency_key_args=["creator_id"],
+                idempotent=True,
+            ),
         },
         "param_spec": {
             "creator_id": {"type": "string", "required": False, "default": "default"},

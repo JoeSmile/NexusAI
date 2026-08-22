@@ -275,6 +275,13 @@ def create_app() -> FastAPI:
         required=True,
         label="Chat 历史",
     )
+    _lazy_include(
+        app,
+        "backend.routers.plan_snapshot",
+        "router",
+        required=True,
+        label="Chat 执行快照",
+    )
     _lazy_include(app, "backend.routers", "memory_router", required=True)
     _lazy_include(app, "backend.routers", "feedback_router", required=True)
     _lazy_include(app, "backend.routers", "evaluation_router", required=True)

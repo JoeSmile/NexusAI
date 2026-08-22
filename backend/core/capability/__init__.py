@@ -1,6 +1,7 @@
 """Capability 层 — 统一能力模型与错误码（Task 30）。"""
 
 from backend.core.capability.errors import (
+    CapabilityContractError,
     CapabilityDisabledError,
     CapabilityGovernanceRequiredError,
     CapabilityNotFoundError,
@@ -30,6 +31,7 @@ from backend.core.capability.registry import (
 )
 
 __all__ = [
+    "CapabilityContractError",
     "CapabilityDisabledError",
     "CapabilityGovernanceRequiredError",
     "CapabilityKind",

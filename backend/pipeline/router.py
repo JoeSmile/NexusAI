@@ -13,10 +13,12 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from backend.core.audit import log_audit
+from backend.core.audit_context import bind_audit_lineage
 from backend.core.auth.models import TenantContext
 from backend.core.auth.permissions import require_permission
 from backend.core.errors import ErrorCode, NexusAIException
 from backend.core.guardrails.output_guard import DRIFT_PATTERNS, VIOLATION_PATTERNS
+from backend.core.plan.event_bus import event_to_sse_payload, get_run_bus_optional
 from backend.observability.decorators import observe
 from backend.pipeline.graph import compiled_graph
 from backend.pipeline.state import make_initial_state
@@ -118,6 +120,7 @@ async def _run_chat_pipeline(
         llm_temperature=body.temperature,
         llm_max_tokens=body.max_tokens,
     )
+    bind_audit_lineage(trace_id=initial["trace_id"])
     _inject_langfuse_parent(initial)
 
     try:
@@ -231,6 +234,35 @@ def _sse_data(payload: dict) -> str:
     return "data: " + json.dumps(payload, ensure_ascii=False) + "\n\n"
 
 
+def _execution_snapshot(trace_id: str | None) -> dict | None:
+    bus = get_run_bus_optional(trace_id)
+    if bus is None:
+        return None
+    return bus.snapshot_dict()
+
+
+def _sse_buffered_execution_events(trace_id: str | None) -> list[str]:
+    bus = get_run_bus_optional(trace_id)
+    if bus is None:
+        return []
+    return [
+        _sse_data(event_to_sse_payload(ev))
+        for ev in bus.events_all()
+    ]
+
+
+def _chat_json_payload(final: dict) -> dict:
+    payload: dict = {
+        "response": final.get("response", ""),
+        "trace_id": final.get("trace_id"),
+        "finish_reason": final.get("finish_reason"),
+    }
+    snap = _execution_snapshot(final.get("trace_id"))
+    if snap is not None:
+        payload["execution_snapshot"] = snap
+    return payload
+
+
 @router.post("/chat/streaming")
 async def chat_streaming(
     request: Request,
@@ -269,6 +301,7 @@ async def chat_streaming(
         llm_max_tokens=body.max_tokens,
     )
     initial["stream_mode"] = True
+    bind_audit_lineage(trace_id=initial["trace_id"])
     _inject_langfuse_parent(initial)
 
     try:
@@ -302,7 +335,7 @@ async def chat_streaming(
             },
         )
     if final.get("finish_reason") != "routed_to_llm":
-        return JSONResponse({"response": final.get("response", "")})
+        return JSONResponse(_chat_json_payload(final))
 
     from backend.core.harness import LLMHarness
     from backend.pipeline.nodes.conversion_hook import conversion_hook
@@ -317,6 +350,8 @@ async def chat_streaming(
     )
 
     async def event_stream() -> AsyncIterator[str]:
+        for line in _sse_buffered_execution_events(final.get("trace_id")):
+            yield line
         buffer = ""
         token_iter = harness.stream(
             model=model,

@@ -20,6 +20,11 @@ from backend.pipeline.nodes.guardrails_output import guardrails_output
 from backend.pipeline.nodes.llm_generate import llm_generate
 from backend.pipeline.nodes.load_memory import load_memory
 from backend.pipeline.nodes.model_router import model_router, route_short_or_long
+from backend.pipeline.nodes.orchestrator import (
+    orchestrator,
+    route_after_orchestrator,
+    should_run_orchestrator,
+)
 from backend.pipeline.nodes.preprocess import preprocess, should_gate_block
 from backend.pipeline.nodes.rate_limiter import rate_limiter
 from backend.pipeline.nodes.task_plan import task_plan
@@ -80,6 +85,7 @@ def build_pipeline():
     builder.add_node("task_planning", _lf_node("task_planning", task_plan))
     builder.add_node("build_context", _lf_node("build_context", build_context))
     builder.add_node("experiment_hook", _lf_node("experiment_hook", experiment_hook))
+    builder.add_node("orchestrator", _lf_node("orchestrator", orchestrator))
     builder.add_node("model_router", _lf_node("model_router", model_router))
     builder.add_node("llm_generate", _lf_node("llm_generate", llm_generate))
     builder.add_node("guardrails_output", _lf_node("guardrails_output", guardrails_output))
@@ -120,7 +126,27 @@ def build_pipeline():
     builder.add_edge("analyze_parallel", "task_planning")
     builder.add_edge("task_planning", "build_context")
     builder.add_edge("build_context", "experiment_hook")
-    builder.add_edge("experiment_hook", "model_router")
+
+    def _route_after_experiment(state: PipelineState) -> str:
+        return "orchestrator" if should_run_orchestrator(state) else "model_router"
+
+    builder.add_conditional_edges(
+        "experiment_hook",
+        _route_after_experiment,
+        {
+            "orchestrator": "orchestrator",
+            "model_router": "model_router",
+        },
+    )
+
+    builder.add_conditional_edges(
+        "orchestrator",
+        route_after_orchestrator,
+        {
+            "model_router": "model_router",
+            "conversion_hook": "conversion_hook",
+        },
+    )
 
     builder.add_conditional_edges(
         "model_router",

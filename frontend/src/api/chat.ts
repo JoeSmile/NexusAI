@@ -5,6 +5,7 @@ export type ChatJsonResponse = {
   response: string
   trace_id?: string
   finish_reason?: string
+  execution_snapshot?: Record<string, unknown>
   total_tokens?: number
   total_cost?: number
   pipeline_latency_ms?: number
@@ -55,6 +56,16 @@ export type ChatTimelineResponse = {
 
 export type ChatSearchResponse = {
   items: ChatHistoryItem[]
+}
+
+/** GET /api/chat/run/{trace_id}/snapshot — Task 56 执行图快照 */
+export async function fetchRunSnapshot(traceId: string): Promise<{
+  trace_id: string
+  snapshot: Record<string, unknown>
+  events: Record<string, unknown>[]
+  latest_seq: number
+}> {
+  return apiGet(`/api/chat/run/${encodeURIComponent(traceId)}/snapshot`)
 }
 
 /** GET /api/chat/history — 47b slice0 + 游标分页 */

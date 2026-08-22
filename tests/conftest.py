@@ -36,3 +36,32 @@ def _quiet_langfuse_unless_requested():
             os.environ.pop(k, None)
         else:
             os.environ[k] = v
+
+
+@pytest.fixture(autouse=True)
+def _autofill_tool_contracts(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+):
+    """存量单测未带 ToolContract 时自动补 stub；``test_tool_contract`` 测硬闸时跳过。"""
+    if "test_tool_contract" in request.node.nodeid:
+        yield
+        return
+
+    from backend.core.capability.contract import (
+        contract_required_for,
+        stub_contract_dict,
+    )
+    from backend.core.capability.registry import CapabilityRegistry
+
+    original = CapabilityRegistry.register
+
+    def _register(self: CapabilityRegistry, spec):  # type: ignore[no-untyped-def]
+        if contract_required_for(spec.kind):
+            nested = dict(spec.spec or {})
+            if "tool_contract" not in nested:
+                nested["tool_contract"] = stub_contract_dict(spec.id)
+                spec.spec = nested
+        return original(self, spec)
+
+    monkeypatch.setattr(CapabilityRegistry, "register", _register)
+    yield

@@ -58,3 +58,14 @@ class CapabilityQuotaExceededError(NexusAIException):
         detail: str | None = None,
     ) -> None:
         super().__init__(ErrorCode.CAP_QUOTA_EXCEEDED.value, message, detail)
+
+
+class CapabilityContractError(NexusAIException):
+    """CAP_006 — ToolContract 缺失或非法（注册硬闸）。"""
+
+    def __init__(
+        self,
+        message: str = "tool_contract_invalid",
+        detail: str | None = None,
+    ) -> None:
+        super().__init__(ErrorCode.CAP_CONTRACT_INVALID.value, message, detail)

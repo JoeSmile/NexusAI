@@ -175,15 +175,18 @@ async def usage_summary(
 
 
 @router.get("/export")
-async def export_audit_csv(
+async def export_audit(
     tenant_id: str | None = Query(None),
     start: str | None = Query(None),
     end: str | None = Query(None),
     action: str | None = Query(None, description="按操作筛选"),
+    format: str = Query("csv", description="csv | ndjson"),
     tenant: TenantContext = Depends(verify_human_or_legacy_key),
 ):
-    """导出审计日志为 CSV（经 OrgScope 收窄；普通 member 不可导出）"""
+    """导出审计日志：默认 CSV；format=ndjson 为回放事件流（Task 56）。"""
     from fastapi import HTTPException
+
+    from backend.core.audit import ndjson_lines_from_rows
 
     if not _can_export_audit(tenant):
         raise HTTPException(
@@ -216,16 +219,36 @@ async def export_audit_csv(
             params.update(extra)
         sql = text(f"""
             SELECT id, tenant_id, user_id, action, trace_id,
+                   parent_trace_id, tool_use_id, decision_explain,
                    input_text, output_text, model,
                    input_tokens, output_tokens, cost, latency_ms,
                    error_code, ip_address, user_agent, created_at
             FROM audit_logs
             WHERE {' AND '.join(conditions)}
-            ORDER BY created_at DESC
+            ORDER BY created_at ASC
             LIMIT 10000
         """)
         rows = session.execute(sql, params).fetchall()
 
+    fmt = (format or "csv").strip().lower()
+    if fmt == "ndjson":
+        body = "".join(ndjson_lines_from_rows(rows))
+        filename_tid = tid or "all"
+        return StreamingResponse(
+            iter([body]),
+            media_type="application/x-ndjson",
+            headers={
+                "Content-Disposition": (
+                    f"attachment; filename=audit_{filename_tid}_"
+                    f"{datetime.now().strftime('%Y%m%d')}.ndjson"
+                )
+            },
+        )
+
+    return _export_audit_csv(rows, tid)
+
+
+def _export_audit_csv(rows, tid: str | None) -> StreamingResponse:
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow([
@@ -234,6 +257,8 @@ async def export_audit_csv(
         "user_id",
         "action",
         "trace_id",
+        "parent_trace_id",
+        "tool_use_id",
         "input_text",
         "output_text",
         "model",
@@ -253,6 +278,8 @@ async def export_audit_csv(
             r.user_id,
             r.action,
             r.trace_id,
+            getattr(r, "parent_trace_id", None),
+            getattr(r, "tool_use_id", None),
             (r.input_text or "")[:500],
             (r.output_text or "")[:500],
             r.model,

@@ -116,6 +116,9 @@ class AuditLog(Base):
     key_id = Column(String(100), nullable=True)
     run_id = Column(String(100), nullable=True)
     node_id = Column(String(100), nullable=True)
+    parent_trace_id = Column(String(100), nullable=True)
+    tool_use_id = Column(String(100), nullable=True)
+    decision_explain = Column(Text, nullable=True)
     __table_args__ = (
         Index("idx_audit_tenant_time", "tenant_id", "created_at"),
     )

@@ -296,19 +296,43 @@ async def invoke(
 ) -> AsyncIterator[dict[str, Any]]:
     """按 capability id 分发调用，产出事件字典（非 SSE 文本）。"""
     from backend.core.capability.governance import (
-        check_cap_quota,
-        check_cap_rate_limit,
         guard_output_text,
         prepare_payload_with_guards,
         record_cap_quota_usage,
     )
+    from backend.core.capability.governance_chain import run_governance_chain
 
     registry = get_capability_registry()
     spec = registry.get(cap_id)  # CAP_001 / CAP_002
 
-    _check_permission(spec, tenant)
-    check_cap_rate_limit(tenant.tenant_id)
-    check_cap_quota(tenant.tenant_id)
+    # Task 56: 叙事治理链（policy→budget→approval→IAM→audit explain）
+    explain = run_governance_chain(
+        spec,
+        tenant,
+        payload if isinstance(payload, dict) else {},
+        check_permission=_check_permission,
+    )
+    from backend.core.audit import write_governance_audit
+    from backend.core.audit_context import bind_audit_lineage, get_audit_lineage
+    from backend.observability.langfuse_client import current_langfuse_trace_ids
+
+    lineage = get_audit_lineage()
+    tool_use_id = lineage.tool_use_id or (
+        f"{cap_id}:{explain.idempotency_key or 'invoke'}"
+    )
+    bind_audit_lineage(
+        trace_id=lineage.trace_id or tool_use_id,
+        parent_trace_id=lineage.parent_trace_id or lineage.trace_id,
+        tool_use_id=tool_use_id,
+    )
+    write_governance_audit(
+        tenant_id=tenant.tenant_id,
+        user_id=tenant.user_id,
+        capability_id=cap_id,
+        explain=explain.to_dict(),
+        lineage=get_audit_lineage(),
+        langfuse_ids=current_langfuse_trace_ids(),
+    )
 
     safe_payload = await prepare_payload_with_guards(payload)
     collected: list[str] = []

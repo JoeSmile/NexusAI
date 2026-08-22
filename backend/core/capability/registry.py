@@ -73,9 +73,21 @@ class CapabilityRegistry:
 
     def register(self, spec: CapabilitySpec) -> None:
         from backend.core.capability.agents import validate_agent_spec
+        from backend.core.capability.contract import (
+            ToolContractError,
+            validate_capability_contract,
+        )
+        from backend.core.capability.errors import CapabilityContractError
         from backend.core.capability.governance import validate_governance_declaration
 
         validate_governance_declaration(spec)
+        try:
+            validate_capability_contract(spec)
+        except ToolContractError as exc:
+            raise CapabilityContractError(
+                message="tool_contract_invalid",
+                detail=str(exc),
+            ) from exc
         validate_agent_spec(spec)
         self._by_id[spec.id] = spec
 

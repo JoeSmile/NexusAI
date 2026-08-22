@@ -9,18 +9,23 @@ import re
 from typing import Any
 
 from backend.core.audit import write_audit_sync
+from backend.core.audit_context import get_audit_lineage
 from backend.core.auth.models import TenantContext
 from backend.core.capability.invoke import capability_visible_to
 from backend.core.capability.registry import get_capability_registry
 from backend.core.guardrails.output_guard import check_output
 from backend.core.harness import LLMHarness
-from backend.core.workflow.ir import _FORBIDDEN_PARAM_KEYS, validate_params_against_spec
+from backend.core.plan.event_bus import bus_for_state
+from backend.core.plan.models import plan_to_state_dict
+from backend.core.plan.tool_index import search_capabilities
+from backend.core.plan.validator import validate_plan_ir
 from backend.observability.decorators import enrich_span, observe
 from backend.pipeline.intent_path import (
     resolve_short_path_skill,
     should_task_plan,
     skill_to_state,
 )
+from backend.pipeline.nodes.query_rewrite import attach_query_rewrite_to_plan
 from backend.pipeline.state import PipelineState
 
 logger = logging.getLogger(__name__)
@@ -66,36 +71,30 @@ def _list_visible_capabilities(state: PipelineState) -> list[dict[str, Any]]:
                 "kind": str(getattr(spec, "kind", "") or ""),
                 "permission": getattr(spec, "permission", None),
                 "param_spec": getattr(spec, "param_spec", None) or {},
+                "description": str((spec.spec or {}).get("description") or spec.name),
             }
         )
     return items
+
+
+def _force_task_plan_on_stream() -> bool:
+    return os.getenv("FORCE_TASK_PLAN_ON_STREAM", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
 
 
 def validate_task_plan(
     plan: dict[str, Any],
     *,
     caps_by_id: dict[str, dict[str, Any]] | None = None,
+    fallback_goal: str = "",
 ) -> None:
-    """轻量校验：禁完整 WorkflowIR.model_validate；复用 forbidden + param_spec。"""
-    steps = plan.get("steps")
-    if not isinstance(steps, list) or not steps:
-        raise ValueError("task_plan.steps must be a non-empty list")
-    caps_by_id = caps_by_id or {}
-    for i, step in enumerate(steps):
-        if not isinstance(step, dict):
-            raise ValueError(f"step[{i}] must be object")
-        cap_id = step.get("capability_id")
-        if not isinstance(cap_id, str) or not cap_id.strip():
-            raise ValueError(f"step[{i}] missing capability_id")
-        params = step.get("params") or {}
-        if not isinstance(params, dict):
-            raise ValueError(f"step[{i}] params must be object")
-        bad = set(params) & _FORBIDDEN_PARAM_KEYS
-        if bad:
-            raise ValueError(f"step[{i}] forbidden keys: {sorted(bad)}")
-        meta = caps_by_id.get(cap_id)
-        if meta is not None:
-            validate_params_against_spec(params, meta.get("param_spec") or {})
+    """PlanIR 硬校验（Task 56）；caps_by_id 必填（白名单）。"""
+    if not caps_by_id:
+        raise ValueError("caps_by_id required for plan validation")
+    validate_plan_ir(plan, caps_by_id=caps_by_id, fallback_goal=fallback_goal)
 
 
 def _parse_plan_json(text: str) -> dict[str, Any]:
@@ -121,7 +120,7 @@ def _build_messages(
     skill_asset_hit: dict[str, Any] | None,
 ) -> list[dict[str, str]]:
     cap_lines = []
-    for c in caps[:40]:
+    for c in caps:
         cap_lines.append(
             f"- {c['id']}: {c.get('name') or c['id']} perm={c.get('permission') or ''}"
         )
@@ -131,9 +130,13 @@ def _build_messages(
 
     system = (
         "You are a task planner for NexusAI Chat. "
-        "Produce a JSON object only (no markdown) with shape:\n"
-        '{"steps":[{"capability_id":"...","params":{},"decision":null}]}\n'
-        "Use only capability ids from the catalog. Fail soft with empty params if unsure. "
+        "Produce a JSON object only (no markdown) with PlanIR shape:\n"
+        '{"query_rewrite":{"rewritten_query":"...","sub_queries":[],"language":"zh",'
+        '"clarification_needed":false},"goal":"...","version":1,"max_depth":3,'
+        '"steps":[{"id":"s1","capability_id":"...","params":{},"depends_on":[],'
+        '"mode":"serial","on_fail":"fail","post_process":[]}]}'
+        "\nUse ONLY capability ids from the catalog (whitelist). "
+        "depends_on must reference prior step ids; no cycles. "
         "Do not include secrets, api keys, code, or headers in params."
     )
     if template:
@@ -158,12 +161,17 @@ def plan_for_audit(plan: dict[str, Any]) -> dict[str, Any]:
             continue
         steps_out.append(
             {
+                "id": step.get("id"),
                 "capability_id": step.get("capability_id"),
+                "depends_on": list(step.get("depends_on") or []),
                 "params": {},
                 "decision": step.get("decision"),
             }
         )
-    return {"steps": steps_out[:40]}
+    out: dict[str, Any] = {"steps": steps_out[:40]}
+    if plan.get("goal"):
+        out["goal"] = str(plan.get("goal"))[:500]
+    return out
 
 
 def audit_task_plan_on_success(state: PipelineState) -> None:
@@ -181,14 +189,22 @@ def audit_task_plan_on_success(state: PipelineState) -> None:
             "trace_id": state.get("trace_id"),
             "plan": plan_for_audit(plan),
         }
+        lineage = get_audit_lineage()
+        plan_audit = plan_for_audit(plan)
         write_audit_sync(
             {
                 "tenant_id": state["tenant_id"],
                 "user_id": state["user_id"],
                 "action": "chat.task_plan",
                 "trace_id": state.get("trace_id") or "",
+                "parent_trace_id": lineage.parent_trace_id,
+                "tool_use_id": lineage.tool_use_id or f"task_plan:{state.get('trace_id')}",
                 "input_text": "",
                 "output_text": json.dumps(blob, ensure_ascii=False)[:2000],
+                "decision_explain": json.dumps(
+                    {"plan": plan_audit, "query_rewrite": state.get("query_rewrite")},
+                    ensure_ascii=False,
+                )[:4000],
                 "model": state.get("selected_model") or "",
                 "input_tokens": 0,
                 "output_tokens": 0,
@@ -273,7 +289,8 @@ async def task_plan(state: PipelineState) -> PipelineState:
 
         # A(08-16 性能修复): 流式路径跳过规划——plan 无消费方(bridge/审计均为旁路),
         # 规划 LLM 是首 token 延迟主因(长路径每条消息白烧一次 5-10s)。
-        if state.get("stream_mode"):
+        # Task 56: stream 默认仍跳过；面试演示开 FORCE_TASK_PLAN_ON_STREAM=1
+        if state.get("stream_mode") and not _force_task_plan_on_stream():
             enrich_span(metadata={"task_plan": "skipped_streaming"})
             return state
 
@@ -325,11 +342,12 @@ async def task_plan(state: PipelineState) -> PipelineState:
         message = state.get("raw_input") or state.get("message") or ""
         intent = state.get("intent", "default") or "default"
         confidence = float(state.get("intent_confidence", 0.0) or 0.0)
+        ranked_caps = search_capabilities(caps, message, top_k=10)
         messages = _build_messages(
             message=message,
             intent=intent,
             confidence=confidence,
-            caps=caps,
+            caps=ranked_caps,
             skill_asset_hit=state.get("skill_asset_hit"),
         )
 
@@ -359,15 +377,30 @@ async def task_plan(state: PipelineState) -> PipelineState:
                     last_err = result.error or "llm_failed"
                     continue
                 parsed = _parse_plan_json(str(result.output or ""))
-                validate_task_plan(parsed, caps_by_id=caps_by_id)
+                enriched = attach_query_rewrite_to_plan(
+                    parsed, original_message=message
+                )
+                plan_ir = validate_plan_ir(
+                    enriched,
+                    caps_by_id=caps_by_id,
+                    fallback_goal=message,
+                )
+                plan_dict = plan_to_state_dict(plan_ir)
                 # CR 2A: plan 过 output_guardrails；blocked → 降级 None
                 guard = await check_output(
-                    json.dumps(parsed, ensure_ascii=False)[:4000]
+                    json.dumps(plan_dict, ensure_ascii=False)[:4000]
                 )
                 if guard.action == "blocked":
                     last_err = guard.reason or "output_blocked"
                     continue
-                plan = parsed
+                plan = plan_dict
+                state["query_rewrite"] = plan_dict.get("query_rewrite")
+                bus = bus_for_state(state)
+                if bus is not None:
+                    bus.publish_plan(
+                        goal=str(plan_dict.get("goal") or ""),
+                        steps=list(plan_dict.get("steps") or []),
+                    )
                 break
             except Exception as exc:
                 last_err = type(exc).__name__
