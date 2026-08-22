@@ -30,10 +30,12 @@ async def analyze_parallel(state: PipelineState) -> PipelineState:
     if isinstance(intent_result, dict):
         state["intent"] = intent_result.get("intent", "default")
         state["intent_confidence"] = float(intent_result.get("confidence", 0.0))
+        state["intent_source"] = intent_result.get("source")
         state["entities"] = intent_result.get("entities", {}) or {}
     else:
         state["intent"] = "default"
         state["intent_confidence"] = 0.0
+        state["intent_source"] = "default"
         state["entities"] = {}
 
     from backend.pipeline.cache.fingerprint_cache import make_fingerprint
@@ -61,7 +63,13 @@ async def _analyze_intent(message: str) -> dict:
         return {
             "intent": intent,
             "confidence": float(result.confidence),
+            "source": str(result.source),
             "entities": {},
         }
     except Exception:
-        return {"intent": "default", "confidence": 0.5, "entities": {}}
+        return {
+            "intent": "default",
+            "confidence": 0.5,
+            "source": "default",
+            "entities": {},
+        }

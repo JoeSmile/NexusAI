@@ -154,12 +154,12 @@ async def write_memory(state: PipelineState) -> PipelineState:
                     (tenant_id, user_id, action, trace_id,
                      input_text, output_text, model,
                      input_tokens, output_tokens, cost, latency_ms,
-                     error_code)
+                     error_code, intent_predicted, intent_confidence, intent_source)
                 VALUES
                     (:tid, :uid, 'chat', :trace_id,
                      :input, :output, :model,
                      :in_tok, :out_tok, :cost, :latency,
-                     :err)
+                     :err, :intent_predicted, :intent_confidence, :intent_source)
             """),
             {
                 "tid": tenant_id,
@@ -173,6 +173,9 @@ async def write_memory(state: PipelineState) -> PipelineState:
                 "cost": state.get("total_cost", 0.0),
                 "latency": state.get("pipeline_latency_ms", 0.0),
                 "err": state.get("error_code"),
+                "intent_predicted": state.get("intent"),
+                "intent_confidence": state.get("intent_confidence"),
+                "intent_source": state.get("intent_source"),
             },
         )
         session.commit()

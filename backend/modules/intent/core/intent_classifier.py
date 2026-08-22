@@ -27,14 +27,7 @@ class MLIntentClassifier:
             model_path: 预训练模型路径（可选）
         """
         self.model_path = model_path or "intent_bert_model"
-        self.labels = [
-            IntentType.KNOWLEDGE_QUERY,
-            IntentType.ADVICE,
-            IntentType.CHAT,
-            IntentType.FUNCTION,
-            IntentType.CRISIS,
-            IntentType.CONVERSATION,
-        ]
+        self.labels = list(IntentType)
         
         # 模型加载（如果有训练好的模型）
         self.model = None

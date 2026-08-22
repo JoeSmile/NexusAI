@@ -126,6 +126,9 @@ class AuditLog(Base):
     input_text_enc = Column(Text, nullable=True)
     output_text_enc = Column(Text, nullable=True)
     text_enc_version = Column(Integer, default=0)
+    intent_predicted = Column(String(32), nullable=True)
+    intent_confidence = Column(Float, nullable=True)
+    intent_source = Column(String(16), nullable=True)
     __table_args__ = (
         Index("idx_audit_tenant_time", "tenant_id", "created_at"),
     )

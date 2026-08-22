@@ -49,6 +49,9 @@ def log_audit(
     decision_explain: str | None = None,
     modality: str | None = None,
     image_hash: str | None = None,
+    intent_predicted: str | None = None,
+    intent_confidence: float | None = None,
+    intent_source: str | None = None,
 ) -> None:
     """发起异步审计写入（不阻塞当前请求）"""
     lineage = get_audit_lineage()
@@ -78,6 +81,9 @@ def log_audit(
             "decision_explain": decision_explain,
             "modality": modality,
             "image_hash": image_hash,
+            "intent_predicted": intent_predicted,
+            "intent_confidence": intent_confidence,
+            "intent_source": intent_source,
             "created_at": datetime.utcnow(),
         },
     )
@@ -261,6 +267,9 @@ def _write_audit(record: dict) -> bool:
             "input_text_enc": None,
             "output_text_enc": None,
             "text_enc_version": 0,
+            "intent_predicted": None,
+            "intent_confidence": None,
+            "intent_source": None,
             "trace_id": "",
             "created_at": datetime.utcnow(),
             **record,
@@ -293,7 +302,9 @@ def _write_audit(record: dict) -> bool:
                      error_code, ip_address, user_agent,
                      credential_kind, key_id, run_id, node_id,
                      dedupe_key, parent_trace_id, tool_use_id, decision_explain,
-                     modality, image_hash, created_at)
+                     modality, image_hash,
+                     intent_predicted, intent_confidence, intent_source,
+                     created_at)
                 VALUES
                     (:tenant_id, :user_id, :action, :trace_id,
                      :input_text, :output_text, :input_text_enc, :output_text_enc,
@@ -302,7 +313,9 @@ def _write_audit(record: dict) -> bool:
                      :error_code, :ip_address, :user_agent,
                      :credential_kind, :key_id, :run_id, :node_id,
                      :dedupe_key, :parent_trace_id, :tool_use_id, :decision_explain,
-                     :modality, :image_hash, :created_at)
+                     :modality, :image_hash,
+                     :intent_predicted, :intent_confidence, :intent_source,
+                     :created_at)
             """)
             session.execute(sql, record)
             session.commit()

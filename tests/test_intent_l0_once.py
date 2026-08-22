@@ -22,6 +22,7 @@ async def test_analyze_parallel_calls_detect_intent_once(monkeypatch):
         result = MagicMock()
         result.intent = MagicMock(value="greeting")
         result.confidence = 0.92
+        result.source = "rule"
         return result
 
     monkeypatch.setattr(
@@ -45,6 +46,7 @@ async def test_orchestrator_execution_does_not_reclassify_l0(monkeypatch):
         result = MagicMock()
         result.intent = MagicMock(value="function")
         result.confidence = 0.8
+        result.source = "model"
         return result
 
     monkeypatch.setattr(

@@ -40,6 +40,7 @@ class PipelineState(TypedDict):
     # ── 分析结果 ──
     intent: str | None
     intent_confidence: float
+    intent_source: str | None
     entities: dict[str, str]
 
     # ── 缓存 ──
@@ -148,6 +149,7 @@ def make_initial_state(
         "retrieval_mode": "A",
         "intent": None,
         "intent_confidence": 0.0,
+        "intent_source": None,
         "entities": {},
         "fingerprint": None,
         "cache_hit": False,

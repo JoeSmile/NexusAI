@@ -218,6 +218,9 @@ async def _run_chat_pipeline(
             error_code=final.get("error_code"),
             ip_address=request.client.host if request.client else "",
             user_agent=request.headers.get("User-Agent", ""),
+            intent_predicted=final.get("intent"),
+            intent_confidence=final.get("intent_confidence"),
+            intent_source=final.get("intent_source"),
         )
 
         enrich_span(

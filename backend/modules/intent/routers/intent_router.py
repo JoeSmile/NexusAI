@@ -6,11 +6,13 @@ Intent Recognition API Router
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
+from backend.core.auth.models import TenantContext
 from backend.core.auth.permissions import require_permission
 
 from ..models.intent_models import IntentRequest, IntentResult, IntentType
+from ..services.intent_metrics import default_since, query_intent_metrics
 from ..services.intent_service import IntentService
 
 logger = logging.getLogger(__name__)
@@ -20,7 +22,6 @@ router = APIRouter(
     prefix="/intent",
     tags=["intent", "意图识别"],
     responses={404: {"description": "Not found"}},
-    dependencies=[Depends(require_permission("chat:write"))],
 )
 
 # 全局意图服务实例
@@ -38,7 +39,8 @@ def get_intent_service() -> IntentService:
 @router.post("/analyze", response_model=dict[str, Any])
 async def analyze_intent(
     request: IntentRequest,
-    intent_service: IntentService = Depends(get_intent_service)
+    intent_service: IntentService = Depends(get_intent_service),
+    _tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
     """
     分析用户输入的意图
@@ -81,7 +83,8 @@ async def analyze_intent(
 @router.post("/detect", response_model=IntentResult)
 async def detect_intent(
     text: str,
-    intent_service: IntentService = Depends(get_intent_service)
+    intent_service: IntentService = Depends(get_intent_service),
+    _tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
     """
     快速检测意图（仅返回意图类型）
@@ -108,7 +111,8 @@ async def detect_intent(
 @router.post("/build_prompt")
 async def build_prompt(
     user_context: dict[str, Any],
-    intent_service: IntentService = Depends(get_intent_service)
+    intent_service: IntentService = Depends(get_intent_service),
+    _tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
     """
     根据用户上下文构建大模型prompt
@@ -152,7 +156,9 @@ async def build_prompt(
 
 
 @router.get("/types")
-async def get_intent_types():
+async def get_intent_types(
+    _tenant: TenantContext = Depends(require_permission("chat:write")),
+):
     """
     获取所有支持的意图类型
     
@@ -210,9 +216,24 @@ async def get_intent_types():
     }
 
 
+@router.get("/metrics")
+async def get_intent_metrics(
+    days: int = Query(7, ge=1, le=90),
+    tenant: TenantContext = Depends(require_permission("audit:read")),
+):
+    """Intent distribution / low-confidence ratio from audit_logs (Task 65)."""
+    since = default_since(days)
+    return {
+        "code": 200,
+        "message": "ok",
+        "data": query_intent_metrics(tenant_id=tenant.tenant_id, since=since),
+    }
+
+
 @router.get("/status")
 async def get_status(
-    intent_service: IntentService = Depends(get_intent_service)
+    intent_service: IntentService = Depends(get_intent_service),
+    _tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
     """
     获取意图识别服务状态
@@ -239,7 +260,8 @@ async def get_status(
 @router.post("/batch")
 async def batch_analyze(
     texts: list[str],
-    intent_service: IntentService = Depends(get_intent_service)
+    intent_service: IntentService = Depends(get_intent_service),
+    _tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
     """
     批量分析意图
