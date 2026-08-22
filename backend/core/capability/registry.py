@@ -90,6 +90,21 @@ class CapabilityRegistry:
             ) from exc
         validate_agent_spec(spec)
         self._by_id[spec.id] = spec
+        try:
+            from backend.core.tool_search import get_tool_search_index
+
+            nested = dict(spec.spec or {})
+            get_tool_search_index().upsert_cap(
+                {
+                    "id": spec.id,
+                    "name": spec.name,
+                    "kind": str(spec.kind.value if hasattr(spec.kind, "value") else spec.kind),
+                    "description": str(nested.get("description") or spec.name),
+                    "tags": nested.get("tags") or [],
+                }
+            )
+        except Exception:
+            logger.debug("tool_search index upsert skipped", exc_info=True)
 
     def get(self, capability_id: str, *, require_enabled: bool = True) -> CapabilitySpec:
         spec = self._by_id.get(capability_id)
@@ -243,6 +258,12 @@ class CapabilityRegistry:
             db_n,
             len(self._by_id),
         )
+        try:
+            from backend.core.tool_search import rebuild_tool_search_from_specs
+
+            rebuild_tool_search_from_specs(self.list(include_disabled=True))
+        except Exception:
+            logger.debug("tool_search index rebuild skipped", exc_info=True)
 
 
 def get_capability_registry(*, reload: bool = False) -> CapabilityRegistry:

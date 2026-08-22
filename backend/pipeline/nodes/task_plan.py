@@ -342,7 +342,7 @@ async def task_plan(state: PipelineState) -> PipelineState:
         message = state.get("raw_input") or state.get("message") or ""
         intent = state.get("intent", "default") or "default"
         confidence = float(state.get("intent_confidence", 0.0) or 0.0)
-        ranked_caps = search_capabilities(caps, message, top_k=10)
+        ranked_caps = search_capabilities(caps, message, top_k=12)
         messages = _build_messages(
             message=message,
             intent=intent,

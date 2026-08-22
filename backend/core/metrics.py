@@ -69,6 +69,24 @@ audit_write_failures_total = Counter(
     "Audit log write failures",
 )
 
+# ── 工具检索指标（Task 60）──
+tool_search_queries_total = Counter(
+    "nexusai_tool_search_queries_total",
+    "Tool search queries",
+)
+tool_search_zero_recall_total = Counter(
+    "nexusai_tool_search_zero_recall_total",
+    "Tool searches that needed zero-recall fallback",
+)
+tool_search_bm25_recall_total = Counter(
+    "nexusai_tool_search_bm25_recall_total",
+    "BM25 hits summed per search",
+)
+tool_search_vector_recall_total = Counter(
+    "nexusai_tool_search_vector_recall_total",
+    "Vector hits summed per search",
+)
+
 
 class MetricsMiddleware(BaseHTTPMiddleware):
     """自动记录请求指标"""
