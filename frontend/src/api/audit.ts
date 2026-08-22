@@ -39,6 +39,8 @@ export type AuditNdjsonEvent = {
   input_text?: string | null
   output_text?: string | null
   decision_explain?: string | null
+  input_preview?: string | null
+  output_preview?: string | null
   error_code?: string | null
   latency_ms?: number | null
   input_tokens?: number | null

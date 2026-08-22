@@ -179,6 +179,17 @@ def audit_row_to_ndjson_events(row: Any) -> list[dict[str, Any]]:
                 "cost": getattr(row, "cost", None),
             }
         ]
+    if action.startswith("memory."):
+        return [
+            {
+                **base,
+                "type": "memory_event",
+                "action": action,
+                "input_preview": (getattr(row, "input_text", "") or "")[:500],
+                "output_preview": (getattr(row, "output_text", "") or "")[:2000],
+                "error_code": getattr(row, "error_code", None),
+            }
+        ]
     return [
         {
             **base,

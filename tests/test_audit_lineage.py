@@ -139,3 +139,28 @@ def test_ndjson_mapping_turn_and_tool() -> None:
     assert events[1]["decision_explain"]["allowed"] is True
     assert events[2]["type"] == "tool_result"
     assert events[2]["ok"] is True
+
+
+def test_ndjson_memory_event_includes_preview() -> None:
+  mem = SimpleNamespace(
+      id=4,
+      tenant_id="t1",
+      user_id="u1",
+      action="memory.rag_sanitize",
+      trace_id="tr-mem",
+      parent_trace_id=None,
+      tool_use_id=None,
+      decision_explain=None,
+      input_text="hello",
+      output_text='{"rag_retrieved_ids":["doc-1"],"flags":{"injection":1},"redacted_fragments":2}',
+      model="memory",
+      error_code=None,
+      latency_ms=None,
+      cost=None,
+      created_at=datetime(2026, 8, 22, 11, 0, 0),
+  )
+  events = audit_mod.audit_row_to_ndjson_events(mem)
+  assert len(events) == 1
+  assert events[0]["type"] == "memory_event"
+  assert events[0]["action"] == "memory.rag_sanitize"
+  assert "doc-1" in events[0]["output_preview"]

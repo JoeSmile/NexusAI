@@ -9,6 +9,7 @@ import {
 import { fetchRunSnapshot } from '@/api/chat'
 import { formatApiError } from '@/api/http'
 import { ExecutionPanel } from '@/components/agent/ExecutionPanel'
+import { TraceMemorySnapshot } from '@/components/trace/TraceMemorySnapshot'
 import { TraceTimeline } from '@/components/trace/TraceTimeline'
 import { Button } from '@/components/ui/button'
 import {
@@ -19,6 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { executionFromSnapshot } from '@/hooks/sseParse'
+import { parseMemorySnapshotFromAudit } from '@/lib/memorySnapshot'
 
 type Props = {
   traceId: string | null
@@ -77,6 +79,8 @@ export function TraceDetailDrawer({ traceId, open, onOpenChange }: Props) {
     }
   }, [open, traceId])
 
+  const memorySnapshot = parseMemorySnapshotFromAudit(events, rows)
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
@@ -107,6 +111,11 @@ export function TraceDetailDrawer({ traceId, open, onOpenChange }: Props) {
             执行图快照不可用（进程重启后仅保留审计回放）
           </p>
         ) : null}
+
+        <section className="space-y-2">
+          <h3 className="text-sm font-semibold">Memory 快照</h3>
+          <TraceMemorySnapshot snapshot={memorySnapshot} />
+        </section>
 
         <section className="space-y-2">
           <h3 className="text-sm font-semibold">时序事件</h3>
