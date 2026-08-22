@@ -9,12 +9,13 @@ Agent Router - Agent路由
     MCP 协议在 ``backend.modules.agent.protocol``（Task 31 已删孤儿实现树）。
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from backend.core.auth.models import TenantContext
 from backend.core.auth.permissions import require_permission
 from backend.core.auth.scope import assert_user_access, resolve_acting_user_id
+from backend.core.errors import raise_internal_error
 from backend.services.agent_service import AgentService, get_agent_service
 
 router = APIRouter(prefix="/agent", tags=["agent"])
@@ -54,6 +55,7 @@ class FollowupRequest(BaseModel):
 @router.post("/chat", deprecated=True)
 async def agent_chat(
     request: MessageRequest,
+    http_request: Request,
     response: Response,
     agent_service: AgentService = Depends(get_agent_service),
     tenant: TenantContext = Depends(require_permission("chat:write")),
@@ -78,11 +80,12 @@ async def agent_chat(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_internal_error(http_request, e)
 
 
 @router.get("/status", deprecated=True)
 async def get_agent_status(
+    http_request: Request,
     response: Response,
     agent_service: AgentService = Depends(get_agent_service),
     tenant: TenantContext = Depends(require_permission("chat:write")),
@@ -99,12 +102,13 @@ async def get_agent_status(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_internal_error(http_request, e)
 
 
 @router.get("/history/{user_id}", deprecated=True)
 async def get_execution_history(
     user_id: str,
+    http_request: Request,
     response: Response,
     limit: int = 10,
     agent_service: AgentService = Depends(get_agent_service),
@@ -123,12 +127,13 @@ async def get_execution_history(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_internal_error(http_request, e)
 
 
 @router.get("/memory/{user_id}", deprecated=True)
 async def get_memory_summary(
     user_id: str,
+    http_request: Request,
     response: Response,
     agent_service: AgentService = Depends(get_agent_service),
     tenant: TenantContext = Depends(require_permission("chat:write")),
@@ -146,11 +151,12 @@ async def get_memory_summary(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_internal_error(http_request, e)
 
 
 @router.get("/tools", deprecated=True)
 async def get_available_tools(
+    http_request: Request,
     response: Response,
     agent_service: AgentService = Depends(get_agent_service),
     tenant: TenantContext = Depends(require_permission("chat:write")),
@@ -167,12 +173,13 @@ async def get_available_tools(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_internal_error(http_request, e)
 
 
 @router.post("/followup", deprecated=True)
 async def plan_followup(
     request: FollowupRequest,
+    http_request: Request,
     response: Response,
     agent_service: AgentService = Depends(get_agent_service),
     tenant: TenantContext = Depends(require_permission("chat:write")),
@@ -199,7 +206,7 @@ async def plan_followup(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_internal_error(http_request, e)
 
 
 @router.get("/health", deprecated=True)

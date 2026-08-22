@@ -121,6 +121,9 @@ class AuditLog(Base):
     decision_explain = Column(Text, nullable=True)
     modality = Column(String(32), nullable=True)
     image_hash = Column(String(64), nullable=True)
+    input_text_enc = Column(Text, nullable=True)
+    output_text_enc = Column(Text, nullable=True)
+    text_enc_version = Column(Integer, default=0)
     __table_args__ = (
         Index("idx_audit_tenant_time", "tenant_id", "created_at"),
     )

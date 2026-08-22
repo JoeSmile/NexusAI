@@ -37,6 +37,16 @@ def _can_export_audit(tenant: TenantContext) -> bool:
     return tenant.role in ("tenant_admin", "auditor", "super_admin")
 
 
+def _can_decrypt_audit_text(tenant: TenantContext) -> bool:
+    return tenant.role in ("auditor", "super_admin")
+
+
+def _resolve_row_texts(row: object, tenant: TenantContext) -> tuple[str, str]:
+    from backend.core.security.audit_crypto import resolve_audit_text
+
+    return resolve_audit_text(row, can_decrypt=_can_decrypt_audit_text(tenant))
+
+
 @router.get("/logs")
 async def query_audit_logs(
     tenant_id: str | None = Query(None, description="按租户筛选"),
@@ -220,7 +230,8 @@ async def export_audit(
         sql = text(f"""
             SELECT id, tenant_id, user_id, action, trace_id,
                    parent_trace_id, tool_use_id, decision_explain,
-                   input_text, output_text, model,
+                   input_text, output_text, input_text_enc, output_text_enc,
+                   text_enc_version, model,
                    input_tokens, output_tokens, cost, latency_ms,
                    error_code, ip_address, user_agent, created_at
             FROM audit_logs
@@ -232,7 +243,16 @@ async def export_audit(
 
     fmt = (format or "csv").strip().lower()
     if fmt == "ndjson":
-        body = "".join(ndjson_lines_from_rows(rows))
+        from types import SimpleNamespace
+
+        resolved_rows = []
+        for row in rows:
+            inp, out = _resolve_row_texts(row, tenant)
+            mapping = dict(row._mapping) if hasattr(row, "_mapping") else row._asdict()
+            mapping["input_text"] = inp
+            mapping["output_text"] = out
+            resolved_rows.append(SimpleNamespace(**mapping))
+        body = "".join(ndjson_lines_from_rows(resolved_rows))
         filename_tid = tid or "all"
         return StreamingResponse(
             iter([body]),
@@ -245,10 +265,10 @@ async def export_audit(
             },
         )
 
-    return _export_audit_csv(rows, tid)
+    return _export_audit_csv(rows, tid, tenant)
 
 
-def _export_audit_csv(rows, tid: str | None) -> StreamingResponse:
+def _export_audit_csv(rows, tid: str | None, tenant: TenantContext) -> StreamingResponse:
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow([
@@ -272,6 +292,7 @@ def _export_audit_csv(rows, tid: str | None) -> StreamingResponse:
         "created_at",
     ])
     for r in rows:
+        inp, out = _resolve_row_texts(r, tenant)
         writer.writerow([
             r.id,
             r.tenant_id,
@@ -280,8 +301,8 @@ def _export_audit_csv(rows, tid: str | None) -> StreamingResponse:
             r.trace_id,
             getattr(r, "parent_trace_id", None),
             getattr(r, "tool_use_id", None),
-            (r.input_text or "")[:500],
-            (r.output_text or "")[:500],
+            inp[:500],
+            out[:500],
             r.model,
             r.input_tokens,
             r.output_tokens,

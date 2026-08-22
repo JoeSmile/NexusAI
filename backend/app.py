@@ -211,6 +211,9 @@ def create_app() -> FastAPI:
     from backend.core.production_guard import assert_production_security
 
     assert_jwt_secret_strength()
+    from backend.core.security.audit_crypto import assert_audit_encryption_config
+
+    assert_audit_encryption_config()
     assert_production_security()
 
     app = FastAPI(
@@ -240,7 +243,12 @@ def create_app() -> FastAPI:
     else:
         _extra = os.getenv("CORS_ALLOW_ORIGINS") or os.getenv("FRONTEND_ORIGINS", "")
         _origins = [o.strip() for o in _extra.split(",") if o.strip()]
-        _creds = True
+        _creds = bool(_origins)
+    if "*" in _origins and _creds:
+        raise RuntimeError(
+            "CORS misconfiguration: wildcard origin with credentials is forbidden "
+            "(set CORS_ALLOW_ALL=true without credentials, or list explicit origins)"
+        )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=_origins,

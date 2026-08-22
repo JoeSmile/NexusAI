@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from enum import StrEnum
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse
+
+logger = logging.getLogger(__name__)
 
 
 class ErrorCode(StrEnum):
@@ -133,19 +136,33 @@ def _expose_internal_detail() -> bool:
     return (os.getenv("DEBUG") or "").strip().lower() in ("1", "true", "yes")
 
 
+def internal_error_payload(request: Request, exc: Exception | None = None) -> dict:
+    """Task 59 S2 — 500 仅回 code + trace_id（详情进日志）。"""
+    if exc is not None:
+        logger.exception("internal_error", exc_info=exc)
+    trace_id = str(getattr(request.state, "trace_id", "") or "")
+    payload: dict = {
+        "code": "INTERNAL",
+        "message": "internal_error",
+        "trace_id": trace_id,
+    }
+    if exc is not None and _expose_internal_detail():
+        payload["detail"] = str(exc)
+    return payload
+
+
+def raise_internal_error(request: Request, exc: Exception) -> None:
+    """记录异常并抛出不含内部细节的 HTTP 500。"""
+    from fastapi import HTTPException
+
+    raise HTTPException(status_code=500, detail=internal_error_payload(request, exc))
+
+
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """兜底异常处理器；生产不回堆栈 / 内部路径。"""
-    detail = str(exc) if _expose_internal_detail() else None
     return JSONResponse(
         status_code=500,
-        content={
-            "error": {
-                "code": ErrorCode.INTERNAL_ERROR.value,
-                "message": "internal_error",
-                "detail": detail,
-                "trace_id": getattr(request.state, "trace_id", ""),
-            }
-        },
+        content=internal_error_payload(request, exc),
     )
 
 
@@ -175,6 +192,22 @@ async def http_exception_audit_handler(request: Request, exc: Exception) -> JSON
     status = int(getattr(exc, "status_code", 500) or 500)
     if status in (401, 403):
         _audit_auth_failure(request, f"HTTP_{status}", str(getattr(exc, "detail", "")))
+    if status >= 500:
+        detail = getattr(exc, "detail", None)
+        if isinstance(detail, dict) and detail.get("code") == "INTERNAL":
+            content = detail
+        else:
+            content = internal_error_payload(
+                request,
+                detail if isinstance(detail, Exception) else None,
+            )
+            if isinstance(detail, str) and _expose_internal_detail():
+                content["detail"] = detail
+        return JSONResponse(
+            status_code=status,
+            content=content,
+            headers=dict(getattr(exc, "headers", None) or {}),
+        )
     return JSONResponse(
         status_code=status,
         content={"detail": getattr(exc, "detail", "error")},

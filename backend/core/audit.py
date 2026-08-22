@@ -221,10 +221,16 @@ def _write_audit(record: dict) -> bool:
             "user_agent": "",
             "input_text": "",
             "output_text": "",
+            "input_text_enc": None,
+            "output_text_enc": None,
+            "text_enc_version": 0,
             "trace_id": "",
             "created_at": datetime.utcnow(),
             **record,
         }
+        from backend.core.security.audit_crypto import prepare_audit_text_fields
+
+        record = prepare_audit_text_fields(record)
         dedupe_key = record.get("dedupe_key") or None
         session_factory = get_pg_session()
         with session_factory.Session() as session:
@@ -244,7 +250,8 @@ def _write_audit(record: dict) -> bool:
             sql = text("""
                 INSERT INTO audit_logs
                     (tenant_id, user_id, action, trace_id,
-                     input_text, output_text, model,
+                     input_text, output_text, input_text_enc, output_text_enc,
+                     text_enc_version, model,
                      input_tokens, output_tokens, cost, latency_ms,
                      error_code, ip_address, user_agent,
                      credential_kind, key_id, run_id, node_id,
@@ -252,7 +259,8 @@ def _write_audit(record: dict) -> bool:
                      modality, image_hash, created_at)
                 VALUES
                     (:tenant_id, :user_id, :action, :trace_id,
-                     :input_text, :output_text, :model,
+                     :input_text, :output_text, :input_text_enc, :output_text_enc,
+                     :text_enc_version, :model,
                      :input_tokens, :output_tokens, :cost, :latency_ms,
                      :error_code, :ip_address, :user_agent,
                      :credential_kind, :key_id, :run_id, :node_id,
