@@ -6,7 +6,7 @@
  * Do NOT deep-import `@chatui/core/lib/...` (CJS) — Vite serves a second React
  * and hooks explode with "Cannot read properties of null (reading 'useState')".
  */
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type UIEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type UIEvent } from 'react'
 import { Bubble, Message, PullToRefresh, type MessageProps } from '@chatui/core'
 import { Bookmark, Copy, ThumbsDown, ThumbsUp } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
@@ -24,6 +24,7 @@ import { fetchTermsPending } from '@/api/terms'
 import { ContextPanel } from '@/components/agent/ContextPanel'
 import { ExecutionPanel } from '@/components/agent/ExecutionPanel'
 import { BookmarksDrawer } from '@/components/agent/BookmarksDrawer'
+import { ClientInputGuardrailBar } from '@/components/agent/ClientInputGuardrailBar'
 import { DislikeReasonDialog } from '@/components/agent/DislikeReasonDialog'
 import { HistoryDrawer } from '@/components/agent/HistoryDrawer'
 import { HotspotDayCollectionDialog } from '@/components/agent/HotspotDayCollectionDialog'
@@ -35,9 +36,11 @@ import {
   ScriptGenDialog,
   type ScriptGenFormValues,
 } from '@/components/agent/ScriptGenDialog'
+import { SensitiveSendConfirmDialog } from '@/components/agent/SensitiveSendConfirmDialog'
 import { useBubbleFeedback } from '@/hooks/useBubbleFeedback'
 import { useChatStream, type ChatMessage } from '@/hooks/useChatStream'
 import { runHotspotDigInPlace } from '@/lib/runHotspotDigInPlace'
+import { detectSensitiveHints, validateChatInput } from '@/lib/clientGuardrails'
 import { runScriptGenInPlace } from '@/lib/runScriptGenInPlace'
 import { useChatPrefsStore } from '@/stores/chatPrefsStore'
 import { useAuthStore } from '@/stores/authStore'
@@ -88,6 +91,10 @@ export default function HomeChatPage() {
   const [pendingImage, setPendingImage] = useState<File | null>(null)
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
   const [visionErr, setVisionErr] = useState<string | null>(null)
+  const [guardrailError, setGuardrailError] = useState<string | null>(null)
+  const [sensitiveOpen, setSensitiveOpen] = useState(false)
+  const pendingSendRef = useRef<string | null>(null)
+  const sensitiveFindings = useMemo(() => detectSensitiveHints(input), [input])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const role = useAuthStore((s) => s.activeRole)
   const canVision = role === 'tenant_admin' || role === 'super_admin'
@@ -442,51 +449,81 @@ export default function HomeChatPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to nonce
   }, [triggerNonce, triggerKind, clearTrigger])
 
-  const onSend = async () => {
-    const text = input.trim()
-    if (!text && !pendingImage) return
-    if (streaming) {
-      abort()
-    }
-    setInput('')
-    setVisionErr(null)
-
-    if (pendingImage) {
-      const preview = imagePreviewUrl
-      const file = pendingImage
-      setPendingImage(null)
-      setImagePreviewUrl(null)
-      const userId = appendLocal(
-        'user',
-        text || '（图片）',
-        'done',
-        preview || undefined,
-      )
-      const asstId = appendLocal('assistant', '', 'streaming')
-      try {
-        const res = await postMultimodalChat(file, text || '请描述这张图片', {
-          session_id: WORKSPACE_CHAT_SESSION,
-          ...(modelId ? { model: modelId } : {}),
-        })
-        patchLocal(asstId, res.response, 'done')
-      } catch (e) {
-        patchLocal(
-          asstId,
-          formatApiError(e, 'multimodal:vision'),
-          'error',
-        )
-        setVisionErr(formatApiError(e, 'multimodal:vision'))
+  const executeSend = useCallback(
+    async (text: string) => {
+      if (streaming) {
+        abort()
       }
-      void userId
+      setInput('')
+      setVisionErr(null)
+      setGuardrailError(null)
+
+      if (pendingImage) {
+        const preview = imagePreviewUrl
+        const file = pendingImage
+        setPendingImage(null)
+        setImagePreviewUrl(null)
+        const userId = appendLocal(
+          'user',
+          text || '（图片）',
+          'done',
+          preview || undefined,
+        )
+        const asstId = appendLocal('assistant', '', 'streaming')
+        try {
+          const res = await postMultimodalChat(file, text || '请描述这张图片', {
+            session_id: WORKSPACE_CHAT_SESSION,
+            ...(modelId ? { model: modelId } : {}),
+          })
+          patchLocal(asstId, res.response, 'done')
+        } catch (e) {
+          patchLocal(asstId, formatApiError(e, 'multimodal:vision'), 'error')
+          setVisionErr(formatApiError(e, 'multimodal:vision'))
+        }
+        void userId
+        return
+      }
+
+      await send(text, {
+        session_id: WORKSPACE_CHAT_SESSION,
+        ...(modelId ? { model: modelId } : {}),
+        temperature,
+        ...(maxTokens > 0 ? { max_tokens: maxTokens } : {}),
+      })
+    },
+    [
+      streaming,
+      abort,
+      pendingImage,
+      imagePreviewUrl,
+      appendLocal,
+      patchLocal,
+      modelId,
+      send,
+      temperature,
+      maxTokens,
+    ],
+  )
+
+  const onSend = async () => {
+    const text = input
+    if (!text.trim() && !pendingImage) {
+      setGuardrailError('请输入消息内容（不能只发空白）')
       return
     }
-
-    await send(text, {
-      session_id: WORKSPACE_CHAT_SESSION,
-      ...(modelId ? { model: modelId } : {}),
-      temperature,
-      ...(maxTokens > 0 ? { max_tokens: maxTokens } : {}),
-    })
+    if (text.trim()) {
+      const validation = validateChatInput(text)
+      if (!validation.ok) {
+        setGuardrailError(validation.message)
+        return
+      }
+      if (!pendingImage && detectSensitiveHints(text).length > 0) {
+        pendingSendRef.current = text
+        setSensitiveOpen(true)
+        return
+      }
+    }
+    await executeSend(text)
   }
 
   const onStop = () => {
@@ -873,6 +910,11 @@ export default function HomeChatPage() {
             }}
           />
           <div className="input-wrapper">
+            <ClientInputGuardrailBar
+              input={input}
+              validationError={guardrailError}
+              findings={sensitiveFindings}
+            />
             <textarea
               ref={textareaRef}
               className="input-textarea"
@@ -884,7 +926,10 @@ export default function HomeChatPage() {
                     : '输入你的问题，Enter 发送 · Shift+Enter 换行'
               }
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                setInput(e.target.value)
+                setGuardrailError(null)
+              }}
               onKeyDown={onKeyDown}
               rows={1}
             />
@@ -1019,6 +1064,20 @@ export default function HomeChatPage() {
         onConfirm={(values) => {
           setScriptOpen(false)
           startScriptGen(values)
+        }}
+      />
+      <SensitiveSendConfirmDialog
+        open={sensitiveOpen}
+        findings={sensitiveFindings}
+        onOpenChange={(open) => {
+          setSensitiveOpen(open)
+          if (!open) pendingSendRef.current = null
+        }}
+        onConfirm={() => {
+          const text = pendingSendRef.current
+          pendingSendRef.current = null
+          setSensitiveOpen(false)
+          if (text) void executeSend(text)
         }}
       />
       <DislikeReasonDialog
