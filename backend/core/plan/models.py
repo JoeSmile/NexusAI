@@ -29,10 +29,15 @@ class PlanStepRetry(BaseModel):
 
 
 class PlanStep(BaseModel):
+    """Single executable step — L1 sub-task intent = capability_id + sub_query."""
+
     model_config = ConfigDict(extra="forbid")
 
     id: str = Field(min_length=1, max_length=64)
     capability_id: str = Field(min_length=1)
+    """L1: sub-task intent target (governed by validator whitelist + permissions)."""
+    sub_query: str | None = Field(default=None, max_length=2000)
+    """L1: natural-language sub-intent for this step; merged into invoke params as message."""
     params: dict[str, Any] = Field(default_factory=dict)
     depends_on: list[str] = Field(default_factory=list)
     mode: PlanStepMode = PlanStepMode.SERIAL

@@ -190,11 +190,20 @@ class PlanEventBus:
             {"step_id": step_id, "attempt": attempt, "max_attempts": max_attempts},
         )
 
-    def publish_replan(self, *, reason: str, new_steps: list[dict[str, str]]) -> PlanGraphEvent:
-        return self.emit(
-            "replan",
-            {"reason": reason[:500], "new_steps": new_steps},
-        )
+    def publish_replan(
+        self,
+        *,
+        reason: str,
+        new_steps: list[dict[str, str]],
+        detail: str | None = None,
+    ) -> PlanGraphEvent:
+        payload: dict[str, Any] = {
+            "reason": reason[:500],
+            "new_steps": new_steps,
+        }
+        if detail:
+            payload["detail"] = detail[:500]
+        return self.emit("replan", payload)
 
     def events_since(self, seq: int = 0) -> list[PlanGraphEvent]:
         with self._lock:

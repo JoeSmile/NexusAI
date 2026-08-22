@@ -10,7 +10,7 @@ from backend.pipeline.state import PipelineState
 
 @observe(name="pipeline.analyze_parallel")
 async def analyze_parallel(state: PipelineState) -> PipelineState:
-    """并发分析意图和实体"""
+    """L0 entry intent — classify once per user message (not re-run during plan execution)."""
     message = state["message"]
 
     from typing import Any, cast

@@ -14,6 +14,11 @@ from backend.core.harness import LLMHarness
 from backend.core.plan.blackboard import Blackboard, entry_from_step_result
 from backend.core.plan.event_bus import PlanEventBus, bus_for_state
 from backend.core.plan.execution import group_independent_batches
+from backend.core.plan.intent_drift import (
+    DriftAssessment,
+    audit_intent_drift,
+    detect_intent_drift,
+)
 from backend.core.plan.llm_output_guard import prevalidate_llm_plan
 from backend.core.plan.loop_guard import LoopGuard, LoopGuardError
 from backend.core.plan.models import OnFailMode, PlanIR, PlanStep
@@ -106,7 +111,10 @@ async def _run_step_once(
     state: PipelineState | None = None,
     loop_guard: LoopGuard | None = None,
 ) -> dict[str, Any]:
-    payload = resolve_step_params(dict(step.params), step_results, state=state)
+    base_params = dict(step.params)
+    if step.sub_query and "message" not in base_params and "query" not in base_params:
+        base_params["message"] = step.sub_query
+    payload = resolve_step_params(base_params, step_results, state=state)
     if loop_guard is not None and state is not None:
         loop_guard.check(
             step.capability_id,
@@ -166,6 +174,7 @@ async def _replan_remaining(
     error: str,
     executed_ids: set[str],
     plan: PlanIR,
+    drift: DriftAssessment | None = None,
 ) -> PlanIR | None:
     count = int(state.get("orchestrator_replan_count") or 0) + 1
     state["orchestrator_replan_count"] = count  # type: ignore[typeddict-item]
@@ -180,8 +189,15 @@ async def _replan_remaining(
 
     caps = _list_visible_capabilities(state)
     caps_by_id = {c["id"]: c for c in caps}
+    drift_block = ""
+    if drift is not None:
+        drift_block = (
+            f"intent_drift_signal: {drift.signal}\n"
+            f"intent_drift_detail: {drift.detail}\n"
+        )
     prompt = (
         "Replan remaining steps after failure. Return JSON only.\n"
+        f"{drift_block}"
         f"goal: {plan.goal}\n"
         f"failed_step: {failed_step.id} ({failed_step.capability_id})\n"
         f"error: {error[:500]}\n"
@@ -347,6 +363,49 @@ async def execute_plan_ir(
                             status="succeeded",
                             summary=summary,
                         )
+                    drift = detect_intent_drift(
+                        goal=current_plan.goal,
+                        user_message=str(state.get("message") or ""),
+                        step=step,
+                        outcome=outcome,
+                    )
+                    if drift is not None:
+                        audit_intent_drift(
+                            tenant_id=state["tenant_id"],
+                            user_id=state["user_id"],
+                            trace_id=str(state.get("trace_id") or ""),
+                            assessment=drift,
+                        )
+                        new_plan = await _replan_remaining(
+                            state,
+                            failed_step=step,
+                            error=drift.detail,
+                            executed_ids=set(step_results.keys()),
+                            plan=current_plan,
+                            drift=drift,
+                        )
+                        if new_plan is not None and bus is not None:
+                            bus.publish_replan(
+                                reason="intent_drift",
+                                detail=drift.detail,
+                                new_steps=[
+                                    {
+                                        "id": s.id,
+                                        "capability_id": s.capability_id,
+                                    }
+                                    for s in new_plan.steps
+                                    if s.id not in step_results
+                                ],
+                            )
+                            bus.publish_plan(
+                                goal=new_plan.goal,
+                                steps=[
+                                    s.model_dump(mode="json") for s in new_plan.steps
+                                ],
+                            )
+                            current_plan = new_plan
+                            replanned = True
+                            return
                 except LoopGuardError as e:
                     step_results[step.id] = {
                         "ok": False,
@@ -366,6 +425,19 @@ async def execute_plan_ir(
                     raise OrchestratorError(e.detail) from e
                 except Exception as e:
                     err = str(e)
+                    drift = detect_intent_drift(
+                        goal=current_plan.goal,
+                        user_message=str(state.get("message") or ""),
+                        step=step,
+                        error=err,
+                    )
+                    if drift is not None:
+                        audit_intent_drift(
+                            tenant_id=state["tenant_id"],
+                            user_id=state["user_id"],
+                            trace_id=str(state.get("trace_id") or ""),
+                            assessment=drift,
+                        )
                     if step.on_fail == OnFailMode.SKIP:
                         step_results[step.id] = {
                             "ok": False,
@@ -388,6 +460,7 @@ async def execute_plan_ir(
                             error=err,
                             executed_ids=set(step_results.keys()),
                             plan=current_plan,
+                            drift=drift,
                         )
                         if new_plan is None:
                             if state.get("finish_reason") == "routed_to_llm":
@@ -402,7 +475,8 @@ async def execute_plan_ir(
                             raise OrchestratorError(err)
                         if bus is not None:
                             bus.publish_replan(
-                                reason=err,
+                                reason="intent_drift" if drift else err[:500],
+                                detail=drift.detail if drift else None,
                                 new_steps=[
                                     {
                                         "id": s.id,
