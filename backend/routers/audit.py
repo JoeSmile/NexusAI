@@ -188,6 +188,62 @@ async def usage_summary(
     }
 
 
+@router.get("/trace/{trace_id}/events")
+async def trace_replay_events(
+    trace_id: str,
+    tenant: TenantContext = Depends(verify_human_or_legacy_key),
+):
+    """单 trace 回放事件（audit:read；脱敏预览；不需 export 权限 — Task 63 拍板 1A）。"""
+    from fastapi import HTTPException
+
+    from backend.core.audit import build_trace_replay_events
+
+    if not _can_query_audit(tenant):
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "AUDIT_001", "message": "audit_read_denied"},
+        )
+
+    tid = trace_id.strip()
+    if not tid:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "AUDIT_003", "message": "trace_id_required"},
+        )
+
+    session_factory = get_pg_session()
+    conditions = ["trace_id = :trace_id"]
+    params: dict = {"trace_id": tid}
+    if not tenant.is_cross_tenant:
+        conditions.append("tenant_id = :tid")
+        params["tid"] = tenant.tenant_id
+
+    with session_factory.Session() as session:
+        frag, extra = audit_user_filter(session, tenant)
+        if frag:
+            conditions.append(frag)
+            params.update(extra)
+        sql = text(f"""
+            SELECT id, tenant_id, user_id, action, trace_id,
+                   parent_trace_id, tool_use_id, decision_explain,
+                   input_text, output_text, input_text_enc, output_text_enc,
+                   text_enc_version, model,
+                   input_tokens, output_tokens, cost, latency_ms,
+                   error_code, ip_address, user_agent, created_at
+            FROM audit_logs
+            WHERE {' AND '.join(conditions)}
+            ORDER BY created_at ASC
+            LIMIT 500
+        """)
+        rows = session.execute(sql, params).fetchall()
+
+    events = build_trace_replay_events(
+        list(rows),
+        resolve_row_texts=lambda row: _resolve_row_texts(row, tenant),
+    )
+    return {"trace_id": tid, "events": events, "count": len(events)}
+
+
 @router.get("/export")
 async def export_audit(
     tenant_id: str | None = Query(None),

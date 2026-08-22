@@ -158,7 +158,7 @@ export default function TraceConsole() {
                       <span className="text-emerald-600">ok</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-xs whitespace-nowrap">{t.started_at}</TableCell>
+                  <TableCell className="text-xs whitespace-nowrap">{t.last_activity_at}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

@@ -26,8 +26,9 @@ function eventDetail(ev: AuditNdjsonEvent): string {
     }
   }
   if (ev.error_code) return `错误: ${ev.error_code}`
+  if (ev.output_preview) return ev.output_preview.slice(0, 240)
   if (ev.output_text) return ev.output_text.slice(0, 240)
-  if (ev.input_text) return ev.input_text.slice(0, 240)
+  if (ev.input_preview) return ev.input_preview.slice(0, 240)
   if (ev.model) return ev.model
   return '—'
 }

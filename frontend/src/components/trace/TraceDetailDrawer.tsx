@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 
 import {
   fetchAuditLogs,
-  fetchAuditNdjsonEvents,
+  fetchTraceEvents,
   type AuditLogRow,
   type AuditNdjsonEvent,
 } from '@/api/audit'
@@ -47,7 +47,7 @@ export function TraceDetailDrawer({ traceId, open, onOpenChange }: Props) {
       try {
         const [logRows, ndjson, snap] = await Promise.all([
           fetchAuditLogs({ trace_id: traceId, limit: 200 }),
-          fetchAuditNdjsonEvents({ trace_id: traceId }).catch(() => [] as AuditNdjsonEvent[]),
+          fetchTraceEvents(traceId),
           fetchRunSnapshot(traceId).catch(() => null),
         ])
         if (cancelled) return

@@ -202,6 +202,18 @@ def audit_row_to_ndjson_events(row: Any) -> list[dict[str, Any]]:
 
 def ndjson_lines_from_rows(rows: list[Any]) -> Iterator[str]:
     """按时间正序输出 NDJSON 行（审计回放）。"""
+    for event in build_trace_replay_events(rows):
+        yield json.dumps(event, ensure_ascii=False) + "\n"
+
+
+def build_trace_replay_events(
+    rows: list[Any],
+    *,
+    resolve_row_texts: Any | None = None,
+) -> list[dict[str, Any]]:
+    """Flatten audit rows into replay events (Task 63 trace detail API)."""
+    from types import SimpleNamespace
+
     ordered = sorted(
         rows,
         key=lambda r: (
@@ -209,9 +221,17 @@ def ndjson_lines_from_rows(rows: list[Any]) -> Iterator[str]:
             int(getattr(r, "id", 0) or 0),
         ),
     )
+    events: list[dict[str, Any]] = []
     for row in ordered:
-        for event in audit_row_to_ndjson_events(row):
-            yield json.dumps(event, ensure_ascii=False) + "\n"
+        mapped = row
+        if resolve_row_texts is not None:
+            inp, out = resolve_row_texts(row)
+            mapping = dict(row._mapping) if hasattr(row, "_mapping") else row._asdict()
+            mapping["input_text"] = inp
+            mapping["output_text"] = out
+            mapped = SimpleNamespace(**mapping)
+        events.extend(audit_row_to_ndjson_events(mapped))
+    return events
 
 
 def _write_audit(record: dict) -> bool:

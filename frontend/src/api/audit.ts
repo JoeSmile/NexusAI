@@ -52,7 +52,7 @@ export type TraceSummary = {
   trace_id: string
   tenant_id: string
   user_id: string
-  started_at: string
+  last_activity_at: string
   actions: string[]
   total_tokens: number
   total_cost: number
@@ -111,7 +111,15 @@ export async function exportAuditCsv(q: Omit<AuditQuery, 'limit' | 'offset'> = {
   URL.revokeObjectURL(url)
 }
 
-/** NDJSON replay events for trace detail (Task 63). */
+/** Single-trace replay events (audit:read — Task 63 拍板 1A). */
+export async function fetchTraceEvents(traceId: string): Promise<AuditNdjsonEvent[]> {
+  const body = await apiGet<{ trace_id: string; events: AuditNdjsonEvent[]; count: number }>(
+    `/api/audit/trace/${encodeURIComponent(traceId)}/events`,
+  )
+  return body.events || []
+}
+
+/** NDJSON replay via export (audit:export) — prefer fetchTraceEvents for UI detail. */
 export async function fetchAuditNdjsonEvents(
   q: Omit<AuditQuery, 'limit' | 'offset'> = {},
 ): Promise<AuditNdjsonEvent[]> {
@@ -149,7 +157,7 @@ export function groupAuditRowsByTrace(rows: AuditLogRow[]): TraceSummary[] {
         trace_id: tid,
         tenant_id: r.tenant_id,
         user_id: r.user_id,
-        started_at: created,
+        last_activity_at: created,
         actions: r.action ? [r.action] : [],
         total_tokens: tokens,
         total_cost: Number(r.cost || 0),
@@ -159,8 +167,8 @@ export function groupAuditRowsByTrace(rows: AuditLogRow[]): TraceSummary[] {
       })
       continue
     }
-    if (created && created > existing.started_at) {
-      existing.started_at = created
+    if (created && created > existing.last_activity_at) {
+      existing.last_activity_at = created
     }
     if (r.action && !existing.actions.includes(r.action)) {
       existing.actions.push(r.action)
@@ -171,5 +179,7 @@ export function groupAuditRowsByTrace(rows: AuditLogRow[]): TraceSummary[] {
     if (r.error_code) existing.error_code = r.error_code
     existing.row_count += 1
   }
-  return [...map.values()].sort((a, b) => b.started_at.localeCompare(a.started_at))
+  return [...map.values()].sort((a, b) =>
+    b.last_activity_at.localeCompare(a.last_activity_at),
+  )
 }

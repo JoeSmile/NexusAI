@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from backend.core.capability.models import CapabilitySpec
 
-_CRITICAL_LEVELS = frozenset({"critical"})
+_SUB_AGENT_BLOCKED_LEVELS = frozenset({"critical", "high"})
 
 
 def capability_risk_level(spec: CapabilitySpec) -> str:
@@ -12,5 +12,11 @@ def capability_risk_level(spec: CapabilitySpec) -> str:
     return str(raw.get("risk_level") or "low").strip().lower()
 
 
+def is_sub_agent_blocked_capability(spec: CapabilitySpec) -> bool:
+    """Sub-agents may not invoke critical or high risk capabilities (Task 62 拍板 B)."""
+    return capability_risk_level(spec) in _SUB_AGENT_BLOCKED_LEVELS
+
+
 def is_critical_capability(spec: CapabilitySpec) -> bool:
-    return capability_risk_level(spec) in _CRITICAL_LEVELS
+    """Deprecated alias — use is_sub_agent_blocked_capability."""
+    return is_sub_agent_blocked_capability(spec)

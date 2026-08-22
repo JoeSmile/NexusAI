@@ -58,6 +58,25 @@ def test_governance_blocks_sub_agent_critical(admin_tenant: TenantContext) -> No
     assert ei.value.code == ErrorCode.AUTH_INSUFFICIENT_PERMISSIONS.value
 
 
+def test_governance_blocks_sub_agent_high(admin_tenant: TenantContext) -> None:
+    sub = make_sub_agent_context(admin_tenant, agent_id="a1")
+    high_risk = CapabilitySpec(
+        id="tool.external",
+        name="external",
+        kind=CapabilityKind.TOOL,
+        provider=CapabilityProvider.NEXUSAI,
+        permission="chat:write",
+        spec={"risk_level": "high"},
+    )
+
+    def allow(_spec, _tenant):
+        return None
+
+    with pytest.raises(NexusAIException) as ei:
+        run_governance_chain(high_risk, sub, {}, check_permission=allow)
+    assert ei.value.code == ErrorCode.AUTH_INSUFFICIENT_PERMISSIONS.value
+
+
 def test_governance_allows_sub_agent_low_risk(admin_tenant: TenantContext) -> None:
     sub = make_sub_agent_context(admin_tenant, agent_id="a1")
     safe = CapabilitySpec(

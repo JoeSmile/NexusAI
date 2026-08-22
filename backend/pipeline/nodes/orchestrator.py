@@ -260,8 +260,8 @@ async def execute_plan_ir(
     *,
     budget: SpawnBudget | None = None,
     spawn_total: int = 0,
-) -> tuple[dict[str, Any], PlanIR, int]:
-    """执行 PlanIR；返回 (step_results, 可能更新后的 plan, spawn_total)。"""
+) -> tuple[dict[str, Any], PlanIR, int, Blackboard]:
+    """执行 PlanIR；返回 (step_results, plan, spawn_total, blackboard)。"""
     budget = budget or resolve_spawn_budget()
     tenant = _tenant_from_state(state)
     step_results: dict[str, Any] = dict(state.get("step_results") or {})
