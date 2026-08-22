@@ -67,8 +67,21 @@ def run_governance_chain(
             payload=payload,
         )
 
-    # 1) policy — 本期恒 allow
-    explain.stages.append(_stage("policy", "allow", "default_allow"))
+    # 1) policy — sub-agent critical tool block (Task 62)
+    from backend.core.auth.subagent import is_sub_agent
+    from backend.core.capability.risk import is_critical_capability
+
+    if is_sub_agent(tenant) and is_critical_capability(spec):
+        explain.stages.append(
+            _stage("policy", "deny", f"sub_agent_critical_blocked:{spec.id}")
+        )
+        explain.reason = "sub_agent_critical_denied"
+        raise NexusAIException(
+            ErrorCode.AUTH_INSUFFICIENT_PERMISSIONS.value,
+            "sub_agent_critical_denied",
+            detail=explain.to_detail(),
+        )
+    explain.stages.append(_stage("policy", "allow", "policy_ok"))
 
     # 2) budget — 复用现有 cap rate/quota
     from backend.core.capability.governance import (

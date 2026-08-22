@@ -16,6 +16,7 @@ from backend.core.capability.registry import get_capability_registry
 from backend.core.guardrails.output_guard import check_output
 from backend.core.harness import LLMHarness
 from backend.core.plan.event_bus import bus_for_state
+from backend.core.plan.llm_output_guard import prevalidate_llm_plan
 from backend.core.plan.models import plan_to_state_dict
 from backend.core.plan.tool_index import search_capabilities
 from backend.core.plan.validator import validate_plan_ir
@@ -94,7 +95,11 @@ def validate_task_plan(
     """PlanIR 硬校验（Task 56）；caps_by_id 必填（白名单）。"""
     if not caps_by_id:
         raise ValueError("caps_by_id required for plan validation")
-    validate_plan_ir(plan, caps_by_id=caps_by_id, fallback_goal=fallback_goal)
+    validate_plan_ir(
+        prevalidate_llm_plan(plan, caps_by_id=caps_by_id),
+        caps_by_id=caps_by_id,
+        fallback_goal=fallback_goal,
+    )
 
 
 def _parse_plan_json(text: str) -> dict[str, Any]:
@@ -381,7 +386,7 @@ async def task_plan(state: PipelineState) -> PipelineState:
                     parsed, original_message=message
                 )
                 plan_ir = validate_plan_ir(
-                    enriched,
+                    prevalidate_llm_plan(enriched, caps_by_id=caps_by_id),
                     caps_by_id=caps_by_id,
                     fallback_goal=message,
                 )

@@ -72,6 +72,11 @@ class TenantContext:
     acting_user_id: str | None = None
     # Wave B — business roles from org memberships (optional; filled by callers)
     business_roles: list[str] | None = None
+    # Task 62 — sub-agent identity for permission isolation
+    agent_role: str = "main"
+    parent_agent_id: str | None = None
+    parent_trace_id: str | None = None
+    risk_level: str = "low"
 
     def has_permission(self, permission: str, *, org_scope: object | None = None) -> bool:
         """平台 ∪ extra ∪ 业务角色 — 委托 evaluate_permission（Wave B）。"""

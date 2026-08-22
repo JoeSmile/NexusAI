@@ -21,6 +21,7 @@ from datetime import datetime
 from typing import Any
 
 from backend.core.auth.models import TenantContext
+from backend.core.auth.subagent import make_sub_agent_context
 from backend.core.capability.errors import (
     CapabilityGovernanceRequiredError,
     CapabilityUpstreamError,
@@ -191,13 +192,21 @@ async def _invoke_child_capability(
     tenant: TenantContext,
     *,
     trace_id: str,
+    parent_agent_id: str | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
     """非 agent 子能力：leaf stub 或真实 ``invoke()``。"""
+    child_tenant = tenant
+    if parent_agent_id:
+        child_tenant = make_sub_agent_context(
+            tenant,
+            agent_id=parent_agent_id,
+            parent_trace_id=trace_id,
+        )
     if _is_leaf_stub(child):
         async for frame in _invoke_leaf_stub(
             child.id,
             payload,
-            tenant,
+            child_tenant,
             trace_id=trace_id,
             do_audit=_should_chain_audit(child),
         ):
@@ -210,11 +219,11 @@ async def _invoke_child_capability(
     if _should_chain_audit(child):
         _audit_agent_invoke(
             capability_id=child.id,
-            tenant=tenant,
+            tenant=child_tenant,
             input_text=_message_from_payload(payload),
             trace_id=trace_id,
         )
-    async for frame in invoke(child.id, payload, tenant):
+    async for frame in invoke(child.id, payload, child_tenant):
         yield frame
 
 
@@ -289,6 +298,11 @@ async def invoke_agent(
 
     registry = get_capability_registry()
     nested_text_parts: list[str] = []
+    child_tenant = (
+        make_sub_agent_context(tenant, agent_id=spec.id, parent_trace_id=trace_id)
+        if _depth == 0
+        else tenant
+    )
 
     # 主链：按 capabilities 顺序展开；agent 递归，叶子走 _invoke_leaf
     for cap_id in agent.capabilities:
@@ -297,7 +311,7 @@ async def invoke_agent(
             async for frame in invoke_agent(
                 child,
                 payload,
-                tenant,
+                child_tenant,
                 _depth=_depth + 1,
                 _chain=chain,
                 _trace_id=trace_id,
@@ -311,7 +325,11 @@ async def invoke_agent(
             if _should_chain_audit(child) and child.id not in chain:
                 chain.append(child.id)
             async for frame in _invoke_child_capability(
-                child, payload, tenant, trace_id=trace_id
+                child,
+                payload,
+                child_tenant,
+                trace_id=trace_id,
+                parent_agent_id=spec.id if _depth == 0 else None,
             ):
                 if frame.get("event") == "token":
                     nested_text_parts.append(str(frame.get("data") or ""))

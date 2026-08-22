@@ -14,9 +14,12 @@ from backend.core.harness import LLMHarness
 from backend.core.plan.blackboard import Blackboard, entry_from_step_result
 from backend.core.plan.event_bus import PlanEventBus, bus_for_state
 from backend.core.plan.execution import group_independent_batches
+from backend.core.plan.llm_output_guard import prevalidate_llm_plan
+from backend.core.plan.loop_guard import LoopGuard, LoopGuardError
 from backend.core.plan.models import OnFailMode, PlanIR, PlanStep
 from backend.core.plan.params_resolve import resolve_step_params
 from backend.core.plan.spawn_budget import SpawnBudget, resolve_spawn_budget
+from backend.core.plan.tool_output_guard import sanitize_tool_output
 from backend.core.plan.validator import topological_sort_steps, validate_plan_ir
 from backend.observability.decorators import enrich_span, observe
 from backend.pipeline.nodes.task_plan import _list_visible_capabilities, _tenant_from_state
@@ -99,9 +102,24 @@ async def _run_step_once(
     step_results: dict[str, Any],
     tenant: TenantContext,
     state: PipelineState | None = None,
+    loop_guard: LoopGuard | None = None,
 ) -> dict[str, Any]:
     payload = resolve_step_params(dict(step.params), step_results, state=state)
-    return await _collect_invoke(step.capability_id, payload, tenant)
+    if loop_guard is not None and state is not None:
+        loop_guard.check(
+            step.capability_id,
+            payload,
+            tenant_id=state.get("tenant_id") or "",
+            user_id=state.get("user_id") or "",
+            trace_id=str(state.get("trace_id") or ""),
+        )
+        loop_guard.persist(state)  # type: ignore[arg-type]
+    outcome = await _collect_invoke(step.capability_id, payload, tenant)
+    text = str(outcome.get("text") or outcome.get("output") or "")
+    sanitized = sanitize_tool_output(text)
+    if sanitized != text:
+        outcome = {**outcome, "text": sanitized, "output": sanitized}
+    return outcome
 
 
 async def _run_step_with_retry(
@@ -111,6 +129,7 @@ async def _run_step_with_retry(
     tenant: TenantContext,
     bus: PlanEventBus | None = None,
     state: PipelineState | None = None,
+    loop_guard: LoopGuard | None = None,
 ) -> dict[str, Any]:
     retry = step.retry
     max_attempts = 1 + (retry.max if step.on_fail == OnFailMode.RETRY and retry else 0)
@@ -119,7 +138,11 @@ async def _run_step_with_retry(
     for attempt in range(max_attempts):
         try:
             return await _run_step_once(
-                step, step_results=step_results, tenant=tenant, state=state
+                step,
+                step_results=step_results,
+                tenant=tenant,
+                state=state,
+                loop_guard=loop_guard if attempt == 0 else None,
             )
         except Exception as e:
             last_err = e
@@ -184,7 +207,7 @@ async def _replan_remaining(
         new_plan_raw = json.loads(m.group(0))
         new_plan_raw["goal"] = plan.goal
         validated = validate_plan_ir(
-            new_plan_raw,
+            prevalidate_llm_plan(new_plan_raw, caps_by_id=caps_by_id),
             caps_by_id=caps_by_id,
             fallback_goal=plan.goal,
         )
@@ -247,6 +270,7 @@ async def execute_plan_ir(
     bus = bus_for_state(state)
     blackboard = Blackboard.from_state(state)
     doc_refs = [str(x) for x in (state.get("rag_retrieved_ids") or [])]
+    loop_guard = LoopGuard.from_pipeline(state)
 
     while True:
         executed_ids = set(step_results.keys())
@@ -293,6 +317,7 @@ async def execute_plan_ir(
                         tenant=tenant,
                         bus=bus,
                         state=state,
+                        loop_guard=loop_guard,
                     )
                     step_results[step.id] = outcome
                     entry = entry_from_step_result(
@@ -318,6 +343,23 @@ async def execute_plan_ir(
                             status="succeeded",
                             summary=summary,
                         )
+                except LoopGuardError as e:
+                    step_results[step.id] = {
+                        "ok": False,
+                        "loop_guard": True,
+                        "error": e.detail,
+                        "capability_id": step.capability_id,
+                    }
+                    if bus is not None:
+                        bus.publish_step(
+                            step.id,
+                            capability_id=step.capability_id,
+                            status="failed",
+                            summary=e.detail[:200],
+                        )
+                    state["finish_reason"] = "loop_guard"
+                    state["response"] = e.detail  # type: ignore[typeddict-item]
+                    raise OrchestratorError(e.detail) from e
                 except Exception as e:
                     err = str(e)
                     if step.on_fail == OnFailMode.SKIP:
@@ -445,6 +487,10 @@ async def orchestrator(state: PipelineState) -> PipelineState:
     except OrchestratorError as e:
         if state.get("finish_reason") == "routed_to_llm":
             enrich_span(metadata={"path": "orchestrator_replan_fallback"})
+            return state
+        if state.get("finish_reason") == "loop_guard":
+            state["response"] = str(state.get("response") or e)
+            enrich_span(metadata={"path": "orchestrator_loop_guard"})
             return state
         state["finish_reason"] = "error"
         state["error_code"] = "ORCH_001"

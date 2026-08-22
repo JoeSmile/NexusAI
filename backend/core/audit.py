@@ -96,10 +96,16 @@ def write_governance_audit(
     explain: dict[str, Any],
     lineage: AuditLineage | None = None,
     langfuse_ids: dict[str, str | None] | None = None,
+    agent_role: str | None = None,
+    parent_agent_id: str | None = None,
 ) -> bool:
     """治理链 allow/deny 可解释审计（不含 params 明文）。"""
     lin = lineage or get_audit_lineage()
     payload = dict(explain)
+    if agent_role:
+        payload["agent_role"] = agent_role
+    if parent_agent_id:
+        payload["parent_agent_id"] = parent_agent_id
     if langfuse_ids:
         payload["langfuse"] = {k: v for k, v in langfuse_ids.items() if v}
     detail = json.dumps(payload, ensure_ascii=False)

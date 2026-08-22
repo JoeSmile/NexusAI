@@ -343,6 +343,8 @@ async def invoke(
         explain=explain.to_dict(),
         lineage=get_audit_lineage(),
         langfuse_ids=current_langfuse_trace_ids(),
+        agent_role=tenant.agent_role,
+        parent_agent_id=tenant.parent_agent_id,
     )
 
     safe_payload = await prepare_payload_with_guards(payload)
