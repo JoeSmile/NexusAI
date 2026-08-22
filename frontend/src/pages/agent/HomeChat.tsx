@@ -18,7 +18,9 @@ import {
   fetchChatHistory,
   postChatNote,
 } from '@/api/chat'
+import { postMultimodalChat } from '@/api/multimodal'
 import { formatApiError } from '@/api/http'
+import { fetchTermsPending } from '@/api/terms'
 import { ContextPanel } from '@/components/agent/ContextPanel'
 import { ExecutionPanel } from '@/components/agent/ExecutionPanel'
 import { BookmarksDrawer } from '@/components/agent/BookmarksDrawer'
@@ -38,7 +40,10 @@ import { useChatStream, type ChatMessage } from '@/hooks/useChatStream'
 import { runHotspotDigInPlace } from '@/lib/runHotspotDigInPlace'
 import { runScriptGenInPlace } from '@/lib/runScriptGenInPlace'
 import { useChatPrefsStore } from '@/stores/chatPrefsStore'
+import { useAuthStore } from '@/stores/authStore'
 import { useWorkflowTriggerStore } from '@/stores/workflowTriggerStore'
+import { TermsAcceptanceDialog } from '@/components/legal/TermsAcceptanceDialog'
+import type { TermsDoc } from '@/api/terms'
 
 export default function HomeChatPage() {
   const {
@@ -74,6 +79,13 @@ export default function HomeChatPage() {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [dayCollectionOpen, setDayCollectionOpen] = useState(false)
   const [dislikeCid, setDislikeCid] = useState<string | null>(null)
+  const [termsPending, setTermsPending] = useState<TermsDoc[]>([])
+  const [pendingImage, setPendingImage] = useState<File | null>(null)
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
+  const [visionErr, setVisionErr] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const role = useAuthStore((s) => s.activeRole)
+  const canVision = role === 'tenant_admin' || role === 'super_admin'
   /** 历史首屏加载完成后强制滚底（内容运营切回对话） */
   const [historyScrollNonce, setHistoryScrollNonce] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -131,6 +143,21 @@ export default function HomeChatPage() {
       cancelled = true
     }
   }, [replaceHistory, mapHistoryItems, hydrateFeedback])
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetchTermsPending()
+        if (!cancelled) setTermsPending(res.pending || [])
+      } catch {
+        if (!cancelled) setTermsPending([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // 历史渲染进 PullToRefresh 后再滚底（单次 rAF 常赶不上 commit）
   // 仅跟 historyScrollNonce：勿依赖 messages.length，否则「加载更早」会误滚底
@@ -412,11 +439,43 @@ export default function HomeChatPage() {
 
   const onSend = async () => {
     const text = input.trim()
-    if (!text) return
+    if (!text && !pendingImage) return
     if (streaming) {
       abort()
     }
     setInput('')
+    setVisionErr(null)
+
+    if (pendingImage) {
+      const preview = imagePreviewUrl
+      const file = pendingImage
+      setPendingImage(null)
+      setImagePreviewUrl(null)
+      const userId = appendLocal(
+        'user',
+        text || '（图片）',
+        'done',
+        preview || undefined,
+      )
+      const asstId = appendLocal('assistant', '', 'streaming')
+      try {
+        const res = await postMultimodalChat(file, text || '请描述这张图片', {
+          session_id: WORKSPACE_CHAT_SESSION,
+          ...(modelId ? { model: modelId } : {}),
+        })
+        patchLocal(asstId, res.response, 'done')
+      } catch (e) {
+        patchLocal(
+          asstId,
+          formatApiError(e, 'multimodal:vision'),
+          'error',
+        )
+        setVisionErr(formatApiError(e, 'multimodal:vision'))
+      }
+      void userId
+      return
+    }
+
     await send(text, {
       session_id: WORKSPACE_CHAT_SESSION,
       ...(modelId ? { model: modelId } : {}),
@@ -522,6 +581,8 @@ export default function HomeChatPage() {
       const body = !text && status === 'streaming' ? '…' : text
 
       const cid = String(msg._id)
+      const localMsg = messages.find((m) => m.id === cid)
+      const imagePreview = localMsg?.imagePreview
       const st = feedbackByMsg[cid]
       const liked = st?.reaction?.type === 'helpful'
       const disliked = st?.reaction?.type === 'irrelevant'
@@ -531,7 +592,16 @@ export default function HomeChatPage() {
         <div className={isUser ? 'chat-bubble-wrap is-user' : 'chat-bubble-wrap is-ai'}>
           <Bubble>
             {isUser ? (
-              <div className="chat-bubble-plain">{body}</div>
+              <div className="chat-bubble-plain">
+                {imagePreview ? (
+                  <img
+                    src={imagePreview}
+                    alt="上传图片"
+                    style={{ maxWidth: 220, borderRadius: 8, marginBottom: 8 }}
+                  />
+                ) : null}
+                {body}
+              </div>
             ) : (
               <div className="chat-bubble-md">
                 {body.includes('<<<DIG>>>') ||
@@ -603,7 +673,7 @@ export default function HomeChatPage() {
         </div>
       )
     },
-    [expandedDig, feedbackByMsg, copyText, toggleReaction, toggleBookmark],
+    [expandedDig, feedbackByMsg, messages, copyText, toggleReaction, toggleBookmark],
   )
 
   return (
@@ -730,6 +800,45 @@ export default function HomeChatPage() {
             ))}
           </div>
           {wfToast ? <div className="chat-wf-toast">{wfToast}</div> : null}
+          {visionErr ? (
+            <div style={{ fontSize: 12, color: 'var(--color-danger)', padding: '0 8px' }}>
+              {visionErr}
+            </div>
+          ) : null}
+          {imagePreviewUrl ? (
+            <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <img
+                src={imagePreviewUrl}
+                alt="待发送"
+                style={{ height: 56, borderRadius: 6, objectFit: 'cover' }}
+              />
+              <button
+                type="button"
+                className="input-action-btn"
+                onClick={() => {
+                  setPendingImage(null)
+                  if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl)
+                  setImagePreviewUrl(null)
+                }}
+              >
+                移除图片
+              </button>
+            </div>
+          ) : null}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/gif"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              e.target.value = ''
+              if (!f) return
+              if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl)
+              setPendingImage(f)
+              setImagePreviewUrl(URL.createObjectURL(f))
+            }}
+          />
           <div className="input-wrapper">
             <textarea
               ref={textareaRef}
@@ -748,6 +857,15 @@ export default function HomeChatPage() {
             />
             <div className="input-footer">
               <div className="input-actions-left">
+                {canVision ? (
+                  <button
+                    type="button"
+                    className="input-action-btn with-label"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    图片
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="input-action-btn with-label"
@@ -823,7 +941,7 @@ export default function HomeChatPage() {
                     type="button"
                     className="send-btn"
                     onClick={() => void onSend()}
-                    disabled={!input.trim()}
+                    disabled={!input.trim() && !pendingImage}
                     aria-label="发送"
                   >
                     ↑
@@ -882,6 +1000,10 @@ export default function HomeChatPage() {
             if (ok) setDislikeCid(null)
           })
         }}
+      />
+      <TermsAcceptanceDialog
+        pending={termsPending}
+        onAccepted={() => setTermsPending([])}
       />
     </>
   )

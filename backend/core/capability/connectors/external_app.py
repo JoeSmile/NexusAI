@@ -23,6 +23,7 @@ from backend.core.capability.errors import CapabilityUpstreamError
 from backend.core.capability.models import CapabilityProvider, CapabilitySpec
 from backend.core.capability.registry import resolve_credential
 from backend.core.circuit_breaker import CircuitBreaker, CircuitState
+from backend.core.security.url_guard import UrlValidationError, validate_base_url
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,13 @@ def _mock_enabled() -> bool:
     ):
         return True
     return os.getenv("LLM_PROVIDER", "").strip().lower() == "mock"
+
+
+def _safe_base_url(raw: str, *, spec_id: str) -> str:
+    try:
+        return validate_base_url(raw)
+    except UrlValidationError as exc:
+        raise CapabilityUpstreamError(message=exc.code, detail=spec_id) from exc
 
 
 @dataclass(frozen=True)
@@ -100,6 +108,7 @@ def build_dify_request(
     base = str(spec.spec.get("base_url") or "").rstrip("/")
     if not base:
         raise CapabilityUpstreamError(message="missing_base_url", detail=spec.id)
+    base = _safe_base_url(base, spec_id=spec.id)
     # base 可含 /v1；默认打 workflows/run
     path = str(spec.spec.get("path") or "/workflows/run")
     if not path.startswith("/"):
@@ -132,6 +141,7 @@ def build_coze_request(
     spec: CapabilitySpec, payload: dict[str, Any], tenant: TenantContext
 ) -> UpstreamRequest:
     base = str(spec.spec.get("base_url") or "https://api.coze.com").rstrip("/")
+    base = _safe_base_url(base, spec_id=spec.id)
     path = str(spec.spec.get("path") or "/v3/chat")
     if not path.startswith("/"):
         path = "/" + path

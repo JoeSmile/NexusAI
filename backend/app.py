@@ -207,8 +207,10 @@ def _lazy_include(
 
 def create_app() -> FastAPI:
     """创建并配置 FastAPI 应用实例。"""
+    from backend.core.auth.jwt_session import assert_jwt_secret_strength
     from backend.core.production_guard import assert_production_security
 
+    assert_jwt_secret_strength()
     assert_production_security()
 
     app = FastAPI(
@@ -264,6 +266,23 @@ def create_app() -> FastAPI:
     _lazy_include(app, "backend.routers", "admin_router", prefix="/api", required=True)
     _lazy_include(app, "backend.routers", "ab_router", prefix="/api", required=True)
     _lazy_include(app, "backend.routers", "audit_router", prefix="/api", required=True)
+    _lazy_include(app, "backend.routers", "billing_router", prefix="/api", required=True)
+    _lazy_include(
+        app,
+        "backend.routers.terms",
+        "router",
+        prefix="/api",
+        required=True,
+        label="Terms",
+    )
+    _lazy_include(
+        app,
+        "backend.routers.multimodal",
+        "router",
+        prefix="/api",
+        required=True,
+        label="Multimodal",
+    )
     _lazy_include(app, "backend.routers.files", "router", required=True)
     _lazy_include(
         app, "backend.pipeline.router", "router", required=True, label="LangGraph 管线"

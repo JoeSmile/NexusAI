@@ -63,6 +63,12 @@ errors_total = Counter(
     labelnames=["tenant", "error_code"],
 )
 
+# ── 审计指标（Task 59 S3）──
+audit_write_failures_total = Counter(
+    "nexusai_audit_write_failures_total",
+    "Audit log write failures",
+)
+
 
 class MetricsMiddleware(BaseHTTPMiddleware):
     """自动记录请求指标"""

@@ -13,9 +13,20 @@ from sqlalchemy import text
 
 from backend.core.auth.models import TenantContext
 from backend.core.auth.permissions import require_permission
+from backend.core.security.url_guard import UrlValidationError, validate_base_url
 from backend.database.pgvector_session import get_pg_session
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+def _guard_base_url(url: str) -> str:
+    try:
+        return validate_base_url(url)
+    except UrlValidationError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "SSRF_001", "message": exc.code},
+        ) from exc
 
 
 # ── Schema ──────────────────────────────────────
@@ -523,7 +534,7 @@ async def create_llm_key(
     allowed_models = _normalize_single_model(
         model=req.model, allowed_models=req.allowed_models
     )
-    base_url = (req.base_url or "").strip()
+    base_url = _guard_base_url((req.base_url or "").strip())
     if not base_url:
         raise HTTPException(
             status_code=400,
@@ -636,7 +647,7 @@ async def patch_llm_key(
         )
 
     if req.base_url is not None:
-        url = req.base_url.strip()
+        url = _guard_base_url(req.base_url.strip())
         if not url:
             raise HTTPException(
                 status_code=400,

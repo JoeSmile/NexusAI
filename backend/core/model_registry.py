@@ -70,6 +70,16 @@ def _default_models() -> dict[str, ModelSpec]:
             tier="cheap",
             capability="chat",
         ),
+        "qwen-vl-plus": ModelSpec(
+            name="qwen-vl-plus",
+            provider="qwen",
+            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+            api_key_ref="QWEN_API_KEY",
+            capability="vision",
+            cost_per_1k=0.0008,
+            max_tokens=2048,
+            tier="cheap",
+        ),
     }
     # MODEL_REGISTRY_JSON='[{"name":"local-7b","provider":"vllm","base_url":"http://localhost:8001/v1",...}]'
     raw = os.getenv("MODEL_REGISTRY_JSON", "").strip()
@@ -178,3 +188,7 @@ def select_embedding_model() -> ModelSpec:
 
 def list_models() -> list[ModelSpec]:
     return [m for m in get_registry().values() if m.enabled]
+
+
+def list_vision_models() -> list[ModelSpec]:
+    return [m for m in get_registry().values() if m.enabled and m.capability == "vision"]

@@ -29,6 +29,7 @@ ROLES: dict[str, dict] = {
         "description": "租户管理员",
         "permissions": [
             "chat:*",
+            "multimodal:vision",
             "kb:*",
             "admin:approve",
             "admin:llm_key",

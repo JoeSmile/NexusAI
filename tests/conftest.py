@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import os
 
+# Strong JWT before backend.app import (Task 59 S6 startup check)
+os.environ.setdefault("JWT_SECRET", "test-jwt-secret-wave-a-min-32-bytes!!")
+
 import pytest
 
 

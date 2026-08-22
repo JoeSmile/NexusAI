@@ -17,6 +17,8 @@ export interface ChatMessage {
   role: ChatRole
   content: string
   status?: 'streaming' | 'done' | 'error' | 'aborted'
+  /** Local preview URL for attached images */
+  imagePreview?: string
   /** DB chat_messages.id — history rows only; used as pagination cursor */
   dbId?: number
 }
@@ -162,9 +164,14 @@ export function useChatStream(endpoint = '/chat/streaming') {
   }, [abort])
 
   const appendLocal = useCallback(
-    (role: ChatRole, content: string, status: ChatMessage['status'] = 'done') => {
+    (
+      role: ChatRole,
+      content: string,
+      status: ChatMessage['status'] = 'done',
+      imagePreview?: string,
+    ) => {
       const id = newClientMessageId()
-      setMessages((m) => [...m, { id, role, content, status }])
+      setMessages((m) => [...m, { id, role, content, status, imagePreview }])
       return id
     },
     [],

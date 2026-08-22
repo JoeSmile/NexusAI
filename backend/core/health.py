@@ -107,6 +107,15 @@ async def health_check():
     except Exception:
         checks["langfuse"] = {"status": "not_configured"}
 
+    # 6. 审计写入失败计数（Task 59 S3）
+    try:
+        from backend.core.audit import audit_write_failure_count
+
+        failures = audit_write_failure_count()
+        checks["audit"] = {"write_failures": failures}
+    except Exception:
+        checks["audit"] = {"write_failures": None, "status": "unknown"}
+
     http_status = 200 if overall == "healthy" else 503
     return JSONResponse(
         status_code=http_status,

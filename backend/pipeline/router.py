@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from backend.core.audit import log_audit
 from backend.core.audit_context import bind_audit_lineage
+from backend.core.billing.context import bind_billing_context
 from backend.core.auth.models import TenantContext
 from backend.core.auth.permissions import require_permission
 from backend.core.errors import ErrorCode, NexusAIException
@@ -52,6 +53,17 @@ def _require_chat_model(body: ChatRequest) -> None:
             "model_required",
             detail="Pick a model in the UI",
         )
+
+
+def _enforce_terms(request: Request, tenant: TenantContext) -> None:
+    from backend.core.terms.service import enforce_terms_for_chat
+
+    enforce_terms_for_chat(
+        tenant_id=tenant.tenant_id,
+        user_id=tenant.user_id,
+        credential_kind="company",
+        ip_address=request.client.host if request.client else None,
+    )
 
 
 class ChatResponse(BaseModel):
@@ -101,6 +113,7 @@ async def _run_chat_pipeline(
     finish_reason = "error"
 
     _require_chat_model(body)
+    _enforce_terms(request, tenant)
 
     initial = make_initial_state(
         tenant_id=tenant.tenant_id,
@@ -121,6 +134,7 @@ async def _run_chat_pipeline(
         llm_max_tokens=body.max_tokens,
     )
     bind_audit_lineage(trace_id=initial["trace_id"])
+    bind_billing_context(user_id=tenant.user_id, trace_id=initial["trace_id"])
     _inject_langfuse_parent(initial)
 
     try:
@@ -281,6 +295,7 @@ async def chat_streaming(
     logger = logging.getLogger(__name__)
 
     _require_chat_model(body)
+    _enforce_terms(request, tenant)
 
     initial = make_initial_state(
         tenant_id=tenant.tenant_id,
@@ -302,6 +317,7 @@ async def chat_streaming(
     )
     initial["stream_mode"] = True
     bind_audit_lineage(trace_id=initial["trace_id"])
+    bind_billing_context(user_id=tenant.user_id, trace_id=initial["trace_id"])
     _inject_langfuse_parent(initial)
 
     try:
@@ -341,6 +357,9 @@ async def chat_streaming(
     from backend.pipeline.nodes.conversion_hook import conversion_hook
     from backend.pipeline.nodes.write_memory import write_memory
 
+    from backend.core.billing.context import bind_billing_from_pipeline_state
+
+    bind_billing_from_pipeline_state(final)
     harness = LLMHarness()
     model = final.get("selected_model") or "deepseek-v4-flash"
     prompt = (

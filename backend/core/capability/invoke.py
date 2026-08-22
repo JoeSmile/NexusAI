@@ -109,6 +109,17 @@ async def _invoke_model(
     api_key_ref = str(spec.spec.get("api_key_ref") or "")
     api_key = resolve_credential(api_key_ref, tenant_id=tenant.tenant_id) or None
     base_url = str(spec.spec.get("base_url") or "") or None
+    if base_url:
+        from backend.core.security.url_guard import UrlValidationError, validate_base_url
+
+        try:
+            base_url = validate_base_url(base_url)
+        except UrlValidationError as exc:
+            raise NexusAIException(
+                ErrorCode.REQ_INVALID.value,
+                exc.code,
+                detail="invalid_base_url",
+            ) from exc
     max_tokens = int(spec.spec.get("max_tokens") or payload.get("max_tokens") or 1000)
 
     harness = LLMHarness()

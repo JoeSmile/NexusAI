@@ -11,6 +11,7 @@ from backend.core.cost_manager import (
     COST_TABLE,
     calculate_cost,
     check_budget,
+    count_message_tokens,
     count_tokens,
     estimate_cost,
     record_consumption,
@@ -30,6 +31,36 @@ async def _budget_allows(tenant_id: str, estimated: float) -> bool:
     if get_llm_provider() in ("mock", "replay"):
         return True
     return await check_budget(tenant_id, estimated)
+
+
+async def _wallet_allows(tenant_id: str, estimated: float) -> bool:
+    if get_llm_provider() in ("mock", "replay"):
+        return True
+    from backend.core.billing.context import get_billing_context
+    from backend.core.billing.wallet import check_wallet_allows
+
+    ctx = get_billing_context()
+    return await check_wallet_allows(tenant_id, estimated, ctx.credential_kind)
+
+
+async def _terms_allows(tenant_id: str) -> bool:
+    if get_llm_provider() in ("mock", "replay"):
+        return True
+    from backend.core.billing.context import get_billing_context
+    from backend.core.terms.service import is_terms_enforcement_enabled, list_pending_terms
+
+    if not is_terms_enforcement_enabled():
+        return True
+    ctx = get_billing_context()
+    uid = (ctx.user_id or "").strip()
+    if not uid:
+        return True
+    pending = list_pending_terms(
+        tenant_id=tenant_id,
+        user_id=uid,
+        credential_kind=ctx.credential_kind,
+    )
+    return not pending
 
 
 def _completion_kwargs(
@@ -68,6 +99,22 @@ class LLMHarness(Harness):
         **kwargs: Any,
     ) -> HarnessResult:
         estimated = estimate_cost(model, kwargs.get("max_tokens") or 1000)
+        if not await _terms_allows(tenant_id):
+            return HarnessResult(
+                output="请先阅读并同意服务条款与隐私政策。",
+                type="llm",
+                name=model,
+                success=False,
+                error="TERMS_001",
+            )
+        if not await _wallet_allows(tenant_id, estimated):
+            return HarnessResult(
+                output="余额不足，请求被拒绝。请先充值。",
+                type="llm",
+                name=model,
+                success=False,
+                error="BILLING_003",
+            )
         if not await _budget_allows(tenant_id, estimated):
             return HarnessResult(
                 output="预算超限，请求被拒绝。",
@@ -77,7 +124,7 @@ class LLMHarness(Harness):
                 error="COST_001",
             )
 
-        input_tokens = sum(count_tokens(m.get("content", "")) for m in messages)
+        input_tokens = sum(count_message_tokens(m) for m in messages)
 
         from backend.core.llm_concurrency import llm_slot
 
@@ -123,7 +170,14 @@ class LLMHarness(Harness):
 
         output_tokens = count_tokens(str(result.output or ""))
         cost = calculate_cost(model, input_tokens + output_tokens)
-        record_consumption(tenant_id, cost, input_tokens + output_tokens, model)
+        record_consumption(
+            tenant_id,
+            cost,
+            input_tokens + output_tokens,
+            model,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+        )
 
         try:
             from backend.observability.decorators import langfuse_context
@@ -175,13 +229,19 @@ class LLMHarness(Harness):
     ) -> AsyncIterator[str]:
         """真流式主体（已在并发槽内）。"""
         estimated = estimate_cost(model, kwargs.get("max_tokens") or 1000)
+        if not await _terms_allows(tenant_id):
+            yield "请先阅读并同意服务条款与隐私政策。"
+            return
+        if not await _wallet_allows(tenant_id, estimated):
+            yield "余额不足，请求被拒绝。请先充值。"
+            return
         if not await _budget_allows(tenant_id, estimated):
             yield "预算超限，请求被拒绝。"
             return
 
         key = api_key or os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or ""
         provider = get_llm_provider()
-        input_tokens = sum(count_tokens(m.get("content", "")) for m in messages)
+        input_tokens = sum(count_message_tokens(m) for m in messages)
         collected: list[str] = []
         prompt = "\n".join(m.get("content", "") for m in messages)
 
@@ -248,7 +308,14 @@ class LLMHarness(Harness):
         output_text = "".join(collected)
         output_tokens = count_tokens(output_text)
         cost = calculate_cost(model, input_tokens + output_tokens)
-        record_consumption(tenant_id, cost, input_tokens + output_tokens, model)
+        record_consumption(
+            tenant_id,
+            cost,
+            input_tokens + output_tokens,
+            model,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+        )
         try:
             from backend.observability.decorators import langfuse_context
 

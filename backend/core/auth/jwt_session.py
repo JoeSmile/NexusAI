@@ -14,6 +14,37 @@ import jwt
 from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
 
 _ALG = "HS256"
+_MIN_SECRET_LEN = 32
+_FORBIDDEN_SUBSTR = "change-me"
+
+
+class JwtSecretError(RuntimeError):
+    """Raised when JWT_SECRET is missing or fails strength checks."""
+
+
+def validate_jwt_secret_strength(secret: str) -> None:
+    """Reject weak or placeholder secrets (Task 59 S6)."""
+    s = (secret or "").strip()
+    if len(s) < _MIN_SECRET_LEN:
+        raise JwtSecretError(
+            f"JWT_SECRET must be at least {_MIN_SECRET_LEN} characters "
+            f"(got {len(s)}); generate with: "
+            "python -c \"import secrets; print(secrets.token_urlsafe(48))\""
+        )
+    if _FORBIDDEN_SUBSTR in s.lower():
+        raise JwtSecretError(
+            "JWT_SECRET contains forbidden placeholder 'change-me'; "
+            "generate a strong random value"
+        )
+
+
+def assert_jwt_secret_strength() -> None:
+    """Startup check — refuse boot with weak JWT_SECRET."""
+    try:
+        secret = _jwt_secret()
+    except RuntimeError as exc:
+        raise JwtSecretError(str(exc)) from exc
+    validate_jwt_secret_strength(secret)
 
 
 def _jwt_secret() -> str:

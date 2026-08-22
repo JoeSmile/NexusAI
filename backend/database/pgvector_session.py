@@ -119,8 +119,98 @@ class AuditLog(Base):
     parent_trace_id = Column(String(100), nullable=True)
     tool_use_id = Column(String(100), nullable=True)
     decision_explain = Column(Text, nullable=True)
+    modality = Column(String(32), nullable=True)
+    image_hash = Column(String(64), nullable=True)
     __table_args__ = (
         Index("idx_audit_tenant_time", "tenant_id", "created_at"),
+    )
+
+
+class UsageRecord(Base):
+    """Append-only billing meter (Task 55) — not coupled to audit retention."""
+
+    __tablename__ = "usage_records"
+    id = Column(_PK, primary_key=True, autoincrement=True)
+    tenant_id = Column(String(50), nullable=False, index=True)
+    user_id = Column(String(100), nullable=False)
+    trace_id = Column(String(100), nullable=True)
+    credential_kind = Column(String(32), nullable=False, default="company")
+    key_id = Column(String(100), nullable=True)
+    model = Column(String(100), nullable=False)
+    provider = Column(String(64), nullable=False, default="default")
+    input_tokens = Column(Integer, nullable=False, default=0)
+    output_tokens = Column(Integer, nullable=False, default=0)
+    cost = Column(Numeric(14, 6), nullable=False, default=0)
+    currency = Column(String(8), nullable=False, default="CNY")
+    billing_month = Column(String(7), nullable=False)
+    idempotency_key = Column(String(128), nullable=False, unique=True)
+    modality = Column(String(32), nullable=True, default="text")
+    image_hash = Column(String(64), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    __table_args__ = (
+        Index("ix_usage_records_tenant_month", "tenant_id", "billing_month"),
+        Index("ix_usage_records_tenant_created", "tenant_id", "created_at"),
+    )
+
+
+class Wallet(Base):
+    __tablename__ = "wallets"
+    id = Column(_PK, primary_key=True, autoincrement=True)
+    tenant_id = Column(String(50), nullable=False, unique=True, index=True)
+    balance = Column(Numeric(14, 4), nullable=False, default=0)
+    currency = Column(String(8), nullable=False, default="CNY")
+    version = Column(Integer, nullable=False, default=0)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class WalletTransaction(Base):
+    __tablename__ = "wallet_transactions"
+    id = Column(_PK, primary_key=True, autoincrement=True)
+    tenant_id = Column(String(50), nullable=False, index=True)
+    type = Column(String(16), nullable=False)
+    amount = Column(Numeric(14, 4), nullable=False)
+    balance_after = Column(Numeric(14, 4), nullable=False)
+    method = Column(String(32), nullable=False, default="manual")
+    reference_no = Column(String(128), nullable=True)
+    operator = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    __table_args__ = (
+        Index("ix_wallet_tx_tenant_created", "tenant_id", "created_at"),
+    )
+
+
+class TermsVersion(Base):
+    __tablename__ = "terms_versions"
+    id = Column(_PK, primary_key=True, autoincrement=True)
+    version = Column(String(32), nullable=False)
+    kind = Column(String(32), nullable=False)
+    effective_at = Column(DateTime, default=datetime.utcnow)
+    content_md = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    __table_args__ = (
+        UniqueConstraint("kind", "version", name="uq_terms_versions_kind_version"),
+        Index("ix_terms_versions_kind_effective", "kind", "effective_at"),
+    )
+
+
+class TermsAcceptance(Base):
+    __tablename__ = "terms_acceptances"
+    id = Column(_PK, primary_key=True, autoincrement=True)
+    tenant_id = Column(String(50), nullable=False, index=True)
+    user_id = Column(String(100), nullable=False)
+    kind = Column(String(32), nullable=False)
+    version = Column(String(32), nullable=False)
+    accepted_at = Column(DateTime, default=datetime.utcnow)
+    ip_address = Column(String(50), nullable=True)
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "user_id",
+            "kind",
+            "version",
+            name="uq_terms_acceptances_user_kind_version",
+        ),
+        Index("ix_terms_acceptances_tenant_user", "tenant_id", "user_id"),
     )
 
 

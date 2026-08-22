@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { fetchUsageSummary } from '@/api/audit'
+import { fetchWallet } from '@/api/billing'
 import { listArtifacts } from '@/api/contentOps'
 import { formatApiError } from '@/api/http'
 
@@ -12,6 +13,7 @@ type Stats = {
   calls: number | null
   tokens: number | null
   cost: number | null
+  walletBalance: number | null
   hotspots: number
   scripts: number
 }
@@ -25,12 +27,13 @@ export default function WorkspaceDashboard() {
     ;(async () => {
       try {
         let usageHint = ''
-        const [usage, arts] = await Promise.all([
+        const [usage, arts, wallet] = await Promise.all([
           fetchUsageSummary().catch((e) => {
             usageHint = formatApiError(e, 'audit:read')
             return null
           }),
           listArtifacts().catch(() => ({ items: [] as { kind?: string }[], count: 0 })),
+          fetchWallet().catch(() => null),
         ])
         const items = arts.items || []
         if (cancelled) return
@@ -39,6 +42,7 @@ export default function WorkspaceDashboard() {
           calls: usage ? Number(usage.calls) : null,
           tokens: usage ? Number(usage.tokens) : null,
           cost: usage ? Number(usage.cost) : null,
+          walletBalance: wallet ? Number(wallet.balance) : null,
           hotspots: items.filter((x) =>
             ['hotspot_day', 'hotspot_run', 'hotspot'].includes(String(x.kind)),
           ).length,
@@ -59,6 +63,10 @@ export default function WorkspaceDashboard() {
     {
       label: '今日成本',
       value: stats?.cost == null ? '—' : `¥${stats.cost.toFixed(3)}`,
+    },
+    {
+      label: '钱包余额',
+      value: stats?.walletBalance == null ? '—' : `¥${stats.walletBalance.toFixed(2)}`,
     },
     { label: '内容库热点/口播', value: stats ? `${stats.hotspots} / ${stats.scripts}` : '—' },
   ]

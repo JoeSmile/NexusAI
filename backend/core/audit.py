@@ -16,6 +16,13 @@ from backend.database.pgvector_session import get_pg_session
 
 logger = logging.getLogger(__name__)
 
+_audit_write_failure_count = 0
+
+
+def audit_write_failure_count() -> int:
+    """进程内审计写入失败次数（供 /health 与单测）。"""
+    return _audit_write_failure_count
+
 
 def log_audit(
     background_tasks: BackgroundTasks,
@@ -40,6 +47,8 @@ def log_audit(
     parent_trace_id: str | None = None,
     tool_use_id: str | None = None,
     decision_explain: str | None = None,
+    modality: str | None = None,
+    image_hash: str | None = None,
 ) -> None:
     """发起异步审计写入（不阻塞当前请求）"""
     lineage = get_audit_lineage()
@@ -67,6 +76,8 @@ def log_audit(
             "parent_trace_id": parent_trace_id or lineage.parent_trace_id,
             "tool_use_id": tool_use_id or lineage.tool_use_id,
             "decision_explain": decision_explain,
+            "modality": modality,
+            "image_hash": image_hash,
             "created_at": datetime.utcnow(),
         },
     )
@@ -198,6 +209,8 @@ def _write_audit(record: dict) -> bool:
             "parent_trace_id": None,
             "tool_use_id": None,
             "decision_explain": None,
+            "modality": None,
+            "image_hash": None,
             "model": "",
             "input_tokens": 0,
             "output_tokens": 0,
@@ -236,7 +249,7 @@ def _write_audit(record: dict) -> bool:
                      error_code, ip_address, user_agent,
                      credential_kind, key_id, run_id, node_id,
                      dedupe_key, parent_trace_id, tool_use_id, decision_explain,
-                     created_at)
+                     modality, image_hash, created_at)
                 VALUES
                     (:tenant_id, :user_id, :action, :trace_id,
                      :input_text, :output_text, :model,
@@ -244,11 +257,48 @@ def _write_audit(record: dict) -> bool:
                      :error_code, :ip_address, :user_agent,
                      :credential_kind, :key_id, :run_id, :node_id,
                      :dedupe_key, :parent_trace_id, :tool_use_id, :decision_explain,
-                     :created_at)
+                     :modality, :image_hash, :created_at)
             """)
             session.execute(sql, record)
             session.commit()
         return True
     except Exception:
         logger.exception("审计日志写入失败")
+        _record_audit_write_failure(record)
         return False
+
+
+def _record_audit_write_failure(record: dict) -> None:
+    global _audit_write_failure_count
+    _audit_write_failure_count += 1
+    try:
+        from backend.core.metrics import audit_write_failures_total
+
+        audit_write_failures_total.inc()
+    except Exception:
+        logger.debug("audit failure metric increment skipped", exc_info=True)
+    _alert_audit_write_failure(record)
+
+
+def _alert_audit_write_failure(record: dict) -> None:
+    """Task 44 通知通道 — 失败静默，不阻断业务。"""
+    try:
+        from backend.modules.notification import notify
+        from backend.modules.notification.service import refs_only
+
+        tenant_id = str(record.get("tenant_id") or "system")
+        user_id = str(record.get("user_id") or "system")
+        notify(
+            tenant_id,
+            user_id,
+            "security.audit_write_failed",
+            refs_only(
+                {
+                    "trace_id": record.get("trace_id"),
+                    "error_code": "audit_write_failed",
+                    "summary": str(record.get("action") or "audit")[:120],
+                }
+            ),
+        )
+    except Exception:
+        logger.debug("audit write failure alert skipped", exc_info=True)

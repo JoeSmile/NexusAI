@@ -51,12 +51,56 @@ def count_tokens(text: str) -> int:
     return chinese_chars * 2 + english_chars // 4 + 10
 
 
+def count_message_tokens(message: dict) -> int:
+    """支持纯文本或多模态 content 块。"""
+    content = message.get("content", "")
+    if isinstance(content, list):
+        total = 0
+        for part in content:
+            if not isinstance(part, dict):
+                continue
+            if part.get("type") == "text":
+                total += count_tokens(str(part.get("text", "")))
+            elif part.get("type") == "image_url":
+                total += 512
+        return total
+    return count_tokens(str(content))
+
+
 def record_consumption(
-    tenant_id: str, cost: float, tokens: int, model: str = "default"
+    tenant_id: str,
+    cost: float,
+    tokens: int,
+    model: str = "default",
+    *,
+    input_tokens: int | None = None,
+    output_tokens: int | None = None,
 ) -> None:
-    """记录消费"""
+    """记录消费（Prometheus + billing usage_records）。"""
     cost_total.labels(tenant=tenant_id, model=model).inc(cost)
     tokens_total.labels(tenant=tenant_id, model=model).inc(tokens)
+    if input_tokens is None and output_tokens is None:
+        input_tokens = tokens
+        output_tokens = 0
+    elif input_tokens is None:
+        input_tokens = max(0, tokens - int(output_tokens or 0))
+    elif output_tokens is None:
+        output_tokens = max(0, tokens - int(input_tokens or 0))
+    try:
+        from backend.core.billing.usage import record_metered_usage
+
+        record_metered_usage(
+            tenant_id=tenant_id,
+            model=model,
+            input_tokens=int(input_tokens or 0),
+            output_tokens=int(output_tokens or 0),
+            cost=float(cost),
+        )
+    except Exception as exc:
+        from backend.core.billing.wallet import InsufficientBalanceError
+
+        if isinstance(exc, InsufficientBalanceError):
+            raise
 
 
 async def check_budget(tenant_id: str, estimated_cost: float) -> bool:

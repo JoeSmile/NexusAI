@@ -43,7 +43,11 @@ class ErrorCode(StrEnum):
     LLM_MODEL_REQUIRED = "LLM_KEY_004"
     LLM_BUDGET_EXCEEDED = "COST_001"
 
-    # ── 文件 (FILE_0xx) ──
+    # ── 计费 (BILLING_0xx) ──
+    INSUFFICIENT_BALANCE = "BILLING_003"
+
+    # ── 条款 (TERMS_0xx) ──
+    TERMS_NOT_ACCEPTED = "TERMS_001"
     FILE_TOO_LARGE = "FILE_001"
     FILE_INVALID_TYPE = "FILE_002"
     FILE_NOT_FOUND = "FILE_003"

@@ -13,11 +13,14 @@ import AdminHomePage from '@/pages/agent/AdminHome'
 import HomeChatPage from '@/pages/agent/HomeChat'
 import WorkspaceDashboard from '@/pages/agent/WorkspaceDashboard'
 import RootLanding from '@/pages/marketing/Landing'
+import PrivacyPage from '@/pages/legal/PrivacyPage'
+import TermsPage from '@/pages/legal/TermsPage'
 import ContentLibraryPage from '@/pages/content/ContentLibrary'
 import ContentStudioPage from '@/pages/content/ContentStudio'
 import SocialBenchmarkPage from '@/pages/content/SocialBenchmark'
 import AdminPanel from '@/pages/panels/admin'
 import AuditPanel from '@/pages/panels/audit'
+import BillingPanel from '@/pages/panels/billing'
 import CapabilitiesPanel from '@/pages/panels/capabilities'
 import PerformancePanel from '@/pages/panels/performance'
 import OrgTreePage from '@/pages/admin/OrgTree'
@@ -65,6 +68,8 @@ function LegacyRedirect({ from }: { from: string }) {
 
 export const router = createBrowserRouter([
   { path: '/', element: <RootLanding /> },
+  { path: '/terms', element: <TermsPage /> },
+  { path: '/privacy', element: <PrivacyPage /> },
   { path: '/login', element: <AgentLoginPage /> },
   // Sales-led: no public self-register; accounts provisioned by ops
   { path: '/register', element: <Navigate to="/login" replace /> },
@@ -101,6 +106,7 @@ export const router = createBrowserRouter([
             children: [{ path: 'org', element: <OrgTreePage /> }],
           },
           { path: 'audit', element: <AuditPanel /> },
+          { path: 'billing', element: <BillingPanel /> },
           { path: 'capabilities', element: <CapabilitiesPanel /> },
           { path: 'performance', element: <PerformancePanel /> },
           {

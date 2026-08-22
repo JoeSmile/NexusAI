@@ -188,6 +188,7 @@ export function AgentAdminShell({ children }: { children?: ReactNode }) {
             ['/admin/workflows', '工作流'],
             ['/admin/org', '组织'],
             ['/admin/audit', '审计'],
+            ['/admin/billing', '账单'],
             ['/admin/keys', '凭证'],
           ].map(([path, label]) => (
             <NavLink
