@@ -20,8 +20,9 @@ def _prior_output(step_results: dict[str, Any], step_id: str) -> Any:
 def resolve_step_params(
     params: dict[str, Any],
     step_results: dict[str, Any],
+    state: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """解析 source_step 引用，产出 invoke payload。"""
+    """解析 source_step / lazy_doc_id 引用，产出 invoke payload。"""
     out = dict(params or {})
     source = out.pop("source_step", None)
     if source:
@@ -32,4 +33,21 @@ def resolve_step_params(
             out.setdefault("message", prior)
         else:
             out.setdefault("message", json.dumps(prior, ensure_ascii=False))
+
+    lazy_doc_id = out.pop("lazy_doc_id", None)
+    if lazy_doc_id and state:
+        try:
+            from backend.core.memory_service import get_unified_memory_service
+
+            svc = get_unified_memory_service(tenant_id=str(state.get("tenant_id") or "default"))
+            doc = svc.load_document_by_id_sync(
+                user_id=str(state.get("user_id") or ""),
+                doc_id=str(lazy_doc_id),
+            )
+            if doc and doc.get("body"):
+                out.setdefault("message", str(doc["body"])[:4000])
+            else:
+                out["lazy_load_unavailable"] = True
+        except Exception:
+            out["lazy_load_unavailable"] = True
     return out

@@ -60,7 +60,7 @@ async def _main() -> None:
   orch._collect_invoke = fake_collect  # type: ignore[method-assign]
   orch._list_visible_capabilities = lambda s: [{"id": "cap.a", "param_spec": {}}]  # type: ignore
 
-  results, _, _ = await execute_plan_ir(state, plan)
+  results, _, _, _ = await execute_plan_ir(state, plan)
   assert results["s1"]["output"] == "out:cap.a"
 
   ok = write_governance_audit(

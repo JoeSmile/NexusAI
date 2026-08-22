@@ -188,12 +188,14 @@ class MemoryBundle:
     hot: list[dict[str, Any]] = field(default_factory=list)
     warm: dict[str, str] = field(default_factory=dict)
     cold: list[dict[str, Any]] = field(default_factory=list)
+    warm_meta: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def to_pipeline_state(self) -> dict[str, Any]:
         return {
             "hot_memory": list(self.hot),
             "warm_memory": dict(self.warm),
             "cold_memory": list(self.cold),
+            "warm_meta": dict(self.warm_meta),
         }
 
 
@@ -377,6 +379,7 @@ class UnifiedMemoryService:
             from datetime import datetime as _dt
 
             from backend.core.memory.supersede import supersede_user_domain
+            from backend.core.memory.structured_summary import build_structured_summary
             from backend.database.embeddings import embed_text
             from backend.database.pgvector_session import UserMemory, get_pg_session
 
@@ -431,6 +434,14 @@ class UnifiedMemoryService:
                     existing.value = value
                     existing.confidence = confidence
                     existing.source = source
+                    if len(value) >= 80:
+                        existing.summary_meta = build_structured_summary(
+                            doc_id=f"warm:{key}",
+                            text=value,
+                            title=key,
+                            source=source,
+                            confidence=confidence,
+                        )
                     if embed:
                         existing.embedding = emb
                     existing.updated_at = _dt.utcnow()
@@ -444,6 +455,17 @@ class UnifiedMemoryService:
                         confidence=confidence,
                         source=source,
                         embedding=emb,
+                        summary_meta=(
+                            build_structured_summary(
+                                doc_id=f"warm:{key}",
+                                text=value,
+                                title=key,
+                                source=source,
+                                confidence=confidence,
+                            )
+                            if len(value) >= 80
+                            else None
+                        ),
                     )
                     session.add(row)
                     session.flush()
@@ -669,6 +691,8 @@ class UnifiedMemoryService:
     ) -> dict[str, Any]:
         if not (summary or "").strip():
             raise ValueError("cold_summary_required")
+        from backend.core.memory.structured_summary import build_structured_summary
+
         session_factory = get_pg_session()
         with session_factory.Session() as session:
             row = ColdMemory(
@@ -678,8 +702,17 @@ class UnifiedMemoryService:
                 summary=summary.strip(),
             )
             session.add(row)
+            session.flush()
+            row.summary_meta = build_structured_summary(
+                doc_id=str(row.id),
+                text=summary.strip(),
+                title=session_id or "session",
+                source="cold",
+                confidence=0.75,
+            )
             session.commit()
             rid = row.id
+            summary_meta = row.summary_meta
         self._invalidate_mem_bundle(user_id)
         return {
             "tier": "cold",
@@ -687,6 +720,7 @@ class UnifiedMemoryService:
             "user_id": user_id,
             "summary": summary.strip(),
             "session_id": session_id,
+            "summary_meta": summary_meta,
         }
 
     # ── read ───────────────────────────────────────────────────────────
@@ -766,6 +800,7 @@ class UnifiedMemoryService:
             ]
 
             warm: dict[str, str] = {}
+            warm_meta: dict[str, dict[str, Any]] = {}
             if include_warm:
                 rows = (
                     session.query(UserMemory)
@@ -783,6 +818,8 @@ class UnifiedMemoryService:
                     if weight < min_w:
                         continue
                     warm[r.key] = r.value
+                    if getattr(r, "summary_meta", None):
+                        warm_meta[r.key] = dict(r.summary_meta)
 
             cold: list[dict[str, Any]] = []
             if include_cold:
@@ -807,6 +844,7 @@ class UnifiedMemoryService:
                         {
                             "id": r.id,
                             "summary": r.summary,
+                            "summary_meta": getattr(r, "summary_meta", None),
                             "session_id": r.session_id,
                             "created_at": (
                                 r.created_at.isoformat() if r.created_at else None
@@ -819,7 +857,61 @@ class UnifiedMemoryService:
                 kept.sort(key=lambda x: x.get("created_at") or "")
                 cold = kept
 
-        return MemoryBundle(hot=hot, warm=warm, cold=cold)
+        return MemoryBundle(hot=hot, warm=warm, cold=cold, warm_meta=warm_meta)
+
+    def load_document_by_id_sync(
+        self,
+        *,
+        user_id: str,
+        doc_id: str,
+    ) -> dict[str, Any] | None:
+        """Sync variant for plan param resolution (Mode B lazy-load)."""
+        raw = str(doc_id or "").strip()
+        if not raw:
+            return None
+        session_factory = get_pg_session()
+        with session_factory.Session() as session:
+            if raw.startswith("warm:"):
+                key = raw.split(":", 1)[1]
+                row = (
+                    session.query(UserMemory)
+                    .filter_by(tenant_id=self.tenant_id, user_id=user_id, key=key)
+                    .first()
+                )
+                if not row:
+                    return None
+                return {
+                    "doc_id": raw,
+                    "tier": "warm",
+                    "body": row.value,
+                    "summary_meta": getattr(row, "summary_meta", None),
+                }
+            try:
+                cid = int(raw)
+            except ValueError:
+                return None
+            row = (
+                session.query(ColdMemory)
+                .filter_by(tenant_id=self.tenant_id, user_id=user_id, id=cid)
+                .first()
+            )
+            if not row:
+                return None
+            return {
+                "doc_id": str(row.id),
+                "tier": "cold",
+                "body": row.summary,
+                "summary_meta": getattr(row, "summary_meta", None),
+            }
+
+    async def load_document_by_id(
+        self,
+        *,
+        user_id: str,
+        doc_id: str,
+    ) -> dict[str, Any] | None:
+        """Mode B lazy-load: fetch full memory body by cold id or warm key."""
+        return self.load_document_by_id_sync(user_id=user_id, doc_id=doc_id)
 
     async def delete_warm(self, *, user_id: str, memory_id: str) -> bool:
         """删除单条 warm（user_memories）；不级联 cold/画像全集。禁删 forget 闸门。"""
@@ -980,8 +1072,14 @@ class UnifiedMemoryService:
 
         返回含隔离标记的文本，供 system 段拼接（不得当 user role）。
         ``pending:*`` 永不注入。世界域选择走 ``select_world_items``（Task 41 S2a）。
+        ``retrieval_mode=B`` 时 cold 仅注入结构化摘要行（Task 61）。
         """
         from backend.core.memory.select_world_items import select_world_items
+        from backend.core.memory.structured_summary import (
+            format_summary_line,
+            parse_structured_summary,
+        )
+        from backend.core.plan.retrieval_mode import normalize_retrieval_mode
 
         window = context_window_tokens or int(
             os.getenv("MEMORY_CONTEXT_TOKENS") or _DEFAULT_CONTEXT_TOKENS
@@ -1004,16 +1102,17 @@ class UnifiedMemoryService:
             except Exception:
                 return raw
 
-        mode = (retrieval_mode or os.getenv("MEMORY_RETRIEVAL_MODE") or "semantic").strip()
-        if mode not in ("keyword", "semantic"):
-            mode = "semantic"
+        load_mode = normalize_retrieval_mode(retrieval_mode)
+        mem_mode = (os.getenv("MEMORY_RETRIEVAL_MODE") or "semantic").strip()
+        if mem_mode not in ("keyword", "semantic"):
+            mem_mode = "semantic"
         selected_world: set[str] | None = None
         if query and str(query).strip():
             selected_world = set(
                 select_world_items(
                     str(query),
                     dict(bundle.warm or {}),
-                    mode=mode,  # type: ignore[arg-type]
+                    mode=mem_mode,  # type: ignore[arg-type]
                     tenant_id=self.tenant_id,
                     user_id=user_id,
                 )
@@ -1111,9 +1210,25 @@ class UnifiedMemoryService:
         if user_keep:
             parts.append("[用户背景]\n" + "\n".join(user_keep))
 
-        cold_blocks = [
-            f"- {c.get('summary')}" for c in bundle.cold if c.get("summary")
-        ]
+        mode = normalize_retrieval_mode(retrieval_mode)
+        cold_blocks: list[str] = []
+        for c in bundle.cold:
+            if not c.get("summary"):
+                continue
+            if load_mode == "B":
+                meta = parse_structured_summary(
+                    c.get("summary_meta"),
+                    doc_id=str(c.get("id") or ""),
+                    fallback_title=str(c.get("session_id") or "session"),
+                )
+                if not meta.get("short_summary"):
+                    meta = parse_structured_summary(
+                        c.get("summary"),
+                        doc_id=str(c.get("id") or ""),
+                    )
+                cold_blocks.append(f"- {format_summary_line(meta)}")
+            else:
+                cold_blocks.append(f"- {c.get('summary')}")
         hot_lines = [
             f"{m.get('role')}: {m.get('content')}"
             for m in bundle.hot

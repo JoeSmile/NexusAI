@@ -33,7 +33,9 @@ class PipelineState(TypedDict):
     hot_memory: list[dict]
     warm_memory: dict[str, str]
     cold_memory: list[dict]
+    warm_meta: dict[str, dict]
     rag_retrieved_ids: list[str]  # Task 61 — sanitized recall lineage
+    retrieval_mode: str  # Task 61 — A direct / B summary+id
 
     # ── 分析结果 ──
     intent: str | None
@@ -93,6 +95,7 @@ class PipelineState(TypedDict):
     step_results: dict | None
     orchestrator_replan_count: int
     orchestrator_spawn_total: int
+    blackboard: list[dict]
     short_path_skill: dict | None  # {id, name} — Chat skills registry
     skill_asset_hit: dict | None  # skill_assets CoT template hit
     triggered_run: dict | None  # 40.86 {run_id, workflow_id, ...}
@@ -135,7 +138,9 @@ def make_initial_state(
         "hot_memory": [],
         "warm_memory": {},
         "cold_memory": [],
+        "warm_meta": {},
         "rag_retrieved_ids": [],
+        "retrieval_mode": "A",
         "intent": None,
         "intent_confidence": 0.0,
         "entities": {},
@@ -175,6 +180,7 @@ def make_initial_state(
         "step_results": None,
         "orchestrator_replan_count": 0,
         "orchestrator_spawn_total": 0,
+        "blackboard": [],
         "short_path_skill": None,
         "skill_asset_hit": None,
         "triggered_run": None,

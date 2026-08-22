@@ -11,6 +11,7 @@ from backend.core.audit_context import bind_audit_lineage
 from backend.core.auth.models import TenantContext
 from backend.core.capability.invoke import invoke
 from backend.core.harness import LLMHarness
+from backend.core.plan.blackboard import Blackboard, entry_from_step_result
 from backend.core.plan.event_bus import PlanEventBus, bus_for_state
 from backend.core.plan.execution import group_independent_batches
 from backend.core.plan.models import OnFailMode, PlanIR, PlanStep
@@ -97,8 +98,9 @@ async def _run_step_once(
     *,
     step_results: dict[str, Any],
     tenant: TenantContext,
+    state: PipelineState | None = None,
 ) -> dict[str, Any]:
-    payload = resolve_step_params(dict(step.params), step_results)
+    payload = resolve_step_params(dict(step.params), step_results, state=state)
     return await _collect_invoke(step.capability_id, payload, tenant)
 
 
@@ -108,6 +110,7 @@ async def _run_step_with_retry(
     step_results: dict[str, Any],
     tenant: TenantContext,
     bus: PlanEventBus | None = None,
+    state: PipelineState | None = None,
 ) -> dict[str, Any]:
     retry = step.retry
     max_attempts = 1 + (retry.max if step.on_fail == OnFailMode.RETRY and retry else 0)
@@ -115,7 +118,9 @@ async def _run_step_with_retry(
     last_err: Exception | None = None
     for attempt in range(max_attempts):
         try:
-            return await _run_step_once(step, step_results=step_results, tenant=tenant)
+            return await _run_step_once(
+                step, step_results=step_results, tenant=tenant, state=state
+            )
         except Exception as e:
             last_err = e
             if attempt + 1 < max_attempts:
@@ -203,7 +208,14 @@ def _caps_index(state: PipelineState) -> dict[str, dict[str, Any]]:
     return {c["id"]: c for c in caps}
 
 
-def _synthesize_response(plan: PlanIR, step_results: dict[str, Any]) -> str:
+def _synthesize_response(
+    plan: PlanIR,
+    step_results: dict[str, Any],
+    *,
+    blackboard: Blackboard | None = None,
+) -> str:
+    if blackboard is not None and blackboard.list_entries():
+        return blackboard.synthesize(plan.goal)
     parts: list[str] = []
     if plan.goal:
         parts.append(f"目标：{plan.goal}")
@@ -233,6 +245,8 @@ async def execute_plan_ir(
     spawn_total = int(spawn_total or state.get("orchestrator_spawn_total") or 0)
     current_plan = plan
     bus = bus_for_state(state)
+    blackboard = Blackboard.from_state(state)
+    doc_refs = [str(x) for x in (state.get("rag_retrieved_ids") or [])]
 
     while True:
         executed_ids = set(step_results.keys())
@@ -278,8 +292,22 @@ async def execute_plan_ir(
                         step_results=step_results,
                         tenant=tenant,
                         bus=bus,
+                        state=state,
                     )
                     step_results[step.id] = outcome
+                    entry = entry_from_step_result(
+                        step_id=step.id,
+                        capability_id=step.capability_id,
+                        outcome=outcome,
+                        document_ids_ref=doc_refs,
+                    )
+                    if entry is not None:
+                        blackboard.add(
+                            entry,
+                            tenant_id=state["tenant_id"],
+                            user_id=state["user_id"],
+                            trace_id=str(state.get("trace_id") or ""),
+                        )
                     if bus is not None:
                         summary = str(
                             outcome.get("output") or outcome.get("text") or ""
@@ -380,7 +408,7 @@ async def execute_plan_ir(
             continue
         break
 
-    return step_results, current_plan, spawn_total
+    return step_results, current_plan, spawn_total, blackboard
 
 
 @observe(name="pipeline.orchestrator")
@@ -410,7 +438,7 @@ async def orchestrator(state: PipelineState) -> PipelineState:
     )
 
     try:
-        step_results, final_plan, spawn_total = await asyncio.wait_for(
+        step_results, final_plan, spawn_total, blackboard = await asyncio.wait_for(
             execute_plan_ir(state, plan),
             timeout=timeout,
         )
@@ -425,7 +453,8 @@ async def orchestrator(state: PipelineState) -> PipelineState:
         return state
     except TimeoutError:
         partial = state.get("step_results") or {}
-        state["response"] = _synthesize_response(plan, partial)
+        bb = Blackboard.from_state(state)
+        state["response"] = _synthesize_response(plan, partial, blackboard=bb)
         state["finish_reason"] = "orchestrated"
         state["orchestrator_timeout"] = True  # type: ignore[typeddict-item]
         enrich_span(metadata={"path": "orchestrator_timeout"})
@@ -443,7 +472,10 @@ async def orchestrator(state: PipelineState) -> PipelineState:
     state["step_results"] = step_results
     state["task_plan"] = final_plan.model_dump(mode="json")
     state["orchestrator_spawn_total"] = spawn_total  # type: ignore[typeddict-item]
-    state["response"] = _synthesize_response(final_plan, step_results)
+    state["blackboard"] = blackboard.list_entries()
+    state["response"] = _synthesize_response(
+        final_plan, step_results, blackboard=blackboard
+    )
     state["finish_reason"] = "orchestrated"
     enrich_span(
         metadata={

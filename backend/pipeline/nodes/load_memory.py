@@ -21,4 +21,5 @@ async def load_memory(state: PipelineState) -> PipelineState:
     state["hot_memory"] = bundle.hot
     state["warm_memory"] = bundle.warm
     state["cold_memory"] = bundle.cold
+    state["warm_meta"] = bundle.warm_meta
     return state

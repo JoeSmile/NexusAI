@@ -12,6 +12,10 @@ from backend.core.memory_service import (
     MemoryBundle,
     get_unified_memory_service,
 )
+from backend.core.plan.retrieval_mode import (
+    choose_retrieval_mode,
+    token_budget_warning,
+)
 from backend.observability.decorators import enrich_span, observe
 from backend.pipeline.state import PipelineState
 
@@ -24,13 +28,22 @@ async def build_context(state: PipelineState) -> PipelineState:
         hot=list(state.get("hot_memory") or []),
         warm=dict(state.get("warm_memory") or {}),
         cold=list(state.get("cold_memory") or []),
+        warm_meta=dict(state.get("warm_meta") or {}),
     )
     bundle, sanitize_report = sanitize_memory_bundle(bundle)
     state["rag_retrieved_ids"] = list(sanitize_report.retrieved_ids)
+    candidate_count = len(bundle.cold) + len(bundle.warm)
+    retrieval_mode = choose_retrieval_mode(
+        candidate_count=candidate_count,
+        cold_items=bundle.cold,
+        query=str(state.get("message") or ""),
+    )
+    state["retrieval_mode"] = retrieval_mode
     memory_block = mem.assemble_prompt_block(
         bundle,
         query=str(state.get("message") or ""),
         user_id=str(state.get("user_id") or ""),
+        retrieval_mode=retrieval_mode,
     )
     drift_blocked = False
     if memory_block:
@@ -42,6 +55,9 @@ async def build_context(state: PipelineState) -> PipelineState:
     parts = [memory_block] if memory_block else []
     parts.append(f"user: {state['message']}")
     state["assembled_prompt"] = "\n\n".join(parts)
+    warn = token_budget_warning(state["assembled_prompt"], budget=8000)
+    if warn:
+        state["context_budget_warning"] = warn  # type: ignore[typeddict-item]
     if sanitize_report.retrieved_ids or sanitize_report.flags:
         write_audit_sync(
             {
@@ -71,6 +87,7 @@ async def build_context(state: PipelineState) -> PipelineState:
             "memory_drift_blocked": drift_blocked,
             "rag_retrieved_ids": sanitize_report.retrieved_ids,
             "rag_sanitize_flags": sanitize_report.flag_summary(),
+            "retrieval_mode": retrieval_mode,
         },
     )
     return state

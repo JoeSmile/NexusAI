@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from backend.core.plan.models import OnFailMode, PlanIR, PlanStep, PlanStepRetry
+from backend.core.plan.blackboard import Blackboard
 from backend.core.plan.spawn_budget import SpawnBudget
 from backend.pipeline.nodes.orchestrator import (
     OrchestratorError,
@@ -85,7 +86,7 @@ async def test_execute_plan_parallel_steps(monkeypatch):
         ],
     )
 
-    results, final_plan, spawn_total = await execute_plan_ir(
+    results, final_plan, spawn_total, _bb = await execute_plan_ir(
         state,
         plan,
         budget=SpawnBudget(max_workers=8, max_depth=3, max_spawn_total=32),
@@ -155,7 +156,7 @@ async def test_execute_plan_skip_on_fail(monkeypatch):
         lambda s: [{"id": "cap.a", "param_spec": {}}],
     )
 
-    results, _, _ = await execute_plan_ir(state, plan)
+    results, _, _, _ = await execute_plan_ir(state, plan)
     assert results["s1"]["skipped"] is True
 
 
@@ -211,7 +212,7 @@ async def test_execute_plan_retry(monkeypatch):
         lambda s: [{"id": "cap.a", "param_spec": {}}],
     )
 
-    results, _, _ = await execute_plan_ir(state, plan)
+    results, _, _, _ = await execute_plan_ir(state, plan)
     assert results["s1"]["output"] == "ok"
     assert n["v"] == 3
 
@@ -226,6 +227,7 @@ async def test_orchestrator_node_sets_response(monkeypatch):
             {"s1": {"output": "a"}, "s2": {"output": "b"}},
             plan,
             2,
+            Blackboard(),
         )
 
     monkeypatch.setattr(

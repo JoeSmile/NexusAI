@@ -74,6 +74,7 @@ class UserMemory(Base):
     value = Column(Text, nullable=False)
     confidence = Column(Float, default=1.0)
     source = Column(String(50), default="extracted")
+    summary_meta = Column(JSON, nullable=True)
     embedding = Column(Vector(1536), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -87,6 +88,7 @@ class ColdMemory(Base):
     user_id = Column(String(100), nullable=False, index=True)
     session_id = Column(String(100))
     summary = Column(Text, nullable=False)
+    summary_meta = Column(JSON, nullable=True)
     embedding = Column(Vector(1536), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
