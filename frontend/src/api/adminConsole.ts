@@ -247,3 +247,106 @@ export async function rejectConsoleSkill(assetId: string) {
     {},
   )
 }
+
+export type GuardrailRule = {
+  id: string
+  side: 'input' | 'output'
+  rule_type: string
+  name: string
+  match: string
+  action: 'block' | 'warn' | 'rewrite' | 'sanitize'
+  priority: number
+  enabled: boolean
+  builtin: boolean
+  description: string
+  updated_at: string
+}
+
+export type GuardrailDryRunResult = {
+  ok: boolean
+  side: string
+  final_action: string
+  output_text: string
+  hits: Array<{
+    rule_id: string
+    rule_name: string
+    action: string
+    reason: string
+    builtin: boolean
+  }>
+  risk_policy: { risk_level: string; action: string } | null
+}
+
+export async function listGuardrailRules(opts?: { side?: string; enabled?: boolean }) {
+  const p = new URLSearchParams()
+  if (opts?.side) p.set('side', opts.side)
+  if (opts?.enabled) p.set('enabled', 'true')
+  const qs = p.toString()
+  return apiGet<{ items: GuardrailRule[]; total: number }>(
+    `/api/admin/console/guardrails/rules${qs ? `?${qs}` : ''}`,
+  )
+}
+
+export async function createGuardrailRule(body: {
+  side: 'input' | 'output'
+  rule_type: string
+  name: string
+  match: string
+  action: 'block' | 'warn' | 'rewrite' | 'sanitize'
+  priority?: number
+  enabled?: boolean
+  description?: string
+}) {
+  return apiPost<{ ok: boolean; item: GuardrailRule }>(
+    '/api/admin/console/guardrails/rules',
+    body,
+  )
+}
+
+export async function updateGuardrailRule(
+  ruleId: string,
+  body: Partial<{
+    side: 'input' | 'output'
+    rule_type: string
+    name: string
+    match: string
+    action: 'block' | 'warn' | 'rewrite' | 'sanitize'
+    priority: number
+    enabled: boolean
+    description: string
+  }>,
+) {
+  return apiPut<{ ok: boolean; item: GuardrailRule }>(
+    `/api/admin/console/guardrails/rules/${encodeURIComponent(ruleId)}`,
+    body,
+  )
+}
+
+export async function deleteGuardrailRule(ruleId: string) {
+  return apiDelete<{ ok: boolean; id: string }>(
+    `/api/admin/console/guardrails/rules/${encodeURIComponent(ruleId)}`,
+  )
+}
+
+export async function getGuardrailRiskMatrix() {
+  return apiGet<{
+    levels: string[]
+    matrix: Record<string, string>
+    actions: string[]
+  }>('/api/admin/console/guardrails/risk-matrix')
+}
+
+export async function putGuardrailRiskMatrix(matrix: Record<string, string>) {
+  return apiPut<{ ok: boolean; matrix: Record<string, string> }>(
+    '/api/admin/console/guardrails/risk-matrix',
+    { matrix },
+  )
+}
+
+export async function dryRunGuardrails(body: {
+  side: 'input' | 'output'
+  text: string
+  risk_level?: string
+}) {
+  return apiPost<GuardrailDryRunResult>('/api/admin/console/guardrails/dry-run', body)
+}
