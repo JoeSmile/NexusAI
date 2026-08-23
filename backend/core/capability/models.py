@@ -25,6 +25,7 @@ class CapabilityProvider(StrEnum):
     COZE = "coze"
     AI_PLATFORM = "ai-platform"
     SELF_HOSTED = "self-hosted"
+    MCP = "mcp"  # Task 66 — external MCP server tools (provider=mcp)
 
 
 class CapabilityStatus(StrEnum):

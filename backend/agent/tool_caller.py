@@ -1,13 +1,11 @@
 """
-Tool Caller - 工具调用模块
+Tool Caller - 工具调用模块（legacy Agent 路径）
 
-负责：
-- 工具注册与管理
-- 工具调用执行
-- 参数验证
-- 结果解析
+负责 legacy ``/agent`` 路由下的本地 ToolRegistry。
+**新工具** 应注册到 ``CapabilityRegistry``（kind=tool）并经
+``backend.core.capability.invoke`` 治理链执行（Task 66）。
 
-支持MCP协议：接收MCP工具请求，返回标准化的MCP工具响应
+本模块内 ``MCPProtocol`` 指内部消息格式，**不是** Anthropic MCP 标准。
 """
 
 import inspect

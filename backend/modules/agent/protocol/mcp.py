@@ -1,20 +1,13 @@
 """
-MCP (Model Context Protocol) - 模型上下文协议
+内部模块消息协议（legacy，命名历史遗留）
 
-专为大模型智能体设计的结构化通信协议，实现模块间标准化通信。
+.. deprecated::
+    本模块**不是** Anthropic Model Context Protocol (MCP) 标准实现。
+    它是 Wave 早期「模块间结构化消息」封装，仅被 ``backend.agent`` 遗留路径引用。
+    **新代码禁止依赖**；工具调用统一走 ``backend.core.capability.invoke`` +
+    ``CapabilityRegistry``（Task 66）。真 MCP client 见 ``connectors/mcp_server.py``（切片 3）。
 
-MCP协议结构：
-{
-    "content": str,              # 自然语言内容（用户输入或AI回复）
-    "context": {                 # 结构化上下文
-        "user_profile": {},      # 用户画像
-        "task_goal": {},         # 任务目标
-        "memory_summary": {},    # 记忆摘要
-        "conversation_history": [] # 对话历史
-    },
-    "tool_calls": [],            # 工具调用指令
-    "tool_responses": []         # 工具执行结果
-}
+历史模块名 ``mcp`` 保留以免破坏 import；类名/函数名暂不 rename。
 """
 
 import json

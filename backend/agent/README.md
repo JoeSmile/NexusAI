@@ -3,8 +3,8 @@
 ## 唯一实现入口
 
 Agent 运行时只在本目录（`backend.agent`）。经 `backend.services.agent_service` →
-`backend.routers.agent` 挂载为 `/agent/*`。MCP 协议类型在
-`backend.modules.agent.protocol`（Task 31 已删除 `modules/agent` 下的孤儿副本）。
+`backend.routers.agent` 挂载为 `/agent/*`。**内部消息协议（legacy，非 Anthropic MCP）** 在
+`backend.modules.agent.protocol.mcp`；新工具走 `CapabilityRegistry` + `invoke.py`（Task 66）。
 
 ```python
 from backend.agent import get_agent_core, AgentCore
@@ -24,7 +24,7 @@ Agent核心控制器，协调所有模块：
 - **功能**: 整合Memory Hub、Planner、Tool Caller、Reflector
 - **主要方法**:
   - `process()`: 处理用户输入（传统接口）
-  - `process_with_mcp()`: 使用MCP协议处理（新接口）
+  - `process_with_mcp()`: 使用内部消息协议（legacy）
 
 ### 2. Memory Hub (memory_hub.py)
 
@@ -54,7 +54,7 @@ Agent核心控制器，协调所有模块：
 
 - **主要方法**:
   - `plan()`: 生成执行计划
-  - `plan_with_mcp()`: 使用MCP协议规划
+  - `plan_with_mcp()`: 使用内部消息协议规划（legacy）
 
 ### 4. Tool Caller (tool_caller.py)
 
@@ -68,7 +68,7 @@ Agent核心控制器，协调所有模块：
 
 - **主要方法**:
   - `call()`: 调用工具
-  - `call_with_mcp()`: 使用MCP协议调用
+  - `call_with_mcp()`: 使用内部消息协议调用（legacy）
 
 ### 5. Reflector (reflector.py)
 
@@ -112,7 +112,7 @@ result = await agent.process(
 )
 ```
 
-### 使用MCP协议
+### 使用内部消息协议（legacy）
 
 ```python
 agent = get_agent_core()
@@ -140,6 +140,9 @@ result = await tool_caller.call("search_memory", {"query": "睡眠", "user_id": 
 
 ### 添加新工具
 
+**新代码** 请在 `backend/core/capability/builtin/` 注册并走 `invoke.py`（Task 66）。
+以下为 legacy `tool_caller` 路径（待收敛）：
+
 在 `tool_caller.py` 的 `_register_builtin_tools()` 方法中添加：
 
 ```python
@@ -161,6 +164,6 @@ self.registry.register(
 ## 注意事项
 
 1. 所有模块都支持单例模式，使用 `get_*()` 函数获取实例
-2. MCP协议是可选的，传统接口仍然可用
+2. `protocol.mcp` 为遗留内部消息格式，**不是** Anthropic MCP；新工具走 CapabilityRegistry
 3. 工具调用是异步的，需要使用 `await`
 4. 记忆巩固是自动的，但也可以手动调用
