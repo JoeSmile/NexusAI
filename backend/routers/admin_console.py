@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from backend.core.audit import write_audit_sync
 from backend.core.auth.models import TenantContext
 from backend.core.capability.admin_store import (
     update_capability_spec_body,
@@ -65,6 +68,29 @@ class ExecPolicyPatch(BaseModel):
     isolation_mode: str | None = None
     max_payload_bytes: int | None = None
     max_concurrent_mcp_subprocess: int | None = None
+
+
+def _audit_console_tool_change(
+    tenant: TenantContext,
+    *,
+    capability_id: str,
+    op: str,
+    payload: dict[str, Any],
+) -> None:
+    write_audit_sync(
+        {
+            "tenant_id": tenant.tenant_id,
+            "user_id": tenant.user_id or "admin",
+            "action": "admin.console_tool",
+            "trace_id": f"console-tool:{uuid.uuid4().hex[:16]}",
+            "input_text": capability_id[:200],
+            "output_text": json.dumps({"op": op, **payload}, ensure_ascii=False)[:4000],
+            "decision_explain": json.dumps(
+                {"op": op, "capability_id": capability_id},
+                ensure_ascii=False,
+            ),
+        }
+    )
 
 
 def _redact_spec(spec_body: dict[str, Any]) -> dict[str, Any]:
@@ -227,6 +253,12 @@ async def patch_tool_status(
     _assert_tool_readable(spec, tenant)
     new_status = CapabilityStatus(body.status)
     updated = update_capability_status(capability_id, new_status)
+    _audit_console_tool_change(
+        tenant,
+        capability_id=capability_id,
+        op="status",
+        payload={"status": updated.status.value},
+    )
     return {"ok": True, "item": _tool_admin_summary(updated)}
 
 

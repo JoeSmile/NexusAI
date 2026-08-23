@@ -133,7 +133,11 @@ def test_user_forbidden(user: TenantContext, tool_reg: CapabilityRegistry) -> No
 
 
 def test_super_admin_can_disable_tool(super_admin: TenantContext, tool_reg: CapabilityRegistry) -> None:
-    with _client(super_admin, tool_reg) as client:
+    with (
+        patch("backend.routers.admin_console.write_audit_sync"),
+        patch("backend.core.capability.admin_store._upsert_db_row"),
+        _client(super_admin, tool_reg) as client,
+    ):
         r = client.patch(
             "/api/admin/console/tools/tool:demo:echo/status",
             json={"status": "disabled"},
