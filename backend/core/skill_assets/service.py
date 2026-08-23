@@ -309,3 +309,75 @@ def bump_usage(session: Session, asset: SkillAsset, *, tokens: int = 0, ok: bool
     stats["avg_tokens"] = ((prev * (n - 1)) + tokens) / n
     asset.usage_stats = stats
     asset.updated_at = datetime.utcnow()
+
+
+def list_skill_assets(
+    *,
+    tenant_id: str | None = None,
+    status: str | None = None,
+    q: str | None = None,
+    limit: int = 200,
+) -> list[SkillAsset]:
+    """Admin list — optional tenant scope and status filter."""
+    sf = get_pg_session()
+    with sf.Session() as session:
+        query = session.query(SkillAsset)
+        if tenant_id:
+            query = query.filter(SkillAsset.tenant_id == tenant_id)
+        if status:
+            query = query.filter(SkillAsset.status == status.strip().lower())
+        rows = query.order_by(SkillAsset.updated_at.desc()).limit(max(1, limit)).all()
+        if q:
+            needle = q.strip().lower()
+            rows = [
+                r
+                for r in rows
+                if needle in (r.name or "").lower()
+                or needle in (r.description or "").lower()
+            ]
+        for row in rows:
+            session.expunge(row)
+        return rows
+
+
+def get_skill_asset(*, tenant_id: str, asset_id: str) -> SkillAsset | None:
+    sf = get_pg_session()
+    with sf.Session() as session:
+        row = (
+            session.query(SkillAsset)
+            .filter(SkillAsset.id == asset_id, SkillAsset.tenant_id == tenant_id)
+            .one_or_none()
+        )
+        if row is not None:
+            session.expunge(row)
+        return row
+
+
+def evolution_stats(*, tenant_id: str | None = None) -> dict[str, Any]:
+    """Aggregate skill_assets metrics for admin evolution panel."""
+    sf = get_pg_session()
+    with sf.Session() as session:
+        query = session.query(SkillAsset)
+        if tenant_id:
+            query = query.filter(SkillAsset.tenant_id == tenant_id)
+        rows = query.all()
+    by_status: dict[str, int] = {"draft": 0, "published": 0, "deprecated": 0}
+    mined_queue = 0
+    total_uses = 0
+    total_successes = 0
+    for row in rows:
+        st = str(row.status or "draft")
+        by_status[st] = by_status.get(st, 0) + 1
+        if st == "draft" and "mined_from" in str(row.description or ""):
+            mined_queue += 1
+        stats = dict(row.usage_stats or {})
+        total_uses += int(stats.get("uses") or 0)
+        total_successes += int(stats.get("successes") or 0)
+    hit_rate = (total_successes / total_uses) if total_uses else 0.0
+    return {
+        "total": len(rows),
+        "by_status": by_status,
+        "mined_draft_queue": mined_queue,
+        "total_uses": total_uses,
+        "cache_hit_rate_proxy": round(hit_rate, 4),
+    }

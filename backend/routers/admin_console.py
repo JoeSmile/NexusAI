@@ -36,9 +36,13 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin/console", tags=["admin-console"])
 
+from backend.routers.admin_console_guardrails import router as _guardrails_router  # noqa: E402
 from backend.routers.admin_console_mcp import router as _mcp_router  # noqa: E402
+from backend.routers.admin_console_skills import router as _skills_router  # noqa: E402
 
 router.include_router(_mcp_router)
+router.include_router(_skills_router)
+router.include_router(_guardrails_router)
 
 _SECRET_SPEC_KEYS = frozenset(
     {"api_key", "api_key_ref", "headers", "secrets", "password", "token"}

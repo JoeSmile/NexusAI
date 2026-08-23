@@ -166,3 +166,84 @@ export async function importMcpTools(
     rejected: Array<Record<string, unknown>>
   }>(`/api/admin/console/mcp/servers/${encodeURIComponent(serverId)}/import-tools`, body)
 }
+
+export type SkillUsage = {
+  uses: number
+  successes: number
+  avg_tokens: number
+  hit_rate: number
+  required_permissions: string[]
+}
+
+export type SkillSummary = {
+  id: string
+  tenant_id: string
+  name: string
+  domain: string
+  status: string
+  version: number
+  visibility: string
+  description: string
+  source: string
+  usage: SkillUsage
+  updated_at: string | null
+  created_at: string | null
+}
+
+export type SkillDetail = SkillSummary & {
+  owner_user_id: string
+  cot_template: string
+  ir_skeleton: Record<string, unknown>
+}
+
+export type SkillEvolution = {
+  total: number
+  by_status: Record<string, number>
+  mined_draft_queue: number
+  total_uses: number
+  cache_hit_rate_proxy: number
+}
+
+export async function listConsoleSkills(opts?: {
+  q?: string
+  status?: string
+  domain?: string
+}) {
+  const p = new URLSearchParams()
+  if (opts?.q) p.set('q', opts.q)
+  if (opts?.status) p.set('status', opts.status)
+  if (opts?.domain) p.set('domain', opts.domain)
+  const qs = p.toString()
+  return apiGet<{ items: SkillSummary[]; total: number }>(
+    `/api/admin/console/skills${qs ? `?${qs}` : ''}`,
+  )
+}
+
+export async function getSkillEvolution() {
+  return apiGet<SkillEvolution>('/api/admin/console/skills/evolution')
+}
+
+export async function getConsoleSkill(assetId: string) {
+  return apiGet<SkillDetail>(`/api/admin/console/skills/${encodeURIComponent(assetId)}`)
+}
+
+export async function publishConsoleSkill(assetId: string) {
+  return apiPost<{ ok: boolean; item: SkillDetail }>(
+    `/api/admin/console/skills/${encodeURIComponent(assetId)}/publish`,
+    {},
+  )
+}
+
+export async function deprecateConsoleSkill(assetId: string) {
+  return apiPost<{ ok: boolean; item: SkillDetail }>(
+    `/api/admin/console/skills/${encodeURIComponent(assetId)}/deprecate`,
+    {},
+  )
+}
+
+export async function rejectConsoleSkill(assetId: string) {
+  return apiPost<{ ok: boolean; id: string }>(
+    `/api/admin/console/skills/${encodeURIComponent(assetId)}/reject`,
+    {},
+  )
+}
