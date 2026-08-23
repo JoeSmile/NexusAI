@@ -251,11 +251,29 @@ class CapabilityRegistry:
         model_n = self.load_from_model_registry()
         env_n = self.load_from_env()
         db_n = self.load_from_db()
+        builtin_n = 0
+        try:
+            from backend.core.capability.builtin import register_builtin_tools
+
+            builtin_n = register_builtin_tools(self)
+        except Exception:
+            logger.debug("builtin tool registration skipped", exc_info=True)
+        mcp_n = 0
+        try:
+            if os.getenv("MCP_SERVERS_JSON", "").strip():
+                from backend.core.capability.mcp_registry import sync_mcp_servers_from_env
+
+                summary = sync_mcp_servers_from_env(self)
+                mcp_n = int(summary.get("registered") or 0)
+        except Exception:
+            logger.debug("mcp server sync skipped", exc_info=True)
         logger.info(
-            "CapabilityRegistry loaded: model=%s env=%s db=%s total=%s",
+            "CapabilityRegistry loaded: model=%s env=%s db=%s builtin=%s mcp=%s total=%s",
             model_n,
             env_n,
             db_n,
+            builtin_n,
+            mcp_n,
             len(self._by_id),
         )
         try:

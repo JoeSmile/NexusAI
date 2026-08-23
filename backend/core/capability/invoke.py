@@ -22,7 +22,7 @@ from backend.core.capability.errors import (
     CapabilityNotFoundError,
     CapabilityUpstreamError,
 )
-from backend.core.capability.models import CapabilityKind, CapabilitySpec
+from backend.core.capability.models import CapabilityKind, CapabilityProvider, CapabilitySpec
 from backend.core.capability.registry import (
     get_capability_registry,
     resolve_credential,
@@ -35,6 +35,7 @@ logger = logging.getLogger(__name__)
 _TOOL_EXECUTOR_MODEL = frozenset({"model", "chat", "llm"})
 _TOOL_EXECUTOR_RAG = frozenset({"rag", "rag_ask", "rag-ask"})
 _TOOL_EXECUTOR_CONTENT_OPS = frozenset({"content_ops", "content-ops", "contentops"})
+_TOOL_EXECUTOR_BUILTIN = frozenset({"builtin"})
 
 
 def _messages_from_payload(payload: dict[str, Any]) -> list[dict[str, str]]:
@@ -291,6 +292,42 @@ async def _invoke_tool(
         from backend.core.content_ops.invoke_exec import invoke_content_ops
 
         async for frame in invoke_content_ops(spec, payload, tenant):
+            yield frame
+        return
+    if executor in _TOOL_EXECUTOR_BUILTIN:
+        from backend.core.capability.builtin.handlers import (
+            builtin_result_to_json,
+            invoke_builtin_handler,
+        )
+
+        handler_id = str((spec.spec or {}).get("builtin_handler") or spec.id)
+        result = await invoke_builtin_handler(
+            handler_id,
+            payload,
+            tenant,
+            spec_body=spec.spec,
+        )
+        text = builtin_result_to_json(result)
+        chunk = 48
+        for i in range(0, max(len(text), 1), chunk):
+            part = text[i : i + chunk] if text else ""
+            if part:
+                yield {"event": "token", "data": part, "cost_source": "invoke"}
+        yield {
+            "event": "done",
+            "data": {
+                "capability_id": spec.id,
+                "kind": spec.kind.value,
+                "executor": "builtin",
+                "result": result,
+            },
+            "cost_source": "invoke",
+        }
+        return
+    if executor == "mcp" or spec.provider == CapabilityProvider.MCP:
+        from backend.core.capability.connectors.mcp_server import invoke_mcp
+
+        async for frame in invoke_mcp(spec, payload, tenant):
             yield frame
         return
     raise CapabilityNotFoundError(
