@@ -1,0 +1,85 @@
+{
+  "version": "v1",
+  "built_at": "2026-08-23T03:01:58.737088+00:00",
+  "golden_size": 500,
+  "train_size": 2046,
+  "annotation_queue_count": 375,
+  "weak_label_count": 167,
+  "golden_balance": {
+    "total": 500,
+    "per_class": {
+      "crisis": 25,
+      "greeting": 74,
+      "knowledge_query": 99,
+      "advice": 84,
+      "conversation": 55,
+      "function": 80,
+      "chat": 83
+    },
+    "min_per_class_target": 0,
+    "deficits": {
+      "crisis": 0,
+      "greeting": 0,
+      "knowledge_query": 0,
+      "advice": 0,
+      "conversation": 0,
+      "function": 0,
+      "chat": 0
+    },
+    "balanced": true
+  },
+  "train_balance": {
+    "total": 2046,
+    "per_class": {
+      "crisis": 44,
+      "greeting": 278,
+      "knowledge_query": 493,
+      "advice": 407,
+      "conversation": 170,
+      "function": 303,
+      "chat": 351
+    },
+    "min_per_class_target": 300,
+    "deficits": {
+      "crisis": 256,
+      "greeting": 22,
+      "knowledge_query": 0,
+      "advice": 0,
+      "conversation": 130,
+      "function": 0,
+      "chat": 0
+    },
+    "balanced": false
+  },
+  "train_meets_target": true,
+  "dual_label_kappa": {
+    "pairs": 0,
+    "kappa": 0.0,
+    "min_kappa_target": 0.7,
+    "passed": false
+  },
+  "golden_label_distribution": {
+    "advice": 84,
+    "chat": 83,
+    "conversation": 55,
+    "crisis": 25,
+    "function": 80,
+    "greeting": 74,
+    "knowledge_query": 99
+  },
+  "train_label_distribution": {
+    "chat": 351,
+    "knowledge_query": 493,
+    "greeting": 278,
+    "function": 303,
+    "advice": 407,
+    "crisis": 44,
+    "conversation": 170
+  },
+  "files": {
+    "golden": "D:\\LLMs\\NexusAI\\data\\intent\\golden\\golden_500.csv",
+    "train": "D:\\LLMs\\NexusAI\\data\\intent\\train\\train_pool.jsonl",
+    "golden_hash": "39c6cff8de9437c5",
+    "train_hash": "37e7a19b40eb038c"
+  }
+}
