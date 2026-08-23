@@ -225,6 +225,10 @@
   animation: right-drawer-in 0.2s ease;
 }
 
+.right-drawer-panel--wide {
+  width: min(560px, 100%);
+}
+
 @keyframes right-drawer-in {
   from {
     transform: translateX(12px);

@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 
 import { TokenUsageBar } from '@/components/agent/TokenUsageBar'
+import { CONSOLE_ROLES, KEYS_ROLES, ORG_ROLES, roleAllowed } from '@/lib/navAccess'
 import { useAuthStore } from '@/stores/authStore'
 import { useChatPrefsStore } from '@/stores/chatPrefsStore'
 import { cn } from '@/lib/utils'
@@ -145,6 +146,24 @@ export function AgentHomeShell() {
 export function AgentAdminShell({ children }: { children?: ReactNode }) {
   const navigate = useNavigate()
   const clear = useAuthStore((s) => s.clear)
+  const activeRole = useAuthStore((s) => s.activeRole)
+  const adminLinks = [
+    ['/admin', '概览'],
+    ['/admin/workflows', '工作流'],
+    ...(roleAllowed(activeRole, ORG_ROLES) ? [['/admin/org', '组织'] as const] : []),
+    ['/admin/audit', '审计'],
+    ['/admin/traces', 'Trace'],
+    ['/admin/billing', '账单'],
+    ...(roleAllowed(activeRole, CONSOLE_ROLES)
+      ? [
+          ['/admin/tools', '工具'] as const,
+          ['/admin/mcp', 'MCP'] as const,
+          ['/admin/skills', 'Skill'] as const,
+          ['/admin/guardrails', '护栏'] as const,
+        ]
+      : []),
+    ...(roleAllowed(activeRole, KEYS_ROLES) ? [['/admin/keys', '凭证'] as const] : []),
+  ]
   return (
     <div
       className="agent-shell"
@@ -183,15 +202,7 @@ export function AgentAdminShell({ children }: { children?: ReactNode }) {
             fontSize: 13,
           }}
         >
-          {[
-            ['/admin', '概览'],
-            ['/admin/workflows', '工作流'],
-            ['/admin/org', '组织'],
-            ['/admin/audit', '审计'],
-            ['/admin/traces', 'Trace'],
-            ['/admin/billing', '账单'],
-            ['/admin/keys', '凭证'],
-          ].map(([path, label]) => (
+          {adminLinks.map(([path, label]) => (
             <NavLink
               key={path}
               to={path}

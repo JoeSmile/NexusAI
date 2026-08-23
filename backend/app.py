@@ -272,6 +272,14 @@ def create_app() -> FastAPI:
     # 必选路由
     _lazy_include(app, "backend.core.health", "router", required=True)
     _lazy_include(app, "backend.routers", "admin_router", prefix="/api", required=True)
+    _lazy_include(
+        app,
+        "backend.routers.admin_console",
+        "router",
+        prefix="/api",
+        required=True,
+        label="Admin Console",
+    )
     _lazy_include(app, "backend.routers", "ab_router", prefix="/api", required=True)
     _lazy_include(app, "backend.routers", "audit_router", prefix="/api", required=True)
     _lazy_include(app, "backend.routers", "billing_router", prefix="/api", required=True)

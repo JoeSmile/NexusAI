@@ -260,9 +260,12 @@ class CapabilityRegistry:
             logger.debug("builtin tool registration skipped", exc_info=True)
         mcp_n = 0
         try:
-            if os.getenv("MCP_SERVERS_JSON", "").strip():
-                from backend.core.capability.mcp_registry import sync_mcp_servers_from_env
+            from backend.core.capability.mcp_registry import (
+                load_mcp_servers,
+                sync_mcp_servers_from_env,
+            )
 
+            if load_mcp_servers():
                 summary = sync_mcp_servers_from_env(self)
                 mcp_n = int(summary.get("registered") or 0)
         except Exception:

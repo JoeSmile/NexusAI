@@ -63,6 +63,12 @@ def capability_visible_to(spec: CapabilitySpec, tenant: TenantContext) -> bool:
     if spec.tenant_id not in ("*", "", tenant.tenant_id):
         if not tenant.is_cross_tenant:
             return False
+    nested = spec.spec if isinstance(spec.spec, dict) else {}
+    allowlist = nested.get("tenant_allowlist")
+    if isinstance(allowlist, list) and allowlist:
+        allowed = {str(t).strip() for t in allowlist if str(t).strip()}
+        if allowed and tenant.tenant_id not in allowed and not tenant.is_cross_tenant:
+            return False
     needed = (spec.permission or "").strip() or "chat:write"
     return tenant.has_permission(needed)
 

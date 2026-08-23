@@ -55,6 +55,13 @@ class McpServerConfig:
         )
 
 
+def load_mcp_servers() -> list[McpServerConfig]:
+    """Merged MCP server config: env + DB (DB wins on same id)."""
+    from backend.core.capability.mcp_store import load_all_mcp_servers
+
+    return load_all_mcp_servers()
+
+
 def load_mcp_servers_from_env(raw: str | None = None) -> list[McpServerConfig]:
     text = (raw if raw is not None else os.getenv("MCP_SERVERS_JSON", "")).strip()
     if not text or text == "[]":
@@ -117,6 +124,7 @@ def normalize_mcp_tool(
     tool: dict[str, Any],
     *,
     snapshot_generation: int | None = None,
+    risk_override: str | None = None,
 ) -> CapabilitySpec | None:
     """Map MCP tool → CapabilitySpec; return None if invalid (isolated reject)."""
     name = str(tool.get("name") or "").strip()
@@ -132,7 +140,11 @@ def normalize_mcp_tool(
         return None
 
     cap_id = capability_id_for_mcp_tool(server.id, name)
-    risk = infer_mcp_risk_level(input_schema, transport=server.transport)
+    risk = infer_mcp_risk_level(
+        input_schema,
+        transport=server.transport,
+        override=risk_override or tool.get("risk_override"),
+    )
     contract = {
         **stub_contract_dict(cap_id),
         "description": description,
@@ -216,7 +228,7 @@ def register_mcp_tools(
 
 
 def get_mcp_server_config(server_id: str) -> McpServerConfig:
-    for cfg in load_mcp_servers_from_env():
+    for cfg in load_mcp_servers():
         if cfg.id == server_id:
             return cfg
     raise McpError(
@@ -237,7 +249,7 @@ async def refresh_mcp_servers_from_env(
 
     fetch = list_tools_fn or list_server_tools
     summary: dict[str, Any] = {"servers": [], "registered": 0, "rejected": 0}
-    for server in load_mcp_servers_from_env():
+    for server in load_mcp_servers():
         if not server.enabled:
             continue
         try:

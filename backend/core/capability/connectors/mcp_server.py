@@ -179,6 +179,20 @@ async def mcp_session(server: McpServerConfig):
                 yield McpSessionHandle(session=session, subprocess_pid=pid)
 
 
+def mcp_server_runtime_status(server_id: str) -> dict[str, Any]:
+    brk = _breaker(server_id)
+    state = brk.state
+    label = "connected"
+    if state == CircuitState.OPEN:
+        label = "circuit_open"
+    elif state == CircuitState.HALF_OPEN:
+        label = "half_open"
+    return {
+        "circuit_state": state.value,
+        "connection_status": label,
+    }
+
+
 async def list_server_tools(server: McpServerConfig) -> list[dict[str, Any]]:
     brk = _breaker(server.id)
     if brk.state == CircuitState.OPEN:

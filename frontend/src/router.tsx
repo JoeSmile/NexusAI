@@ -6,7 +6,7 @@ import {
   AgentAdminShell,
   AgentHomeShell,
 } from '@/layouts/AgentShell'
-import { KEYS_ROLES, ORG_ROLES } from '@/lib/navAccess'
+import { KEYS_ROLES, ORG_ROLES, CONSOLE_ROLES } from '@/lib/navAccess'
 import { HOME_PATH, PANEL_REDIRECTS } from '@/lib/routes'
 import AgentLoginPage from '@/pages/agent/LoginPage'
 import AdminHomePage from '@/pages/agent/AdminHome'
@@ -25,6 +25,10 @@ import BillingPanel from '@/pages/panels/billing'
 import CapabilitiesPanel from '@/pages/panels/capabilities'
 import PerformancePanel from '@/pages/panels/performance'
 import OrgTreePage from '@/pages/admin/OrgTree'
+import ToolsConsolePage from '@/pages/admin/tools/ToolsPage'
+import McpConsolePage from '@/pages/admin/tools/McpPage'
+import SkillsConsolePage from '@/pages/admin/tools/SkillsPage'
+import GuardrailsConsolePage from '@/pages/admin/tools/GuardrailsPage'
 import RagPanel from '@/pages/panels/rag'
 import WorkflowListPage from '@/pages/workflows/WorkflowList'
 import WorkflowEditorPage from '@/pages/workflows/WorkflowEditor'
@@ -111,6 +115,15 @@ export const router = createBrowserRouter([
           { path: 'billing', element: <BillingPanel /> },
           { path: 'capabilities', element: <CapabilitiesPanel /> },
           { path: 'performance', element: <PerformancePanel /> },
+          {
+            element: <RequireRoles allow={CONSOLE_ROLES} />,
+            children: [
+              { path: 'tools', element: <ToolsConsolePage /> },
+              { path: 'mcp', element: <McpConsolePage /> },
+              { path: 'skills', element: <SkillsConsolePage /> },
+              { path: 'guardrails', element: <GuardrailsConsolePage /> },
+            ],
+          },
           {
             element: <RequireRoles allow={KEYS_ROLES} />,
             children: [{ path: 'keys', element: <AdminPanel /> }],

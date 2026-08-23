@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 
 import {
   fetchAuditLogs,
@@ -29,6 +30,8 @@ import {
 import { useAuthStore } from '@/stores/authStore'
 
 export default function TraceConsole() {
+  const [searchParams] = useSearchParams()
+  const capabilityFilter = (searchParams.get('capability_id') || '').trim()
   const role = useAuthStore((s) => s.activeRole)
   const roleEpoch = useAuthStore((s) => s.roleEpoch)
   const [traceFilter, setTraceFilter] = useState('')
@@ -48,7 +51,10 @@ export default function TraceConsole() {
         action: action.trim() || undefined,
         limit: 200,
       })
-      setTraces(groupAuditRowsByTrace(rows))
+      const scoped = capabilityFilter
+        ? rows.filter((r) => (r.model || '').trim() === capabilityFilter)
+        : rows
+      setTraces(groupAuditRowsByTrace(scoped))
     } catch (e) {
       setTraces([])
       setErr(formatApiError(e, 'audit:read'))
@@ -60,7 +66,7 @@ export default function TraceConsole() {
   useEffect(() => {
     void load()
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh on role switch
-  }, [roleEpoch, role])
+  }, [roleEpoch, role, capabilityFilter])
 
   const openTrace = (traceId: string) => {
     setSelectedTrace(traceId)
@@ -76,6 +82,11 @@ export default function TraceConsole() {
         </p>
       </div>
       <ForbiddenBanner />
+      {capabilityFilter ? (
+        <p className="text-muted-foreground text-xs">
+          按 capability 过滤：<code>{capabilityFilter}</code>
+        </p>
+      ) : null}
       {err ? (
         <p className="text-destructive text-sm" role="alert">
           {err}

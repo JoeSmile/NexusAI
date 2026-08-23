@@ -350,6 +350,26 @@ class Capability(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class McpServer(Base):
+    """MCP server 配置（Task 67 / alembic 033）。"""
+
+    __tablename__ = "mcp_servers"
+    id = Column(String, primary_key=True)
+    tenant_id = Column(String, nullable=False, default="*", index=True)
+    transport = Column(String, nullable=False, default="stdio")
+    command = Column(String, nullable=False, default="")
+    args = Column(JSON, nullable=False, default=list)
+    env = Column(JSON, nullable=False, default=dict)
+    url = Column(String, nullable=False, default="")
+    headers_encrypted = Column(Text, nullable=True)
+    enabled = Column(Boolean, nullable=False, default=True)
+    allow_pass_user_context = Column(Boolean, nullable=False, default=False)
+    timeout_s = Column(Float, nullable=False, default=30.0)
+    last_probe = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class Workflow(Base):
     """Workflow 定义（Wave C / alembic 010）。"""
 

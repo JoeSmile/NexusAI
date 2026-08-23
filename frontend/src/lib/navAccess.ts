@@ -9,6 +9,8 @@ export const ORG_ROLES: RoleName[] = [
 
 export const KEYS_ROLES: RoleName[] = ['tenant_admin', 'super_admin']
 
+export const CONSOLE_ROLES: RoleName[] = ['tenant_admin', 'super_admin']
+
 export function roleAllowed(
   role: RoleName,
   allow: readonly RoleName[] | undefined,
