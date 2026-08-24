@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 from backend.core.plan.clarification import (
-    audit_clarification_event,
     evaluate_clarification_triggers,
     get_pending,
-    store_pending,
+    hold_for_clarification,
     try_resolve_pending,
 )
-from backend.core.plan.event_bus import bus_for_state
 from backend.observability.decorators import enrich_span, observe
 from backend.pipeline.state import PipelineState
 
@@ -40,34 +38,7 @@ async def clarification_gate(state: PipelineState) -> PipelineState:
         enrich_span(metadata={"clarification": "pass"})
         return state
 
-    body = payload.to_dict()
-    state["pending_clarification"] = True  # type: ignore[typeddict-item]
-    state["clarification"] = body
-    state["response"] = payload.question
-    state["finish_reason"] = "clarification_pending"
-    state["task_plan"] = None
-
-    await store_pending(state, payload)
-    audit_clarification_event(
-        tenant_id=str(state.get("tenant_id") or ""),
-        user_id=str(state.get("user_id") or ""),
-        trace_id=payload.trace_id,
-        event="triggered",
-        payload=body,
-    )
-
-    bus = bus_for_state(state)
-    if bus is not None:
-        bus.emit(
-            "clarify",
-            {
-                "source": payload.source,
-                "question": payload.question,
-                "options": payload.options,
-                "trace_id": payload.trace_id,
-            },
-        )
-
+    await hold_for_clarification(state, payload)
     enrich_span(metadata={"clarification": "hold", "source": payload.source})
     return state
 

@@ -32,11 +32,15 @@ async def analyze_parallel(state: PipelineState) -> PipelineState:
         state["intent_confidence"] = float(intent_result.get("confidence", 0.0))
         state["intent_source"] = intent_result.get("source")
         state["entities"] = intent_result.get("entities", {}) or {}
+        state["agent_type_id"] = intent_result.get("agent_type_id")
+        state["slot_values"] = dict(state.get("slot_values") or {})
     else:
         state["intent"] = "default"
         state["intent_confidence"] = 0.0
         state["intent_source"] = "default"
         state["entities"] = {}
+        state["agent_type_id"] = None
+        state["slot_values"] = {}
 
     from backend.pipeline.cache.fingerprint_cache import make_fingerprint
 
@@ -60,12 +64,17 @@ async def _analyze_intent(message: str) -> dict:
 
         result = get_intent_service().intent_classifier.detect_intent(message)
         raw = result.intent
-        intent = raw.value if hasattr(raw, "value") else str(raw)
+        intent = result.intent.value if hasattr(result.intent, "value") else str(result.intent)
+        from backend.core.plan.agent_type import agent_type_for_intent
+
+        at = agent_type_for_intent(intent)
+        agent_type_id = at.type_id if at else None
         return {
             "intent": intent,
             "confidence": float(result.confidence),
             "source": str(result.source),
             "tier": result.tier or confidence_tier(float(result.confidence)),
+            "agent_type_id": agent_type_id,
             "entities": {},
         }
     except Exception:

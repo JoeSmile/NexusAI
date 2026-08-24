@@ -124,6 +124,7 @@ def _build_messages(
     caps: list[dict[str, Any]],
     skill_asset_hit: dict[str, Any] | None,
     session_coref: dict[str, Any] | None = None,
+    agent_type_id: str | None = None,
 ) -> list[dict[str, str]]:
     cap_lines = []
     for c in caps:
@@ -155,6 +156,15 @@ def _build_messages(
         f"intent={intent} confidence={confidence:.3f}\n"
         f"message={message[:2000]}\n"
     )
+    if agent_type_id:
+        from backend.core.plan.agent_type import get_agent_type
+
+        at = get_agent_type(agent_type_id)
+        if at is not None:
+            user += (
+                f"agent_type={at.type_id} role={at.role}\n"
+                f"preferred_capabilities={','.join(at.capability_ids)}\n"
+            )
     if session_coref and session_coref.get("entries"):
         user += (
             "session_coref_table="
@@ -377,6 +387,12 @@ async def task_plan(state: PipelineState) -> PipelineState:
         session_coref_dict = session_coref.model_dump(mode="json")
 
         ranked_caps = search_capabilities(caps, message, top_k=12)
+        from backend.core.plan.agent_spawn import boost_capabilities_for_agent_type
+
+        ranked_caps = boost_capabilities_for_agent_type(
+            ranked_caps,
+            str(state.get("agent_type_id") or "") or None,
+        )
         messages = _build_messages(
             message=message,
             intent=intent,
@@ -384,6 +400,7 @@ async def task_plan(state: PipelineState) -> PipelineState:
             caps=ranked_caps,
             skill_asset_hit=state.get("skill_asset_hit"),
             session_coref=session_coref_dict if session_coref.entries else None,
+            agent_type_id=str(state.get("agent_type_id") or "") or None,
         )
 
         model = state.get("selected_model") or "deepseek-v4-flash"

@@ -8,6 +8,16 @@ import os
 from typing import Any
 
 from backend.core.audit_context import bind_audit_lineage
+from backend.core.plan.agent_spawn import (
+    SpawnBlockedError,
+    audit_agent_spawn,
+    prepare_orchestrator_spawn,
+    resolve_step_tenant,
+)
+from backend.core.plan.clarification import (
+    hold_for_clarification,
+)
+from backend.core.plan.slot_gate import evaluate_required_slots
 from backend.core.auth.models import TenantContext
 from backend.core.capability.invoke import invoke
 from backend.core.harness import LLMHarness
@@ -115,6 +125,25 @@ async def _run_step_once(
     if step.sub_query and "message" not in base_params and "query" not in base_params:
         base_params["message"] = step.sub_query
     payload = resolve_step_params(base_params, step_results, state=state)
+    invoke_tenant = tenant
+    if state is not None:
+        invoke_tenant = resolve_step_tenant(
+            state,
+            step_capability_id=step.capability_id,
+            parent=tenant,
+            step_id=step.id,
+        )
+        if is_sub_agent(invoke_tenant):
+            audit_agent_spawn(
+                tenant_id=state.get("tenant_id") or "",
+                user_id=state.get("user_id") or "",
+                parent_trace_id=str(state.get("trace_id") or ""),
+                agent_type_id=str(state.get("agent_type_id") or ""),
+                step_id=step.id,
+                capability_id=step.capability_id,
+            )
+            spawn_n = int(state.get("orchestrator_spawn_total") or 0) + 1
+            state["orchestrator_spawn_total"] = spawn_n  # type: ignore[typeddict-item]
     if loop_guard is not None and state is not None:
         loop_guard.check(
             step.capability_id,
@@ -124,7 +153,7 @@ async def _run_step_once(
             trace_id=str(state.get("trace_id") or ""),
         )
         loop_guard.persist(state)  # type: ignore[arg-type]
-    outcome = await _collect_invoke(step.capability_id, payload, tenant)
+    outcome = await _collect_invoke(step.capability_id, payload, invoke_tenant)
     text = str(outcome.get("text") or outcome.get("output") or "")
     sanitized = sanitize_tool_output(text)
     if sanitized != text:
@@ -287,6 +316,7 @@ async def execute_plan_ir(
     current_plan = plan
     bus = bus_for_state(state)
     blackboard = Blackboard.from_state(state)
+    prepare_orchestrator_spawn(state, blackboard)
     doc_refs = [str(x) for x in (state.get("rag_retrieved_ids") or [])]
     loop_guard = LoopGuard.from_pipeline(state)
 
@@ -575,6 +605,17 @@ async def orchestrator(state: PipelineState) -> PipelineState:
         state["response"] = "请求已取消。"
         enrich_span(metadata={"path": "orchestrator_cancelled"})
         return state
+    except SpawnBlockedError as e:
+        payload = getattr(e, "payload", None) or evaluate_required_slots(state)
+        if payload is not None:
+            await hold_for_clarification(state, payload)
+            enrich_span(metadata={"path": "orchestrator_spawn_clarify"})
+            return state
+        state["finish_reason"] = "routed_to_llm"
+        state["orchestrator_error"] = str(e)[:500]  # type: ignore[typeddict-item]
+        state["response"] = str(e)
+        enrich_span(metadata={"path": "orchestrator_spawn_blocked"})
+        return state
     except OrchestratorError as e:
         if state.get("finish_reason") == "routed_to_llm":
             enrich_span(metadata={"path": "orchestrator_replan_fallback"})
@@ -631,7 +672,9 @@ async def orchestrator(state: PipelineState) -> PipelineState:
 
 
 def route_after_orchestrator(state: PipelineState) -> str:
-    """编排后：replan 超限走 model_router；否则直接收尾。"""
+    """编排后：replan 超限走 model_router；澄清挂起走 write_memory；否则直接收尾。"""
     if state.get("finish_reason") == "routed_to_llm":
         return "model_router"
+    if state.get("finish_reason") == "clarification_pending":
+        return "write_memory"
     return "conversion_hook"

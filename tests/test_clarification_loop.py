@@ -189,6 +189,16 @@ def test_high_risk_incomplete_tool_trigger(monkeypatch):
     assert payload.source == "high_risk_tool"
 
 
+def test_required_slots_triggers_even_when_clarification_resolved():
+    state = make_initial_state("t1", "u1", "s1", "介绍一下")
+    state["clarification_resolved"] = True
+    state["agent_type_id"] = "pre_sales_agent"
+    state["slot_values"] = {}
+    payload = evaluate_clarification_triggers(state)
+    assert payload is not None
+    assert payload.source == "required_slots"
+
+
 @pytest.mark.asyncio
 async def test_store_pending_writes_warm_key(monkeypatch, _mock_warm_write):
     state = make_initial_state("t1", "u1", "s1", "q")

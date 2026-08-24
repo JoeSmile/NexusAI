@@ -111,6 +111,10 @@ class PipelineState(TypedDict):
     clarification: dict | None
     clarification_resolved: bool
 
+    # ── Task 62 — AgentType / slots ──
+    agent_type_id: str | None
+    slot_values: dict[str, Any]
+
 
 def make_initial_state(
     tenant_id: str,
@@ -204,4 +208,6 @@ def make_initial_state(
         "pending_clarification": False,
         "clarification": None,
         "clarification_resolved": False,
+        "agent_type_id": None,
+        "slot_values": {},
     }

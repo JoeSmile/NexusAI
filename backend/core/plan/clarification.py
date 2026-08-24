@@ -182,8 +182,55 @@ def _high_risk_incomplete_steps(plan: dict[str, Any]) -> list[str]:
     return missing
 
 
+async def hold_for_clarification(
+    state: dict[str, Any],
+    payload: ClarificationPayload,
+    *,
+    clear_task_plan: bool = True,
+) -> dict[str, Any]:
+    """Apply clarification hold — shared by clarification_gate and orchestrator fallback."""
+    from backend.core.plan.event_bus import bus_for_state
+
+    body = payload.to_dict()
+    state["pending_clarification"] = True
+    state["clarification"] = body
+    state["response"] = payload.question
+    state["finish_reason"] = "clarification_pending"
+    state["clarification_resolved"] = False
+    if clear_task_plan:
+        state["task_plan"] = None
+
+    await store_pending(state, payload)
+    audit_clarification_event(
+        tenant_id=str(state.get("tenant_id") or ""),
+        user_id=str(state.get("user_id") or ""),
+        trace_id=payload.trace_id,
+        event="triggered",
+        payload=body,
+    )
+
+    bus = bus_for_state(state)
+    if bus is not None:
+        bus.emit(
+            "clarify",
+            {
+                "source": payload.source,
+                "question": payload.question,
+                "options": payload.options,
+                "trace_id": payload.trace_id,
+            },
+        )
+    return state
+
+
 def evaluate_clarification_triggers(state: dict[str, Any]) -> ClarificationPayload | None:
     """Return clarification payload when a trigger fires; None to continue pipeline."""
+    from backend.core.plan.slot_gate import evaluate_required_slots
+
+    slot_payload = evaluate_required_slots(state)
+    if slot_payload is not None:
+        return slot_payload
+
     if state.get("clarification_resolved"):
         return None
 

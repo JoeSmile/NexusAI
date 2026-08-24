@@ -159,6 +159,7 @@ def build_pipeline():
         route_after_orchestrator,
         {
             "model_router": "model_router",
+            "write_memory": "write_memory",
             "conversion_hook": "conversion_hook",
         },
     )
