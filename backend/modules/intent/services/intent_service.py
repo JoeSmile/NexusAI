@@ -103,17 +103,40 @@ class IntentService:
         
         # 根据不同意图类型提供不同的响应策略
         suggestions = {
-            IntentType.CRISIS: {
-                "response_style": "专业、冷静、关怀",
-                "priority": "highest",
-                "actions": [
-                    "提供专业求助热线",
-                    "表达关心和支持",
-                    "建议寻求专业帮助",
-                    "不做价值判断"
-                ],
-                "avoid": ["说教", "轻视", "劝阻"],
-                "prompt_hint": "安全预警模式：需要提供明确的求助指引"
+            IntentType.GREETING: {
+                "response_style": "友好、简短",
+                "priority": "low",
+                "actions": ["寒暄回应"],
+                "avoid": ["冗长"],
+                "prompt_hint": "问候模式：短路径 greeting skill",
+            },
+            IntentType.PRE_SALES: {
+                "response_style": "专业、价值导向",
+                "priority": "high",
+                "actions": ["产品介绍", "方案对比", "报价说明"],
+                "avoid": ["编造价格", "过度承诺"],
+                "prompt_hint": "售前模式：走售前 Agent / quote_proposal",
+            },
+            IntentType.AFTER_SALES: {
+                "response_style": "合规、安抚、可执行",
+                "priority": "high",
+                "actions": ["政策查表", "工单升级", "时效说明"],
+                "avoid": ["擅自承诺退款"],
+                "prompt_hint": "售后模式：refund_policy / complaint_escalation 短路径或售后 Agent",
+            },
+            IntentType.CONTENT_CREATION: {
+                "response_style": "创意、结构化",
+                "priority": "medium",
+                "actions": ["生成脚本/文案/周报"],
+                "avoid": ["抄袭", "违规表述"],
+                "prompt_hint": "内容创作模式：内容 Agent + 对应 skill",
+            },
+            IntentType.CONTENT_ANALYSIS: {
+                "response_style": "分析、客观",
+                "priority": "medium",
+                "actions": ["热点/竞品/选题分析"],
+                "avoid": ["无依据结论"],
+                "prompt_hint": "内容分析模式：分析 Agent + hotspot.dig",
             },
             IntentType.KNOWLEDGE_QUERY: {
                 "response_style": "专业、准确、可溯源",
@@ -124,49 +147,21 @@ class IntentService:
                     "标明出处",
                 ],
                 "avoid": ["编造制度", "情感化安慰"],
-                "prompt_hint": "知识查询模式：优先 RAG/知识库，给出可核对的制度信息",
-            },
-            IntentType.ADVICE: {
-                "response_style": "建设性、实用、简洁",
-                "priority": "medium",
-                "actions": [
-                    "分析问题",
-                    "提供可操作步骤",
-                    "给出备选方案",
-                ],
-                "avoid": ["强制建议", "过于复杂"],
-                "prompt_hint": "操作建议模式：给出中性可执行建议",
+                "prompt_hint": "知识查询模式：优先 RAG/知识库",
             },
             IntentType.FUNCTION: {
                 "response_style": "高效、明确、友好",
                 "priority": "medium",
-                "actions": [
-                    "确认需求",
-                    "执行功能",
-                    "反馈结果",
-                ],
+                "actions": ["确认需求", "执行功能", "反馈结果"],
                 "avoid": ["冗长", "模糊"],
-                "prompt_hint": "功能执行模式：快速准确地完成用户请求",
-            },
-            IntentType.CHAT: {
-                "response_style": "轻松、友好、自然",
-                "priority": "low",
-                "actions": [
-                    "保持对话",
-                    "展现亲和力",
-                ],
-                "avoid": ["过于正式", "冷漠"],
-                "prompt_hint": "闲聊模式：自然友好的日常交流",
+                "prompt_hint": "功能执行模式：工具/提醒/记录",
             },
             IntentType.CONVERSATION: {
                 "response_style": "平衡、自然、专业",
                 "priority": "medium",
-                "actions": [
-                    "理解上下文",
-                    "延续话题",
-                ],
+                "actions": ["理解上下文", "延续话题"],
                 "avoid": ["突兀", "生硬"],
-                "prompt_hint": "普通对话模式：保持自然流畅的对话",
+                "prompt_hint": "普通对话模式：默认 LLM",
             },
         }
         
@@ -190,16 +185,10 @@ class IntentService:
         Returns:
             是否需要特殊行动
         """
-        from ..models.intent_models import IntentType
-        
-        # 危机情况需要立即行动
-        if intent_result.intent == IntentType.CRISIS:
-            return True
-        
-        # 高风险输入需要特别关注
+        # 高风险输入需要特别关注（危机由 guardrails_input 承接）
         if processed.get("risk_level") == "high":
             return True
-        
+
         return False
     
     def build_prompt(self, user_context: dict[str, Any]) -> str:

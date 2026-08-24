@@ -20,6 +20,15 @@ from backend.observability.decorators import enrich_span, observe
 from backend.pipeline.state import PipelineState
 
 
+def _resolved_query(state: PipelineState) -> str:
+    qr = state.get("query_rewrite")
+    if isinstance(qr, dict):
+        rq = str(qr.get("rewritten_query") or "").strip()
+        if rq:
+            return rq
+    return str(state.get("message") or "")
+
+
 @observe(name="pipeline.build_context")
 async def build_context(state: PipelineState) -> PipelineState:
     """组装最终上下文（记忆段带隔离标记 + token 预算；漂移则剥离记忆正文）。"""
@@ -36,12 +45,12 @@ async def build_context(state: PipelineState) -> PipelineState:
     retrieval_mode = choose_retrieval_mode(
         candidate_count=candidate_count,
         cold_items=bundle.cold,
-        query=str(state.get("message") or ""),
+        query=_resolved_query(state),
     )
     state["retrieval_mode"] = retrieval_mode
     memory_block = mem.assemble_prompt_block(
         bundle,
-        query=str(state.get("message") or ""),
+        query=_resolved_query(state),
         user_id=str(state.get("user_id") or ""),
         retrieval_mode=retrieval_mode,
     )

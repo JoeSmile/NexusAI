@@ -10,6 +10,7 @@ import { fetchRunSnapshot } from '@/api/chat'
 import { formatApiError } from '@/api/http'
 import { ExecutionPanel } from '@/components/agent/ExecutionPanel'
 import { TraceMemorySnapshot } from '@/components/trace/TraceMemorySnapshot'
+import { TraceRewriteCard } from '@/components/trace/TraceRewriteCard'
 import { TraceTimeline } from '@/components/trace/TraceTimeline'
 import { Button } from '@/components/ui/button'
 import {
@@ -116,6 +117,8 @@ export function TraceDetailDrawer({ traceId, open, onOpenChange }: Props) {
           <h3 className="text-sm font-semibold">Memory 快照</h3>
           <TraceMemorySnapshot snapshot={memorySnapshot} />
         </section>
+
+        <TraceRewriteCard events={events} />
 
         <section className="space-y-2">
           <h3 className="text-sm font-semibold">时序事件</h3>

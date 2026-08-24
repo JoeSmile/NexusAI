@@ -123,6 +123,7 @@ def _build_messages(
     confidence: float,
     caps: list[dict[str, Any]],
     skill_asset_hit: dict[str, Any] | None,
+    session_coref: dict[str, Any] | None = None,
 ) -> list[dict[str, str]]:
     cap_lines = []
     for c in caps:
@@ -137,7 +138,10 @@ def _build_messages(
         "You are a task planner for NexusAI Chat. "
         "Produce a JSON object only (no markdown) with PlanIR shape:\n"
         '{"query_rewrite":{"rewritten_query":"...","sub_queries":[],"language":"zh",'
-        '"clarification_needed":false},"goal":"...","version":1,"max_depth":3,'
+        '"clarification_needed":false,'
+        '"coref_table":{"entries":[{"entity_id":"e1","canonical":"...",'
+        '"mentions":["它"],"resolved_value":"...","confidence":0.9,"source_turn":1}]}},'
+        '"goal":"...","version":1,"max_depth":3,'
         '"steps":[{"id":"s1","capability_id":"...","params":{},"depends_on":[],'
         '"mode":"serial","on_fail":"fail","post_process":[]}]}'
         "\nUse ONLY capability ids from the catalog (whitelist). "
@@ -150,8 +154,14 @@ def _build_messages(
     user = (
         f"intent={intent} confidence={confidence:.3f}\n"
         f"message={message[:2000]}\n"
-        f"capabilities:\n" + ("\n".join(cap_lines) or "(none)")
     )
+    if session_coref and session_coref.get("entries"):
+        user += (
+            "session_coref_table="
+            + json.dumps(session_coref, ensure_ascii=False)[:1500]
+            + "\n"
+        )
+    user += "capabilities:\n" + ("\n".join(cap_lines) or "(none)")
     return [
         {"role": "system", "content": system},
         {"role": "user", "content": user},
@@ -207,7 +217,11 @@ def audit_task_plan_on_success(state: PipelineState) -> None:
                 "input_text": "",
                 "output_text": json.dumps(blob, ensure_ascii=False)[:2000],
                 "decision_explain": json.dumps(
-                    {"plan": plan_audit, "query_rewrite": state.get("query_rewrite")},
+                    {
+                        "plan": plan_audit,
+                        "query_rewrite": state.get("query_rewrite"),
+                        "coref_table": (state.get("query_rewrite") or {}).get("coref_table"),
+                    },
                     ensure_ascii=False,
                 )[:4000],
                 "model": state.get("selected_model") or "",
@@ -347,6 +361,21 @@ async def task_plan(state: PipelineState) -> PipelineState:
         message = state.get("raw_input") or state.get("message") or ""
         intent = state.get("intent", "default") or "default"
         confidence = float(state.get("intent_confidence", 0.0) or 0.0)
+
+        from backend.core.plan.coref import (
+            apply_coref_to_plan,
+            infer_coref_table,
+            invalidate_coref_if_drift,
+            load_session_coref,
+            merge_coref_tables,
+            parse_coref_table,
+            save_session_coref,
+        )
+
+        await invalidate_coref_if_drift(state)
+        session_coref = load_session_coref(state)
+        session_coref_dict = session_coref.model_dump(mode="json")
+
         ranked_caps = search_capabilities(caps, message, top_k=12)
         messages = _build_messages(
             message=message,
@@ -354,6 +383,7 @@ async def task_plan(state: PipelineState) -> PipelineState:
             confidence=confidence,
             caps=ranked_caps,
             skill_asset_hit=state.get("skill_asset_hit"),
+            session_coref=session_coref_dict if session_coref.entries else None,
         )
 
         model = state.get("selected_model") or "deepseek-v4-flash"
@@ -385,6 +415,16 @@ async def task_plan(state: PipelineState) -> PipelineState:
                 enriched = attach_query_rewrite_to_plan(
                     parsed, original_message=message
                 )
+                qr_raw = enriched.get("query_rewrite") or {}
+                fresh = parse_coref_table(qr_raw.get("coref_table"))
+                if fresh is None or not fresh.entries:
+                    fresh = infer_coref_table(
+                        message,
+                        dict(state.get("entities") or {}),
+                    )
+                merged_coref = merge_coref_tables(session_coref, fresh)
+                enriched = apply_coref_to_plan(enriched, merged_coref)
+                await save_session_coref(state, merged_coref)
                 plan_ir = validate_plan_ir(
                     prevalidate_llm_plan(enriched, caps_by_id=caps_by_id),
                     caps_by_id=caps_by_id,
@@ -402,9 +442,11 @@ async def task_plan(state: PipelineState) -> PipelineState:
                 state["query_rewrite"] = plan_dict.get("query_rewrite")
                 bus = bus_for_state(state)
                 if bus is not None:
+                    qr = plan_dict.get("query_rewrite") or {}
                     bus.publish_plan(
                         goal=str(plan_dict.get("goal") or ""),
                         steps=list(plan_dict.get("steps") or []),
+                        coref_table=qr.get("coref_table"),
                     )
                 break
             except Exception as exc:

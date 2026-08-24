@@ -13,12 +13,14 @@ class SkillRegistry:
 
     def __init__(self):
         self._skills: dict[str, BaseSkill] = {}
-        self._intent_map: dict[str, str] = {}
+        self._intent_map: dict[str, list[str]] = {}
 
     def register(self, skill: BaseSkill) -> None:
         self._skills[skill.id] = skill
         for intent in skill.trigger_intents:
-            self._intent_map[intent] = skill.id
+            bucket = self._intent_map.setdefault(intent, [])
+            if skill.id not in bucket:
+                bucket.append(skill.id)
 
     def discover(self) -> None:
         """自动扫描 builtin/ 目录"""
@@ -44,14 +46,35 @@ class SkillRegistry:
         return self._skills.get(skill_id)
 
     def get_skill_for_intent(
-        self, intent: str, confidence: float, threshold: float = 0.85
+        self,
+        intent: str,
+        confidence: float,
+        threshold: float = 0.85,
+        *,
+        text: str = "",
     ) -> BaseSkill | None:
         if confidence < threshold:
             return None
-        skill_id = self._intent_map.get(intent)
-        if skill_id:
-            return self._skills.get(skill_id)
-        return None
+        skill_ids = self._intent_map.get(intent)
+        if not skill_ids:
+            return None
+        if len(skill_ids) == 1:
+            return self._skills.get(skill_ids[0])
+        text_l = (text or "").lower()
+        best_id: str | None = None
+        best_score = -1
+        for sid in skill_ids:
+            skill = self._skills.get(sid)
+            if skill is None:
+                continue
+            keywords = list(getattr(skill, "short_path_keywords", None) or [])
+            score = sum(1 for kw in keywords if kw and kw in text_l)
+            if score > best_score:
+                best_score = score
+                best_id = sid
+        if best_id and best_score >= 0:
+            return self._skills.get(best_id)
+        return self._skills.get(skill_ids[0])
 
     async def execute_skill(
         self,

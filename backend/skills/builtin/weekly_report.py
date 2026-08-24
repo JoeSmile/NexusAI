@@ -10,7 +10,7 @@ class WeeklyReportSkill(BaseSkill):
     id = "weekly_report"
     name = "周报生成"
     description = "汇总热点与效能指标，输出社媒周报大纲"
-    trigger_intents = ["weekly_report", "report"]
+    trigger_intents = ["content_creation"]
     required_permissions = ["chat:write", "analytics:read"]
 
     async def _do_execute(self, entities: dict) -> SkillResult:

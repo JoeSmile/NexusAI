@@ -10,7 +10,7 @@ class QuoteProposalSkill(BaseSkill):
     id = "quote_proposal"
     name = "售前报价"
     description = "根据 SKU 与数量生成售前报价话术"
-    trigger_intents = ["quote", "sales"]
+    trigger_intents = ["pre_sales"]
     required_permissions = ["chat:write"]
 
     async def _do_execute(self, entities: dict) -> SkillResult:

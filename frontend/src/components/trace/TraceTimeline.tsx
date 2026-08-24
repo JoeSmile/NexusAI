@@ -17,6 +17,23 @@ function eventLabel(ev: AuditNdjsonEvent): string {
 }
 
 function eventDetail(ev: AuditNdjsonEvent): string {
+  if (ev.action === 'chat.task_plan' && ev.decision_explain) {
+    try {
+      const parsed = JSON.parse(ev.decision_explain) as {
+        query_rewrite?: { rewritten_query?: string; coref_table?: { entries?: unknown[] } }
+        coref_table?: { entries?: unknown[] }
+      }
+      const rq = parsed.query_rewrite?.rewritten_query || ''
+      const n = (
+        parsed.query_rewrite?.coref_table?.entries ||
+        parsed.coref_table?.entries ||
+        []
+      ).length
+      if (rq) return `rewrite: ${rq.slice(0, 120)}${n ? ` · coref×${n}` : ''}`
+    } catch {
+      /* fall through */
+    }
+  }
   if (ev.decision_explain) {
     try {
       const parsed = JSON.parse(ev.decision_explain) as { reason?: string; stages?: unknown[] }

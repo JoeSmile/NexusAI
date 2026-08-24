@@ -30,6 +30,7 @@ class BaseSkill(ABC):
     name: str = ""
     description: str = ""
     trigger_intents: list[str] = []
+    short_path_keywords: list[str] = []
     tool_schema: dict = {}
     required_permissions: list[str] = []
     requires_human_approval: bool = False

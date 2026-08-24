@@ -10,7 +10,8 @@ class ComplaintEscalationSkill(BaseSkill):
     id = "complaint_escalation"
     name = "投诉升级"
     description = "高优先级投诉升级话术，触发人工审批"
-    trigger_intents = ["complaint", "escalation"]
+    trigger_intents = ["after_sales"]
+    short_path_keywords = ["投诉", "升级", "差评", "举报"]
     required_permissions = ["chat:write"]
     requires_human_approval = True
 

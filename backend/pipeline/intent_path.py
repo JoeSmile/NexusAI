@@ -13,6 +13,8 @@ from backend.skills.base import BaseSkill
 from backend.skills.registry import registry
 
 SHORT_PATH_CONFIDENCE = 0.85
+# 仅整类可安全短路径的 L0 意图（Task 65 slice 8）
+SHORT_PATH_INTENTS = frozenset({"greeting", "after_sales"})
 
 
 def _skill_from_state_value(raw: Any) -> BaseSkill | None:
@@ -44,9 +46,14 @@ def resolve_short_path_skill(state: PipelineState | dict) -> BaseSkill | None:
 
     intent = state.get("intent", "default") or "default"
     confidence = float(state.get("intent_confidence", 0.0) or 0.0)
+    if intent not in SHORT_PATH_INTENTS:
+        return None
     if confidence < SHORT_PATH_CONFIDENCE:
         return None
-    return registry.get_skill_for_intent(intent, confidence, threshold=SHORT_PATH_CONFIDENCE)
+    text = str(state.get("message") or state.get("raw_input") or "")
+    return registry.get_skill_for_intent(
+        intent, confidence, threshold=SHORT_PATH_CONFIDENCE, text=text
+    )
 
 
 def short_path_predicate(state: PipelineState | dict) -> bool:

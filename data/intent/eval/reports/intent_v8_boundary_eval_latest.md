@@ -1,0 +1,34 @@
+# Intent v8 Manual Holdout Evaluation
+
+- Generated: 2026-08-24T09:33:23.143061+00:00
+- Dataset: `data\intent\eval\intent_v8_boundary_cases.csv` (6 samples, hand-written holdout)
+- Model: `D:\LLMs\NexusAI\data\models\intent_v8`
+
+## Summary
+
+| Metric | Value |
+|--------|-------|
+| Accuracy | **16.67%** (1/6) |
+| Macro F1 | **0.0833** |
+| High-tier (≥0.85) accuracy | **16.67%** (1/6) |
+
+## Per-class
+
+| Label | P | R | F1 | Support |
+|-------|---|---|----|---------|
+| greeting | 0.00 | 0.00 | 0.00 | 1 |
+| pre_sales | 0.00 | 0.00 | 0.00 | 1 |
+| after_sales | 0.00 | 0.00 | 0.00 | 0 |
+| content_creation | 0.00 | 0.00 | 0.00 | 0 |
+| content_analysis | 0.00 | 0.00 | 0.00 | 1 |
+| knowledge_query | 0.00 | 0.00 | 0.00 | 1 |
+| function | 0.00 | 0.00 | 0.00 | 1 |
+| conversation | 0.33 | 1.00 | 0.50 | 1 |
+
+## Misclassified
+
+- `在吗` — gold **greeting** → pred **conversation** (conf=0.9858, tier=high)
+- `和竞品对比一下` — gold **pre_sales** → pred **content_analysis** (conf=0.9956, tier=high)
+- `差旅报销标准是多少` — gold **knowledge_query** → pred **after_sales** (conf=0.9937, tier=high)
+- `这条内容爆不爆` — gold **content_analysis** → pred **conversation** (conf=0.9931, tier=high)
+- `备忘一下周五交周报` — gold **function** → pred **content_creation** (conf=0.9972, tier=high)

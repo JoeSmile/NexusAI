@@ -3,216 +3,195 @@
 Intent Classifier with hybrid approach (rule-based + ML)
 """
 
-import logging
+from __future__ import annotations
 
-from ..models.intent_models import IntentResult, IntentType
+import json
+import logging
+from pathlib import Path
+
+from ..models.intent_models import IntentResult, IntentType, confidence_tier
+from .label_map import V8_ID2LABEL, V8_LABEL_ORDER
 from .rule_engine import RuleBasedIntentEngine
 
 logger = logging.getLogger(__name__)
 
+MAX_SEQ_LEN = 48
+
+
+def resolve_intent_model_path(model_path: str | None = None) -> Path:
+    """Resolve INTENT_MODEL_PATH (absolute or relative to project_root)."""
+    try:
+        from config import get_settings
+
+        settings = get_settings()
+        root = Path(settings.project_root)
+        raw = model_path or settings.intent_model_path
+    except Exception:
+        root = Path(__file__).resolve().parents[4]
+        raw = model_path or "data/models/intent_v8"
+
+    path = Path(raw)
+    if path.is_absolute():
+        return path
+    return root / path
+
+
+def _attach_tier(result: IntentResult) -> IntentResult:
+    if result.tier is None:
+        return result.model_copy(update={"tier": confidence_tier(result.confidence)})
+    return result
+
 
 class MLIntentClassifier:
-    """
-    机器学习意图分类器（基于BERT）
-    
-    注意：这里提供了接口框架，实际的BERT模型需要单独训练
-    可以使用 transformers 库的 AutoModelForSequenceClassification
-    """
-    
+    """v8 BERT 意图分类器；加载失败时回退启发式规则。"""
+
     def __init__(self, model_path: str | None = None):
-        """
-        初始化ML分类器
-        
-        Args:
-            model_path: 预训练模型路径（可选）
-        """
-        self.model_path = model_path or "intent_bert_model"
-        self.labels = list(IntentType)
-        
-        # 模型加载（如果有训练好的模型）
+        self.model_path = resolve_intent_model_path(model_path)
         self.model = None
         self.tokenizer = None
+        self._device = None
+        self.id2label: dict[int, str] = dict(V8_ID2LABEL)
         self._load_model()
-    
-    def _load_model(self):
-        """加载预训练模型"""
+
+    def _load_model(self) -> None:
+        config_file = self.model_path / "config.json"
+        if not config_file.is_file():
+            logger.warning(
+                "Intent v8 model not found at %s; using rule/heuristic fallback",
+                self.model_path,
+            )
+            return
         try:
-            # 这里可以集成真实的BERT模型
-            # from transformers import AutoTokenizer, AutoModelForSequenceClassification
-            # self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
-            # self.model = AutoModelForSequenceClassification.from_pretrained(self.model_path)
-            logger.info("ML模型加载成功（当前为模拟模式）")
-        except Exception as e:
-            logger.warning(f"ML模型加载失败，将使用模拟预测: {e}")
-    
+            import torch
+            from transformers import AutoModelForSequenceClassification, AutoTokenizer
+        except ImportError:
+            logger.warning(
+                "transformers/torch not installed (uv sync --extra intent-model); "
+                "using rule/heuristic fallback"
+            )
+            return
+
+        try:
+            with config_file.open(encoding="utf-8") as fh:
+                cfg = json.load(fh)
+            raw_id2label = cfg.get("id2label") or {}
+            if raw_id2label:
+                self.id2label = {int(k): str(v) for k, v in raw_id2label.items()}
+            elif len(self.id2label) != 8:
+                raise ValueError("config.json id2label missing and V8_ID2LABEL invalid")
+
+            self.tokenizer = AutoTokenizer.from_pretrained(str(self.model_path))
+            self.model = AutoModelForSequenceClassification.from_pretrained(
+                str(self.model_path)
+            )
+            self.model.eval()
+            self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            self.model.to(self._device)
+            logger.info("Intent v8 BERT loaded from %s on %s", self.model_path, self._device)
+        except Exception as exc:
+            logger.warning("Intent v8 model load failed (%s); using fallback", exc)
+            self.model = None
+            self.tokenizer = None
+            self._device = None
+
+    @property
+    def is_loaded(self) -> bool:
+        return self.model is not None and self.tokenizer is not None
+
     def classify(self, text: str) -> IntentResult:
-        """
-        使用机器学习模型分类意图
-        
-        Args:
-            text: 输入文本
-            
-        Returns:
-            意图识别结果
-        """
-        # 如果有真实模型，使用模型预测
-        if self.model is not None and self.tokenizer is not None:
-            return self._predict_with_model(text)
-        else:
-            # 使用启发式规则模拟（简化版）
-            return self._heuristic_classify(text)
-    
+        if self.is_loaded:
+            return _attach_tier(self._predict_with_model(text))
+        return _attach_tier(self._heuristic_classify(text))
+
     def _predict_with_model(self, text: str) -> IntentResult:
-        """
-        使用训练好的BERT模型进行预测
-        
-        Args:
-            text: 输入文本
-            
-        Returns:
-            意图识别结果
-        """
-        # TODO: 实现真实的模型推理；当前回退启发式
-        return self._heuristic_classify(text)
+        import torch
 
-    
+        assert self.model is not None and self.tokenizer is not None
+        enc = self.tokenizer(
+            text,
+            return_tensors="pt",
+            truncation=True,
+            max_length=MAX_SEQ_LEN,
+        )
+        enc = {k: v.to(self._device) for k, v in enc.items()}
+        with torch.no_grad():
+            logits = self.model(**enc).logits
+        probs = torch.softmax(logits, dim=-1)[0]
+        idx = int(probs.argmax())
+        conf = float(probs[idx].item())
+        label = self.id2label.get(idx)
+        if label is None and 0 <= idx < len(V8_LABEL_ORDER):
+            label = V8_LABEL_ORDER[idx]
+        try:
+            intent = IntentType(label or IntentType.CONVERSATION.value)
+        except ValueError:
+            intent = IntentType.CONVERSATION
+        return IntentResult(
+            intent=intent,
+            confidence=conf,
+            source="model",
+            metadata={"method": "bert_v8", "model_path": str(self.model_path)},
+        )
+
     def _heuristic_classify(self, text: str) -> IntentResult:
-        """
-        启发式分类（当无可用模型时的备选方案）
-        
-        Args:
-            text: 输入文本
-            
-        Returns:
-            意图识别结果
-        """
-        text_lower = text.lower()
-
-        knowledge_markers = [
-            "如何查询",
-            "怎么查询",
-            "查询公司",
-            "管理制度",
-            "信息安全",
-            "知识库",
-            "制度",
-            "政策",
-            "规定",
-            "合规",
-        ]
-        if any(word in text_lower for word in knowledge_markers):
-            return IntentResult(
-                intent=IntentType.KNOWLEDGE_QUERY,
-                confidence=0.85,
-                source="model",
-                metadata={"method": "heuristic"},
-            )
-        if any(word in text_lower for word in ["怎么办", "有什么建议", "怎么处理"]):
-            return IntentResult(
-                intent=IntentType.ADVICE,
-                confidence=0.75,
-                source="model",
-                metadata={"method": "heuristic"},
-            )
-        if any(word in text_lower for word in ["提醒", "记得", "别忘"]):
-            return IntentResult(
-                intent=IntentType.FUNCTION,
-                confidence=0.70,
-                source="model",
-                metadata={"method": "heuristic"},
-            )
-        if any(word in text_lower for word in ["你好", "早上好", "hi", "在吗"]):
-            return IntentResult(
-                intent=IntentType.CHAT,
-                confidence=0.85,
-                source="model",
-                metadata={"method": "heuristic"},
-            )
+        """Model unavailable — delegate to rule engine, else conversation."""
+        rule = RuleBasedIntentEngine().detect_intent(text)
+        if rule is not None:
+            return rule.model_copy(update={"source": "rule"})
         return IntentResult(
             intent=IntentType.CONVERSATION,
             confidence=0.60,
-            source="model",
-            metadata={"method": "heuristic"},
+            source="rule",
+            metadata={"method": "fallback_default"},
         )
 
 
 class IntentClassifier:
-    """
-    混合式意图分类器
-    整合规则引擎和机器学习模型
-    """
-    
+    """混合式意图分类器 — 规则优先，模型补充。"""
+
     def __init__(self, model_path: str | None = None):
-        """
-        初始化意图分类器
-        
-        Args:
-            model_path: ML模型路径（可选）
-        """
         self.rule_engine = RuleBasedIntentEngine()
         self.ml_classifier = MLIntentClassifier(model_path)
-        logger.info("意图分类器初始化完成（混合模式：规则+模型）")
-    
-    def detect_intent(self, text: str) -> IntentResult:
-        """
-        检测用户意图（融合策略）
-        
-        策略：
-        1. 优先使用规则引擎检测危机情况（安全第一）
-        2. 如果规则引擎有高置信度匹配，使用规则结果
-        3. 否则使用ML模型进行预测
-        
-        Args:
-            text: 输入文本
-            
-        Returns:
-            意图识别结果
-        """
-        if not text or not text.strip():
-            return IntentResult(
-                intent=IntentType.CONVERSATION,
-                confidence=0.5,
-                source="default",
-                metadata={"reason": "empty_input"}
-            )
-        
-        # 1. 优先检查危机关键词（安全第一）
-        rule_result = self.rule_engine.detect_intent(text)
-        if rule_result and rule_result.intent == IntentType.CRISIS:
-            logger.warning(f"检测到危机意图：{text[:50]}...")
-            return rule_result
-        
-        # 2. 如果规则引擎有高置信度匹配（>0.85），使用规则结果
-        if rule_result and rule_result.confidence > 0.85:
-            return rule_result
-        
-        # 3. 使用ML模型预测
-        ml_result = self.ml_classifier.classify(text)
-        
-        # 4. 如果规则和模型都有结果，进行融合
-        if rule_result:
-            # 如果规则和模型预测一致，提高置信度
-            if rule_result.intent == ml_result.intent:
-                ml_result.confidence = min(ml_result.confidence + 0.1, 1.0)
-                ml_result.metadata = ml_result.metadata or {}
-                ml_result.metadata["rule_confirmed"] = True
-            else:
-                # 如果不一致，记录次要意图
-                ml_result.secondary_intents = {
-                    rule_result.intent: rule_result.confidence
-                }
-        
-        return ml_result
-    
-    def batch_detect(self, texts: list[str]) -> list[IntentResult]:
-        """
-        批量检测意图
-        
-        Args:
-            texts: 文本列表
-            
-        Returns:
-            意图结果列表
-        """
-        return [self.detect_intent(text) for text in texts]
+        logger.info(
+            "意图分类器初始化完成（混合模式：规则+模型%s）",
+            "" if self.ml_classifier.is_loaded else "，BERT 未加载→规则回退",
+        )
 
+    def detect_intent(self, text: str) -> IntentResult:
+        if not text or not text.strip():
+            return _attach_tier(
+                IntentResult(
+                    intent=IntentType.CONVERSATION,
+                    confidence=0.5,
+                    source="default",
+                    metadata={"reason": "empty_input"},
+                )
+            )
+
+        rule_result = self.rule_engine.detect_intent(text)
+        if rule_result and rule_result.confidence > 0.85:
+            return _attach_tier(rule_result)
+
+        ml_result = self.ml_classifier.classify(text)
+
+        if rule_result:
+            if rule_result.intent == ml_result.intent:
+                boosted = min(ml_result.confidence + 0.1, 1.0)
+                metadata = dict(ml_result.metadata or {})
+                metadata["rule_confirmed"] = True
+                ml_result = ml_result.model_copy(
+                    update={"confidence": boosted, "metadata": metadata}
+                )
+            else:
+                ml_result = ml_result.model_copy(
+                    update={
+                        "secondary_intents": {
+                            rule_result.intent: rule_result.confidence
+                        }
+                    }
+                )
+
+        return _attach_tier(ml_result)
+
+    def batch_detect(self, texts: list[str]) -> list[IntentResult]:
+        return [self.detect_intent(text) for text in texts]

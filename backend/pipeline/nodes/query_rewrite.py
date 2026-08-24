@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from backend.core.plan.models import QueryRewrite
+from backend.core.plan.models import CorefTable, QueryRewrite
 
 _SECRET_RE = re.compile(
     r"(?i)(api[_-]?key|secret|password|token|bearer\s+\S+|sk-[a-z0-9]{8,})"
@@ -45,6 +45,12 @@ def parse_query_rewrite(
             data["sub_queries"] = [str(x)[:500] for x in subs if str(x).strip()]
         else:
             data["sub_queries"] = []
+        ct = data.get("coref_table")
+        if ct is not None:
+            try:
+                data["coref_table"] = CorefTable.model_validate(ct).model_dump(mode="json")
+            except Exception:
+                data.pop("coref_table", None)
         return QueryRewrite.model_validate(data)
     except Exception:
         return None

@@ -54,6 +54,23 @@ class PlanStep(BaseModel):
         return v
 
 
+class CorefEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    entity_id: str = Field(min_length=1, max_length=32)
+    canonical: str = Field(min_length=1, max_length=256)
+    mentions: list[str] = Field(default_factory=list, max_length=16)
+    resolved_value: str = Field(min_length=1, max_length=256)
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    source_turn: int = Field(default=0, ge=0)
+
+
+class CorefTable(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    entries: list[CorefEntry] = Field(default_factory=list, max_length=20)
+
+
 class QueryRewrite(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -62,6 +79,7 @@ class QueryRewrite(BaseModel):
     language: str = Field(default="zh", max_length=16)
     clarification_needed: bool = False
     suggested_intent: str | None = Field(default=None, max_length=64)
+    coref_table: CorefTable | None = None
 
 
 class PlanIR(BaseModel):

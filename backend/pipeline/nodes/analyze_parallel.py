@@ -55,6 +55,7 @@ async def _analyze_intent(message: str) -> dict:
     异常时降级保守默认(best 档),不阻断管线。
     """
     try:
+        from backend.modules.intent.models.intent_models import confidence_tier
         from backend.modules.intent.routers.intent_router import get_intent_service
 
         result = get_intent_service().intent_classifier.detect_intent(message)
@@ -64,6 +65,7 @@ async def _analyze_intent(message: str) -> dict:
             "intent": intent,
             "confidence": float(result.confidence),
             "source": str(result.source),
+            "tier": result.tier or confidence_tier(float(result.confidence)),
             "entities": {},
         }
     except Exception:

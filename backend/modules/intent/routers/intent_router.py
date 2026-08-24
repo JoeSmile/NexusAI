@@ -6,6 +6,7 @@ Intent Recognition API Router
 import logging
 from typing import Any
 
+from config import get_settings
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from backend.core.auth.models import TenantContext
@@ -32,7 +33,8 @@ def get_intent_service() -> IntentService:
     """获取意图服务实例（依赖注入）"""
     global _intent_service
     if _intent_service is None:
-        _intent_service = IntentService()
+        settings = get_settings()
+        _intent_service = IntentService(model_path=settings.intent_model_path)
     return _intent_service
 
 
@@ -168,41 +170,43 @@ async def get_intent_types(
     intent_types = {
         "greeting": {
             "name": "问候",
-            "description": "打招呼、寒暄，触发内置 greeting skill 短路径(零成本)",
+            "description": "打招呼、寒暄，触发 greeting skill 短路径",
             "examples": ["你好", "早上好", "hello"],
+        },
+        "pre_sales": {
+            "name": "售前",
+            "description": "产品介绍/对比/报价，走售前 Agent（长路径）",
+            "examples": ["介绍一下产品", "报个价", "和竞品对比"],
+        },
+        "after_sales": {
+            "name": "售后",
+            "description": "退款/投诉/发票，高置信可 refund_policy 短路径",
+            "examples": ["怎么退款", "我要投诉", "开发票"],
+        },
+        "content_creation": {
+            "name": "内容创作",
+            "description": "口播脚本/社媒文案/周报",
+            "examples": ["写个口播稿", "生成社媒文案"],
+        },
+        "content_analysis": {
+            "name": "内容分析",
+            "description": "热点挖掘/选题/竞品洞察",
+            "examples": ["分析这个热点", "这条内容爆不爆"],
         },
         "knowledge_query": {
             "name": "知识查询",
-            "description": "查询企业制度、政策或知识库内容",
-            "examples": [
-                "如何查询公司的信息安全管理制度？",
-                "出差报销流程是什么？",
-            ],
-        },
-        "advice": {
-            "name": "操作建议",
-            "description": "寻求可执行的操作建议或处理步骤",
-            "examples": ["这个故障怎么办？", "有什么处理建议吗？"],
-        },
-        "conversation": {
-            "name": "普通对话",
-            "description": "日常交流对话",
-            "examples": ["今天站会改到三点", "这份报告我看完了"],
+            "description": "企业制度/政策/RAG 检索",
+            "examples": ["报销流程是什么", "合规要求有哪些"],
         },
         "function": {
             "name": "功能请求",
-            "description": "请求执行特定功能（提醒、记录等）",
-            "examples": ["提醒我周五提交周报", "记录这次会议结论", "设置闹钟"],
+            "description": "提醒/记录/日程",
+            "examples": ["提醒我周五交周报", "帮我记一下"],
         },
-        "crisis": {
-            "name": "安全预警",
-            "description": "紧急情况，需要立即关注",
-            "examples": ["不想活了", "很想自杀", "撑不下去了"],
-        },
-        "chat": {
-            "name": "闲聊",
-            "description": "寒暄之外的日常对话",
-            "examples": ["在吗", "你是谁", "今天天气怎么样"],
+        "conversation": {
+            "name": "普通对话",
+            "description": "兜底日常交流",
+            "examples": ["然后呢", "嗯嗯继续"],
         },
     }
     

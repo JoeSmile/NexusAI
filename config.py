@@ -92,6 +92,9 @@ class Settings(BaseSettings):
     langfuse_sample_short_path: float = 0.1
     langfuse_sample_long_path: float = 1.0
 
+    # Intent v8 BERT (Task 65 slice 9) — relative to project_root unless absolute
+    intent_model_path: str = "data/models/intent_v8"
+
     # Capability Hub (Task 30.03)
     capability_registry_json: str = "[]"
     cap_quota_daily_calls: int = 1000

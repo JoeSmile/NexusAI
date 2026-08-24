@@ -1,6 +1,8 @@
 """PlanIR + 验证器 + 工具检索（Task 56 切片 2）。"""
 
 from backend.core.plan.models import (
+    CorefEntry,
+    CorefTable,
     OnFailMode,
     PlanIR,
     PlanStep,
@@ -17,6 +19,8 @@ from backend.core.plan.validator import (
 )
 
 __all__ = [
+    "CorefEntry",
+    "CorefTable",
     "OnFailMode",
     "PlanIR",
     "PlanStep",

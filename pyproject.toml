@@ -92,6 +92,12 @@ multimodal = [
 tool-search = [
     "sentence-transformers>=2.2.0",
 ]
+# 意图 BERT v8（Task 65 slice 9）— 未安装或未部署模型时回退规则引擎
+# 安装: uv sync --extra intent-model
+intent-model = [
+    "transformers>=4.46.0,<5",
+    "torch>=2.0.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/joe/context-gate"

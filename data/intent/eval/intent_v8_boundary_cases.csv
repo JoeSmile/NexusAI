@@ -1,0 +1,7 @@
+text,label,note
+在吗,greeting,训练弱标签曾标conversation-产品应为greeting
+拜拜,conversation,v8.3告别词→conversation
+和竞品对比一下,pre_sales,产品对比L0-模型易判content_analysis
+差旅报销标准是多少,knowledge_query,含报销词-模型易判after_sales
+这条内容爆不爆,content_analysis,口语短句-模型易判conversation
+备忘一下周五交周报,function,含周报词-模型易判content_creation

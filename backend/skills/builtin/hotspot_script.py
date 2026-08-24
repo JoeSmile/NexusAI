@@ -10,7 +10,7 @@ class HotspotScriptSkill(BaseSkill):
     id = "hotspot_script"
     name = "热点脚本"
     description = "将热点话题转为短视频口播脚本"
-    trigger_intents = ["hotspot", "content"]
+    trigger_intents = ["content_creation"]
     required_permissions = ["chat:write"]
 
     async def _do_execute(self, entities: dict) -> SkillResult:

@@ -13,11 +13,11 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from backend.modules.intent.core.label_map import normalize_label  # noqa: E402
+from backend.modules.intent.core.label_map import normalize_sample  # noqa: E402
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Normalize intent seed labels to 7 classes")
+    parser = argparse.ArgumentParser(description="Normalize intent seed labels to 8 classes")
     parser.add_argument(
         "--in",
         dest="in_path",
@@ -40,7 +40,8 @@ def main() -> int:
 
     for row in rows_in:
         raw = (row.get("label") or "").strip()
-        normalized = normalize_label(raw)
+        text = (row.get("text") or "").strip()
+        normalized = normalize_sample(text, raw)
         if raw.lower() != normalized:
             remapped[f"{raw}->{normalized}"] += 1
         rows_out.append({"text": row.get("text", ""), "label": normalized})

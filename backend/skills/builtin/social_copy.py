@@ -10,7 +10,7 @@ class SocialCopySkill(BaseSkill):
     id = "social_copy"
     name = "社媒文案"
     description = "生成多平台社媒短文案"
-    trigger_intents = ["social", "copywriting"]
+    trigger_intents = ["content_creation"]
     required_permissions = ["chat:write"]
 
     async def _do_execute(self, entities: dict) -> SkillResult:

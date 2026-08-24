@@ -40,7 +40,7 @@ def fake_skill(monkeypatch):
         def get_skill(self, skill_id: str):
             return skill if skill_id == skill.id else None
 
-        def get_skill_for_intent(self, intent, confidence, threshold=0.85):
+        def get_skill_for_intent(self, intent, confidence, threshold=0.85, text=""):
             if confidence < threshold:
                 return None
             if intent == "greeting":

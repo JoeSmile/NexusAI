@@ -117,7 +117,13 @@ class PlanEventBus:
         with self._lock:
             self._edges.add((source, target))
 
-    def publish_plan(self, *, goal: str, steps: list[dict[str, Any]]) -> PlanGraphEvent:
+    def publish_plan(
+        self,
+        *,
+        goal: str,
+        steps: list[dict[str, Any]],
+        coref_table: dict[str, Any] | None = None,
+    ) -> PlanGraphEvent:
         self.set_goal(goal)
         overview: list[dict[str, str]] = []
         for step in steps:
@@ -133,13 +139,13 @@ class PlanEventBus:
                 dep_s = str(dep)
                 if dep_s:
                     self.add_edge(dep_s, sid)
-        return self.emit(
-            "plan",
-            {
-                "goal": goal,
-                "steps": overview,
-            },
-        )
+        payload: dict[str, Any] = {
+            "goal": goal,
+            "steps": overview,
+        }
+        if coref_table:
+            payload["coref_table"] = coref_table
+        return self.emit("plan", payload)
 
     def publish_step(
         self,

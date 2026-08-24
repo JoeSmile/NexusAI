@@ -9,8 +9,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from backend.modules.intent.models.intent_models import IntentType
-
 from .augment import augment_samples
 from .io import (
     IntentSample,
@@ -27,7 +25,6 @@ from .synthetic import generate_synthetic_hardcases
 
 GOLDEN_SIZE = 500
 TRAIN_TARGET = 2000
-CRISIS_GOLDEN_CAP = 20
 
 
 def split_golden_pool(
@@ -54,8 +51,7 @@ def split_golden_pool(
     remainder: list[IntentSample] = []
     for label in labels:
         rows = by_label[label]
-        take_cap = min(quota, CRISIS_GOLDEN_CAP) if label == IntentType.CRISIS.value else quota
-        take = min(take_cap, len(rows))
+        take = min(quota, len(rows))
         for i, row in enumerate(rows):
             item = dict(row)
             item["label_source"] = "golden_holdout"

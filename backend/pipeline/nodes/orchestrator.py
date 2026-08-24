@@ -376,6 +376,10 @@ async def execute_plan_ir(
                             trace_id=str(state.get("trace_id") or ""),
                             assessment=drift,
                         )
+                        if drift.signal == "user_correction":
+                            from backend.core.plan.coref import clear_session_coref
+
+                            await clear_session_coref(state)
                         new_plan = await _replan_remaining(
                             state,
                             failed_step=step,

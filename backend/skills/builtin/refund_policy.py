@@ -10,7 +10,8 @@ class RefundPolicySkill(BaseSkill):
     id = "refund_policy"
     name = "退款话术"
     description = "根据订单场景生成标准退款沟通话术"
-    trigger_intents = ["refund", "customer_service"]
+    trigger_intents = ["after_sales"]
+    short_path_keywords = ["退款", "退货", "退钱", "换货", "发票"]
     required_permissions = ["chat:write"]
 
     async def _do_execute(self, entities: dict) -> SkillResult:

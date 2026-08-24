@@ -136,9 +136,11 @@ def select_model_for_intent(intent: str) -> ModelSpec:
     reg = get_registry()
     tier_map = {
         "greeting": "cheap",
-        "chat": "cheap",
+        "after_sales": "cheap",
         "knowledge_query": "good",
-        "advice": "good",
+        "pre_sales": "good",
+        "content_creation": "good",
+        "content_analysis": "good",
         "function": "good",
     }
     tier = tier_map.get(intent or "default", "best")

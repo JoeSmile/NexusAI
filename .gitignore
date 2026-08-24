@@ -70,3 +70,6 @@ uploads/
 
 # Internal pitch/positioning — NOT open-source (do not commit)
 docs/pitch/
+
+# Internal launch gap analysis — NOT open-source (do not commit)
+docs/audit/2026-08-24-launch-gap-checklist.md

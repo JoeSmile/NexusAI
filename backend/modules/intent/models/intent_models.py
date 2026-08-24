@@ -8,17 +8,30 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+INTENT_TIER_HIGH = 0.85
+INTENT_TIER_LOW = 0.4
+
+
+def confidence_tier(confidence: float) -> str:
+    """三档置信度路由（Task 65 slice 9）。"""
+    if confidence >= INTENT_TIER_HIGH:
+        return "high"
+    if confidence >= INTENT_TIER_LOW:
+        return "low"
+    return "fallback"
+
 
 class IntentType(StrEnum):
-    """用户意图类型枚举"""
+    """用户意图类型枚举（Task 65 切片 8 · 8 类业务导向 L0）"""
 
-    CRISIS = "crisis"  # 危机检测(安全兜底,保留)
-    GREETING = "greeting"  # 问候/寒暄(触发 greeting skill 短路径,EVID-16 补)
-    KNOWLEDGE_QUERY = "knowledge_query"  # 企业知识库 / 制度查询
-    ADVICE = "advice"  # 操作建议(中性,非情感倾诉)
-    CONVERSATION = "conversation"  # 普通对话
-    FUNCTION = "function"  # 功能请求(提醒、记录)
-    CHAT = "chat"  # 闲聊(寒暄之外的日常对话)
+    GREETING = "greeting"
+    PRE_SALES = "pre_sales"
+    AFTER_SALES = "after_sales"
+    CONTENT_CREATION = "content_creation"
+    CONTENT_ANALYSIS = "content_analysis"
+    KNOWLEDGE_QUERY = "knowledge_query"
+    FUNCTION = "function"
+    CONVERSATION = "conversation"
 
 
 class IntentResult(BaseModel):
@@ -27,6 +40,10 @@ class IntentResult(BaseModel):
     intent: IntentType = Field(..., description="识别的意图类型")
     confidence: float = Field(..., ge=0.0, le=1.0, description="置信度（0-1）")
     source: str = Field(..., description="识别来源：rule（规则）或 model（模型）")
+    tier: str | None = Field(
+        default=None,
+        description="置信度档位：high|low|fallback",
+    )
     secondary_intents: dict[IntentType, float] | None = Field(
         default=None,
         description="次要意图及其置信度",
