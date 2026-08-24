@@ -71,6 +71,7 @@ async def _dispatch(
         "deploy.release": _deploy_release,
         "sys.metrics": _sys_metrics,
         "plan.status": _plan_status,
+        "blackboard.search": _blackboard_search,
     }
     fn = handlers.get(handler_id)
     if fn is None:
@@ -314,6 +315,28 @@ async def _plan_status(payload: dict[str, Any], tenant: TenantContext) -> dict[s
             "status": "unknown",
             "nodes": [],
         },
+    }
+
+
+async def _blackboard_search(
+    payload: dict[str, Any], tenant: TenantContext
+) -> dict[str, Any]:
+    from backend.core.plan.blackboard import Blackboard
+
+    raw = payload.get("blackboard")
+    if not isinstance(raw, list):
+        raw = payload.get("entries") or []
+    bb = Blackboard.from_state({"blackboard": raw})
+    results = bb.search(
+        topic=str(payload.get("topic") or "") or None,
+        keyword=str(payload.get("keyword") or "") or None,
+        min_confidence=float(payload.get("min_confidence") or 0.0),
+        limit=int(payload.get("limit") or 12),
+    )
+    return {
+        "ok": True,
+        "entries": results,
+        "count": len(results),
     }
 
 

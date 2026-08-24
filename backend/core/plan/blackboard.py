@@ -12,6 +12,9 @@ from typing import Any
 from backend.core.audit import write_audit_sync
 from backend.core.guardrails.rag_sanitize import sanitize_fragment
 
+from .blackboard_preprocess import preprocess_blackboard_write
+from .topic_registry import TopicRegistryError, validate_topic
+
 _MAX_FACT_CHARS = 800
 _DEFAULT_CAPACITY = 50
 _DEFAULT_TTL_S = 3600
@@ -83,6 +86,7 @@ class Blackboard:
         tenant_id: str = "default",
         user_id: str = "system",
         trace_id: str = "",
+        skip_topic_validation: bool = False,
     ) -> bool:
         fact_raw = (fact_content or "").strip()
         if not fact_raw:
@@ -93,27 +97,69 @@ class Blackboard:
         if confidence < _MIN_CONFIDENCE:
             return False
         self._evict_expired()
-        topic = topic.strip()
-        prev = self._by_topic.get(topic)
+        try:
+            topic_key = (
+                validate_topic(topic.strip())
+                if not skip_topic_validation
+                else (topic.strip() or "fact.general")
+            )
+        except TopicRegistryError:
+            raise
+        prev = self._by_topic.get(topic_key)
+        pre = preprocess_blackboard_write(
+            topic=topic_key,
+            fact_content=fact,
+            confidence=float(confidence),
+            document_ids_ref=list(document_ids_ref or []),
+            prev=prev,
+        )
+        if pre.action in {"dedup_skip", "confidence_suppress"}:
+            self._audit_preprocess(
+                topic_key,
+                pre.action,
+                pre.detail,
+                tenant_id=tenant_id,
+                user_id=user_id,
+                trace_id=trace_id,
+            )
+            return False
+
+        write_fact = pre.fact_content or fact
+        write_conf = float(pre.confidence if pre.confidence is not None else confidence)
+        write_docs = list(
+            pre.document_ids_ref if pre.document_ids_ref is not None else (document_ids_ref or [])
+        )
         version = (prev.version + 1) if prev else 1
         status = "active"
-        if prev and prev.fact_content.strip() != fact.strip():
+        if pre.action == "semantic_conflict" and prev is not None:
             prev.status = "conflict"
             status = "conflict"
+        elif pre.action == "homogeneous_merge" and prev is not None:
+            status = "active"
+
         entry = BlackboardEntry(
             entry_id=str(uuid.uuid4()),
-            topic=topic,
+            topic=topic_key,
             source_agent_id=source_agent_id,
-            document_ids_ref=list(document_ids_ref or []),
-            fact_content=fact[:_MAX_FACT_CHARS],
-            confidence=float(confidence),
+            document_ids_ref=write_docs,
+            fact_content=write_fact[:_MAX_FACT_CHARS],
+            confidence=write_conf,
             trace_id=trace_id,
             status=status,
             version=version,
             created_at=time.time(),
         )
-        self._by_topic[topic] = entry
+        self._by_topic[topic_key] = entry
         self._enforce_capacity()
+        if pre.action != "insert":
+            self._audit_preprocess(
+                topic_key,
+                pre.action,
+                pre.detail,
+                tenant_id=tenant_id,
+                user_id=user_id,
+                trace_id=trace_id,
+            )
         self._audit_add(entry, tenant_id=tenant_id, user_id=user_id, trace_id=trace_id)
         return True
 
@@ -122,14 +168,66 @@ class Blackboard:
         return [e.to_dict() for e in sorted(self._by_topic.values(), key=lambda x: x.created_at)]
 
     def hot_entries(self, *, limit: int = _HOT_LIMIT) -> list[BlackboardEntry]:
+        return self.project_entries(limit=limit)
+
+    def cold_entries(self) -> list[BlackboardEntry]:
+        """Entries outside hot projection (full retention for blackboard_search)."""
         self._evict_expired()
-        active = [
+        hot_ids = {e.entry_id for e in self.hot_entries()}
+        return [
+            e
+            for e in sorted(self._by_topic.values(), key=lambda x: x.created_at)
+            if e.entry_id not in hot_ids
+        ]
+
+    def project_entries(
+        self,
+        *,
+        filter_topic: str | None = None,
+        min_confidence: float = _MIN_CONFIDENCE,
+        only_status: frozenset[str] | None = None,
+        limit: int = _HOT_LIMIT,
+    ) -> list[BlackboardEntry]:
+        """Hot projection — spec §7.10 filterTopic/minConfidence/onlyStatus/limit."""
+        from .topic_registry import match_topic_prefix
+
+        self._evict_expired()
+        statuses = only_status or frozenset({"active", "conflict"})
+        rows = [
             e
             for e in self._by_topic.values()
-            if e.status in {"active", "conflict"}
+            if e.status in statuses
+            and e.confidence >= min_confidence
+            and match_topic_prefix(e.topic, filter_topic)
         ]
-        active.sort(key=lambda e: (e.confidence, e.created_at), reverse=True)
-        return active[:limit]
+        rows.sort(key=lambda e: (e.confidence, e.created_at), reverse=True)
+        return rows[:limit]
+
+    def search(
+        self,
+        *,
+        topic: str | None = None,
+        keyword: str | None = None,
+        min_confidence: float = 0.0,
+        limit: int = 12,
+    ) -> list[dict[str, Any]]:
+        """Cold-path search for blackboard_search capability (§7.10)."""
+        from .topic_registry import match_topic_prefix
+
+        self._evict_expired()
+        kw = (keyword or "").strip().lower()
+        out: list[BlackboardEntry] = []
+        for e in sorted(self._by_topic.values(), key=lambda x: x.created_at, reverse=True):
+            if e.confidence < min_confidence:
+                continue
+            if not match_topic_prefix(e.topic, topic):
+                continue
+            if kw and kw not in e.fact_content.lower() and kw not in e.topic.lower():
+                continue
+            out.append(e)
+            if len(out) >= limit:
+                break
+        return [e.to_dict() for e in out]
 
     def synthesize(self, goal: str = "") -> str:
         lines: list[str] = []
@@ -195,6 +293,34 @@ class Blackboard:
         )
         for topic, _ in ranked[: len(self._by_topic) - self._capacity]:
             del self._by_topic[topic]
+
+    def _audit_preprocess(
+        self,
+        topic: str,
+        action: str,
+        detail: str,
+        *,
+        tenant_id: str,
+        user_id: str,
+        trace_id: str,
+    ) -> None:
+        try:
+            write_audit_sync(
+                {
+                    "tenant_id": tenant_id,
+                    "user_id": user_id,
+                    "action": "plan.blackboard_preprocess",
+                    "trace_id": trace_id,
+                    "input_text": topic[:200],
+                    "output_text": json.dumps(
+                        {"topic": topic, "action": action, "detail": detail},
+                        ensure_ascii=False,
+                    )[:2000],
+                    "model": "blackboard",
+                }
+            )
+        except Exception:
+            pass
 
     def _audit_add(
         self,

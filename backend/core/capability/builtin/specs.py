@@ -235,4 +235,23 @@ BUILTIN_TOOL_SPECS: list[dict[str, Any]] = [
         ),
         risk_level="low",
     ),
+    _tool(
+        "blackboard.search",
+        description="Search session blackboard entries (cold path / topic filter)",
+        contract=generic_contract(
+            "blackboard.search",
+            description="Filter blackboard facts by topic prefix, keyword, confidence.",
+            input_props={
+                "blackboard": {"type": "array"},
+                "topic": _STR,
+                "keyword": _STR,
+                "min_confidence": {"type": "number"},
+                "limit": {"type": "integer"},
+            },
+            required=[],
+            idempotent=True,
+        ),
+        risk_level="low",
+        permission="chat:read",
+    ),
 ]

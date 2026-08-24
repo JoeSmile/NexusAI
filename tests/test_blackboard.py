@@ -31,7 +31,7 @@ def test_blackboard_rejects_oversized_fact() -> None:
 def test_blackboard_capacity_evicts_low_confidence() -> None:
     bb = Blackboard(capacity=2, ttl_s=3600)
     bb.add_topic(
-        topic="t.low",
+        topic="step.low",
         fact_content="low",
         source_agent_id="a",
         confidence=0.3,
@@ -40,7 +40,7 @@ def test_blackboard_capacity_evicts_low_confidence() -> None:
         trace_id="tr",
     )
     bb.add_topic(
-        topic="t.mid",
+        topic="step.mid",
         fact_content="mid",
         source_agent_id="b",
         confidence=0.6,
@@ -49,7 +49,7 @@ def test_blackboard_capacity_evicts_low_confidence() -> None:
         trace_id="tr",
     )
     bb.add_topic(
-        topic="t.high",
+        topic="step.high",
         fact_content="high",
         source_agent_id="c",
         confidence=0.95,
