@@ -3,14 +3,21 @@
 from __future__ import annotations
 
 import json
-import uuid
 from dataclasses import replace
 from typing import Any
 
-from backend.core.audit import write_audit_sync
 from backend.core.auth.models import TenantContext
 from backend.core.auth.subagent import is_sub_agent, make_sub_agent_context
 
+from .agent_instance import (
+    AgentInstance,
+    audit_instance_event,
+    complete_agent_instance,
+    fail_agent_instance,
+    mark_instance_running,
+    record_instance_on_state,
+    spawn_agent_instance,
+)
 from .agent_type import TOPIC_SLOTS_FILLED, AgentType, get_agent_type
 from .clarification import ClarificationPayload
 from .slot_gate import (
@@ -55,6 +62,92 @@ def boost_capabilities_for_agent_type(
     preferred = [c for c in caps if c.get("id") in allow]
     rest = [c for c in caps if c.get("id") not in allow]
     return preferred + rest
+
+
+def spawn_sub_agent_instance(
+    state: dict[str, Any],
+    *,
+    step_id: str,
+    capability_id: str,
+    task: str = "",
+    attempt: int = 1,
+    max_attempts: int = 1,
+    model_name: str | None = None,
+    escalated_model: str | None = None,
+) -> AgentInstance | None:
+    """Create AgentInstance when orchestrator step uses sub-agent context."""
+    type_id = str(state.get("agent_type_id") or "").strip()
+    if not type_id:
+        return None
+    agent_type = get_agent_type(type_id)
+    if agent_type is None or not capability_allowed(agent_type, capability_id):
+        return None
+    parent_run_id = str(state.get("trace_id") or "")
+    tenant_id = str(state.get("tenant_id") or "")
+    user_id = str(state.get("user_id") or "")
+    instance = spawn_agent_instance(
+        agent_type_id=type_id,
+        parent_run_id=parent_run_id,
+        step_id=step_id,
+        capability_id=capability_id,
+        task=task,
+        attempt=attempt,
+        max_attempts=max_attempts,
+        model_name=model_name,
+        escalated_model=escalated_model,
+    )
+    audit_instance_event(
+        event="spawned",
+        instance=instance,
+        tenant_id=tenant_id,
+        user_id=user_id,
+    )
+    instance = mark_instance_running(instance)
+    audit_instance_event(
+        event="running",
+        instance=instance,
+        tenant_id=tenant_id,
+        user_id=user_id,
+    )
+    record_instance_on_state(state, instance)
+    spawn_n = int(state.get("orchestrator_spawn_total") or 0) + 1
+    state["orchestrator_spawn_total"] = spawn_n
+    return instance
+
+
+def complete_agent_instance_for_step(
+    state: dict[str, Any],
+    instance: AgentInstance,
+    outcome: dict[str, Any],
+) -> AgentInstance:
+    summary = str(outcome.get("output") or outcome.get("text") or "")
+    updated = complete_agent_instance(instance, output_summary=summary)
+    audit_instance_event(
+        event="completed",
+        instance=updated,
+        tenant_id=str(state.get("tenant_id") or ""),
+        user_id=str(state.get("user_id") or ""),
+        extra={"output_summary": summary[:500]},
+    )
+    record_instance_on_state(state, updated)
+    return updated
+
+
+def fail_agent_instance_for_step(
+    state: dict[str, Any],
+    instance: AgentInstance,
+    error: str,
+) -> AgentInstance:
+    updated = fail_agent_instance(instance, error)
+    audit_instance_event(
+        event="failed",
+        instance=updated,
+        tenant_id=str(state.get("tenant_id") or ""),
+        user_id=str(state.get("user_id") or ""),
+        extra={"error": error[:500]},
+    )
+    record_instance_on_state(state, updated)
+    return updated
 
 
 def resolve_step_tenant(
@@ -155,37 +248,3 @@ def prepare_orchestrator_spawn(
             user_id=str(state.get("user_id") or ""),
             trace_id=str(state.get("trace_id") or ""),
         )
-
-
-def audit_agent_spawn(
-    *,
-    tenant_id: str,
-    user_id: str,
-    parent_trace_id: str,
-    agent_type_id: str,
-    step_id: str,
-    capability_id: str,
-) -> None:
-    spawn_trace = f"{parent_trace_id}:spawn:{step_id or uuid.uuid4().hex[:8]}"
-    try:
-        write_audit_sync(
-            {
-                "tenant_id": tenant_id,
-                "user_id": user_id,
-                "action": "plan.agent_spawn",
-                "trace_id": spawn_trace,
-                "parent_trace_id": parent_trace_id,
-                "input_text": agent_type_id[:200],
-                "output_text": json.dumps(
-                    {
-                        "agent_type_id": agent_type_id,
-                        "step_id": step_id,
-                        "capability_id": capability_id,
-                    },
-                    ensure_ascii=False,
-                )[:2000],
-                "model": "agent_spawn",
-            }
-        )
-    except Exception:
-        pass

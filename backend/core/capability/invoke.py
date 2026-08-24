@@ -113,6 +113,14 @@ async def _invoke_model(
         )
 
     model_name = str(spec.spec.get("model") or spec.name)
+    retry_attempt = int(payload.get("_orchestrator_retry_attempt") or 1)
+    override = payload.get("_model_override")
+    if override:
+        model_name = str(override)
+    elif retry_attempt > 1:
+        from backend.core.model_registry import resolve_model_for_retry
+
+        model_name, _ = resolve_model_for_retry(model_name, retry_attempt)
     api_key_ref = str(spec.spec.get("api_key_ref") or "")
     api_key = resolve_credential(api_key_ref, tenant_id=tenant.tenant_id) or None
     base_url = str(spec.spec.get("base_url") or "") or None

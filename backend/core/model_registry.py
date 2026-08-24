@@ -192,5 +192,39 @@ def list_models() -> list[ModelSpec]:
     return [m for m in get_registry().values() if m.enabled]
 
 
+_TIER_RANK = {"cheap": 0, "good": 1, "best": 2}
+
+
+def escalate_model_name(current: str) -> str | None:
+    """Return next-tier chat model name, or None if none higher is enabled."""
+    spec = get_model(current)
+    if spec is None or spec.capability != "chat":
+        return None
+    current_rank = _TIER_RANK.get(spec.tier, 1)
+    reg = get_registry()
+    candidates = [
+        s
+        for s in reg.values()
+        if s.enabled
+        and s.capability == "chat"
+        and _TIER_RANK.get(s.tier, 0) > current_rank
+    ]
+    if not candidates:
+        return None
+    next_rank = min(_TIER_RANK.get(s.tier, 0) for s in candidates)
+    tier_models = [s for s in candidates if _TIER_RANK.get(s.tier, 0) == next_rank]
+    return min(tier_models, key=lambda s: (float(s.cost_per_1k), s.name)).name
+
+
+def resolve_model_for_retry(base_model: str, attempt: int) -> tuple[str, str | None]:
+    """attempt=1 → base; attempt>1 → escalate one tier if available else base."""
+    if attempt <= 1:
+        return base_model, None
+    escalated = escalate_model_name(base_model)
+    if escalated and escalated != base_model:
+        return escalated, escalated
+    return base_model, None
+
+
 def list_vision_models() -> list[ModelSpec]:
     return [m for m in get_registry().values() if m.enabled and m.capability == "vision"]

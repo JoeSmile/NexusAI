@@ -10,9 +10,11 @@ from typing import Any
 from backend.core.audit_context import bind_audit_lineage
 from backend.core.plan.agent_spawn import (
     SpawnBlockedError,
-    audit_agent_spawn,
+    complete_agent_instance_for_step,
+    fail_agent_instance_for_step,
     prepare_orchestrator_spawn,
     resolve_step_tenant,
+    spawn_sub_agent_instance,
 )
 from backend.core.plan.clarification import (
     hold_for_clarification,
@@ -120,12 +122,34 @@ async def _run_step_once(
     tenant: TenantContext,
     state: PipelineState | None = None,
     loop_guard: LoopGuard | None = None,
+    bus: PlanEventBus | None = None,
+    attempt: int = 1,
+    max_attempts: int = 1,
 ) -> dict[str, Any]:
     base_params = dict(step.params)
     if step.sub_query and "message" not in base_params and "query" not in base_params:
         base_params["message"] = step.sub_query
     payload = resolve_step_params(base_params, step_results, state=state)
+    model_name: str | None = None
+    escalated_model: str | None = None
+    if attempt > 1:
+        payload["_orchestrator_retry_attempt"] = attempt
+        from backend.core.capability.registry import get_capability_registry
+        from backend.core.model_registry import resolve_model_for_retry
+
+        try:
+            spec = get_capability_registry().get(
+                step.capability_id,
+                require_enabled=False,
+            )
+            base_model = str(spec.spec.get("model") or spec.name)
+            model_name, escalated_model = resolve_model_for_retry(base_model, attempt)
+            if escalated_model:
+                payload["_model_override"] = escalated_model
+        except Exception:
+            pass
     invoke_tenant = tenant
+    instance = None
     if state is not None:
         invoke_tenant = resolve_step_tenant(
             state,
@@ -134,16 +158,41 @@ async def _run_step_once(
             step_id=step.id,
         )
         if is_sub_agent(invoke_tenant):
-            audit_agent_spawn(
-                tenant_id=state.get("tenant_id") or "",
-                user_id=state.get("user_id") or "",
-                parent_trace_id=str(state.get("trace_id") or ""),
-                agent_type_id=str(state.get("agent_type_id") or ""),
+            task = step.sub_query or str(state.get("message") or "")[:500]
+            instance = spawn_sub_agent_instance(
+                state,
                 step_id=step.id,
                 capability_id=step.capability_id,
+                task=task,
+                attempt=attempt,
+                max_attempts=max_attempts,
+                model_name=model_name,
+                escalated_model=escalated_model,
             )
-            spawn_n = int(state.get("orchestrator_spawn_total") or 0) + 1
-            state["orchestrator_spawn_total"] = spawn_n  # type: ignore[typeddict-item]
+            if instance is not None:
+                bind_audit_lineage(
+                    trace_id=instance.trace_id,
+                    parent_trace_id=instance.parent_run_id,
+                    run_id=instance.instance_id,
+                    node_id=step.id,
+                )
+                if bus is not None:
+                    bus.emit(
+                        "agent_spawn",
+                        {
+                            "agent_type": instance.agent_type_id,
+                            "instance_id": instance.instance_id,
+                            "trace_id": instance.trace_id,
+                            "parent_run_id": instance.parent_run_id,
+                            "step_id": step.id,
+                            "capability_id": step.capability_id,
+                            "attempt": attempt,
+                            "max_attempts": max_attempts,
+                            "model_name": instance.model_name,
+                            "escalated_model": instance.escalated_model,
+                            "status": instance.status,
+                        },
+                    )
     if loop_guard is not None and state is not None:
         loop_guard.check(
             step.capability_id,
@@ -153,7 +202,14 @@ async def _run_step_once(
             trace_id=str(state.get("trace_id") or ""),
         )
         loop_guard.persist(state)  # type: ignore[arg-type]
-    outcome = await _collect_invoke(step.capability_id, payload, invoke_tenant)
+    try:
+        outcome = await _collect_invoke(step.capability_id, payload, invoke_tenant)
+    except Exception as exc:
+        if instance is not None and state is not None:
+            fail_agent_instance_for_step(state, instance, str(exc))
+        raise
+    if instance is not None and state is not None:
+        complete_agent_instance_for_step(state, instance, outcome)
     text = str(outcome.get("text") or outcome.get("output") or "")
     sanitized = sanitize_tool_output(text)
     if sanitized != text:
@@ -182,6 +238,9 @@ async def _run_step_with_retry(
                 tenant=tenant,
                 state=state,
                 loop_guard=loop_guard if attempt == 0 else None,
+                bus=bus,
+                attempt=attempt + 1,
+                max_attempts=max_attempts,
             )
         except Exception as e:
             last_err = e
