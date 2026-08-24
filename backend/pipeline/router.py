@@ -337,6 +337,9 @@ def _chat_json_payload(final: dict) -> dict:
     render = _render_from_final(final)
     if render is not None:
         payload["render"] = render.model_dump(mode="json")
+    clarification = final.get("clarification")
+    if isinstance(clarification, dict) and clarification:
+        payload["clarification"] = clarification
     return payload
 
 

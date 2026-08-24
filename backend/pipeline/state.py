@@ -106,6 +106,11 @@ class PipelineState(TypedDict):
     skill_asset_hit: dict | None  # skill_assets CoT template hit
     triggered_run: dict | None  # 40.86 {run_id, workflow_id, ...}
 
+    # ── Task 65 slice 6 — clarification loop ──
+    pending_clarification: bool
+    clarification: dict | None
+    clarification_resolved: bool
+
 
 def make_initial_state(
     tenant_id: str,
@@ -196,4 +201,7 @@ def make_initial_state(
         "short_path_skill": None,
         "skill_asset_hit": None,
         "triggered_run": None,
+        "pending_clarification": False,
+        "clarification": None,
+        "clarification_resolved": False,
     }

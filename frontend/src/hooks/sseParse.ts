@@ -57,6 +57,7 @@ export type SSEHandlers = {
   onToolResult?: (payload: Record<string, unknown>) => void
   onRetry?: (payload: Record<string, unknown>) => void
   onReplan?: (payload: Record<string, unknown>) => void
+  onClarify?: (payload: Record<string, unknown>) => void
   onCancelled?: (reason: string) => void
   onTraceId?: (traceId: string) => void
   onStreamAlert?: (alert: StreamAlert) => void
@@ -209,6 +210,10 @@ export function dispatchSSEData(raw: string, h: SSEHandlers): 'done' | 'continue
   }
   if (t === 'replan') {
     h.onReplan?.(obj)
+    return 'continue'
+  }
+  if (t === 'clarify') {
+    h.onClarify?.(obj)
     return 'continue'
   }
   if (t === 'abort') {

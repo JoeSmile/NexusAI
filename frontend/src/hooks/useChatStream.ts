@@ -16,6 +16,14 @@ import { isRenderDirective, type RenderDirective } from '@/types/render'
 
 export type ChatRole = 'user' | 'assistant' | 'system'
 
+export type ClarificationInfo = {
+  source: string
+  question: string
+  options: string[]
+  trace_id?: string
+  original_query?: string
+}
+
 export interface ChatMessage {
   id: string
   role: ChatRole
@@ -23,6 +31,8 @@ export interface ChatMessage {
   status?: 'streaming' | 'done' | 'error' | 'aborted'
   /** Task 63 — agent-driven component mount */
   render?: RenderDirective | null
+  /** Task 65 — pending clarification card */
+  clarification?: ClarificationInfo | null
   /** Local preview URL for attached images */
   imagePreview?: string
   /** DB chat_messages.id — history rows only; used as pagination cursor */
@@ -121,6 +131,34 @@ export function useChatStream(endpoint = '/chat/streaming') {
         activeTraceRef.current = null
       }
 
+      const applyClarification = (payload: Record<string, unknown>) => {
+        const question = String(payload.question || '')
+        const options = Array.isArray(payload.options)
+          ? payload.options.map((o) => String(o))
+          : []
+        const info: ClarificationInfo = {
+          source: String(payload.source || ''),
+          question,
+          options,
+          trace_id: payload.trace_id ? String(payload.trace_id) : undefined,
+          original_query: payload.original_query
+            ? String(payload.original_query)
+            : undefined,
+        }
+        setMessages((msgs) =>
+          msgs.map((msg) =>
+            msg.id === asstId
+              ? {
+                  ...msg,
+                  content: question || msg.content,
+                  clarification: info,
+                  status: 'done',
+                }
+              : msg,
+          ),
+        )
+      }
+
       await start(
         endpoint,
         {
@@ -143,6 +181,7 @@ export function useChatStream(endpoint = '/chat/streaming') {
           onToolResult: (p) => mergeExecution({ ...p, type: 'tool_result' }),
           onRetry: () => undefined,
           onReplan: (p) => mergeExecution({ ...p, type: 'replan' }),
+          onClarify: (p) => applyClarification(p),
           onStreamAlert: (alert) => setStreamAlert(alert),
           onAbort: () => {
             finishAssistant('aborted')
@@ -241,6 +280,14 @@ export function useChatStream(endpoint = '/chat/streaming') {
             if (snap) setExecution(snap)
             const renderRaw = meta?.render
             const render = isRenderDirective(renderRaw) ? renderRaw : null
+            const finishReason = String(meta?.finish_reason || '')
+            const clarificationRaw = meta?.clarification
+            const clarification =
+              finishReason === 'clarification_pending' &&
+              clarificationRaw &&
+              typeof clarificationRaw === 'object'
+                ? (clarificationRaw as ClarificationInfo)
+                : null
             setMessages((msgs) =>
               msgs.map((msg) =>
                 msg.id === asstId
@@ -249,6 +296,7 @@ export function useChatStream(endpoint = '/chat/streaming') {
                       content: msg.content,
                       status: 'done',
                       ...(render ? { render } : {}),
+                      ...(clarification ? { clarification } : {}),
                     }
                   : msg,
               ),

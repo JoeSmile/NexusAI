@@ -18,6 +18,7 @@ _SHORT_FINISH = frozenset(
         "rate_limited",
         "blocked",
         "AUTH_002",
+        "clarification_pending",
     }
 )
 

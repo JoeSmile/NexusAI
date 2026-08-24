@@ -10,6 +10,10 @@ from backend.pipeline.nodes.analyze_parallel import analyze_parallel
 from backend.pipeline.nodes.auth_check import auth_check
 from backend.pipeline.nodes.build_context import build_context
 from backend.pipeline.nodes.cache_check import cache_check, should_skip_to_end
+from backend.pipeline.nodes.clarification_gate import (
+    clarification_gate,
+    route_after_clarification,
+)
 from backend.pipeline.nodes.conversion_hook import conversion_hook
 from backend.pipeline.nodes.experiment_hook import experiment_hook
 from backend.pipeline.nodes.guardrails_input import (
@@ -83,6 +87,9 @@ def build_pipeline():
     builder.add_node("analyze_parallel", _lf_node("analyze_parallel", analyze_parallel))
     # Node name ≠ state key `task_plan` (official LangGraph forbids collision)
     builder.add_node("task_planning", _lf_node("task_planning", task_plan))
+    builder.add_node(
+        "clarification_gate", _lf_node("clarification_gate", clarification_gate)
+    )
     builder.add_node("build_context", _lf_node("build_context", build_context))
     builder.add_node("experiment_hook", _lf_node("experiment_hook", experiment_hook))
     builder.add_node("orchestrator", _lf_node("orchestrator", orchestrator))
@@ -124,7 +131,15 @@ def build_pipeline():
     )
     builder.add_edge("load_memory", "analyze_parallel")
     builder.add_edge("analyze_parallel", "task_planning")
-    builder.add_edge("task_planning", "build_context")
+    builder.add_edge("task_planning", "clarification_gate")
+    builder.add_conditional_edges(
+        "clarification_gate",
+        route_after_clarification,
+        {
+            "hold": "write_memory",
+            "continue": "build_context",
+        },
+    )
     builder.add_edge("build_context", "experiment_hook")
 
     def _route_after_experiment(state: PipelineState) -> str:

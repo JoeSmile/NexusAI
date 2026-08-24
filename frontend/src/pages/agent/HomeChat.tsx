@@ -25,6 +25,7 @@ import { ContextPanel } from '@/components/agent/ContextPanel'
 import { ExecutionPanel } from '@/components/agent/ExecutionPanel'
 import { BookmarksDrawer } from '@/components/agent/BookmarksDrawer'
 import { ClientInputGuardrailBar } from '@/components/agent/ClientInputGuardrailBar'
+import { ClarificationCard } from '@/components/agent/ClarificationCard'
 import { DislikeReasonDialog } from '@/components/agent/DislikeReasonDialog'
 import { HistoryDrawer } from '@/components/agent/HistoryDrawer'
 import { HotspotDayCollectionDialog } from '@/components/agent/HotspotDayCollectionDialog'
@@ -643,6 +644,7 @@ export default function HomeChatPage() {
       const localMsg = messages.find((m) => m.id === cid)
       const imagePreview = localMsg?.imagePreview
       const render = localMsg?.render
+      const clarification = localMsg?.clarification
       const st = feedbackByMsg[cid]
       const liked = st?.reaction?.type === 'helpful'
       const disliked = st?.reaction?.type === 'irrelevant'
@@ -680,6 +682,13 @@ export default function HomeChatPage() {
                 ) : (
                   <ReactMarkdown>{body}</ReactMarkdown>
                 )}
+                {clarification ? (
+                  <ClarificationCard
+                    info={clarification}
+                    disabled={streaming}
+                    onPick={(opt) => void send(opt)}
+                  />
+                ) : null}
                 {status === 'error' && !body.includes('抓取失败') ? (
                   <div className="chat-bubble-error">发送失败</div>
                 ) : null}
@@ -742,7 +751,7 @@ export default function HomeChatPage() {
         </div>
       )
     },
-    [expandedDig, feedbackByMsg, messages, copyText, toggleReaction, toggleBookmark, handleRenderAction],
+    [expandedDig, feedbackByMsg, messages, copyText, toggleReaction, toggleBookmark, handleRenderAction, send, streaming],
   )
 
   return (

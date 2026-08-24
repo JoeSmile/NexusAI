@@ -149,6 +149,9 @@ async def test_miss_pass_calls_load_memory(monkeypatch):
     async def _task_plan(state):
         return state
 
+    async def _clarification_gate(state):
+        return state
+
     async def _router(state):
         state["finish_reason"] = "skill_executed"
         state["response"] = "hi"
@@ -172,6 +175,7 @@ async def test_miss_pass_calls_load_memory(monkeypatch):
         cache_check=_cache_miss,
         analyze_parallel=_analyze,
         task_plan=_task_plan,
+        clarification_gate=_clarification_gate,
         build_context=_build,
         experiment_hook=_experiment,
         model_router=_router,
@@ -190,13 +194,14 @@ async def test_miss_pass_calls_load_memory(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_task_plan_edge_preserved():
-    """analyze → task_plan → build_context must remain (Task 43 / G1)."""
+    """analyze → task_plan → clarification_gate → build_context (Task 43 / 65)."""
     import inspect
 
     from backend.pipeline import graph as graph_mod
 
     src = inspect.getsource(graph_mod.build_pipeline)
     assert 'add_edge("analyze_parallel", "task_planning")' in src
-    assert 'add_edge("task_planning", "build_context")' in src
+    assert 'add_edge("task_planning", "clarification_gate")' in src
+    assert '"continue": "build_context"' in src
     assert 'add_edge("auth_check", "preprocess")' in src
     assert 'continue": "load_memory"' in src
