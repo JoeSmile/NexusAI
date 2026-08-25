@@ -41,7 +41,9 @@ def test_evaluate_required_slots_triggers_clarification() -> None:
     payload = evaluate_required_slots(state)
     assert payload is not None
     assert payload.source == "required_slots"
-    assert "issue_type" in payload.question
+    assert payload.options == []
+    assert "issue_type" not in payload.question
+    assert "请问您需要补充" in payload.question
 
 
 def test_write_slots_missing_to_blackboard() -> None:

@@ -413,17 +413,17 @@ async def chat_streaming(
             content={
                 "type": "error",
                 "code": getattr(e, "code", "SYS_001"),
-                "message": str(e),
+                "message": getattr(e, "message", None) or "请求失败，请稍后重试。",
             },
         )
-    except Exception as e:
+    except Exception:
         _release_run()
         return JSONResponse(
             status_code=500,
             content={
                 "type": "error",
                 "code": "SYS_001",
-                "message": str(e),
+                "message": "请求失败，请稍后重试。",
             },
         )
 

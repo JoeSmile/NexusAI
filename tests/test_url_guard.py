@@ -1,10 +1,16 @@
-"""SSRF guard for base_url (Task 59 S1)."""
+"""SSRF guard for base_url (Task 59 S1 / Task 71)."""
 
 from __future__ import annotations
 
 import pytest
 
 from backend.core.security.url_guard import UrlValidationError, validate_base_url
+
+
+@pytest.fixture(autouse=True)
+def _clear_ssrf_dev_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Isolate from developer config.env SSRF_ALLOW_LOCAL_DEV=1."""
+    monkeypatch.delenv("SSRF_ALLOW_LOCAL_DEV", raising=False)
 
 
 @pytest.mark.parametrize(

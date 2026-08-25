@@ -30,7 +30,7 @@ class RuleBasedIntentEngine:
             "文档在哪", "sop", "合规", "内控", "报销流程", "请假制度",
         ],
         IntentType.CONTENT_ANALYSIS: [
-            "热点挖掘", "选题", "竞品分析", "分析一下", "评估一下", "爆不爆",
+            "热点挖掘", "选题", "竞品分析", "分析一下", "分析下", "评估一下", "爆不爆",
             "数据洞察", "趋势", "这条内容", "竞争对手",
         ],
         IntentType.CONTENT_CREATION: [
@@ -56,17 +56,32 @@ class RuleBasedIntentEngine:
         if not text:
             return None
 
+        # 收集全部命中；问候与业务意图并存时优先业务（B10 复合句不截胡）
+        hits: list[tuple[IntentType, list[str]]] = []
         for intent, keywords in self.INTENT_RULES.items():
             matched = [kw for kw in keywords if kw in text]
             if matched:
-                confidence = min(0.8 + len(matched) * 0.05, 1.0)
-                return IntentResult(
-                    intent=intent,
-                    confidence=confidence,
-                    source="rule",
-                    metadata={"matched_keywords": matched},
-                )
-        return None
+                hits.append((intent, matched))
+        if not hits:
+            return None
+
+        if len(hits) > 1:
+            non_greeting = [(i, m) for i, m in hits if i != IntentType.GREETING]
+            if non_greeting:
+                hits = non_greeting
+
+        # 多业务命中时取关键词更长/更多者，稳定优先
+        intent, matched = max(
+            hits,
+            key=lambda item: (len(item[1]), max(len(k) for k in item[1])),
+        )
+        confidence = min(0.8 + len(matched) * 0.05, 1.0)
+        return IntentResult(
+            intent=intent,
+            confidence=confidence,
+            source="rule",
+            metadata={"matched_keywords": matched},
+        )
 
     def get_matched_keywords(self, text: str, intent: IntentType) -> list[str]:
         text = text.lower()
