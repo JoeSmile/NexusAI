@@ -83,6 +83,6 @@ def test_blackboard_synthesize_includes_refs() -> None:
         user_id="u",
         trace_id="tr",
     )
-    text = bb.synthesize("目标X")
+    text = bb.synthesize_legacy("目标X")
     assert "结论A" in text
     assert "doc-1" in text

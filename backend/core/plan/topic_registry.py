@@ -21,6 +21,7 @@ PREFIX_WHITELIST = (
     "coref.",
     "request.",
     "fact.",
+    "risk.",
 )
 
 

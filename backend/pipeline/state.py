@@ -115,6 +115,7 @@ class PipelineState(TypedDict):
     agent_type_id: str | None
     slot_values: dict[str, Any]
     agent_instances: list[dict[str, Any]]
+    seen_fact_ids: list[str]
 
 
 def make_initial_state(
@@ -212,4 +213,5 @@ def make_initial_state(
         "agent_type_id": None,
         "slot_values": {},
         "agent_instances": [],
+        "seen_fact_ids": [],
     }

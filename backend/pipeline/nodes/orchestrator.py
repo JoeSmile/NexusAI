@@ -342,9 +342,15 @@ def _synthesize_response(
     step_results: dict[str, Any],
     *,
     blackboard: Blackboard | None = None,
+    state: PipelineState | None = None,
 ) -> str:
     if blackboard is not None and blackboard.list_entries():
-        return blackboard.synthesize(plan.goal)
+        seen = set(state.get("seen_fact_ids") or []) if state is not None else set()
+        text, newly_seen = blackboard.synthesize(plan.goal, seen_fact_ids=seen)
+        if state is not None and newly_seen:
+            merged = blackboard.mark_seen(seen, newly_seen)
+            state["seen_fact_ids"] = list(merged)  # type: ignore[typeddict-item]
+        return text
     parts: list[str] = []
     if plan.goal:
         parts.append(f"目标：{plan.goal}")
@@ -419,7 +425,17 @@ async def execute_plan_ir(
                     tool_use_id=f"{state.get('trace_id')}:{step.id}",
                     node_id=step.id,
                 )
+                pending_id: str | None = None
                 try:
+                    pending_id = blackboard.begin_pending(
+                        topic=f"step.{step.id}",
+                        fact_content="…",
+                        source_agent_id=f"{step.id}:{step.capability_id}",
+                        confidence=0.5,
+                        tenant_id=state["tenant_id"],
+                        user_id=state["user_id"],
+                        trace_id=str(state.get("trace_id") or ""),
+                    )
                     outcome = await _run_step_with_retry(
                         step,
                         step_results=step_results,
@@ -435,9 +451,20 @@ async def execute_plan_ir(
                         outcome=outcome,
                         document_ids_ref=doc_refs,
                     )
-                    if entry is not None:
-                        blackboard.add(
-                            entry,
+                    if entry is not None and pending_id:
+                        blackboard.complete_entry(
+                            pending_id,
+                            fact_content=entry.fact_content,
+                            confidence=entry.confidence,
+                            document_ids_ref=entry.document_ids_ref,
+                            tenant_id=state["tenant_id"],
+                            user_id=state["user_id"],
+                            trace_id=str(state.get("trace_id") or ""),
+                        )
+                    elif pending_id:
+                        blackboard.fail_entry(
+                            pending_id,
+                            error="empty_step_output",
                             tenant_id=state["tenant_id"],
                             user_id=state["user_id"],
                             trace_id=str(state.get("trace_id") or ""),
@@ -500,6 +527,14 @@ async def execute_plan_ir(
                             replanned = True
                             return
                 except LoopGuardError as e:
+                    if pending_id:
+                        blackboard.fail_entry(
+                            pending_id,
+                            error=e.detail[:200],
+                            tenant_id=state["tenant_id"],
+                            user_id=state["user_id"],
+                            trace_id=str(state.get("trace_id") or ""),
+                        )
                     step_results[step.id] = {
                         "ok": False,
                         "loop_guard": True,
@@ -517,6 +552,14 @@ async def execute_plan_ir(
                     state["response"] = e.detail  # type: ignore[typeddict-item]
                     raise OrchestratorError(e.detail) from e
                 except Exception as e:
+                    if pending_id:
+                        blackboard.fail_entry(
+                            pending_id,
+                            error=str(e)[:200],
+                            tenant_id=state["tenant_id"],
+                            user_id=state["user_id"],
+                            trace_id=str(state.get("trace_id") or ""),
+                        )
                     err = str(e)
                     drift = detect_intent_drift(
                         goal=current_plan.goal,
@@ -621,6 +664,12 @@ async def execute_plan_ir(
             continue
         break
 
+    blackboard.fail_stale_pending(
+        error="run_ended_incomplete",
+        tenant_id=state["tenant_id"],
+        user_id=state["user_id"],
+        trace_id=str(state.get("trace_id") or ""),
+    )
     return step_results, current_plan, spawn_total, blackboard
 
 
@@ -691,7 +740,9 @@ async def orchestrator(state: PipelineState) -> PipelineState:
     except TimeoutError:
         partial = state.get("step_results") or {}
         bb = Blackboard.from_state(state)
-        state["response"] = _synthesize_response(plan, partial, blackboard=bb)
+        state["response"] = _synthesize_response(
+            plan, partial, blackboard=bb, state=state
+        )
         directive = extract_render_directive(partial)
         if directive is not None:
             state["render_directive"] = render_directive_to_dict(directive)
@@ -714,7 +765,7 @@ async def orchestrator(state: PipelineState) -> PipelineState:
     state["orchestrator_spawn_total"] = spawn_total  # type: ignore[typeddict-item]
     state["blackboard"] = blackboard.list_entries()
     state["response"] = _synthesize_response(
-        final_plan, step_results, blackboard=blackboard
+        final_plan, step_results, blackboard=blackboard, state=state
     )
     directive = extract_render_directive(step_results)
     if directive is not None:
