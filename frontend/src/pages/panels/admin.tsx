@@ -12,6 +12,7 @@ import {
 import {
   createLlmKey,
   deactivateLlmKey,
+  deleteLlmKey,
   listLlmKeys,
   patchLlmKey,
   type LlmKeyPurpose,
@@ -205,6 +206,25 @@ export default function AdminPanel() {
     setErr('')
     try {
       await deactivateLlmKey(row.id)
+      await load()
+    } catch (e) {
+      setErr(formatApiError(e, 'admin:llm_key'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onDeleteFromDialog = async () => {
+    if (editingId == null) return
+    const ok = window.confirm(
+      `确认永久删除「${form.alias.trim() || '该凭证'}」？\n删除后 API Key 将从系统中彻底清除，且无法恢复。`,
+    )
+    if (!ok) return
+    setBusy(true)
+    setErr('')
+    try {
+      await deleteLlmKey(editingId)
+      closeDialog()
       await load()
     } catch (e) {
       setErr(formatApiError(e, 'admin:llm_key'))
@@ -477,13 +497,27 @@ export default function AdminPanel() {
             ) : null}
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" disabled={busy} onClick={closeDialog}>
-              取消
-            </Button>
-            <Button type="button" disabled={busy} onClick={() => void onSubmit()}>
-              {formMode === 'edit' ? '保存' : '添加'}
-            </Button>
+          <DialogFooter className="sm:justify-between">
+            {formMode === 'edit' && editingId != null ? (
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={busy}
+                onClick={() => void onDeleteFromDialog()}
+              >
+                删除
+              </Button>
+            ) : (
+              <span />
+            )}
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" disabled={busy} onClick={closeDialog}>
+                取消
+              </Button>
+              <Button type="button" disabled={busy} onClick={() => void onSubmit()}>
+                {formMode === 'edit' ? '保存' : '添加'}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

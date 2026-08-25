@@ -40,6 +40,7 @@ import {
 import { SensitiveSendConfirmDialog } from '@/components/agent/SensitiveSendConfirmDialog'
 import { useBubbleFeedback } from '@/hooks/useBubbleFeedback'
 import { useChatStream, type ChatMessage } from '@/hooks/useChatStream'
+import { useSyncChatModels } from '@/hooks/useSyncChatModels'
 import { runHotspotDigInPlace } from '@/lib/runHotspotDigInPlace'
 import { detectSensitiveHints, validateChatInput } from '@/lib/clientGuardrails'
 import { runScriptGenInPlace } from '@/lib/runScriptGenInPlace'
@@ -76,6 +77,7 @@ export default function HomeChatPage() {
     toggleBookmark,
     busy: feedbackBusy,
   } = useBubbleFeedback()
+  useSyncChatModels()
   const [input, setInput] = useState('')
   const [digOpen, setDigOpen] = useState(false)
   const [digBusy, setDigBusy] = useState(false)

@@ -761,17 +761,23 @@ async def delete_llm_key(
     key_id: int,
     tenant: TenantContext = Depends(require_permission("admin:llm_key")),
 ):
-    """吊销 LLM Key"""
+    """Permanently remove an LLM key row (encrypted secret erased; not listed again)."""
     session_factory = get_pg_session()
     with session_factory.Session() as session:
         if tenant.is_cross_tenant:
-            sql = text("UPDATE llm_api_keys SET is_active=false WHERE id=:id")
-            session.execute(sql, {"id": key_id})
+            sql = text("DELETE FROM llm_api_keys WHERE id = :id RETURNING id")
+            params: dict[str, object] = {"id": key_id}
         else:
             sql = text(
-                "UPDATE llm_api_keys SET is_active=false WHERE id=:id AND tenant_id=:tid"
+                "DELETE FROM llm_api_keys WHERE id = :id AND tenant_id = :tid RETURNING id"
             )
-            session.execute(sql, {"id": key_id, "tid": tenant.tenant_id})
+            params = {"id": key_id, "tid": tenant.tenant_id}
+        row = session.execute(sql, params).fetchone()
+        if row is None:
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "AUTH_004", "message": "llm_key_not_found"},
+            )
         session.commit()
     return {"status": "deleted", "id": key_id}
 

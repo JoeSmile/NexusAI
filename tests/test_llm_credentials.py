@@ -10,7 +10,11 @@ import pytest
 import backend.core.key_repository as key_repo
 import backend.core.llm_credentials as llm_cred
 from backend.core.errors import NexusAIException
-from backend.core.llm_credentials import list_available_models, resolve_tenant_credential
+from backend.core.llm_credentials import (
+    list_available_models,
+    resolve_chat_model_for_request,
+    resolve_tenant_credential,
+)
 
 
 class _RecordingSession:
@@ -228,6 +232,66 @@ async def test_list_available_models_chat_only(monkeypatch):
     assert "text-embedding-3-small" not in models
     assert all(i["series"] == "chat" for i in items)
     assert all(i["configured"] is True for i in items)
+
+
+@pytest.mark.asyncio
+async def test_resolve_chat_model_auto_first_when_empty(monkeypatch):
+    session = _RecordingSession(
+        fetchall=[
+            _cred_row(provider="chat", allowed_models=["qwen2.5:7b"]),
+        ]
+    )
+    monkeypatch.setattr(
+        "backend.core.llm_credentials.get_pg_session",
+        lambda: MagicMock(Session=lambda: session),
+    )
+
+    model = await resolve_chat_model_for_request("t1", None)
+    assert model == "qwen2.5:7b"
+
+
+@pytest.mark.asyncio
+async def test_resolve_chat_model_honors_valid_request(monkeypatch):
+    session = _RecordingSession(
+        fetchall=[
+            _cred_row(id=1, provider="chat", allowed_models=["model-a"]),
+            _cred_row(id=2, provider="chat", allowed_models=["model-b"]),
+        ]
+    )
+    monkeypatch.setattr(
+        "backend.core.llm_credentials.get_pg_session",
+        lambda: MagicMock(Session=lambda: session),
+    )
+
+    assert await resolve_chat_model_for_request("t1", "model-b") == "model-b"
+
+
+@pytest.mark.asyncio
+async def test_resolve_chat_model_replaces_stale_request(monkeypatch):
+    session = _RecordingSession(
+        fetchall=[
+            _cred_row(provider="chat", allowed_models=["only-model"]),
+        ]
+    )
+    monkeypatch.setattr(
+        "backend.core.llm_credentials.get_pg_session",
+        lambda: MagicMock(Session=lambda: session),
+    )
+
+    assert await resolve_chat_model_for_request("t1", "stale-model") == "only-model"
+
+
+@pytest.mark.asyncio
+async def test_resolve_chat_model_missing_raises(monkeypatch):
+    session = _RecordingSession(fetchall=[])
+    monkeypatch.setattr(
+        "backend.core.llm_credentials.get_pg_session",
+        lambda: MagicMock(Session=lambda: session),
+    )
+
+    with pytest.raises(NexusAIException) as ei:
+        await resolve_chat_model_for_request("t1", "")
+    assert ei.value.code == "LLM_KEY_004"
 
 
 @pytest.mark.asyncio

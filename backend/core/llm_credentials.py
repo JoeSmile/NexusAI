@@ -27,7 +27,7 @@ _TENANT_KEY_ROWS_SQL = text(
     """
 )
 
-EMBEDDING_DIMENSIONS = 1536
+EMBEDDING_DIMENSIONS = 768
 
 
 def normalize_purpose(raw: str) -> str:
@@ -110,6 +110,27 @@ async def list_available_models(tenant_id: str) -> list[dict]:
             }
         )
     return items
+
+
+async def resolve_chat_model_for_request(
+    tenant_id: str,
+    requested: str | None,
+) -> str:
+    """Pick tenant chat model: honor valid request; else auto first/only configured."""
+    items = await list_available_models(tenant_id)
+    names = [str(i["model"]) for i in items if i.get("model")]
+    req = (requested or "").strip()
+    if req and req in names:
+        return req
+    if not names:
+        raise NexusAIException(
+            ErrorCode.LLM_MODEL_REQUIRED.value,
+            "tenant_llm_key_missing",
+            detail="Ask tenant admin to configure LLM credentials",
+        )
+    if req and req not in names:
+        return names[0]
+    return names[0]
 
 
 async def resolve_tenant_credential(tenant_id: str, model: str) -> LLMKey:

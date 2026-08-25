@@ -93,12 +93,19 @@ def _render_from_final(final: dict) -> RenderDirectiveOut | None:
 
 
 def _require_chat_model(body: ChatRequest) -> None:
+    """Legacy sync guard — prefer ``_resolve_chat_model`` in route handlers."""
     if not (body.model or "").strip():
         raise NexusAIException(
             ErrorCode.LLM_MODEL_REQUIRED.value,
             "model_required",
             detail="Pick a model in the UI",
         )
+
+
+async def _resolve_chat_model(body: ChatRequest, tenant_id: str) -> None:
+    from backend.core.llm_credentials import resolve_chat_model_for_request
+
+    body.model = await resolve_chat_model_for_request(tenant_id, body.model)
 
 
 def _enforce_terms(request: Request, tenant: TenantContext) -> None:
@@ -164,7 +171,7 @@ async def _run_chat_pipeline(
     start = time.time()
     finish_reason = "error"
 
-    _require_chat_model(body)
+    await _resolve_chat_model(body, tenant.tenant_id)
     _enforce_terms(request, tenant)
 
     initial = make_initial_state(
@@ -360,7 +367,7 @@ async def chat_streaming(
 
     logger = logging.getLogger(__name__)
 
-    _require_chat_model(body)
+    await _resolve_chat_model(body, tenant.tenant_id)
     _enforce_terms(request, tenant)
 
     initial = make_initial_state(
@@ -433,16 +440,15 @@ async def chat_streaming(
     from backend.core.billing.context import bind_billing_from_pipeline_state
     from backend.core.harness import LLMHarness
     from backend.pipeline.nodes.conversion_hook import conversion_hook
+    from backend.pipeline.nodes.llm_generate import _resolve_system_template
+    from backend.pipeline.context_messages import build_llm_messages
     from backend.pipeline.nodes.write_memory import write_memory
 
     bind_billing_from_pipeline_state(final)
     harness = LLMHarness()
     model = final.get("selected_model") or "deepseek-v4-flash"
-    prompt = (
-        final.get("assembled_prompt")
-        or final.get("message")
-        or ""
-    )
+    system_template, _prompt_meta = await _resolve_system_template(final)
+    stream_messages = build_llm_messages(final, system_template=system_template)
 
     async def event_stream() -> AsyncIterator[str]:
         for line in _sse_buffered_execution_events(final.get("trace_id")):
@@ -450,7 +456,7 @@ async def chat_streaming(
         buffer = ""
         token_iter = harness.stream(
             model=model,
-            messages=[{"role": "user", "content": prompt}],
+            messages=stream_messages,
             tenant_id=final["tenant_id"],
             api_key=final.get("llm_api_key") or "",
             base_url=final.get("llm_base_url") or "",

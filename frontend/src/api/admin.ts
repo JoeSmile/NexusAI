@@ -144,6 +144,10 @@ export async function patchLlmKey(id: number, body: PatchLlmKeyBody) {
 }
 
 export async function deactivateLlmKey(id: number) {
+  return patchLlmKey(id, { is_active: false })
+}
+
+export async function deleteLlmKey(id: number) {
   const res = await apiFetch(`/api/admin/llm-keys/${id}`, { method: 'DELETE' })
   if (!res.ok) {
     let body: unknown

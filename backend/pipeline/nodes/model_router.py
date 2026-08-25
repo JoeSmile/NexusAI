@@ -83,6 +83,11 @@ async def model_router(state: PipelineState) -> PipelineState:
 
     # A/B 或用户显式选择可覆盖模型名
     preferred = (state.get("preferred_model") or "").strip()
+    if not preferred:
+        from backend.core.llm_credentials import resolve_chat_model_for_request
+
+        preferred = await resolve_chat_model_for_request(state["tenant_id"], None)
+        state["preferred_model"] = preferred
     override = preferred or (state.get("ab_variant_config") or {}).get("model")
     if override:
         spec = get_model(str(override)) or select_model_for_intent(intent)

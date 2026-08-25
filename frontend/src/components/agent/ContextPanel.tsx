@@ -16,7 +16,9 @@ import {
 } from '@/api/memory'
 import { ragStatus } from '@/api/rag'
 import { RightDrawer } from '@/components/agent/RightDrawer'
+import { canConfigureTenantLlm, pickDefaultModelId } from '@/lib/chatModels'
 import { useChatPrefsStore } from '@/stores/chatPrefsStore'
+import { useAuthStore } from '@/stores/authStore'
 import { cn } from '@/lib/utils'
 
 type SectionKey = 'memory' | 'profile' | 'style' | 'rag' | 'model'
@@ -90,6 +92,8 @@ export function ContextPanel({
   const setModelId = useChatPrefsStore((s) => s.setModelId)
   const setTemperature = useChatPrefsStore((s) => s.setTemperature)
   const setMaxTokens = useChatPrefsStore((s) => s.setMaxTokens)
+  const activeRole = useAuthStore((s) => s.activeRole)
+  const canConfigureLlm = canConfigureTenantLlm(activeRole)
 
   const toggle = (k: SectionKey) =>
     setSections((s) => ({ ...s, [k]: !s[k] }))
@@ -116,12 +120,11 @@ export function ContextPanel({
       const items = available.items ?? []
       setModels(items)
       setModelsLoaded(true)
-      const current = useChatPrefsStore.getState().modelId
-      if (!current && items[0]?.model) {
-        setModelId(items[0].model)
-      } else if (current && items.length > 0 && !items.some((m) => m.model === current)) {
-        setModelId(items[0].model)
-      }
+      const nextModel = pickDefaultModelId(
+        items,
+        useChatPrefsStore.getState().modelId,
+      )
+      if (nextModel) setModelId(nextModel)
       const styles = styleRes.items ?? []
       const defId = styleRes.default_creator_id
       const st =
@@ -424,13 +427,66 @@ export function ContextPanel({
                 加载中…
               </p>
             ) : models.length === 0 ? (
-              <Link
-                to="/admin/keys"
-                className="btn-primary btn-sm"
-                style={{ alignSelf: 'flex-start' }}
-              >
-                配置 LLM
-              </Link>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <p style={{ fontSize: 12, color: 'var(--color-gray-500)', margin: 0 }}>
+                  {canConfigureLlm
+                    ? '尚未配置对话模型凭证，请添加后再使用。'
+                    : '租户管理员尚未配置对话模型，请联系管理员后再使用。'}
+                </p>
+                {canConfigureLlm ? (
+                  <Link
+                    to="/admin/keys"
+                    className="btn-primary btn-sm"
+                    style={{ alignSelf: 'flex-start' }}
+                  >
+                    配置 LLM
+                  </Link>
+                ) : null}
+              </div>
+            ) : models.length === 1 ? (
+              <>
+                <div className="info-row">
+                  <span className="info-label">当前模型</span>
+                  <span className="info-value">
+                    <code>{models[0].model}</code>
+                    <span className="text-muted-foreground ml-1 text-[10px]">
+                      （租户统一配置）
+                    </span>
+                  </span>
+                </div>
+                <div className="slider-wrap">
+                  <div className="slider-label">
+                    <span>Temperature</span>
+                    <span className="slider-value">{temperature.toFixed(1)}</span>
+                  </div>
+                  <input
+                    type="range"
+                    className="slider"
+                    min={0}
+                    max={1}
+                    step={0.1}
+                    value={temperature}
+                    onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                  />
+                </div>
+                <div className="slider-wrap">
+                  <div className="slider-label">
+                    <span>Max tokens</span>
+                    <span className="slider-value">
+                      {maxTokens > 0 ? String(maxTokens) : '模型默认'}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    className="slider"
+                    min={0}
+                    max={4096}
+                    step={256}
+                    value={maxTokens}
+                    onChange={(e) => setMaxTokens(parseInt(e.target.value, 10))}
+                  />
+                </div>
+              </>
             ) : (
               <>
                 <div className="form-group">

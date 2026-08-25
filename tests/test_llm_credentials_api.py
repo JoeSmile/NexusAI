@@ -131,6 +131,20 @@ class _StoreSession:
             result.fetchone.return_value = None
             return result
 
+        if "delete from llm_api_keys" in s:
+            key_id = params.get("id")
+            tid = params.get("tid")
+            kept: list[dict[str, Any]] = []
+            deleted = False
+            for row in self.rows:
+                if row["id"] == key_id and (tid is None or row["tenant_id"] == tid):
+                    deleted = True
+                    continue
+                kept.append(row)
+            self.rows = kept
+            result.fetchone.return_value = SimpleNamespace(id=key_id) if deleted else None
+            return result
+
         if "from llm_api_keys" in s and "select" in s:
             tid = params.get("tid")
             filtered = self.rows if tid is None else [
@@ -357,6 +371,48 @@ def test_patch_model(admin_client):
     assert r.status_code == 200, r.text
     listed = admin_client.get("/api/admin/llm-keys").json()
     assert listed[0]["model"] == "deepseek-chat"
+
+
+def test_deactivate_soft_delete_keeps_row(admin_client):
+    admin_client.post(
+        "/api/admin/llm-keys",
+        json={
+            "key_alias": "ds1",
+            "provider": "chat",
+            "api_key_plaintext": "sk-test",
+            "base_url": "https://api.deepseek.com/v1",
+            "model": "deepseek-v4-flash",
+        },
+    )
+    key_id = admin_client._store.rows[0]["id"]  # type: ignore[attr-defined]
+    r = admin_client.patch(
+        f"/api/admin/llm-keys/{key_id}",
+        json={"is_active": False},
+    )
+    assert r.status_code == 200, r.text
+    listed = admin_client.get("/api/admin/llm-keys").json()
+    assert len(listed) == 1
+    assert listed[0]["is_active"] is False
+    assert listed[0]["key_preview"]
+
+
+def test_delete_hard_delete_removes_row(admin_client):
+    admin_client.post(
+        "/api/admin/llm-keys",
+        json={
+            "key_alias": "ds1",
+            "provider": "chat",
+            "api_key_plaintext": "sk-test",
+            "base_url": "https://api.deepseek.com/v1",
+            "model": "deepseek-v4-flash",
+        },
+    )
+    key_id = admin_client._store.rows[0]["id"]  # type: ignore[attr-defined]
+    r = admin_client.delete(f"/api/admin/llm-keys/{key_id}")
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "deleted"
+    listed = admin_client.get("/api/admin/llm-keys").json()
+    assert listed == []
 
 
 def test_available_models_returns_configured(auth_client, monkeypatch):
