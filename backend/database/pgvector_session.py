@@ -57,7 +57,7 @@ class ChatMessage(Base):
     content = Column(Text, nullable=False)
     # 47b I1: FE UUID; history returns as-is for feedback hydrate
     client_message_id = Column(String(64), nullable=True, index=True)
-    embedding = Column(Vector(1536), nullable=True)
+    embedding = Column(Vector(768), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (
@@ -75,7 +75,7 @@ class UserMemory(Base):
     confidence = Column(Float, default=1.0)
     source = Column(String(50), default="extracted")
     summary_meta = Column(JSON, nullable=True)
-    embedding = Column(Vector(1536), nullable=True)
+    embedding = Column(Vector(768), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     __table_args__ = (UniqueConstraint("tenant_id", "user_id", "key"),)
@@ -89,7 +89,7 @@ class ColdMemory(Base):
     session_id = Column(String(100))
     summary = Column(Text, nullable=False)
     summary_meta = Column(JSON, nullable=True)
-    embedding = Column(Vector(1536), nullable=True)
+    embedding = Column(Vector(768), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -562,7 +562,7 @@ class SkillAsset(Base):
     status = Column(String(32), nullable=False, default="draft")
     visibility = Column(String(32), nullable=False, default="private")
     usage_stats = Column(JSON, nullable=False, default=dict)
-    embedding = Column(Vector(1536), nullable=True)
+    embedding = Column(Vector(768), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     __table_args__ = (
@@ -587,7 +587,7 @@ class KnowledgeChunk(Base):
     source = Column(String(256), default="")
     source_type = Column(String(32), default="text", index=True)  # text|pdf|audio|image
     meta = Column(JSON, default=dict)
-    embedding = Column(Vector(1536), nullable=True)
+    embedding = Column(Vector(768), nullable=True)
     org_unit_id = Column(String(36), nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 

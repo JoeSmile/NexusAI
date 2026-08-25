@@ -1,0 +1,37 @@
+# 虚拟环境与依赖（最大头）
+.venv/
+venv/
+frontend/node_modules/
+**/node_modules/
+
+# 数据与模型（构建不需要，且体积大）
+data/
+mlruns/
+mlflow.db
+*.safetensors
+*.bin
+
+# 版本库与缓存
+.git/
+.gitignore
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# 环境与密钥（构建不打包 secrets）
+config.env
+.env
+.env.*
+*.pem
+*.key
+
+# 本地杂项
+logs/
+tmp/
+dist/
+frontend/dist/
+*.log
+.DS_Store
+Thumbs.db

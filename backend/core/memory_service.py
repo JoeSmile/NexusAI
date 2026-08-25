@@ -1067,6 +1067,7 @@ class UnifiedMemoryService:
         query: str | None = None,
         user_id: str | None = None,
         retrieval_mode: str | None = None,
+        include_hot: bool = True,
     ) -> str:
         """按 token 预算组装记忆段（Task 42 双轨：用户域常驻 + 世界域按需）。
 
@@ -1246,15 +1247,16 @@ class UnifiedMemoryService:
         if cold_kept:
             parts.append("[会话摘要]\n" + "\n".join(cold_kept))
 
-        hot_kept: list[str] = []
-        for line in reversed(hot_lines):
-            t = _tok(line)
-            if used + t > budget:
-                break
-            hot_kept.insert(0, line)
-            used += t
-        if hot_kept:
-            parts.append("[最近对话]\n" + "\n".join(hot_kept))
+        if include_hot:
+            hot_kept: list[str] = []
+            for line in reversed(hot_lines):
+                t = _tok(line)
+                if used + t > budget:
+                    break
+                hot_kept.insert(0, line)
+                used += t
+            if hot_kept:
+                parts.append("[最近对话]\n" + "\n".join(hot_kept))
 
         return "\n\n".join(parts)
 

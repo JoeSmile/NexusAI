@@ -13,8 +13,8 @@ async def load_memory(state: PipelineState) -> PipelineState:
     svc = get_unified_memory_service(tenant_id=state["tenant_id"])
     bundle = await svc.read(
         user_id=state["user_id"],
-        session_id=None,
-        hot_limit=5,
+        session_id=state.get("session_id") or None,
+        hot_limit=10,
         include_warm=True,
         include_cold=True,
     )

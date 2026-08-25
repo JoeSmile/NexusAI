@@ -23,6 +23,7 @@ from backend.core.plan.validator import validate_plan_ir
 from backend.observability.decorators import enrich_span, observe
 from backend.pipeline.intent_path import (
     resolve_short_path_skill,
+    short_path_predicate,
     should_task_plan,
     skill_to_state,
 )
@@ -78,12 +79,58 @@ def _list_visible_capabilities(state: PipelineState) -> list[dict[str, Any]]:
     return items
 
 
+def _plan_timeout_s() -> float:
+    raw = (os.getenv("TASK_PLAN_TIMEOUT_S") or "").strip()
+    if not raw:
+        return 8.0
+    try:
+        return max(1.0, min(60.0, float(raw)))
+    except ValueError:
+        return 8.0
+
+
 def _force_task_plan_on_stream() -> bool:
     return os.getenv("FORCE_TASK_PLAN_ON_STREAM", "").strip().lower() in (
         "1",
         "true",
         "yes",
     )
+
+
+def _async_task_plan_on_stream_enabled() -> bool:
+    """Task 70: 异步规划需显式开启，或编排开关打开（编排消费 PlanIR）。
+
+    默认关：避免每条长路径消息都白等规划 LLM（5–8s）。FORCE 仍走图内同步（演示用）。
+    """
+    if os.getenv("ASYNC_TASK_PLAN_ON_STREAM", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    ):
+        return True
+    return os.getenv("ORCHESTRATOR_ENABLED", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def should_async_plan_on_stream(state: PipelineState | dict) -> bool:
+    """Task 70: stream 复杂路径走异步规划（图内同步仍跳过，除非 FORCE）。"""
+    if not state.get("stream_mode"):
+        return False
+    if not _async_task_plan_on_stream_enabled():
+        return False
+    if _force_task_plan_on_stream():
+        # FORCE 时图内已同步规划，避免重复
+        return False
+    if state.get("triggered_run") or state.get("finish_reason") == "workflow_triggered":
+        return False
+    if state.get("task_plan"):
+        return False
+    if short_path_predicate(state):
+        return False
+    return should_task_plan(state)
 
 
 def validate_task_plan(
@@ -285,6 +332,136 @@ def _tenant_has_bridge_targets(tenant_id: str) -> bool:
         return True  # 保守: 预判失败按原逻辑跑,不改变行为
 
 
+async def _produce_plan_ir(state: PipelineState) -> dict[str, Any] | None:
+    """跑规划 LLM + 校验；失败返回 None（fail-soft）。"""
+    try:
+        caps = _list_visible_capabilities(state)
+    except Exception:
+        logger.debug("task_plan caps load failed", exc_info=True)
+        return None
+
+    if not state.get("skill_asset_hit"):
+        try:
+            from backend.core.skill_assets.service import search_published
+
+            hits = search_published(
+                tenant_id=state["tenant_id"],
+                query=state.get("raw_input") or state.get("message") or "",
+                limit=1,
+                user_id=state.get("user_id"),
+            )
+            if hits:
+                asset, score = hits[0]
+                state["skill_asset_hit"] = {
+                    "id": asset.id,
+                    "name": asset.name,
+                    "cot_template": asset.cot_template,
+                    "score": score,
+                }
+                try:
+                    from backend.core.skill_assets.service import bump_usage_by_id
+
+                    bump_usage_by_id(
+                        tenant_id=state["tenant_id"],
+                        asset_id=asset.id,
+                    )
+                except Exception:
+                    logger.debug("skill_asset usage bump skipped", exc_info=True)
+        except Exception:
+            logger.debug("skill_asset search skipped", exc_info=True)
+
+    caps_by_id = {c["id"]: c for c in caps}
+    message = state.get("raw_input") or state.get("message") or ""
+    intent = state.get("intent", "default") or "default"
+    confidence = float(state.get("intent_confidence", 0.0) or 0.0)
+
+    from backend.core.plan.coref import (
+        apply_coref_to_plan,
+        infer_coref_table,
+        invalidate_coref_if_drift,
+        load_session_coref,
+        merge_coref_tables,
+        parse_coref_table,
+        save_session_coref,
+    )
+
+    await invalidate_coref_if_drift(state)
+    session_coref = load_session_coref(state)
+    session_coref_dict = session_coref.model_dump(mode="json")
+
+    ranked_caps = search_capabilities(caps, message, top_k=12)
+    from backend.core.plan.agent_spawn import boost_capabilities_for_agent_type
+
+    ranked_caps = boost_capabilities_for_agent_type(
+        ranked_caps,
+        str(state.get("agent_type_id") or "") or None,
+    )
+    messages = _build_messages(
+        message=message,
+        intent=intent,
+        confidence=confidence,
+        caps=ranked_caps,
+        skill_asset_hit=state.get("skill_asset_hit"),
+        session_coref=session_coref_dict if session_coref.entries else None,
+        agent_type_id=str(state.get("agent_type_id") or "") or None,
+    )
+
+    model = state.get("selected_model") or "deepseek-v4-flash"
+    max_tokens = _max_tokens()
+    plan: dict[str, Any] | None = None
+    last_err: str | None = None
+    for _attempt in range(2):
+        try:
+            result = await harness.generate(
+                model=model,
+                messages=messages,
+                tenant_id=state["tenant_id"],
+                api_key=state.get("llm_api_key"),
+                base_url=state.get("llm_base_url"),
+                max_tokens=max_tokens,
+                provider=state.get("llm_key_provider") or "default",
+            )
+            if not result.success:
+                last_err = result.error or "llm_failed"
+                continue
+            parsed = _parse_plan_json(str(result.output or ""))
+            enriched = attach_query_rewrite_to_plan(
+                parsed, original_message=message
+            )
+            qr_raw = enriched.get("query_rewrite") or {}
+            fresh = parse_coref_table(qr_raw.get("coref_table"))
+            if fresh is None or not fresh.entries:
+                fresh = infer_coref_table(
+                    message,
+                    dict(state.get("entities") or {}),
+                )
+            merged_coref = merge_coref_tables(session_coref, fresh)
+            enriched = apply_coref_to_plan(enriched, merged_coref)
+            await save_session_coref(state, merged_coref)
+            plan_ir = validate_plan_ir(
+                prevalidate_llm_plan(enriched, caps_by_id=caps_by_id),
+                caps_by_id=caps_by_id,
+                fallback_goal=message,
+            )
+            plan_dict = plan_to_state_dict(plan_ir)
+            guard = await check_output(
+                json.dumps(plan_dict, ensure_ascii=False)[:4000]
+            )
+            if guard.action == "blocked":
+                last_err = guard.reason or "output_blocked"
+                continue
+            plan = plan_dict
+            state["query_rewrite"] = plan_dict.get("query_rewrite")
+            break
+        except Exception as exc:
+            last_err = type(exc).__name__
+            continue
+
+    if plan is None and last_err:
+        logger.debug("task_plan produce degraded: %s", last_err)
+    return plan
+
+
 @observe(name="pipeline.task_plan")
 async def task_plan(state: PipelineState) -> PipelineState:
     """analyze → task_plan → build_context；短路径空跑；失败 → task_plan=None。"""
@@ -316,168 +493,39 @@ async def task_plan(state: PipelineState) -> PipelineState:
         except Exception:
             logger.debug("early chat workflow bridge skipped", exc_info=True)
 
-        # A(08-16 性能修复): 流式路径跳过规划——plan 无消费方(bridge/审计均为旁路),
-        # 规划 LLM 是首 token 延迟主因(长路径每条消息白烧一次 5-10s)。
-        # Task 56: stream 默认仍跳过；面试演示开 FORCE_TASK_PLAN_ON_STREAM=1
+        # A(08-16 / Task 70): 流式路径图内跳过同步规划——首 token 不阻塞。
+        # 复杂路径改由 SSE 侧 asyncio.wait_for(8s) 异步规划（见 run_async_task_plan_for_stream）。
+        # 面试演示仍可用 FORCE_TASK_PLAN_ON_STREAM=1 恢复图内同步。
         if state.get("stream_mode") and not _force_task_plan_on_stream():
             enrich_span(metadata={"task_plan": "skipped_streaming"})
             return state
 
-        # B(08-16 性能修复): 非流式——租户无已发布带 intent_tags 的 workflow 时,
-        # bridge 永不命中,plan 无消费方,跳过规划 LLM 与 skill_assets 检索。
+        # B(08-16 性能修复): 租户无已发布带 intent_tags 的 workflow 时,
+        # bridge 永不命中；图内同步规划仍跳过（异步流式规划见 run_async_task_plan_for_stream）。
         if not _tenant_has_bridge_targets(state.get("tenant_id") or ""):
             enrich_span(metadata={"task_plan": "skipped_no_bridge_target"})
             return state
 
-        try:
-            caps = _list_visible_capabilities(state)
-        except Exception:
-            logger.debug("task_plan caps load failed", exc_info=True)
-            state["task_plan"] = None
-            return state
-
-        # 43.2+ : 可选检索 skill_assets（失败忽略，从零 CoT）
-        if not state.get("skill_asset_hit"):
-            try:
-                from backend.core.skill_assets.service import search_published
-
-                hits = search_published(
-                    tenant_id=state["tenant_id"],
-                    query=state.get("raw_input") or state.get("message") or "",
-                    limit=1,
-                    user_id=state.get("user_id"),
-                )
-                if hits:
-                    asset, score = hits[0]
-                    state["skill_asset_hit"] = {
-                        "id": asset.id,
-                        "name": asset.name,
-                        "cot_template": asset.cot_template,
-                        "score": score,
-                    }
-                    try:
-                        from backend.core.skill_assets.service import bump_usage_by_id
-
-                        bump_usage_by_id(
-                            tenant_id=state["tenant_id"],
-                            asset_id=asset.id,
-                        )
-                    except Exception:
-                        logger.debug("skill_asset usage bump skipped", exc_info=True)
-            except Exception:
-                logger.debug("skill_asset search skipped", exc_info=True)
-
-        caps_by_id = {c["id"]: c for c in caps}
-        message = state.get("raw_input") or state.get("message") or ""
-        intent = state.get("intent", "default") or "default"
-        confidence = float(state.get("intent_confidence", 0.0) or 0.0)
-
-        from backend.core.plan.coref import (
-            apply_coref_to_plan,
-            infer_coref_table,
-            invalidate_coref_if_drift,
-            load_session_coref,
-            merge_coref_tables,
-            parse_coref_table,
-            save_session_coref,
-        )
-
-        await invalidate_coref_if_drift(state)
-        session_coref = load_session_coref(state)
-        session_coref_dict = session_coref.model_dump(mode="json")
-
-        ranked_caps = search_capabilities(caps, message, top_k=12)
-        from backend.core.plan.agent_spawn import boost_capabilities_for_agent_type
-
-        ranked_caps = boost_capabilities_for_agent_type(
-            ranked_caps,
-            str(state.get("agent_type_id") or "") or None,
-        )
-        messages = _build_messages(
-            message=message,
-            intent=intent,
-            confidence=confidence,
-            caps=ranked_caps,
-            skill_asset_hit=state.get("skill_asset_hit"),
-            session_coref=session_coref_dict if session_coref.entries else None,
-            agent_type_id=str(state.get("agent_type_id") or "") or None,
-        )
-
-        model = state.get("selected_model") or "deepseek-v4-flash"
-        max_tokens = _max_tokens()
-        prompt_meta = {
-            "prompt_name": "task_plan.cot",
-            "prompt_version": "1",
-            "prompt_label": "builtin",
-            "prompt_source": "builtin",
-        }
-
-        plan: dict[str, Any] | None = None
-        last_err: str | None = None
-        for _attempt in range(2):
-            try:
-                result = await harness.generate(
-                    model=model,
-                    messages=messages,
-                    tenant_id=state["tenant_id"],
-                    api_key=state.get("llm_api_key"),
-                    base_url=state.get("llm_base_url"),
-                    max_tokens=max_tokens,
-                    provider=state.get("llm_key_provider") or "default",
-                )
-                if not result.success:
-                    last_err = result.error or "llm_failed"
-                    continue
-                parsed = _parse_plan_json(str(result.output or ""))
-                enriched = attach_query_rewrite_to_plan(
-                    parsed, original_message=message
-                )
-                qr_raw = enriched.get("query_rewrite") or {}
-                fresh = parse_coref_table(qr_raw.get("coref_table"))
-                if fresh is None or not fresh.entries:
-                    fresh = infer_coref_table(
-                        message,
-                        dict(state.get("entities") or {}),
-                    )
-                merged_coref = merge_coref_tables(session_coref, fresh)
-                enriched = apply_coref_to_plan(enriched, merged_coref)
-                await save_session_coref(state, merged_coref)
-                plan_ir = validate_plan_ir(
-                    prevalidate_llm_plan(enriched, caps_by_id=caps_by_id),
-                    caps_by_id=caps_by_id,
-                    fallback_goal=message,
-                )
-                plan_dict = plan_to_state_dict(plan_ir)
-                # CR 2A: plan 过 output_guardrails；blocked → 降级 None
-                guard = await check_output(
-                    json.dumps(plan_dict, ensure_ascii=False)[:4000]
-                )
-                if guard.action == "blocked":
-                    last_err = guard.reason or "output_blocked"
-                    continue
-                plan = plan_dict
-                state["query_rewrite"] = plan_dict.get("query_rewrite")
-                bus = bus_for_state(state)
-                if bus is not None:
-                    qr = plan_dict.get("query_rewrite") or {}
-                    bus.publish_plan(
-                        goal=str(plan_dict.get("goal") or ""),
-                        steps=list(plan_dict.get("steps") or []),
-                        coref_table=qr.get("coref_table"),
-                    )
-                break
-            except Exception as exc:
-                last_err = type(exc).__name__
-                continue
-
+        plan = await _produce_plan_ir(state)
         state["task_plan"] = plan
         enrich_span(
             metadata={
                 "task_plan": "ok" if plan is not None else "degraded",
-                "error": last_err,
-                **prompt_meta,
+                "prompt_name": "task_plan.cot",
+                "prompt_version": "1",
+                "prompt_label": "builtin",
+                "prompt_source": "builtin",
             }
         )
+        if plan is not None:
+            bus = bus_for_state(state)
+            if bus is not None:
+                qr = plan.get("query_rewrite") or {}
+                bus.publish_plan(
+                    goal=str(plan.get("goal") or ""),
+                    steps=list(plan.get("steps") or []),
+                    coref_table=qr.get("coref_table"),
+                )
         # 40.86: optional Chat → published workflow bridge (fail-soft)
         try:
             from backend.pipeline.chat_workflow_bridge import try_bridge_start_run
@@ -489,3 +537,79 @@ async def task_plan(state: PipelineState) -> PipelineState:
         logger.debug("task_plan node failed", exc_info=True)
         state["task_plan"] = None
     return state
+
+
+async def run_async_task_plan_for_stream(
+    state: PipelineState,
+    *,
+    timeout_s: float | None = None,
+    emit_pending: bool = True,
+) -> tuple[PipelineState, str]:
+    """Task 70 C: SSE 侧异步规划。返回 (state, status)。
+
+    status: skipped | ok | degraded | timeout | error
+
+    Caller should yield ``task_plan_pending`` SSE *before* awaiting this when
+    ``emit_pending=False`` (keeps TTFB for the placeholder frame).
+    """
+    import asyncio
+
+    if not should_async_plan_on_stream(state):
+        return state, "skipped"
+
+    bus = bus_for_state(state)
+    if emit_pending and bus is not None:
+        bus.publish_task_plan_pending(
+            message=str(state.get("message") or state.get("raw_input") or "")[:200]
+        )
+
+    limit = _plan_timeout_s() if timeout_s is None else float(timeout_s)
+    try:
+        plan = await asyncio.wait_for(_produce_plan_ir(state), timeout=limit)
+    except TimeoutError:
+        state["task_plan"] = None
+        state["task_plan_async_status"] = "timeout"  # type: ignore[typeddict-item]
+        if bus is not None:
+            bus.publish_task_plan_timeout(timeout_s=limit)
+        enrich_span(metadata={"task_plan": "async_timeout", "timeout_s": limit})
+        return state, "timeout"
+    except Exception:
+        logger.debug("async task_plan failed", exc_info=True)
+        state["task_plan"] = None
+        state["task_plan_async_status"] = "error"  # type: ignore[typeddict-item]
+        if bus is not None:
+            bus.publish_task_plan_done(ok=False, reason="error")
+        return state, "error"
+
+    state["task_plan"] = plan
+    if plan is None:
+        state["task_plan_async_status"] = "degraded"  # type: ignore[typeddict-item]
+        if bus is not None:
+            bus.publish_task_plan_done(ok=False, reason="degraded")
+        enrich_span(metadata={"task_plan": "async_degraded"})
+        return state, "degraded"
+
+    state["task_plan_async_status"] = "ok"  # type: ignore[typeddict-item]
+    state["stream_async_plan"] = True  # type: ignore[typeddict-item]
+    if bus is not None:
+        qr = plan.get("query_rewrite") or {}
+        bus.publish_plan(
+            goal=str(plan.get("goal") or ""),
+            steps=list(plan.get("steps") or []),
+            coref_table=qr.get("coref_table"),
+        )
+        bus.publish_task_plan_done(ok=True, goal=str(plan.get("goal") or ""))
+    enrich_span(metadata={"task_plan": "async_ok"})
+
+    try:
+        from backend.pipeline.nodes.orchestrator import (
+            orchestrator,
+            should_run_orchestrator,
+        )
+
+        if should_run_orchestrator(state):
+            state = await orchestrator(state)
+    except Exception:
+        logger.debug("async stream orchestrator skipped", exc_info=True)
+
+    return state, "ok"

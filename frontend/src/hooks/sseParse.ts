@@ -192,6 +192,27 @@ export function dispatchSSEData(raw: string, h: SSEHandlers): 'done' | 'continue
     h.onPlan?.(obj)
     return 'continue'
   }
+  if (t === 'task_plan_pending') {
+    h.onStreamAlert?.({
+      kind: 'info',
+      title: '正在规划',
+      message: String(obj.message || '正在规划任务步骤…'),
+      code: 'TASK_PLAN_PENDING',
+    })
+    return 'continue'
+  }
+  if (t === 'task_plan_done') {
+    const status = String(obj.status || '')
+    if (status === 'timeout') {
+      h.onStreamAlert?.({
+        kind: 'info',
+        title: '规划超时',
+        message: '规划超时，已改为直接回答。',
+        code: 'TASK_PLAN_TIMEOUT',
+      })
+    }
+    return 'continue'
+  }
   if (t === 'step') {
     h.onStep?.(obj)
     return 'continue'

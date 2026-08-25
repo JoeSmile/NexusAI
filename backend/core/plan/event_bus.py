@@ -147,6 +147,43 @@ class PlanEventBus:
             payload["coref_table"] = coref_table
         return self.emit("plan", payload)
 
+    def publish_task_plan_pending(self, *, message: str = "") -> PlanGraphEvent:
+        """Task 70: 流式首帧占位 — 规划进行中。"""
+        return self.emit(
+            "task_plan_pending",
+            {
+                "status": "pending",
+                "message": (message or "正在规划…")[:200],
+            },
+        )
+
+    def publish_task_plan_done(
+        self,
+        *,
+        ok: bool,
+        goal: str = "",
+        reason: str = "",
+    ) -> PlanGraphEvent:
+        """Task 70: 规划完成或失败（不含超时，超时见 publish_task_plan_timeout）。"""
+        payload: dict[str, Any] = {"ok": ok, "status": "done" if ok else "failed"}
+        if goal:
+            payload["goal"] = goal[:2000]
+        if reason:
+            payload["reason"] = reason[:500]
+        return self.emit("task_plan_done", payload)
+
+    def publish_task_plan_timeout(self, *, timeout_s: float) -> PlanGraphEvent:
+        """Task 70: 规划超时 → 降级直答。"""
+        return self.emit(
+            "task_plan_done",
+            {
+                "ok": False,
+                "status": "timeout",
+                "timeout_s": timeout_s,
+                "reason": "plan_timeout_degrade_to_llm",
+            },
+        )
+
     def publish_step(
         self,
         step_id: str,

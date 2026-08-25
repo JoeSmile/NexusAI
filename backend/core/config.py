@@ -77,7 +77,7 @@ class OpenAIConfig:
 class VectorDBConfig:
     """向量数据库配置 — pgvector"""
     backend: str = "pgvector"
-    dimension: int = 1536
+    dimension: int = 768
     collection_name: str = "nexusai_memories"
     chunk_size: int = 500
     chunk_overlap: int = 50

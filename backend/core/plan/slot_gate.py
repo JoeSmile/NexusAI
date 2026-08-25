@@ -70,16 +70,16 @@ def evaluate_required_slots(state: dict[str, Any]) -> ClarificationPayload | Non
     if not missing:
         return None
 
-    hints = [f"{k}（{agent_type.required_slots[k]}）" for k in missing]
+    # 面向用户文案：不暴露 agent_type.role 与内部字段名（08-25）
+    # required_slots 值为中文说明（如"想了解的产品或方案范围"）
+    hints = [str(agent_type.required_slots[k]) for k in missing]
     question = (
-        f"继续「{agent_type.role}」前需要补充："
-        + "、".join(hints)
-        + "。"
+        f"请问您需要补充：{'、'.join(hints)}？请直接告诉我。"
     )
     return ClarificationPayload(
         source="required_slots",
         question=question,
-        options=["补充信息"],
+        options=[],  # 08-25：去掉"补充信息"死路按钮——用户直接输入缺失值，避免二次触发澄清链
         trace_id=str(state.get("trace_id") or ""),
         original_query=str(state.get("raw_input") or state.get("message") or ""),
     )

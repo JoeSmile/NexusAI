@@ -179,7 +179,10 @@ export function groupAuditRowsByTrace(rows: AuditLogRow[]): TraceSummary[] {
     if (r.error_code) existing.error_code = r.error_code
     existing.row_count += 1
   }
-  return [...map.values()].sort((a, b) =>
-    b.last_activity_at.localeCompare(a.last_activity_at),
-  )
+  return [...map.values()].sort((a, b) => {
+    const ta = Date.parse(a.last_activity_at) || 0
+    const tb = Date.parse(b.last_activity_at) || 0
+    if (tb !== ta) return tb - ta
+    return b.trace_id.localeCompare(a.trace_id)
+  })
 }

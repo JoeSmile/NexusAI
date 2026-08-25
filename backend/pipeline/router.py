@@ -19,7 +19,11 @@ from backend.core.auth.permissions import require_permission
 from backend.core.billing.context import bind_billing_context
 from backend.core.errors import ErrorCode, NexusAIException
 from backend.core.guardrails.output_guard import DRIFT_PATTERNS, VIOLATION_PATTERNS
-from backend.core.plan.event_bus import event_to_sse_payload, get_run_bus_optional
+from backend.core.plan.event_bus import (
+    event_to_sse_payload,
+    get_run_bus,
+    get_run_bus_optional,
+)
 from backend.core.plan.run_cancel import (
     clear_cancel,
     is_cancelled,
@@ -451,8 +455,60 @@ async def chat_streaming(
     stream_messages = build_llm_messages(final, system_template=system_template)
 
     async def event_stream() -> AsyncIterator[str]:
-        for line in _sse_buffered_execution_events(final.get("trace_id")):
-            yield line
+        nonlocal final, stream_messages
+
+        from backend.pipeline.nodes.task_plan import (
+            run_async_task_plan_for_stream,
+            should_async_plan_on_stream,
+        )
+
+        # Task 70 C: 复杂路径先发占位帧，再异步规划（≤8s），超时降级直答
+        if should_async_plan_on_stream(final):
+            tid = str(final.get("trace_id") or "")
+            bus = get_run_bus(tid) if tid else None
+            pending_seq = 0
+            if bus is not None:
+                pending = bus.publish_task_plan_pending(
+                    message=str(final.get("message") or "")[:200]
+                )
+                pending_seq = pending.seq
+                yield _sse_data(event_to_sse_payload(pending))
+
+            final, _plan_status = await run_async_task_plan_for_stream(
+                final, emit_pending=False
+            )
+            if bus is not None:
+                for ev in bus.events_since(pending_seq):
+                    yield _sse_data(event_to_sse_payload(ev))
+
+            # 编排已产出终态：不再走 LLM token 流
+            fr = final.get("finish_reason")
+            if fr and fr not in ("routed_to_llm",):
+                try:
+                    if fr == "clarification_pending":
+                        clarify = final.get("clarification") or {}
+                        yield _sse_data({"type": "clarify", **clarify})
+                        await write_memory(final)
+                    else:
+                        text = str(final.get("response") or "")
+                        if text:
+                            yield _sse_data({"token": text})
+                        await write_memory(final)
+                        await conversion_hook(final)
+                    yield "data: [DONE]\n\n"
+                finally:
+                    _release_run()
+                return
+
+            # 降级/超时后继续直答：刷新 messages（可能带上 query_rewrite）
+            system_template2, _ = await _resolve_system_template(final)
+            stream_messages = build_llm_messages(
+                final, system_template=system_template2
+            )
+        else:
+            for line in _sse_buffered_execution_events(final.get("trace_id")):
+                yield line
+
         buffer = ""
         token_iter = harness.stream(
             model=model,
@@ -513,11 +569,13 @@ async def chat_streaming(
             raise
         except Exception as e:
             logger.exception("SSE stream error: %s", e)
+            # 08-25 脱敏：不把 LLM 原始输出/内部细节发给前端（曾泄漏 rewrite 内容给用户）
+            # 错误详情进日志与审计，SSE 只给安全文案；code 保留供前端分类
             yield _sse_data(
                 {
                     "type": "error",
                     "code": "LLM_002",
-                    "message": str(e),
+                    "message": "生成失败，请稍后重试或换个说法。",
                 }
             )
             yield "data: [DONE]\n\n"

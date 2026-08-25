@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 
 import {
@@ -29,6 +30,18 @@ import {
 } from '@/components/ui/table'
 import { useAuthStore } from '@/stores/authStore'
 
+const PAGE_SIZE = 20
+const FETCH_LIMIT = 500
+
+function sortTracesNewestFirst(items: TraceSummary[]): TraceSummary[] {
+  return [...items].sort((a, b) => {
+    const ta = Date.parse(a.last_activity_at) || 0
+    const tb = Date.parse(b.last_activity_at) || 0
+    if (tb !== ta) return tb - ta
+    return b.trace_id.localeCompare(a.trace_id)
+  })
+}
+
 export default function TraceConsole() {
   const [searchParams] = useSearchParams()
   const capabilityFilter = (searchParams.get('capability_id') || '').trim()
@@ -37,10 +50,17 @@ export default function TraceConsole() {
   const [traceFilter, setTraceFilter] = useState('')
   const [action, setAction] = useState('')
   const [traces, setTraces] = useState<TraceSummary[]>([])
+  const [page, setPage] = useState(1)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const [selectedTrace, setSelectedTrace] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+
+  const totalPages = Math.max(1, Math.ceil(traces.length / PAGE_SIZE))
+  const pageTraces = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE
+    return traces.slice(start, start + PAGE_SIZE)
+  }, [traces, page])
 
   const load = async () => {
     setBusy(true)
@@ -49,14 +69,17 @@ export default function TraceConsole() {
       const rows = await fetchAuditLogs({
         trace_id: traceFilter.trim() || undefined,
         action: action.trim() || undefined,
-        limit: 200,
+        limit: FETCH_LIMIT,
+        offset: 0,
       })
       const scoped = capabilityFilter
         ? rows.filter((r) => (r.model || '').trim() === capabilityFilter)
         : rows
-      setTraces(groupAuditRowsByTrace(scoped))
+      setTraces(sortTracesNewestFirst(groupAuditRowsByTrace(scoped)))
+      setPage(1)
     } catch (e) {
       setTraces([])
+      setPage(1)
       setErr(formatApiError(e, 'audit:read'))
     } finally {
       setBusy(false)
@@ -68,10 +91,17 @@ export default function TraceConsole() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh on role switch
   }, [roleEpoch, role, capabilityFilter])
 
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
+
   const openTrace = (traceId: string) => {
     setSelectedTrace(traceId)
     setDrawerOpen(true)
   }
+
+  const rangeStart = traces.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
+  const rangeEnd = Math.min(page * PAGE_SIZE, traces.length)
 
   return (
     <div className="space-y-4">
@@ -97,7 +127,7 @@ export default function TraceConsole() {
         <CardHeader>
           <CardTitle className="text-sm font-semibold">筛选</CardTitle>
           <CardDescription className="text-xs">
-            按 trace_id / action 过滤；点击行查看链路详情
+            按 trace_id / action 过滤；点击行查看链路详情（默认按最近活动时间倒序）
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -128,8 +158,26 @@ export default function TraceConsole() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-semibold">请求链路</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 gap-2">
+          <div>
+            <CardTitle className="text-sm font-semibold">请求链路</CardTitle>
+            <CardDescription className="text-xs">
+              {traces.length > 0
+                ? `共 ${traces.length} 条 · 显示 ${rangeStart}–${rangeEnd}`
+                : '暂无记录'}
+            </CardDescription>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            disabled={busy}
+            aria-label="刷新链路列表"
+            title="刷新"
+            onClick={() => void load()}
+          >
+            <RefreshCw className={busy ? 'animate-spin' : undefined} />
+          </Button>
         </CardHeader>
         <CardContent>
           <Table>
@@ -146,7 +194,7 @@ export default function TraceConsole() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {traces.map((t) => (
+              {pageTraces.map((t) => (
                 <TableRow
                   key={t.trace_id}
                   className="cursor-pointer hover:bg-muted/50"
@@ -176,6 +224,35 @@ export default function TraceConsole() {
           </Table>
           {traces.length === 0 && !err ? (
             <p className="text-muted-foreground mt-2 text-xs">无链路记录</p>
+          ) : null}
+          {traces.length > 0 ? (
+            <div className="mt-3 flex items-center justify-between gap-2">
+              <p className="text-muted-foreground text-xs">
+                第 {page} / {totalPages} 页 · 每页 {PAGE_SIZE} 条
+              </p>
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  disabled={busy || page <= 1}
+                  aria-label="上一页"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  <ChevronLeft />
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  disabled={busy || page >= totalPages}
+                  aria-label="下一页"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  <ChevronRight />
+                </Button>
+              </div>
+            </div>
           ) : null}
         </CardContent>
       </Card>

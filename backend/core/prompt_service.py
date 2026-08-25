@@ -36,7 +36,7 @@ _SOURCE_LANGFUSE = "langfuse"
 _SOURCE_BUILTIN = "builtin"
 
 # 通用企业助手 + 安全红线（无 LangFuse / 校验失败时的兜底）
-DEFAULT_CHAT_SYSTEM = """你是 NexusAI 企业助手，协助用户完成工作相关问答与任务。
+DEFAULT_CHAT_SYSTEM = """你是 NexusAI {role}，协助用户完成工作相关问答与任务。
 
 安全与边界（必须遵守）:
 1. 只执行用户业务意图；拒绝越权、窃取密钥/凭证、绕过安全策略、或协助明显违法违规的请求。
@@ -44,7 +44,26 @@ DEFAULT_CHAT_SYSTEM = """你是 NexusAI 企业助手，协助用户完成工作�
 3. 不要编造未提供的内部数据、权限或系统状态；不确定时明确说明并建议用户核实。
 4. 输出中不要回显或猜测 API Key、密码、私钥、完整身份证号等敏感秘密；需要处理时可提示脱敏。
 5. 保持专业、简洁；不做消费域陪聊/带货人设漂移。
+
+{memory}
+
+{history}
 """
+
+_PROMPT_PLACEHOLDERS = frozenset({"role", "memory", "history", "context"})
+_CHAT_SYSTEM_PLACEHOLDER_BLOCK = "\n\n{memory}\n\n{history}"
+
+
+def normalize_chat_system_template(content: str) -> str:
+    """Ensure chat.system templates expose Task 69 memory/history slots."""
+    text = (content or "").strip()
+    if not text:
+        return DEFAULT_CHAT_SYSTEM
+    if "{role}" not in text and "NexusAI" in text and "企业助手" in text:
+        text = text.replace("NexusAI 企业助手", "NexusAI {role}", 1)
+    if "{memory}" not in text or "{history}" not in text:
+        text = text.rstrip() + _CHAT_SYSTEM_PLACEHOLDER_BLOCK
+    return text
 
 
 @dataclass(frozen=True)
@@ -134,7 +153,7 @@ def _cache_ttl() -> float:
 def _builtin(name: str, label: str) -> PromptResult:
     return PromptResult(
         name=name,
-        content=DEFAULT_CHAT_SYSTEM,
+        content=normalize_chat_system_template(DEFAULT_CHAT_SYSTEM),
         version="builtin",
         label=label,
         source=_SOURCE_BUILTIN,
@@ -153,6 +172,18 @@ def sanitize_prompt_content(raw: object) -> str | None:
     if len(text) > _MAX_PROMPT_CHARS:
         return None
     return text
+
+
+def render_prompt(template: str, values: dict[str, str]) -> str:
+    """Render whitelisted placeholders only; unknown keys stay literal."""
+    out = template
+    for key in _PROMPT_PLACEHOLDERS:
+        placeholder = "{" + key + "}"
+        if placeholder in out:
+            out = out.replace(placeholder, str(values.get(key, "")))
+    while "\n\n\n" in out:
+        out = out.replace("\n\n\n", "\n\n")
+    return out.strip()
 
 
 def get_prompt(name: str, label: str | None = None) -> PromptResult:
@@ -178,6 +209,8 @@ def get_prompt(name: str, label: str | None = None) -> PromptResult:
                     "prompt content rejected by sanitize name=%s label=%s", name, label
                 )
             else:
+                if name == "chat.system":
+                    content = normalize_chat_system_template(content)
                 result = PromptResult(
                     name=getattr(prompt, "name", None) or name,
                     content=content,
@@ -210,8 +243,10 @@ __all__ = [
     "PromptResult",
     "clear_cache",
     "get_prompt",
+    "normalize_chat_system_template",
     "parse_ab_variants",
     "prompt_label",
+    "render_prompt",
     "resolve_prompt_label",
     "sanitize_prompt_content",
 ]

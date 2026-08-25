@@ -34,7 +34,7 @@ services:
 
   nexusai:
     build: .
-    ports: ["8000:8000"]
+    # 生产：8000 不直接对外暴露，由 nginx 反代（80/443）收口
     env_file: config.env
     environment:
       ENVIRONMENT: production

@@ -116,6 +116,20 @@ describe('SSE parse frames', () => {
     expect(onStep).toHaveBeenCalled()
     expect(parser.stopped()).toBe(false)
   })
+
+  it('surfaces task_plan_pending as info alert', () => {
+    const onStreamAlert = vi.fn()
+    const parser = createEventParser({ onStreamAlert })
+    parser.feed(
+      'data: {"type":"task_plan_pending","status":"pending","message":"正在规划…"}\n\n',
+    )
+    expect(onStreamAlert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'info',
+        code: 'TASK_PLAN_PENDING',
+      }),
+    )
+  })
 })
 
 describe('useSSEStream dual format', () => {

@@ -10,7 +10,7 @@ from typing import Literal
 
 logger = logging.getLogger(__name__)
 
-EMBED_DIM = 1536  # pgvector 列维度；API 返回更短时补零
+EMBED_DIM = 768  # pgvector 列维度（nomic-embed-text）；API 返回更短时补零
 
 EmbedMode = Literal["api", "hash", "api-error", "cache", "unconfigured"]
 _last_embed_mode: EmbedMode | None = None

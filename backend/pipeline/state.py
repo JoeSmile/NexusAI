@@ -23,6 +23,7 @@ class PipelineState(TypedDict):
     raw_input: str
     query_hash: str
     assembled_prompt: str | None
+    memory_prompt_block: str | None
     gate_reason: str | None
     cache_bypass: bool  # Task 39 GAP-2 / 40.86：触发型消息不查不写 exact
     # 47b I1 — FE bubble UUIDs persisted on write_memory
@@ -147,6 +148,7 @@ def make_initial_state(
         "raw_input": message,
         "query_hash": "",
         "assembled_prompt": None,
+        "memory_prompt_block": None,
         "gate_reason": None,
         "cache_bypass": False,
         "user_client_message_id": (user_client_message_id or "").strip() or None,

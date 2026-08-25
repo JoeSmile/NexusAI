@@ -354,3 +354,119 @@ def test_audit_only_on_llm_success(monkeypatch):
     # idempotent
     audit_task_plan_on_success(state)
     assert len(calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_async_plan_skipped_when_flag_off(monkeypatch):
+    from backend.pipeline.nodes.task_plan import run_async_task_plan_for_stream
+
+    monkeypatch.delenv("ASYNC_TASK_PLAN_ON_STREAM", raising=False)
+    monkeypatch.delenv("ORCHESTRATOR_ENABLED", raising=False)
+    monkeypatch.delenv("FORCE_TASK_PLAN_ON_STREAM", raising=False)
+
+    async def boom(*a, **k):
+        raise AssertionError("should not plan when async flag off")
+
+    monkeypatch.setattr(
+        "backend.pipeline.nodes.task_plan._produce_plan_ir", boom
+    )
+    state = make_initial_state("t", "u", "s", "complex please")
+    state["stream_mode"] = True
+    state["intent"] = "complex"
+    state["intent_confidence"] = 0.3
+    out, status = await run_async_task_plan_for_stream(state)
+    assert status == "skipped"
+    assert out.get("task_plan") is None
+
+
+@pytest.mark.asyncio
+async def test_async_plan_ok_emits_done(monkeypatch):
+    from backend.core.plan.event_bus import get_run_bus
+    from backend.pipeline.nodes.task_plan import run_async_task_plan_for_stream
+
+    monkeypatch.setenv("ASYNC_TASK_PLAN_ON_STREAM", "1")
+    monkeypatch.delenv("ORCHESTRATOR_ENABLED", raising=False)
+    monkeypatch.delenv("FORCE_TASK_PLAN_ON_STREAM", raising=False)
+
+    plan = {
+        "goal": "g",
+        "version": 1,
+        "max_depth": 3,
+        "steps": [
+            {
+                "id": "s1",
+                "capability_id": "cap.a",
+                "params": {},
+                "depends_on": [],
+                "mode": "serial",
+                "on_fail": "fail",
+            }
+        ],
+    }
+
+    async def fake_produce(state):
+        return plan
+
+    monkeypatch.setattr(
+        "backend.pipeline.nodes.task_plan._produce_plan_ir", fake_produce
+    )
+    monkeypatch.setattr(
+        "backend.pipeline.intent_path.registry.get_skill_for_intent",
+        lambda *a, **k: None,
+    )
+
+    state = make_initial_state("t", "u", "s", "do multi step")
+    state["stream_mode"] = True
+    state["intent"] = "complex"
+    state["intent_confidence"] = 0.3
+    state["trace_id"] = "trace-async-ok"
+    bus = get_run_bus("trace-async-ok")
+    bus.publish_task_plan_pending(message="do multi step")
+
+    out, status = await run_async_task_plan_for_stream(state, emit_pending=False)
+    assert status == "ok"
+    assert out["task_plan"]["goal"] == "g"
+    assert out.get("stream_async_plan") is True
+    types = [e.type for e in bus.events_all()]
+    assert "task_plan_pending" in types
+    assert "plan" in types
+    assert "task_plan_done" in types
+
+
+@pytest.mark.asyncio
+async def test_async_plan_timeout_degrades(monkeypatch):
+    import asyncio
+
+    from backend.core.plan.event_bus import get_run_bus
+    from backend.pipeline.nodes.task_plan import run_async_task_plan_for_stream
+
+    monkeypatch.setenv("ASYNC_TASK_PLAN_ON_STREAM", "1")
+    monkeypatch.delenv("ORCHESTRATOR_ENABLED", raising=False)
+
+    async def slow_produce(state):
+        await asyncio.sleep(2.0)
+        return {"goal": "late"}
+
+    monkeypatch.setattr(
+        "backend.pipeline.nodes.task_plan._produce_plan_ir", slow_produce
+    )
+    monkeypatch.setattr(
+        "backend.pipeline.intent_path.registry.get_skill_for_intent",
+        lambda *a, **k: None,
+    )
+
+    state = make_initial_state("t", "u", "s", "slow plan")
+    state["stream_mode"] = True
+    state["intent"] = "complex"
+    state["intent_confidence"] = 0.2
+    state["trace_id"] = "trace-async-to"
+    bus = get_run_bus("trace-async-to")
+
+    out, status = await run_async_task_plan_for_stream(
+        state, timeout_s=0.05, emit_pending=True
+    )
+    assert status == "timeout"
+    assert out.get("task_plan") is None
+    assert out.get("task_plan_async_status") == "timeout"
+    done = [e for e in bus.events_all() if e.type == "task_plan_done"]
+    assert done and done[-1].payload.get("status") == "timeout"

@@ -17,21 +17,13 @@ from backend.core.plan.retrieval_mode import (
     token_budget_warning,
 )
 from backend.observability.decorators import enrich_span, observe
+from backend.pipeline.context_messages import resolved_query
 from backend.pipeline.state import PipelineState
-
-
-def _resolved_query(state: PipelineState) -> str:
-    qr = state.get("query_rewrite")
-    if isinstance(qr, dict):
-        rq = str(qr.get("rewritten_query") or "").strip()
-        if rq:
-            return rq
-    return str(state.get("message") or "")
 
 
 @observe(name="pipeline.build_context")
 async def build_context(state: PipelineState) -> PipelineState:
-    """组装最终上下文（记忆段带隔离标记 + token 预算；漂移则剥离记忆正文）。"""
+    """组装记忆段（warm/cold → system）；hot 由 llm_generate 多轮展开。"""
     mem = get_unified_memory_service(tenant_id=state["tenant_id"])
     bundle = MemoryBundle(
         hot=list(state.get("hot_memory") or []),
@@ -45,26 +37,32 @@ async def build_context(state: PipelineState) -> PipelineState:
     retrieval_mode = choose_retrieval_mode(
         candidate_count=candidate_count,
         cold_items=bundle.cold,
-        query=_resolved_query(state),
+        query=resolved_query(state),
     )
     state["retrieval_mode"] = retrieval_mode
     memory_block = mem.assemble_prompt_block(
         bundle,
-        query=_resolved_query(state),
+        query=resolved_query(state),
         user_id=str(state.get("user_id") or ""),
         retrieval_mode=retrieval_mode,
+        include_hot=False,
     )
     drift_blocked = False
     if memory_block:
         drift = await check_role_drift(memory_block)
         if drift.action == "blocked":
-            # 保留隔离头，丢弃可能污染人设的记忆正文
             memory_block = MEMORY_ISOLATION_HEADER
             drift_blocked = True
-    parts = [memory_block] if memory_block else []
-    parts.append(f"user: {state['message']}")
-    state["assembled_prompt"] = "\n\n".join(parts)
-    warn = token_budget_warning(state["assembled_prompt"], budget=8000)
+    state["memory_prompt_block"] = memory_block or ""
+    state["assembled_prompt"] = f"user: {resolved_query(state)}"
+    warn = token_budget_warning(
+        "\n".join(
+            part
+            for part in (memory_block, state["assembled_prompt"])
+            if part
+        ),
+        budget=8000,
+    )
     if warn:
         state["context_budget_warning"] = warn  # type: ignore[typeddict-item]
     if sanitize_report.retrieved_ids or sanitize_report.flags:
@@ -88,7 +86,10 @@ async def build_context(state: PipelineState) -> PipelineState:
         )
     enrich_span(
         input_data={"message": state.get("message")},
-        output_data={"assembled_prompt_len": len(state["assembled_prompt"] or "")},
+        output_data={
+            "assembled_prompt_len": len(state["assembled_prompt"] or ""),
+            "memory_prompt_block_len": len(state.get("memory_prompt_block") or ""),
+        },
         metadata={
             "intent": state.get("intent"),
             "cold_count": len(bundle.cold),

@@ -10,7 +10,7 @@ EventEmitter.defaultMaxListeners = Math.max(EventEmitter.defaultMaxListeners, 20
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url))
 
-const backend = 'http://localhost:8000'
+const backend = 'http://127.0.0.1:8000'
 
 // https://vite.dev/config/
 export default defineConfig({

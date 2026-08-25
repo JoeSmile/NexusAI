@@ -21,6 +21,7 @@ from backend.core.plan.clarification import (
 )
 from backend.core.plan.slot_gate import evaluate_required_slots
 from backend.core.auth.models import TenantContext
+from backend.core.auth.subagent import is_sub_agent
 from backend.core.capability.invoke import invoke
 from backend.core.harness import LLMHarness
 from backend.core.plan.blackboard import Blackboard, entry_from_step_result
@@ -64,7 +65,10 @@ def orchestrator_enabled() -> bool:
 
 
 def should_run_orchestrator(state: PipelineState) -> bool:
-    """experiment_hook 之后：有 PlanIR 且开关打开时走编排。"""
+    """experiment_hook 之后：有 PlanIR 且开关打开时走编排。
+
+    Task 70: 流式默认仍跳过；异步规划成功后设 ``stream_async_plan`` 允许编排。
+    """
     if not orchestrator_enabled():
         return False
     if state.get("triggered_run") or state.get("finish_reason") == "workflow_triggered":
@@ -73,7 +77,7 @@ def should_run_orchestrator(state: PipelineState) -> bool:
         return False
     if not state.get("task_plan"):
         return False
-    if state.get("stream_mode"):
+    if state.get("stream_mode") and not state.get("stream_async_plan"):
         return False
     return True
 

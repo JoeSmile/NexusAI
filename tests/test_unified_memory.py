@@ -417,9 +417,9 @@ async def test_build_context_strips_memory_on_role_drift() -> None:
     state["hot_memory"] = []
     state["cold_memory"] = []
     out = await build_context(state)
-    assert MEMORY_ISOLATION_HEADER in (out["assembled_prompt"] or "")
-    assert "家人们" not in (out["assembled_prompt"] or "")
-    assert "user: 你好" in (out["assembled_prompt"] or "")
+    assert MEMORY_ISOLATION_HEADER in (out.get("memory_prompt_block") or "")
+    assert "家人们" not in (out.get("memory_prompt_block") or "")
+    assert "user: 你好" in (out.get("assembled_prompt") or "")
     assert out["raw_input"] == "你好"
 
 
