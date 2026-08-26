@@ -97,6 +97,17 @@ async def model_router(state: PipelineState) -> PipelineState:
     preferred = (state.get("preferred_model") or "").strip() or spec.name
     state["selected_model"] = preferred
     state["estimated_cost"] = estimate_cost(preferred, spec.max_tokens)
+
+    from backend.pipeline.cache.semantic_cache import try_apply_semantic_cache
+
+    if try_apply_semantic_cache(state):
+        enrich_span(
+            metadata={"path": "semantic_cache", "intent": intent, "model": preferred},
+            output_data=state.get("finish_reason"),
+        )
+        _maybe_disable_short_path_trace(state["finish_reason"])
+        return state
+
     state["finish_reason"] = "routed_to_llm"
     state["llm_key_provider"] = spec.provider or "default"
 
@@ -131,11 +142,16 @@ async def model_router(state: PipelineState) -> PipelineState:
 
 
 def route_short_or_long(state: PipelineState) -> str:
-    """条件边: 仅「非流式的长路径」去 llm_generate；其余(短路径/错误/流式)一律 conversion_hook。
+    """条件边: 仅「非流式的长路径」去 llm_generate。
 
     反向判断而非枚举终止态: skill 失败(finish_reason=error / 任意错误字符串)已有响应,
-    必须终止并记转化,不能遗漏式落进 LLM 被覆盖(曾致错误被吞 + 双份成本 + 审计不一致)。
+    必须终止并落库,不能遗漏式落进 LLM 被覆盖(曾致错误被吞 + 双份成本 + 审计不一致)。
+
+    流式长路径(routed_to_llm + stream_mode)仍走 conversion_hook：token 在路由层生成,
+    write_memory 由 SSE 结束后补跑，避免图内先写入空回复。
     """
     if state.get("finish_reason") == "routed_to_llm" and not state.get("stream_mode"):
         return "llm_generate"
-    return "conversion_hook"
+    if state.get("finish_reason") == "routed_to_llm" and state.get("stream_mode"):
+        return "conversion_hook"
+    return "write_memory"

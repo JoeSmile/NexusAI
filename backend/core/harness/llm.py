@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 from collections.abc import AsyncIterator
 from typing import Any
@@ -16,6 +17,7 @@ from backend.core.cost_manager import (
     estimate_cost,
     record_consumption,
 )
+from backend.core.fallback import get_fallback
 from backend.core.harness.base import Harness, HarnessResult
 from backend.core.harness.provider import (
     get_llm_provider,
@@ -23,6 +25,11 @@ from backend.core.harness.provider import (
     mock_response,
     save_fixture,
 )
+from backend.core.key_repository import LLMKey
+
+logger = logging.getLogger(__name__)
+
+_MAX_MODEL_FALLBACKS = 2
 
 
 async def _budget_allows(tenant_id: str, estimated: float) -> bool:
@@ -83,11 +90,93 @@ def _completion_kwargs(
     return params
 
 
+def _models_to_try(base_model: str) -> list[str]:
+    from backend.core.model_registry import fallback_chain
+
+    base = (base_model or "").strip() or "default"
+    alts = fallback_chain(base)[:_MAX_MODEL_FALLBACKS]
+    out: list[str] = [base]
+    for name in alts:
+        if name not in out:
+            out.append(name)
+    return out
+
+
+def _pipeline_key_chain(
+    *,
+    tenant_id: str,
+    key_provider: str,
+    api_key: str,
+    base_url: str | None,
+) -> list[LLMKey]:
+    if not api_key:
+        return []
+    return [
+        LLMKey(
+            id="pipeline",
+            tenant_id=tenant_id or "default",
+            provider=key_provider or "default",
+            base_url=base_url or "",
+            api_key=api_key,
+            key_version=0,
+            is_active=True,
+            expires_at=None,
+        )
+    ]
+
+
+async def _keys_for_model(
+    tenant_id: str,
+    model: str,
+    *,
+    api_key: str | None,
+    base_url: str | None,
+    key_provider: str,
+    allow_pipeline: bool,
+) -> list[LLMKey]:
+    from backend.core.llm_credentials import get_key_chain_for_model
+
+    chain = await get_key_chain_for_model(tenant_id, model, limit=3)
+    if chain:
+        return chain
+    if allow_pipeline and api_key:
+        return _pipeline_key_chain(
+            tenant_id=tenant_id,
+            key_provider=key_provider,
+            api_key=api_key,
+            base_url=base_url,
+        )
+    return []
+
+
+def _record_fallback_metadata(*, original_model: str, final_model: str) -> None:
+    if original_model == final_model:
+        return
+    try:
+        from backend.observability.decorators import langfuse_context
+
+        langfuse_context.update_current_observation(
+            metadata={
+                "fallback": True,
+                "original_model": original_model,
+                "final_model": final_model,
+            }
+        )
+    except Exception:
+        pass
+
+
 class LLMHarness(Harness):
     """LLM 调用入口"""
 
     def __init__(self):
         super().__init__(name="llm")
+        self._last_stream_model: str = ""
+        self._stream_finish_reason: str = "llm_generated"
+
+    def stream_finish_reason(self) -> str:
+        """Set during ``stream`` — consumed by SSE router for done frame (Task 72 D7)."""
+        return self._stream_finish_reason or "llm_generated"
 
     async def generate(
         self,
@@ -178,7 +267,12 @@ class LLMHarness(Harness):
             input_tokens=input_tokens,
             output_tokens=output_tokens,
         )
+        try:
+            from backend.core.token_quota import record_token_usage
 
+            record_token_usage(tenant_id, input_tokens + output_tokens)
+        except Exception:
+            pass
         try:
             from backend.observability.decorators import langfuse_context
 
@@ -213,6 +307,7 @@ class LLMHarness(Harness):
         from backend.core.llm_concurrency import llm_slot
 
         async with llm_slot():
+            self._stream_finish_reason = "llm_generated"
             async for chunk in self._stream_unlocked(
                 model, messages, tenant_id, api_key, base_url, **kwargs
             ):
@@ -239,7 +334,6 @@ class LLMHarness(Harness):
             yield "预算超限，请求被拒绝。"
             return
 
-        key = api_key or os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or ""
         provider = get_llm_provider()
         input_tokens = sum(count_message_tokens(m) for m in messages)
         collected: list[str] = []
@@ -260,50 +354,38 @@ class LLMHarness(Harness):
                 collected.append(ch)
                 yield ch
         else:
-            # record / openai:真流式(OpenAI-compatible astream,失败降级非流式)
             recorded = ""
+            original_model = model
+            final_model = model
             try:
-                from openai import AsyncOpenAI
-
-                client = AsyncOpenAI(
-                    api_key=key,
-                    base_url=base_url or os.getenv("LLM_BASE_URL") or None,
-                )
-                stream = await client.chat.completions.create(
-                    **_completion_kwargs(
-                        model=model,
-                        messages=messages,
-                        temperature=float(kwargs.get("temperature", 0.7)),
-                        max_tokens=kwargs.get("max_tokens"),
-                        stream=True,
-                    )
-                )
-                task = asyncio.current_task()
-                async for chunk in stream:  # type: ignore[union-attr]
-                    if task is not None and task.cancelled():
-                        raise asyncio.CancelledError()
-                    delta = chunk.choices[0].delta.content if chunk.choices else None
-                    if delta:
-                        collected.append(delta)
-                        recorded += delta
-                        yield delta
-            except Exception:
-                # 失败时降级为非流式 generate
-                result = await self.generate(
+                async for delta in self._stream_with_resilience(
                     model=model,
                     messages=messages,
                     tenant_id=tenant_id,
                     api_key=api_key,
                     base_url=base_url,
-                    **kwargs,
-                )
-                text = str(result.output or "")
+                    temperature=float(kwargs.get("temperature", 0.7)),
+                    max_tokens=kwargs.get("max_tokens"),
+                    key_provider=str(kwargs.get("provider") or "default"),
+                ):
+                    collected.append(delta)
+                    recorded += delta
+                    yield delta
+                final_model = getattr(self, "_last_stream_model", model)
+            except Exception:
+                logger.exception("LLM stream resilience exhausted")
+                self._stream_finish_reason = "fallback"
+                text = get_fallback("zh")
                 for ch in text:
                     collected.append(ch)
                     yield ch
                 return
             if provider == "record" and recorded:
-                save_fixture(model, messages, recorded)
+                save_fixture(final_model or model, messages, recorded)
+            _record_fallback_metadata(
+                original_model=original_model,
+                final_model=final_model or model,
+            )
 
         output_text = "".join(collected)
         output_tokens = count_tokens(output_text)
@@ -317,6 +399,12 @@ class LLMHarness(Harness):
             output_tokens=output_tokens,
         )
         try:
+            from backend.core.token_quota import record_token_usage
+
+            record_token_usage(tenant_id, input_tokens + output_tokens)
+        except Exception:
+            pass
+        try:
             from backend.observability.decorators import langfuse_context
 
             langfuse_context.update_current_observation(
@@ -327,6 +415,91 @@ class LLMHarness(Harness):
             )
         except Exception:
             pass
+
+    async def _stream_with_resilience(
+        self,
+        *,
+        model: str,
+        messages: list[dict],
+        tenant_id: str,
+        api_key: str | None,
+        base_url: str | None,
+        temperature: float,
+        max_tokens: int | None,
+        key_provider: str,
+    ) -> AsyncIterator[str]:
+        from backend.core.key_failover import should_try_next_model, stream_with_key_failover
+        from backend.core.key_repository import LLMKeyRepository
+
+        repo = LLMKeyRepository()
+        last_err: BaseException | None = None
+
+        for idx, attempt_model in enumerate(_models_to_try(model)):
+            chain = await _keys_for_model(
+                tenant_id,
+                attempt_model,
+                api_key=api_key if idx == 0 else None,
+                base_url=base_url if idx == 0 else None,
+                key_provider=key_provider,
+                allow_pipeline=idx == 0,
+            )
+            if not chain:
+                continue
+
+            current_model = attempt_model
+
+            async def _stream_once(
+                plain_key: str, url: str, *, m: str = current_model
+            ) -> AsyncIterator[str]:
+                from openai import AsyncOpenAI
+
+                client = AsyncOpenAI(
+                    api_key=plain_key,
+                    base_url=url or base_url or os.getenv("LLM_BASE_URL") or None,
+                )
+                stream = await client.chat.completions.create(
+                    **_completion_kwargs(
+                        model=m,
+                        messages=messages,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        stream=True,
+                    )
+                )
+                task = asyncio.current_task()
+                async for chunk in stream:  # type: ignore[union-attr]
+                    if task is not None and task.cancelled():
+                        raise asyncio.CancelledError()
+                    delta = chunk.choices[0].delta.content if chunk.choices else None
+                    if delta:
+                        yield delta
+
+            try:
+                async for delta in stream_with_key_failover(
+                    chain,
+                    _stream_once,
+                    repo=repo,
+                    tenant_id=tenant_id or "default",
+                    provider=key_provider,
+                ):
+                    self._last_stream_model = attempt_model
+                    yield delta
+                self._last_stream_model = attempt_model
+                return
+            except Exception as e:
+                if should_try_next_model(e):
+                    last_err = e
+                    logger.warning(
+                        "stream model fallback: %s → next (reason=%s)",
+                        attempt_model,
+                        type(e).__name__,
+                    )
+                    continue
+                raise
+
+        if last_err is not None:
+            raise last_err
+        raise RuntimeError("无可用 LLM API Key")
 
     async def _call_api(
         self,
@@ -340,58 +513,73 @@ class LLMHarness(Harness):
         max_tokens: int | None = 1000,
         temperature: float = 0.7,
     ) -> str:
-        """真实调用 OpenAI-compatible API;429/401 沿候选链切 key。"""
+        """OpenAI-compatible API with model-scoped key chain + model fallback (Task 72)."""
         from openai import AsyncOpenAI
 
         from backend.core.harness.provider import get_llm_provider, save_fixture
-        from backend.core.key_failover import call_with_key_failover
-        from backend.core.key_repository import LLMKey, LLMKeyRepository
+        from backend.core.key_failover import call_with_key_failover, should_try_next_model
+        from backend.core.key_repository import LLMKeyRepository
 
         repo = LLMKeyRepository()
-        chain = await repo.get_key_chain(
-            tenant_id or "default", key_provider or "default", limit=3
-        )
-        if not chain:
-            key = api_key or os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or ""
-            if not key:
-                raise RuntimeError("无可用 LLM API Key")
-            chain = [
-                LLMKey(
-                    id="fallback",
+        llm_mode = get_llm_provider()
+        last_err: BaseException | None = None
+        original = model
+        final_model = model
+
+        for idx, attempt_model in enumerate(_models_to_try(model)):
+            chain = await _keys_for_model(
+                tenant_id,
+                attempt_model,
+                api_key=api_key if idx == 0 else None,
+                base_url=base_url if idx == 0 else None,
+                key_provider=key_provider,
+                allow_pipeline=idx == 0,
+            )
+            if not chain:
+                continue
+
+            current_model = attempt_model
+
+            async def _once(plain_key: str, url: str, *, m: str = current_model) -> str:
+                client = AsyncOpenAI(
+                    api_key=plain_key,
+                    base_url=url or base_url or os.getenv("LLM_BASE_URL") or None,
+                )
+                resp = await client.chat.completions.create(
+                    **_completion_kwargs(
+                        model=m,
+                        messages=messages,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                    )
+                )
+                text = (resp.choices[0].message.content or "").strip()
+                if llm_mode == "record" and text:
+                    save_fixture(m, messages, text)
+                return text
+
+            try:
+                text = await call_with_key_failover(
+                    chain,
+                    lambda pk, url, m=current_model: _once(pk, url, m=m),
+                    repo=repo,
                     tenant_id=tenant_id or "default",
                     provider=key_provider or "default",
-                    base_url=base_url or os.getenv("LLM_BASE_URL") or "",
-                    api_key=key,
-                    key_version=0,
-                    is_active=True,
-                    expires_at=None,
                 )
-            ]
+                final_model = attempt_model
+                _record_fallback_metadata(original_model=original, final_model=final_model)
+                return text
+            except Exception as e:
+                if should_try_next_model(e):
+                    last_err = e
+                    logger.warning(
+                        "generate model fallback: %s → next (reason=%s)",
+                        attempt_model,
+                        type(e).__name__,
+                    )
+                    continue
+                raise
 
-        llm_mode = get_llm_provider()
-
-        async def _once(plain_key: str, url: str) -> str:
-            client = AsyncOpenAI(
-                api_key=plain_key,
-                base_url=url or base_url or os.getenv("LLM_BASE_URL") or None,
-            )
-            resp = await client.chat.completions.create(
-                **_completion_kwargs(
-                    model=model,
-                    messages=messages,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                )
-            )
-            text = (resp.choices[0].message.content or "").strip()
-            if llm_mode == "record" and text:
-                save_fixture(model, messages, text)
-            return text
-
-        return await call_with_key_failover(
-            chain,
-            _once,
-            repo=repo,
-            tenant_id=tenant_id or "default",
-            provider=key_provider or "default",
-        )
+        if last_err is not None:
+            raise last_err
+        raise RuntimeError("无可用 LLM API Key")

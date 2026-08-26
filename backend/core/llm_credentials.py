@@ -27,6 +27,22 @@ _TENANT_KEY_ROWS_SQL = text(
     """
 )
 
+_TENANT_KEY_CHAIN_SQL = text(
+    """
+    SELECT id, tenant_id, provider, allowed_models, base_url, encrypted_key,
+           key_version, is_active, expires_at
+    FROM llm_api_keys
+    WHERE tenant_id = :tid AND is_active = true
+      AND owner_user_id IS NULL
+      AND (expires_at IS NULL OR expires_at > now())
+      AND (
+        last_failed_at IS NULL
+        OR last_failed_at <= (now() - make_interval(secs => :cooldown))
+      )
+    ORDER BY key_version DESC
+    """
+)
+
 EMBEDDING_DIMENSIONS = 768
 
 
@@ -91,6 +107,59 @@ def _fetch_tenant_rows(tenant_id: str) -> list:
         return list(session.execute(_TENANT_KEY_ROWS_SQL, {"tid": tenant_id}).fetchall())
 
 
+def _fetch_tenant_chain_rows(tenant_id: str, cooldown: int) -> list:
+    session_factory = get_pg_session()
+    with session_factory.Session() as session:
+        return list(
+            session.execute(
+                _TENANT_KEY_CHAIN_SQL,
+                {"tid": tenant_id, "cooldown": int(cooldown)},
+            ).fetchall()
+        )
+
+
+def _key_cooldown_seconds() -> int:
+    try:
+        from backend.core.key_repository import _cooldown_seconds
+
+        return int(_cooldown_seconds())
+    except Exception:
+        return 60
+
+
+async def get_key_chain_for_model(
+    tenant_id: str,
+    model: str,
+    *,
+    limit: int = 3,
+) -> list[LLMKey]:
+    """Model-scoped key chain: chat-purpose rows + allowed_models match + cooldown.
+
+    Tenant-only; no env fallback (Task 49 / Task 72).
+    """
+    model = (model or "").strip()
+    if not model:
+        return []
+    lim = max(1, min(int(limit), 3))
+    cooldown = _key_cooldown_seconds()
+    chain: list[LLMKey] = []
+    seen: set[str] = set()
+    for row in _fetch_tenant_chain_rows(tenant_id, cooldown):
+        if not is_chat_purpose(str(row.provider)):
+            continue
+        if not _model_allowed(row.allowed_models, model):
+            continue
+        kid = str(row.id)
+        if kid in seen:
+            continue
+        seen.add(kid)
+        key = _row_to_key(row)
+        chain.append(key)
+        if len(chain) >= lim:
+            break
+    return chain
+
+
 async def list_available_models(tenant_id: str) -> list[dict]:
     """Chat models only — from active chat-purpose credentials."""
     items: list[dict] = []
@@ -135,21 +204,20 @@ async def resolve_chat_model_for_request(
 
 async def resolve_tenant_credential(tenant_id: str, model: str) -> LLMKey:
     """Resolve chat credential by exact model name; no env fallback."""
+    from backend.core.llm_key_pool import pick_key_from_chain
+
     model = (model or "").strip()
     if not model:
         raise NexusAIException(_LLM_MODEL_NOT_ALLOWED, "model_not_allowed")
 
-    for row in _fetch_tenant_rows(tenant_id):
-        if not is_chat_purpose(str(row.provider)):
-            continue
-        if not _model_allowed(row.allowed_models, model):
-            continue
-        key = _row_to_key(row)
-        if not key.base_url:
-            raise NexusAIException(_LLM_KEY_MISSING, "tenant_llm_base_url_missing")
-        return key
+    chain = await get_key_chain_for_model(tenant_id, model, limit=3)
+    if not chain:
+        raise NexusAIException(_LLM_MODEL_NOT_ALLOWED, "model_not_allowed")
 
-    raise NexusAIException(_LLM_MODEL_NOT_ALLOWED, "model_not_allowed")
+    key = pick_key_from_chain(chain, tenant_id=tenant_id, model=model)
+    if key is None or not key.base_url:
+        raise NexusAIException(_LLM_KEY_MISSING, "tenant_llm_base_url_missing")
+    return key
 
 
 async def resolve_embedding_credential(tenant_id: str) -> tuple[LLMKey, str]:

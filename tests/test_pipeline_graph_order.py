@@ -205,3 +205,73 @@ async def test_task_plan_edge_preserved():
     assert '"continue": "build_context"' in src
     assert 'add_edge("auth_check", "preprocess")' in src
     assert 'continue": "load_memory"' in src
+
+
+@pytest.mark.asyncio
+async def test_short_path_graph_invokes_write_memory(monkeypatch):
+    """Skill 短路径必须经过 write_memory，再 conversion_hook。"""
+    writes: list[str] = []
+
+    class FakeMem:
+        async def read(self, **kwargs):
+            return MagicMock(hot=[], warm={}, cold=[], warm_meta={})
+
+        def assemble_prompt_block(self, bundle, query=""):
+            return ""
+
+    monkeypatch.setattr(
+        "backend.pipeline.nodes.load_memory.get_unified_memory_service",
+        lambda tenant_id=None: FakeMem(),
+    )
+    monkeypatch.setattr(
+        "backend.pipeline.nodes.build_context.get_unified_memory_service",
+        lambda tenant_id=None: FakeMem(),
+    )
+
+    async def _cache_miss(state):
+        return state
+
+    async def _analyze(state):
+        state["intent"] = "greeting"
+        state["intent_confidence"] = 0.9
+        return state
+
+    async def _passthrough(state):
+        return state
+
+    async def _router(state):
+        state["finish_reason"] = "skill_executed"
+        state["response"] = "hi"
+        return state
+
+    async def _write(state):
+        writes.append(state.get("response") or "")
+        return state
+
+    async def _conversion(state):
+        return state
+
+    monkeypatch.setattr(
+        "backend.pipeline.nodes.rate_limiter.check_rate_limit",
+        lambda tenant_id: True,
+    )
+    _patch_graph_nodes(
+        monkeypatch,
+        cache_check=_cache_miss,
+        analyze_parallel=_analyze,
+        task_plan=_passthrough,
+        clarification_gate=_passthrough,
+        build_context=_passthrough,
+        experiment_hook=_passthrough,
+        model_router=_router,
+        write_memory=_write,
+        conversion_hook=_conversion,
+    )
+
+    from backend.pipeline.graph import build_pipeline
+
+    graph = build_pipeline()
+    state = make_initial_state("t1", "u1", "s1", "你好")
+    final = await graph.ainvoke(state)
+    assert writes == ["hi"]
+    assert final.get("finish_reason") == "skill_executed"

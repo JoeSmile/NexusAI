@@ -61,6 +61,7 @@ data/*
 !data/.gitkeep
 !data/intent/
 !data/intent/**
+data/intent/eval/reports/
 chroma_db/
 uploads/
 

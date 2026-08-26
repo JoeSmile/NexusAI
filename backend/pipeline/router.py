@@ -354,6 +354,25 @@ def _chat_json_payload(final: dict) -> dict:
     return payload
 
 
+def _sse_done_payload(final: dict) -> dict:
+    """Typed SSE done frame — finish_reason 透传（Task 72 D7）。"""
+    payload: dict = {
+        "type": "done",
+        "finish_reason": final.get("finish_reason") or "llm_generated",
+        "trace_id": final.get("trace_id"),
+    }
+    snap = _execution_snapshot(final.get("trace_id"))
+    if snap is not None:
+        payload["execution_snapshot"] = snap
+    render = _render_from_final(final)
+    if render is not None:
+        payload["render"] = render.model_dump(mode="json")
+    clarification = final.get("clarification")
+    if isinstance(clarification, dict) and clarification:
+        payload["clarification"] = clarification
+    return payload
+
+
 @router.post("/chat/streaming")
 async def chat_streaming(
     request: Request,
@@ -443,9 +462,9 @@ async def chat_streaming(
 
     from backend.core.billing.context import bind_billing_from_pipeline_state
     from backend.core.harness import LLMHarness
+    from backend.pipeline.context_messages import build_llm_messages
     from backend.pipeline.nodes.conversion_hook import conversion_hook
     from backend.pipeline.nodes.llm_generate import _resolve_system_template
-    from backend.pipeline.context_messages import build_llm_messages
     from backend.pipeline.nodes.write_memory import write_memory
 
     bind_billing_from_pipeline_state(final)
@@ -495,6 +514,7 @@ async def chat_streaming(
                             yield _sse_data({"token": text})
                         await write_memory(final)
                         await conversion_hook(final)
+                    yield _sse_data(_sse_done_payload(final))
                     yield "data: [DONE]\n\n"
                 finally:
                     _release_run()
@@ -557,11 +577,12 @@ async def chat_streaming(
 
             if buffer:
                 final["response"] = buffer
-                final["finish_reason"] = "llm_generated"
+                final["finish_reason"] = harness.stream_finish_reason()
                 await write_memory(final)
                 # SSE 长路径: 图在 conversion_hook 处已结束(stream_mode),此处补记转化。
                 # 仅正常结束(含 retraction)记;abort/断连/异常已提前 return,不会到这。
                 await conversion_hook(final)
+            yield _sse_data(_sse_done_payload(final))
             yield "data: [DONE]\n\n"
 
         except asyncio.CancelledError:

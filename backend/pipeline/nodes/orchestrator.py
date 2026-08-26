@@ -786,9 +786,7 @@ async def orchestrator(state: PipelineState) -> PipelineState:
 
 
 def route_after_orchestrator(state: PipelineState) -> str:
-    """编排后：replan 超限走 model_router；澄清挂起走 write_memory；否则直接收尾。"""
+    """编排后：replan 超限走 model_router；其余终态（成功/取消/澄清/失败）走 write_memory。"""
     if state.get("finish_reason") == "routed_to_llm":
         return "model_router"
-    if state.get("finish_reason") == "clarification_pending":
-        return "write_memory"
-    return "conversion_hook"
+    return "write_memory"

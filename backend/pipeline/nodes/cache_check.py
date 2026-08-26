@@ -101,6 +101,8 @@ async def cache_check(state: PipelineState) -> PipelineState:
                 cache_hits.labels(tenant=tenant_id, cache_type="template").inc()
                 return state
 
+    # Task 72：语义缓存在 model_router（D4：需 model + intent + context_hash）。
+
     from backend.core.metrics import cache_misses
 
     cache_misses.labels(tenant=tenant_id, cache_type="pipeline").inc()

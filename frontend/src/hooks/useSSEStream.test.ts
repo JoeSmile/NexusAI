@@ -66,6 +66,19 @@ describe('SSE parse frames', () => {
     expect(onDone).toHaveBeenCalledWith({ path: 'long' })
   })
 
+  it('passes finish_reason on typed done frame (Task 72 D7)', () => {
+    const onDone = vi.fn()
+    expect(
+      dispatchSSEData(
+        '{"type":"done","finish_reason":"fallback","trace_id":"tr-1"}',
+        { onDone },
+      ),
+    ).toBe('done')
+    expect(onDone).toHaveBeenCalledWith(
+      expect.objectContaining({ finish_reason: 'fallback', trace_id: 'tr-1', path: 'long' }),
+    )
+  })
+
   it('handles tool_call and cancelled events', () => {
     const onToolCall = vi.fn()
     const onCancelled = vi.fn()

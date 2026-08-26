@@ -137,8 +137,12 @@ def process_one(xid: str, data: dict, *, deliveries: int = 1) -> float:
 
 def run_forever() -> None:
     from backend.core.memory.memory_queue import claim_stale, read_group
+    from backend.workers.heartbeat import WorkerHeartbeat
 
     logger.info("memory_worker started")
+    hb = WorkerHeartbeat("memory")
+    hb.start()
+    hb.beat()  # first beat before the (blocking) loop
     # I7：启动时先 XAUTOCLAIM 收 PEL
     try:
         stale = claim_stale(count=20)
@@ -151,6 +155,7 @@ def run_forever() -> None:
         logger.debug("startup xautoclaim skipped", exc_info=True)
 
     while True:
+        hb.beat()  # liveness progress (watchdog + Redis heartbeat)
         batch = read_group(count=10, block_ms=2000)
         if not batch:
             # 周期再扫一次 stale PEL

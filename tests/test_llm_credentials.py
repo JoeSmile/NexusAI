@@ -334,9 +334,9 @@ async def test_model_router_missing_tenant_key_raises(monkeypatch):
     state["intent"] = "default"
     state["intent_confidence"] = 0.1
 
-    with pytest.raises(NexusAIException) as ei:
-        await model_router(state)
-    assert ei.value.code == "LLM_KEY_001"
+    out = await model_router(state)
+    assert out["error_code"] == "LLM_KEY_001"
+    assert out["finish_reason"] == "error"
 
 
 @pytest.mark.asyncio

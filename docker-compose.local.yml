@@ -246,7 +246,7 @@ services:
       dockerfile: Dockerfile
     command: ["python", "-m", "backend.workers.memory_worker"]
     healthcheck:
-      test: ["CMD", "python", "-c", "import backend.workers.memory_worker"]
+      test: ["CMD", "python", "scripts/worker_liveness.py", "memory"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -271,7 +271,7 @@ services:
       dockerfile: Dockerfile
     command: ["python", "-m", "backend.workers.social_worker"]
     healthcheck:
-      test: ["CMD", "python", "-c", "import backend.workers.social_worker"]
+      test: ["CMD", "python", "scripts/worker_liveness.py", "social"]
       interval: 30s
       timeout: 5s
       retries: 3

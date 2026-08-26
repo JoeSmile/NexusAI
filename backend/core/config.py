@@ -117,6 +117,9 @@ class SecurityConfig:
     auto_publish_content: bool = False
     rate_limit_enabled: bool = True
     max_requests_per_minute: int = 60
+    # Task 72 — chat Token 配额（0=关；租户 config.token_quota 可覆盖）
+    token_quota_tpm: int = 0
+    token_quota_tpd: int = 0
     # Wave A — human JWT (separate from secret_key)
     jwt_secret: str = ""
     jwt_ttl_seconds: int = 3600

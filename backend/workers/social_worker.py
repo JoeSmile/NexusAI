@@ -52,8 +52,14 @@ def process_once(session_factory: Callable[[], Any] | None = None) -> bool:
 
 
 def run_forever() -> None:
+    from backend.workers.heartbeat import WorkerHeartbeat
+
     logger.info("social_worker starting poll=%ss", _POLL_SEC)
+    hb = WorkerHeartbeat("social")
+    hb.start()
+    hb.beat()  # first beat before the loop
     while True:
+        hb.beat()  # liveness progress (watchdog + Redis heartbeat)
         try:
             did = process_once()
             if not did:

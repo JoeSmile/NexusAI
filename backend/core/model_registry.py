@@ -226,5 +226,41 @@ def resolve_model_for_retry(base_model: str, attempt: int) -> tuple[str, str | N
     return base_model, None
 
 
+def fallback_chain(base_model: str) -> list[str]:
+    """Chat path de-escalation: same-tier aliases, then lower tiers (best→good→cheap).
+
+    Does not escalate to more expensive models (orchestrator retry keeps escalate).
+    """
+    spec = get_model(base_model)
+    if spec is None or spec.capability != "chat":
+        return []
+    reg = get_registry()
+    current_rank = _TIER_RANK.get(spec.tier, 1)
+    out: list[str] = []
+
+    same_tier = sorted(
+        s.name
+        for s in reg.values()
+        if s.enabled
+        and s.capability == "chat"
+        and s.tier == spec.tier
+        and s.name != base_model
+    )
+    out.extend(same_tier)
+
+    for tier in ("good", "cheap"):
+        if _TIER_RANK.get(tier, 0) >= current_rank:
+            continue
+        candidates = [
+            s for s in reg.values() if s.enabled and s.capability == "chat" and s.tier == tier
+        ]
+        if not candidates:
+            continue
+        name = min(candidates, key=lambda s: (float(s.cost_per_1k), s.name)).name
+        if name not in out:
+            out.append(name)
+    return out
+
+
 def list_vision_models() -> list[ModelSpec]:
     return [m for m in get_registry().values() if m.enabled and m.capability == "vision"]

@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import datetime
 from typing import TypeVar
 
@@ -18,6 +18,9 @@ T = TypeVar("T")
 
 # 仅这些状态码触发切 key
 _SWITCH_STATUS = frozenset({401, 429})
+
+# 5xx 触发换 model（不切 key）
+_MODEL_FALLBACK_STATUS = frozenset({500, 502, 503, 504})
 
 
 def classify_switchable_status(exc: BaseException) -> int | None:
@@ -41,6 +44,79 @@ def classify_switchable_status(exc: BaseException) -> int | None:
             return int(nested)
 
     return None
+
+
+def classify_model_fallback_status(exc: BaseException) -> bool:
+    """5xx / timeout → try next model (Task 72)."""
+    if isinstance(exc, TimeoutError):
+        return True
+    status = getattr(exc, "status_code", None)
+    if isinstance(status, int) and status in _MODEL_FALLBACK_STATUS:
+        return True
+    response = getattr(exc, "response", None)
+    if response is not None:
+        sc = getattr(response, "status_code", None)
+        if isinstance(sc, int) and sc in _MODEL_FALLBACK_STATUS:
+            return True
+    return False
+
+
+def should_try_next_model(exc: BaseException) -> bool:
+    """Key chain exhausted (401/429) or infra failure (5xx/timeout)."""
+    return (
+        classify_switchable_status(exc) is not None
+        or classify_model_fallback_status(exc)
+    )
+
+
+async def stream_with_key_failover(
+    keys: list[LLMKey],
+    stream_fn: Callable[[str, str], AsyncIterator[str]],
+    *,
+    repo: LLMKeyRepository | None = None,
+    tenant_id: str = "default",
+    provider: str = "default",
+) -> AsyncIterator[str]:
+    """Async generator: 401/429 → mark_key_failed → next key; other errors propagate."""
+    if not keys:
+        raise RuntimeError("无可用 LLM API Key 候选")
+
+    repository = repo or LLMKeyRepository()
+    chain = keys[:3]
+    last_err: BaseException | None = None
+
+    for i, key in enumerate(chain):
+        try:
+            async for chunk in stream_fn(key.api_key, key.base_url or ""):
+                yield chunk
+            await repository.clear_key_failure(key.id)
+            return
+        except Exception as e:
+            status = classify_switchable_status(e)
+            if status is None:
+                raise
+            await repository.mark_key_failed(key.id)
+            last_err = e
+            next_key = chain[i + 1] if i + 1 < len(chain) else None
+            if next_key is not None:
+                _audit_failover(
+                    tenant_id=tenant_id,
+                    provider=provider or key.provider,
+                    from_key_id=str(key.id),
+                    to_key_id=str(next_key.id),
+                    reason=str(status),
+                )
+                logger.warning(
+                    "LLM stream key failover: %s → %s (HTTP %s)",
+                    key.id,
+                    next_key.id,
+                    status,
+                )
+                continue
+            break
+
+    assert last_err is not None
+    raise last_err
 
 
 def _audit_failover(

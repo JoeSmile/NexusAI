@@ -37,26 +37,139 @@
 
 ## 3. 系统架构
 
+对照 `backend/pipeline/graph.py`：**外层**是 LangGraph 编译节点与条件边；**内层**是 `orchestrator` 单步循环（治理链 / 黑板 / L2）。实线 = 已落地；虚线 + `【plan】` = 设计已写、未接线或仅 stub。
+
+真双轨开关在 `model_router`（不是 L0 之后立刻分叉）。短路径仍会经过 `task_planning`（空跑）、`clarification_gate`、`build_context`。BM25+向量 RRF 用在 **capability 工具检索**，不是文档库的固定 Tier‑1 节点。
+
+`write_memory` 图边：澄清 hold、编排终态（成功/取消/失败）、短路径 Skill（含流式入口已有响应）、非流式长路径（`llm_generate` 之后）。流式长路径仍由 SSE 结束后补跑，避免图内写入空回复。
+
 ```mermaid
 flowchart TD
-    U["用户入口<br/>Web / SSE / API"] --> GATE["闸门层<br/>auth → rate limit → cache"]
-    GATE --> GI["输入护栏<br/>注入检测 / PII 脱敏"]
-    GI --> L0["L0 意图识别<br/>BERT 8 类 · 三档置信度"]
-    L0 --> TW{"双轨判定"}
-    TW -- "高置信 + 绑定 skill" --> SP["短路径 · skill 话术"]
-    TW -- "复杂任务" --> MEM["记忆注入<br/>hot / warm / cold + coref"]
-    MEM --> QR["QueryRewrite<br/>诉求枚举 + 指代消解"]
-    QR --> CL{"槽位缺失?"}
-    CL -- "是" --> CLAR["澄清机制<br/>SSE 卡片 · 续跑"]
-    CL -- "否" --> PIR["PlanIR<br/>步骤契约 + depends_on"]
-    CLAR --> PIR
-    PIR --> ORCH["Orchestrator<br/>并行组 · on_fail · L2 漂移"]
-    ORCH --> GOV["治理链<br/>6 节点统一入口"]
-    GOV --> EX["执行<br/>16 工具 / 8 Skill / MCP"]
-    EX --> BB["黑板 Blackboard"]
-    BB --> AGG["聚合生成"]
-    AGG --> VO["输出校验 + 审计落库"]
-    OBS["LangFuse · TraceConsole"] -.-> U
+    %% ========== 外层：LangGraph 编译图 ==========
+    subgraph OUTER["外层 · LangGraph graph.py"]
+        U["用户入口<br/>🔹 Web / SSE / API<br/>🔹 FastAPI 先 verify_api_key + chat:write<br/>🔹 流式与同步共用 compiled_graph"]
+        AUTH["auth_check<br/>🔹 注入 tenant/user/role 到 state<br/>🔹 真鉴权在 Depends，本节点不验 key"]
+        PRE["preprocess<br/>🔹 NFKC 归一化 + query_hash<br/>🔹 deny-list GATE / 超长截断<br/>🔹 内容工厂触发词 → cache_bypass"]
+        RL["rate_limiter<br/>🔹 租户令牌桶<br/>🔹 超限 RATE_001 抛错"]
+        CACHE["cache_check<br/>🔹 exact:tid:uid:hash 精确命中<br/>🔹 fingerprint 模板命中<br/>🔹 hit → END，跳过后续节点"]
+        GI["guardrails_input<br/>🔹 prompt 注入检测（拦截）<br/>🔹 PII 脱敏改写 message<br/>🔹 不改 query_hash（缓存锚定原意）"]
+        LOAD["load_memory<br/>🔹 hot = chat_messages 本会话最近轮<br/>🔹 warm = user_memories 画像/偏好 kv<br/>🔹 cold = cold_memories 会话摘要"]
+        L0["analyze_parallel · L0<br/>🔹 BERT 8 类 + 规则降级<br/>🔹 高/中/低三档置信度<br/>🔹 每轮一次，规划执行中不重跑"]
+        TP["task_planning<br/>🔹 短路径空跑，不调规划 LLM<br/>🔹 QueryRewrite+PlanIR 同一次调用<br/>🔹 coref 指代表会话级合并/漂移失效<br/>🔹 BM25+向量 RRF 检索可见 capability"]
+        CLAR["clarification_gate<br/>🔹 槽位缺失 / 低置信 / rewrite 标记 / 高危缺参<br/>🔹 hold → SSE 澄清卡片，本轮结束"]
+        CTX["build_context<br/>🔹 拼 warm/cold 进 system 记忆块<br/>🔹 RAG sanitize + 角色漂移检测<br/>🔹 Mode A 直装全文 / Mode B 摘要+id"]
+        EXP["experiment_hook<br/>🔹 A/B 用户哈希分流<br/>🔹 可覆盖 model / prompt_prefix"]
+        ORCH["orchestrator<br/>🔹 有 PlanIR 且 ORCHESTRATOR_ENABLED<br/>🔹 短路径/无计划/纯流式默认跳过<br/>🔹 终态（成功/取消/澄清/失败）→ write_memory"]
+        ROUTER["model_router · 真双轨<br/>🔹 短：greeting/after_sales 且 ≥0.85 绑 Skill → write_memory<br/>🔹 长：ModelRegistry 选模 + BYOK 凭证<br/>🔹 短路径在此执行 Skill（不做图级跳过）"]
+        LLM["llm_generate<br/>🔹 仅非流式长路径进此节点<br/>🔹 Harness + failover<br/>🔹 messages = 角色+记忆块 + hot 多轮 + user"]
+        GOUT["guardrails_output<br/>🔹 长度截断 / 敏感拦截 / 学员名脱敏<br/>🔹 短路径跳过本节点，在 router 内补脱敏"]
+        WM["write_memory<br/>🔹 write_turn 写本轮对话<br/>🔹 规则抽取 → warm（同步/入队）<br/>🔹 maybe_cold_summarize 达阈值写摘要<br/>🔹 mock 下写 exact/template 缓存 + audit"]
+        CONV["conversion_hook<br/>🔹 A/B 转化事件<br/>🔹 图的统一出口"]
+        SSE["SSE 旁路 · router.py<br/>🔹 流式：图在 router 后直达 CONV<br/>🔹 token 由 LLMHarness.stream 另走<br/>🔹 复杂任务可异步补规划 ≤8s"]
+        RESP["返回用户<br/>🔹 JSON ChatResponse 或 SSE token 流"]
+    end
+
+    U --> AUTH --> PRE
+    PRE -->|GATE 拦截| RESP
+    PRE --> RL --> CACHE
+    CACHE -->|hit| RESP
+    CACHE -->|miss| GI
+    GI -->|拦截| RESP
+    GI --> LOAD --> L0 --> TP --> CLAR
+    CLAR -->|hold| WM
+    CLAR -->|continue| CTX --> EXP
+    EXP -->|有 PlanIR| ORCH
+    EXP -->|无计划或短路径标记| ROUTER
+    ORCH -->|orchestrated / 取消 / 失败终态| WM
+    ORCH -->|失败/replan 超限降级| ROUTER
+    ROUTER -->|Skill 短路径| WM
+    ROUTER -->|长路径 非流式| LLM
+    ROUTER -->|长路径 流式| SSE
+    LLM --> GOUT --> WM --> CONV
+    SSE -.->|流结束后补跑| WM
+    WM --> CONV --> RESP
+
+    %% ========== 内层：编排单步 ==========
+    subgraph INNER["内层 · Orchestrator 单步循环"]
+        DAG["DAG 调度<br/>🔹 topological_sort<br/>🔹 无依赖并行组 asyncio.gather"]
+        SLOT["槽位门 slot_gate<br/>🔹 缺必填 → 澄清 hang<br/>🔹 spawn 子 Agent 同样过槽位"]
+        GOV["治理链 · invoke 统一入口<br/>🔹 policy 子 Agent 高危拦截<br/>🔹 budget 配额/限流<br/>🔹 approval stub（UI【plan】）<br/>🔹 IAM 权限串<br/>🔹 audit 写 DecisionExplain"]
+        LAZY["Mode B lazy-load<br/>🔹 按 cold id / warm key 回读正文<br/>🔹 不是 DocID 白名单二次向量检索"]
+        EXE["异构执行<br/>🔹 Tool 原子工具<br/>🔹 Skill 话术技能<br/>🔹 SubAgent spawn（最小权限）<br/>🔹 MCP 外部工具"]
+        BB["Blackboard 运行时<br/>🔹 结构化 fact≤800 字 / topic 注册表<br/>🔹 容量 50 + TTL + 低置信淘汰<br/>🔹 冲突预处理；当前在 pipeline state 内存"]
+        L2["L2 漂移<br/>🔹 detect_intent_drift<br/>🔹 偏离 → replan 剩余步骤，最多 2 次"]
+        LOOP["LoopGuard<br/>🔹 连续重复调用判死循环<br/>🔹 单会话步数上限"]
+        FAIL["on_fail 四语义<br/>🔹 retry / skip / replan / fail"]
+        AGG["聚合生成<br/>🔹 读黑板结构化事实 + step_results<br/>🔹 _synthesize_response 面向用户"]
+    end
+
+    ORCH --> DAG --> SLOT --> GOV --> LAZY --> EXE --> BB
+    BB -.->|回填下一步 params| DAG
+    EXE --> L2
+    EXE --> LOOP
+    EXE --> FAIL
+    L2 -->|漂移 replan| DAG
+    FAIL -->|replan| DAG
+    BB --> AGG
+    AGG --> WM
+
+    %% ========== 记忆写：请求内轻量 + 队列 ==========
+    subgraph MEMQ["记忆写路径 · 不阻塞主返回"]
+        EXTR["规则抽取 extractor<br/>🔹 每轮轻抽：记住/偏好/身份<br/>🔹 cold 阈值触发时会话级聚合"]
+        SYNC["同步写 warm<br/>🔹 identity / preference / fact / todo / pending"]
+        Q["Redis Streams mem:write<br/>🔹 db=1，与缓存/限流 db0 隔离<br/>🔹 不是 Arq；积压则同步兜底 degraded"]
+        WK["memory_worker 独立进程<br/>🔹 XREADGROUP + 启动 XAUTOCLAIM<br/>🔹 落 user_memories + 可选 embedding<br/>🔹 tombstone / 遗忘权 fail-closed"]
+        COLDJ["maybe_cold_summarize<br/>🔹 会话消息达阈值 → 规则摘要写 cold<br/>🔹 在 write_memory 内同步触发，非 cron"]
+    end
+
+    WM --> EXTR
+    EXTR --> SYNC
+    EXTR --> Q --> WK
+    WM --> COLDJ
+
+    %% ========== 存储（以代码表为准） ==========
+    CHAT[(chat_messages = hot<br/>全量对话不可删<br/>prompt 展开最近 N 轮)]
+    WARM[(user_memories = warm<br/>kv 画像/偏好/事实<br/>可选 pgvector embedding)]
+    COLD[(cold_memories = cold<br/>会话规则摘要)]
+    CACHET[(cache_entries<br/>exact 300s / template 1h)]
+    AUD[(audit_logs 加密<br/>chat + 治理 DecisionExplain)]
+    RAG[(RAG 知识库分片<br/>经 rag.search capability 调用<br/>不是管线固定检索节点)]
+
+    LOAD --> CHAT
+    LOAD --> WARM
+    LOAD --> COLD
+    WM --> CHAT
+    SYNC --> WARM
+    WK --> WARM
+    COLDJ --> COLD
+    WM --> CACHET
+    WM --> AUD
+    GOV --> AUD
+    LAZY -.-> WARM
+    LAZY -.-> COLD
+    EXE -.->|rag.search / memory.search| RAG
+
+    %% ========== plan ==========
+    subgraph PLAN["【plan】设计已写、未接线或仅 stub"]
+        P1["审批真接线<br/>🔹 approval_requests UI<br/>🔹 现治理链 requires_approval 仅 stub deny"]
+        P2["黑板 Run 结束持久化到审计库<br/>🔹 非独立 blackboard 业务表<br/>🔹 当前只在 state + 审计 span"]
+        P3["记忆 BM25 summary+tags 倒排<br/>🔹 统一档位 cron：hot→warm→cold<br/>🔹 现冷摘要靠消息条数阈值，无档位 cron"]
+        P4["子任务 RAG 限定 Tier-1 DocID 白名单<br/>🔹 现 RAG 为 capability 全库/租户检索"]
+        P5["对等协作档③ / 图快照持久化可动画回放"]
+    end
+
+    BB -.-> P2
+    GOV -.-> P1
+    LAZY -.-> P4
+    COLDJ -.-> P3
+
+    OBS["LangFuse @observe<br/>🔹 各图节点 span：耗时 / token / 中间元数据<br/>🔹 短路径可按配置降采样"]
+    OBS -.-> AUTH
+    OBS -.-> L0
+    OBS -.-> TP
+    OBS -.-> ORCH
+    OBS -.-> LLM
+    OBS -.-> WK
 ```
 
 ---

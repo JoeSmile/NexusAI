@@ -105,10 +105,12 @@ async def llm_generate(state: PipelineState) -> PipelineState:
     state["pipeline_latency_ms"] = result.latency_ms
 
     if not result.success:
-        state["response"] = get_fallback("zh") if result.error != "COST_001" else str(
-            result.output
-        )
-        state["finish_reason"] = result.error or "error"
+        if result.error == "COST_001":
+            state["response"] = str(result.output or "")
+            state["finish_reason"] = result.error or "error"
+        else:
+            state["response"] = get_fallback("zh")
+            state["finish_reason"] = "fallback"
         state["error_code"] = result.error or "LLM_002"
     else:
         state["response"] = str(result.output or "")

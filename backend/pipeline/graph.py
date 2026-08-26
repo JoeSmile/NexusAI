@@ -170,6 +170,7 @@ def build_pipeline():
         {
             "conversion_hook": "conversion_hook",
             "llm_generate": "llm_generate",
+            "write_memory": "write_memory",
         },
     )
 

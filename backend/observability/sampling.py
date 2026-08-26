@@ -14,6 +14,7 @@ _SHORT_FINISH = frozenset(
     {
         "skill_executed",
         "cache_hit",
+        "semantic_cache_hit",
         "PENDING_APPROVAL",
         "rate_limited",
         "blocked",

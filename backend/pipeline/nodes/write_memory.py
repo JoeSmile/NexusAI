@@ -148,6 +148,13 @@ async def write_memory(state: PipelineState) -> PipelineState:
                 "write_memory: cache_bypass; skip exact/template cache write"
             )
 
+        try:
+            from backend.pipeline.cache.semantic_cache import upsert as semantic_upsert
+
+            semantic_upsert(state, response or "")
+        except Exception as exc:
+            logger.debug("semantic_cache upsert skipped: %s", exc)
+
         session.execute(
             text("""
                 INSERT INTO audit_logs
