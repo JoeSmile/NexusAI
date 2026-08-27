@@ -16,6 +16,7 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD:-nexusai_redis}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - LLM_API_KEY=${LLM_API_KEY:-${OPENAI_API_KEY:-}}
+      - UVICORN_WORKERS=2
     volumes:
       - ./logs:/app/logs
       - ./uploads:/app/uploads

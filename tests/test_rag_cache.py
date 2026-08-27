@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.core.errors import NexusAIException, ErrorCode
+from backend.core.errors import ErrorCode, NexusAIException
 from backend.modules.rag import cache as rag_cache
 
 
@@ -121,8 +121,8 @@ def test_l2_same_text_one_api_call(fake_redis, monkeypatch):
     a = embed_text("Hello World")
     b = embed_text("hello   world")
     assert calls["n"] == 1
-    assert len(a) == 1536
-    assert a[:768] == pytest.approx(b[:768])
+    assert len(a) == emb_mod.EMBED_DIM
+    assert a == pytest.approx(b)
     assert emb_mod._last_embed_mode == "cache"  # 第二次为 L2 命中,非真实 API 调用
 
 
@@ -299,6 +299,7 @@ def test_miss_audit_carries_real_cost(fake_redis, monkeypatch):
     monkeypatch.setattr(
         "backend.core.audit.write_audit_sync", lambda rec: records.append(rec)
     )
+    monkeypatch.setattr("backend.core.cost_manager._price", lambda _n: 0.0001)
 
     def invoke(prompt):
         return SimpleNamespace(content="答案", metadata={"cost": 0.00042})

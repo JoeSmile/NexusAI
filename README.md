@@ -50,7 +50,7 @@ flowchart TD
         U["用户入口<br/>🔹 Web / SSE / API<br/>🔹 FastAPI 先 verify_api_key + chat:write<br/>🔹 流式与同步共用 compiled_graph"]
         AUTH["auth_check<br/>🔹 注入 tenant/user/role 到 state<br/>🔹 真鉴权在 Depends，本节点不验 key"]
         PRE["preprocess<br/>🔹 NFKC 归一化 + query_hash<br/>🔹 deny-list GATE / 超长截断<br/>🔹 内容工厂触发词 → cache_bypass"]
-        RL["rate_limiter<br/>🔹 租户令牌桶<br/>🔹 超限 RATE_001 抛错"]
+        RL["rate_limiter<br/>🔹 Redis 分钟桶 rl:ep:chat（跨实例共享）<br/>🔹 另检 TPM/TPD；超限 RATE_001"]
         CACHE["cache_check<br/>🔹 exact:tid:uid:hash 精确命中<br/>🔹 fingerprint 模板命中<br/>🔹 hit → END，跳过后续节点"]
         GI["guardrails_input<br/>🔹 prompt 注入检测（拦截）<br/>🔹 PII 脱敏改写 message<br/>🔹 不改 query_hash（缓存锚定原意）"]
         LOAD["load_memory<br/>🔹 hot = chat_messages 本会话最近轮<br/>🔹 warm = user_memories 画像/偏好 kv<br/>🔹 cold = cold_memories 会话摘要"]

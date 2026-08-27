@@ -15,6 +15,7 @@ import os
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 
@@ -49,10 +50,15 @@ def _mock_enabled() -> bool:
 
 
 def _safe_base_url(raw: str, *, spec_id: str) -> str:
+    """SSRF-check host, but keep path prefix (e.g. https://api.dify.ai/v1)."""
     try:
-        return validate_base_url(raw)
+        validate_base_url(raw)
     except UrlValidationError as exc:
         raise CapabilityUpstreamError(message=exc.code, detail=spec_id) from exc
+    parsed = urlparse(raw.strip())
+    origin = f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+    path = (parsed.path or "").rstrip("/")
+    return f"{origin}{path}"
 
 
 @dataclass(frozen=True)

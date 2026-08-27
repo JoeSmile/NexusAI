@@ -541,7 +541,7 @@ async def chat_streaming(
             temperature=final.get("llm_temperature")
             if final.get("llm_temperature") is not None
             else 0.7,
-        ).__aiter__()
+        )
 
         try:
             while True:
@@ -601,6 +601,7 @@ async def chat_streaming(
             )
             yield "data: [DONE]\n\n"
         finally:
+            await token_iter.aclose()
             _release_run()
 
     return StreamingResponse(

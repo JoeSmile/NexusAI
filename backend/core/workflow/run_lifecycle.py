@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import hashlib
 import logging
 import uuid
 from datetime import datetime
@@ -40,6 +41,40 @@ from backend.core.workflow.runner_shared import (
 from backend.database.pgvector_session import Workflow, WorkflowRun, WorkflowRunNode, get_pg_session
 
 logger = logging.getLogger(__name__)
+
+# Session-level lock: 崩溃后连接断开，PG 自动释放，不永久挂起。
+_ADVISORY_LOCK_NS = b"nexusai:execute_run:"
+
+
+def run_advisory_lock_key(run_id: str) -> int:
+    """Stable positive int8 for ``pg_try_advisory_lock`` from ``run_id``."""
+    digest = hashlib.sha256(_ADVISORY_LOCK_NS + run_id.encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], "big", signed=False) & 0x7FFFFFFFFFFFFFFF
+
+
+def _try_execute_lock(session: Session, run_id: str) -> bool:
+    bind = session.get_bind()
+    if bind is not None and bind.dialect.name == "sqlite":
+        return True
+    key = run_advisory_lock_key(run_id)
+    try:
+        return bool(
+            session.execute(text("SELECT pg_try_advisory_lock(:k)"), {"k": key}).scalar()
+        )
+    except Exception:
+        logger.debug("pg_try_advisory_lock unavailable; skip run=%s", run_id)
+        return True
+
+
+def _unlock_execute(session: Session, run_id: str) -> None:
+    bind = session.get_bind()
+    if bind is not None and bind.dialect.name == "sqlite":
+        return
+    key = run_advisory_lock_key(run_id)
+    try:
+        session.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": key})
+    except Exception:
+        logger.debug("pg_advisory_unlock failed run=%s", run_id)
 
 
 def start_run(
@@ -183,88 +218,94 @@ async def execute_run(run_id: str) -> None:
     sf = get_pg_session()
     try:
         with sf.Session() as session:
-            run = session.query(WorkflowRun).filter(WorkflowRun.id == run_id).one_or_none()
-            if run is None:
+            if not _try_execute_lock(session, run_id):
+                logger.debug("execute_run lock busy run=%s", run_id)
                 return
-            # 并发护栏 + CAS pending → running（子 run 豁免根配额）
-            if run.parent_run_id is None and (
-                _count_inflight_roots(
-                    session,
-                    tenant_id=run.tenant_id,
-                    acting_user_id=run.acting_user_id,
-                )
-                >= MAX_RUNNING_ROOT_RUNS
-            ):
-                run.status = "failed"
-                run.error_code = ErrorCode.RUN_CONCURRENCY_LIMIT
-                run.error_message = "too_many_running_runs"
-                run.finished_at = datetime.utcnow()
-                session.commit()
-                return  # 后台兜底:直接终态,不 raise(调用方已不可见)
-            res = session.execute(
-                text(
-                    "UPDATE workflow_runs SET status='running', updated_at=:now "
-                    "WHERE id=:id AND status='pending'"
-                ),
-                {"id": run_id, "now": datetime.utcnow()},
-            )
-            if res.rowcount != 1:
-                # CAS 失败:另一个 executor 已持有(或 run 已终态)——不是失败,
-                # 直接退出;绝不能走 _fail_run(会把胜者的 running 标 failed + 写错误审计)
-                return
-            session.commit()
-            run = session.query(WorkflowRun).filter(WorkflowRun.id == run_id).one()
-
             try:
-                from backend.core.workflow.scheduler import validate_grants_before_execute
+                run = session.query(WorkflowRun).filter(WorkflowRun.id == run_id).one_or_none()
+                if run is None:
+                    return
+                # 并发护栏 + CAS pending → running（子 run 豁免根配额）
+                if run.parent_run_id is None and (
+                    _count_inflight_roots(
+                        session,
+                        tenant_id=run.tenant_id,
+                        acting_user_id=run.acting_user_id,
+                    )
+                    >= MAX_RUNNING_ROOT_RUNS
+                ):
+                    run.status = "failed"
+                    run.error_code = ErrorCode.RUN_CONCURRENCY_LIMIT
+                    run.error_message = "too_many_running_runs"
+                    run.finished_at = datetime.utcnow()
+                    session.commit()
+                    return  # 后台兜底:直接终态,不 raise(调用方已不可见)
+                res = session.execute(
+                    text(
+                        "UPDATE workflow_runs SET status='running', updated_at=:now "
+                        "WHERE id=:id AND status='pending'"
+                    ),
+                    {"id": run_id, "now": datetime.utcnow()},
+                )
+                if res.rowcount != 1:
+                    # CAS 失败:另一个 executor 已持有(或 run 已终态)——不是失败,
+                    # 直接退出;绝不能走 _fail_run(会把胜者的 running 标 failed + 写错误审计)
+                    return
+                session.commit()
+                run = session.query(WorkflowRun).filter(WorkflowRun.id == run_id).one()
 
-                validate_grants_before_execute(
+                try:
+                    from backend.core.workflow.scheduler import validate_grants_before_execute
+
+                    validate_grants_before_execute(
+                        session,
+                        tenant_id=run.tenant_id,
+                        workflow_id=run.workflow_id,
+                        acting_user_id=run.acting_user_id,
+                    )
+                    session.commit()
+                except Exception as exc:
+                    # I3 拍板：不得吞异常（fail-closed）
+                    logger.exception("grant validate at execute failed run=%s", run_id)
+                    _fail_run(
+                        run_id,
+                        error_code=ErrorCode.AUTH_INSUFFICIENT_PERMISSIONS,
+                        error_message=f"grant_validate_failed:{exc!s}"[:500],
+                    )
+                    return
+
+                tenant, org_scope = rebuild_tenant_context(
                     session,
                     tenant_id=run.tenant_id,
-                    workflow_id=run.workflow_id,
                     acting_user_id=run.acting_user_id,
+                    credential_kind=run.credential_kind,
                 )
+
+                ir = WorkflowIR.model_validate(dict(run.ir_snapshot or {}))
+                await _execute_ir_ready_driven(
+                    session,
+                    run=run,
+                    ir=ir,
+                    tenant=tenant,
+                    org_scope=org_scope,
+                )
+
+                run.status = "succeeded"
+                run.finished_at = datetime.utcnow()
+                run.updated_at = datetime.utcnow()
                 session.commit()
-            except Exception as exc:
-                # I3 拍板：不得吞异常（fail-closed）
-                logger.exception("grant validate at execute failed run=%s", run_id)
-                _fail_run(
-                    run_id,
-                    error_code=ErrorCode.AUTH_INSUFFICIENT_PERMISSIONS,
-                    error_message=f"grant_validate_failed:{exc!s}"[:500],
+                _audit(
+                    tenant_id=run.tenant_id,
+                    user_id=run.acting_user_id,
+                    action="workflow.run.succeeded",
+                    credential_kind=run.credential_kind,
+                    run_id=run.id,
                 )
-                return
-
-            tenant, org_scope = rebuild_tenant_context(
-                session,
-                tenant_id=run.tenant_id,
-                acting_user_id=run.acting_user_id,
-                credential_kind=run.credential_kind,
-            )
-
-            ir = WorkflowIR.model_validate(dict(run.ir_snapshot or {}))
-            await _execute_ir_ready_driven(
-                session,
-                run=run,
-                ir=ir,
-                tenant=tenant,
-                org_scope=org_scope,
-            )
-
-            run.status = "succeeded"
-            run.finished_at = datetime.utcnow()
-            run.updated_at = datetime.utcnow()
-            session.commit()
-            _audit(
-                tenant_id=run.tenant_id,
-                user_id=run.acting_user_id,
-                action="workflow.run.succeeded",
-                credential_kind=run.credential_kind,
-                run_id=run.id,
-            )
-            _notify_run_done(run, status="succeeded")
-            if run.parent_run_id:
-                wake_parent(run.parent_run_id, run.parent_node_id or "", child_run_id=run.id)
+                _notify_run_done(run, status="succeeded")
+                if run.parent_run_id:
+                    wake_parent(run.parent_run_id, run.parent_node_id or "", child_run_id=run.id)
+            finally:
+                _unlock_execute(session, run_id)
     except RunWaitingChild:
         return
     except RunSuspended:

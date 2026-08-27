@@ -55,6 +55,7 @@ services:
         "8000",
         "--reload",
       ]
+    # --reload 强制 1 worker；勿在本文件设 UVICORN_WORKERS>1
     restart: unless-stopped
     networks:
       - nexusai_local

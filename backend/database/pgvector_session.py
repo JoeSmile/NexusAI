@@ -29,6 +29,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import declarative_base, sessionmaker
 
+from backend.database.pg_pool import pg_engine_kwargs
+
 Base = declarative_base()
 
 # BigInteger PK on PG; Integer+autoincrement on SQLite (unit tests)
@@ -823,7 +825,7 @@ class PGVectorSession:
             from backend.database.models import _resolve_database_url
 
             db_url = _resolve_database_url()
-        self.engine = create_engine(db_url, pool_pre_ping=True)
+        self.engine = create_engine(db_url, **pg_engine_kwargs(db_url))
         self.Session = sessionmaker(bind=self.engine)
 
     def init_db(self):

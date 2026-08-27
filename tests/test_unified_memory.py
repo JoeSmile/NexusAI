@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -315,6 +315,9 @@ async def test_maybe_cold_summarize_triggers_on_threshold() -> None:
 
         def add(self, obj) -> None:  # noqa: ANN001
             obj.id = 99
+
+        def flush(self) -> None:
+            return None
 
         def commit(self) -> None:
             return None

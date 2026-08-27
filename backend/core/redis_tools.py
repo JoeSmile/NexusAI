@@ -76,6 +76,17 @@ def resolve_redis_url(default: str = "redis://localhost:6379") -> str:
     return default
 
 
+def resolve_ratelimit_redis_url() -> str:
+    """限流/并发槽 Redis：``REDIS_RATELIMIT_URL`` 优先，未设则回退 ``REDIS_URL``。
+
+    禁止指向 langfuse-redis。记忆队列保持 db1，不走本函数。
+    """
+    extra = (os.getenv("REDIS_RATELIMIT_URL") or "").strip()
+    if extra:
+        return extra
+    return resolve_redis_url()
+
+
 SyncSlot = tuple[bool, str | int | None]
 
 
@@ -112,6 +123,43 @@ def get_sync_redis(*, decode_responses: bool = False, db: str | int | None = Non
     except Exception as e:
         logger.warning("Redis sync 不可用(降级): %s", e)
         _sync_failed[slot] = time.monotonic()
+        return None
+
+
+_rl_clients: dict[tuple[bool, str], Any] = {}
+_rl_failed: dict[tuple[bool, str], float] = {}
+
+
+def get_ratelimit_sync_redis(*, decode_responses: bool = True) -> Any | None:
+    """并发槽 / 限流热路径客户端。
+
+    未设 ``REDIS_RATELIMIT_URL`` 时复用 ``get_sync_redis``（同一实例 db0）。
+    独立 URL 时 ``socket_timeout`` 150ms，超时不在本函数内重试。
+    """
+    extra = (os.getenv("REDIS_RATELIMIT_URL") or "").strip()
+    if not extra:
+        return get_sync_redis(decode_responses=decode_responses)
+    slot = (decode_responses, extra)
+    if not _should_retry(_rl_failed, slot):
+        return None
+    if slot in _rl_clients:
+        return _rl_clients[slot]
+    try:
+        import redis
+
+        client = redis.Redis.from_url(
+            extra,
+            decode_responses=decode_responses,
+            socket_connect_timeout=0.15,
+            socket_timeout=0.15,
+        )
+        client.ping()
+        _rl_clients[slot] = client
+        _rl_failed.pop(slot, None)
+        return client
+    except Exception as e:
+        logger.warning("Redis ratelimit 不可用(降级): %s", e)
+        _rl_failed[slot] = time.monotonic()
         return None
 
 
@@ -171,6 +219,13 @@ def close_sync_redis() -> None:
             pass
     _sync_clients.clear()
     _sync_failed.clear()
+    for client in list(_rl_clients.values()):
+        try:
+            client.close()
+        except Exception:
+            pass
+    _rl_clients.clear()
+    _rl_failed.clear()
 
 
 def reset_redis_clients_for_tests() -> None:
@@ -194,6 +249,7 @@ CACHE_KEY_DOMAINS: dict[str, str] = {
     "ctx": "能力/上下文缓存 (预留)",
     "rl": "限流桶 (rl:cap / rl:rag / …)",
     "mem": "记忆热缓存 (mem:bundle 读结果 TTL 30s)",
+    "llm": "LLM 并发 in-flight (llm:in-flight:global / llm:in-flight:{hash})",
 }
 
 

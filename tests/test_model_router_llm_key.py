@@ -27,6 +27,7 @@ async def test_missing_credential_sets_llm_key_001(monkeypatch) -> None:
     state = make_initial_state("t1", "u1", "s1", "hello")
     state["intent"] = "default"
     state["intent_confidence"] = 0.1
+    state["preferred_model"] = "deepseek-v4-flash"
     out = await model_router(state)
     assert out["error_code"] == "LLM_KEY_001"
     assert out["finish_reason"] == "error"
@@ -67,6 +68,7 @@ async def test_credential_ok_still_routes(monkeypatch) -> None:
     )
     state = make_initial_state("t1", "u1", "s1", "hello")
     state["intent_confidence"] = 0.1
+    state["preferred_model"] = "deepseek-v4-flash"
     out = await model_router(state)
     assert out["finish_reason"] == "routed_to_llm"
     assert out["llm_api_key"] == "sk-test"

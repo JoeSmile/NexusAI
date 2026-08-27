@@ -135,6 +135,10 @@ async def test_non_leaf_child_uses_real_invoke(tenant: TenantContext) -> None:
             "backend.core.capability.registry.get_capability_registry",
             return_value=reg,
         ),
+        patch(
+            "backend.core.capability.invoke.get_capability_registry",
+            return_value=reg,
+        ),
         patch("backend.core.capability.governance._redis", return_value=None),
         patch("backend.core.audit.write_audit_sync"),
         patch(

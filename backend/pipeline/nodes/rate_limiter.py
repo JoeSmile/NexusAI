@@ -1,4 +1,4 @@
-"""速率限制节点 — 桶令牌检查"""
+"""速率限制节点 — Redis 分钟桶 + Token TPM/TPD 预检"""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from backend.pipeline.state import PipelineState
 
 @observe(name="pipeline.rate_limiter")
 async def rate_limiter(state: PipelineState) -> PipelineState:
-    """桶令牌 + Token TPM/TPD 预检 — 超出抛 RATE_001"""
+    """租户 QPS（Redis 分钟桶）+ Token TPM/TPD 预检 — 超出抛 RATE_001"""
     tenant_id = state["tenant_id"]
     if not check_rate_limit(tenant_id):
         state["finish_reason"] = "rate_limited"

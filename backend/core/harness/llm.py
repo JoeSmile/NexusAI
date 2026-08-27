@@ -217,7 +217,7 @@ class LLMHarness(Harness):
 
         from backend.core.llm_concurrency import llm_slot
 
-        async with llm_slot():
+        async with llm_slot(base_url=base_url):
             async def _call():
                 provider = get_llm_provider()
                 prompt = "\n".join(m.get("content", "") for m in messages)
@@ -306,7 +306,7 @@ class LLMHarness(Harness):
         """真流式：优先 OpenAI-compatible astream；否则 mock/降级切片。"""
         from backend.core.llm_concurrency import llm_slot
 
-        async with llm_slot():
+        async with llm_slot(base_url=base_url):
             self._stream_finish_reason = "llm_generated"
             async for chunk in self._stream_unlocked(
                 model, messages, tenant_id, api_key, base_url, **kwargs

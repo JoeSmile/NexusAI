@@ -534,12 +534,13 @@ async def create_llm_key(
     allowed_models = _normalize_single_model(
         model=req.model, allowed_models=req.allowed_models
     )
-    base_url = _guard_base_url((req.base_url or "").strip())
-    if not base_url:
+    raw_url = (req.base_url or "").strip()
+    if not raw_url:
         raise HTTPException(
             status_code=400,
             detail={"code": "REQ_001", "message": "base_url_required"},
         )
+    base_url = _guard_base_url(raw_url)
     if not (req.api_key_plaintext or "").strip():
         raise HTTPException(
             status_code=400,
@@ -647,13 +648,13 @@ async def patch_llm_key(
         )
 
     if req.base_url is not None:
-        url = _guard_base_url(req.base_url.strip())
-        if not url:
+        raw_url = req.base_url.strip()
+        if not raw_url:
             raise HTTPException(
                 status_code=400,
                 detail={"code": "REQ_001", "message": "base_url_required"},
             )
-        params["url"] = url
+        params["url"] = _guard_base_url(raw_url)
 
     if req.key_alias is not None:
         alias = req.key_alias.strip()

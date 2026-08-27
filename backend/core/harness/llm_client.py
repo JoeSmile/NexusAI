@@ -119,7 +119,7 @@ def complete_via_provider(
     """按 LLM_PROVIDER 完成一次文本生成（同步）。openai/record 支持 429/401 切 key。"""
     from backend.core.llm_concurrency import llm_slot_sync
 
-    with llm_slot_sync():
+    with llm_slot_sync(base_url=base_url):
         return _complete_via_provider_unlocked(
             model,
             messages,

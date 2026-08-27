@@ -10,6 +10,12 @@ os.environ.setdefault("JWT_SECRET", "test-jwt-secret-wave-a-min-32-bytes!!")
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def _ssrf_default_deny(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Unit tests default-deny loopback; opt in with SSRF_ALLOW_LOCAL_DEV in the test."""
+    monkeypatch.delenv("SSRF_ALLOW_LOCAL_DEV", raising=False)
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _quiet_langfuse_unless_requested():
     if os.getenv("LANGFUSE_IN_TESTS", "").strip() in {"1", "true", "yes"}:

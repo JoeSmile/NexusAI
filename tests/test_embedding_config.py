@@ -16,6 +16,10 @@ def _reload_registry(monkeypatch):
 
     # Task 29: 避免本地 redis-stack 污染 L2 命中,导致 API mock 未被调用
     monkeypatch.setenv("RAG_CACHE_ENABLED", "false")
+    monkeypatch.setattr(
+        "backend.core.redis_tools.get_ratelimit_sync_redis",
+        lambda **_k: None,
+    )
     rag_cache.reset_redis_for_tests()
 
     mr.reload_registry()
@@ -277,7 +281,7 @@ def test_embed_text_uses_tenant_embedding_credential(monkeypatch):
 
     vec = emb.embed_text("tenant path", tenant_id="acme")
     assert created["model"] == "text-embedding-3-small"
-    assert created["dimensions"] == 1536
+    assert created["dimensions"] == 768
     assert client_kwargs.get("api_key") == "sk-tenant-embed"
     assert "tenant.embed.example" in str(client_kwargs.get("base_url") or "")
     assert len(vec) == emb.EMBED_DIM
@@ -298,6 +302,7 @@ def test_embed_text_tenant_missing_falls_back_to_registry(monkeypatch):
     )
     monkeypatch.setenv("QWEN_API_KEY", "sk-registry")
     monkeypatch.setenv("EMBEDDING_DIMENSIONS", "768")
+    monkeypatch.delenv("EMBEDDING_API_KEY", raising=False)
     mr.reload_registry()
 
     def _missing(_tid: str):

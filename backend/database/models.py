@@ -89,15 +89,12 @@ def init_database(url: str | None = None) -> None:
 
     resolved = url or _resolve_database_url()
     _database_url = resolved
-    kwargs: dict = {"echo": False}
+    from backend.database.pg_pool import pg_engine_kwargs
+
+    kwargs = pg_engine_kwargs(resolved)
     if resolved.startswith("sqlite"):
-        kwargs["connect_args"] = {"check_same_thread": False}
         print(f"✓ 使用 SQLite 数据库: {resolved}")
     else:
-        kwargs["pool_pre_ping"] = True
-        kwargs["pool_size"] = int(os.getenv("DB_POOL_SIZE", "10"))
-        kwargs["max_overflow"] = int(os.getenv("DB_MAX_OVERFLOW", "20"))
-        kwargs["pool_recycle"] = int(os.getenv("DB_POOL_RECYCLE", "3600"))
         print("✓ 使用 PostgreSQL + pgvector 数据库")
 
     _engine = create_engine(resolved, **kwargs)

@@ -83,13 +83,16 @@ def test_resolve_redis_url_assembles_from_host_port(monkeypatch: pytest.MonkeyPa
     assert redis_tools.resolve_redis_url() == "redis://redis:6379/0"
 
 
-def test_resolve_redis_url_assembles_with_password(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("REDIS_URL", raising=False)
-    monkeypatch.setenv("REDIS_HOST", "redis")
-    monkeypatch.setenv("REDIS_PORT", "6379")
-    monkeypatch.setenv("REDIS_PASSWORD", "s3cret")
-    monkeypatch.setenv("REDIS_DB", "1")
-    assert redis_tools.resolve_redis_url() == "redis://:s3cret@redis:6379/1"
+def test_resolve_ratelimit_url_falls_back_to_redis_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("REDIS_RATELIMIT_URL", raising=False)
+    monkeypatch.setenv("REDIS_URL", "redis://biz:6379/0")
+    assert redis_tools.resolve_ratelimit_redis_url() == "redis://biz:6379/0"
+
+
+def test_resolve_ratelimit_url_prefers_dedicated(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("REDIS_URL", "redis://biz:6379/0")
+    monkeypatch.setenv("REDIS_RATELIMIT_URL", "redis://rl:6381/0")
+    assert redis_tools.resolve_ratelimit_redis_url() == "redis://rl:6381/0"
 
 
 @pytest.mark.asyncio

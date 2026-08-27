@@ -86,8 +86,14 @@ async def model_router(state: PipelineState) -> PipelineState:
     if not preferred:
         from backend.core.llm_credentials import resolve_chat_model_for_request
 
-        preferred = await resolve_chat_model_for_request(state["tenant_id"], None)
-        state["preferred_model"] = preferred
+        try:
+            preferred = await resolve_chat_model_for_request(state["tenant_id"], None)
+            state["preferred_model"] = preferred
+        except NexusAIException as e:
+            state["finish_reason"] = "error"
+            state["error_code"] = e.code or "LLM_KEY_001"
+            state["response"] = "请在设置中配置公司 Key 后再发起对话"
+            return state
     override = preferred or (state.get("ab_variant_config") or {}).get("model")
     if override:
         spec = get_model(str(override)) or select_model_for_intent(intent)

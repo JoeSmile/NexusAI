@@ -215,36 +215,46 @@ def embed_text(text: str, tenant_id: str | None = None) -> list[float]:
 
     if get_redis() is not None:
         record_l2_miss()
+    from backend.core.errors import NexusAIException
+    from backend.core.llm_concurrency import embed_http_timeout_s, embed_slot_sync
+
     try:
         from openai import OpenAI
 
-        client = OpenAI(api_key=ep.api_key, base_url=ep.base_url)
-        try:
-            resp = client.embeddings.create(
-                model=ep.model,
-                input=norm[:8000],
-                dimensions=dims,
+        with embed_slot_sync(base_url=ep.base_url):
+            client = OpenAI(
+                api_key=ep.api_key,
+                base_url=ep.base_url,
+                timeout=embed_http_timeout_s(),
             )
-        except Exception as e:
-            if _dimensions_unsupported(e):
-                logger.info(
-                    "embedding dimensions=%s 不被支持，重试不带 dimensions: %s",
-                    dims,
-                    e,
-                )
+            try:
                 resp = client.embeddings.create(
                     model=ep.model,
                     input=norm[:8000],
+                    dimensions=dims,
                 )
-            else:
-                raise
-        vec = list(resp.data[0].embedding)
-        _set_embed_mode("api", ep.model)
-        try:
-            l2_set(ep.model, norm, vec)
-        except Exception:
-            pass
-        return _pad_or_trim(vec)
+            except Exception as e:
+                if _dimensions_unsupported(e):
+                    logger.info(
+                        "embedding dimensions=%s 不被支持，重试不带 dimensions: %s",
+                        dims,
+                        e,
+                    )
+                    resp = client.embeddings.create(
+                        model=ep.model,
+                        input=norm[:8000],
+                    )
+                else:
+                    raise
+            vec = list(resp.data[0].embedding)
+            _set_embed_mode("api", ep.model)
+            try:
+                l2_set(ep.model, norm, vec)
+            except Exception:
+                pass
+            return _pad_or_trim(vec)
+    except NexusAIException:
+        raise
     except Exception as e:
         logger.warning("API embedding 失败，回退哈希向量（非语义）: %s", e)
         _set_embed_mode("api-error", ep.model)

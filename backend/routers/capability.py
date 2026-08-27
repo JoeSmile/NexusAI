@@ -331,6 +331,7 @@ async def _sse_event_stream(
         yield _sse_data({"type": "error", "code": "SYS_001", "message": str(e)})
         yield "data: [DONE]\n\n"
     finally:
+        await token_iter.aclose()
         latency = (time.perf_counter() - t0) * 1000
         if buffer or error_code:
             _schedule_audit(

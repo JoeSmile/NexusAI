@@ -12,7 +12,23 @@ from backend.database.pgvector_session import SkillAsset, get_pg_session
 
 
 @pytest.fixture()
-def ensure_table():
+def ensure_table(monkeypatch: pytest.MonkeyPatch):
+    """Deterministic embeddings: no live HTTP; 'invoice' vs unrelated stay separable."""
+
+    def _fake_embed(text: str, tenant_id: str | None = None) -> list[float]:
+        from backend.database.embeddings import EMBED_DIM
+
+        vec = [0.0] * EMBED_DIM
+        blob = (text or "").lower()
+        if "zzz_unrelated" in blob:
+            vec[0] = 1.0
+        elif "invoice" in blob:
+            vec[1] = 1.0
+        else:
+            vec[2] = 1.0
+        return vec
+
+    monkeypatch.setattr("backend.core.skill_assets.service.embed_text", _fake_embed)
     sf = get_pg_session()
     SkillAsset.__table__.create(sf.engine, checkfirst=True)
     yield sf

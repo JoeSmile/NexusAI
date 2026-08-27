@@ -1,50 +1,38 @@
-"""速率限制 — 桶令牌（进程内）+ Redis 分钟桶（Task 52 P1-5）。"""
+"""速率限制 — Redis 分钟桶（chat QPS + 端点）。
+
+Chat 主路径曾用进程内 TokenBucket：多 worker/多 pod 各桶独立，租户几乎打不满，
+表现就是线上不限流。现与 capability/RAG/端点同一契约：Redis INCR+EXPIRE，
+跨实例共享；Redis 挂 → 放行（不 500）。
+"""
 
 from __future__ import annotations
 
 import logging
-import time
-from collections import defaultdict
+import os
 from datetime import UTC, datetime
 
 logger = logging.getLogger(__name__)
 
-
-class TokenBucket:
-    """租户级桶令牌速率限制器"""
-
-    def __init__(self, rate: float = 10.0, burst: int = 20):
-        self.rate = rate
-        self.burst = burst
-        self._tokens: dict[str, float] = defaultdict(lambda: float(burst))
-        self._last_refill: dict[str, float] = defaultdict(time.time)
-
-    def consume(self, tenant_id: str) -> bool:
-        """消费一个 token，返回是否允许通过"""
-        now = time.time()
-        elapsed = now - self._last_refill[tenant_id]
-        self._tokens[tenant_id] = min(
-            self.burst,
-            self._tokens[tenant_id] + elapsed * self.rate,
-        )
-        self._last_refill[tenant_id] = now
-        if self._tokens[tenant_id] >= 1:
-            self._tokens[tenant_id] -= 1
-            return True
-        return False
-
-    def reset(self, tenant_id: str) -> None:
-        """重置租户的桶"""
-        self._tokens[tenant_id] = float(self.burst)
-        self._last_refill[tenant_id] = time.time()
+# 约等于旧 TokenBucket rate=10/s；分钟窗没有独立 burst=20。0 = 关闭。
+_DEFAULT_CHAT_PER_MIN = 600
 
 
-_bucket = TokenBucket()
+def _chat_limit_per_min() -> int:
+    raw = (os.getenv("CHAT_RATE_LIMIT_PER_MIN") or "").strip()
+    if not raw:
+        return _DEFAULT_CHAT_PER_MIN
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return _DEFAULT_CHAT_PER_MIN
 
 
 def check_rate_limit(tenant_id: str) -> bool:
-    """检查是否被限流"""
-    return _bucket.consume(tenant_id)
+    """租户 chat QPS。True=放行。键 ``rl:ep:chat:{tid}:{YYYYMMDDHHMM}``。"""
+    limit = _chat_limit_per_min()
+    if limit <= 0:
+        return True
+    return check_endpoint_rate_limit(tenant_id, "chat", limit_per_min=limit) is None
 
 
 def check_endpoint_rate_limit(

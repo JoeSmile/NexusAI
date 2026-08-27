@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from contextlib import contextmanager
 
 import pytest
@@ -45,25 +46,26 @@ def _client(tenant: TenantContext):
 
 def test_mcp_crud_and_test_import(super_admin: TenantContext, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CAPABILITY_UPSTREAM_MOCK", "true")
+    sid = f"mcp-crud-{uuid.uuid4().hex[:10]}"
 
     with _client(super_admin) as client:
         r = client.post(
             "/api/admin/console/mcp/servers",
             json={
-                "id": "mock",
+                "id": sid,
                 "transport": "http",
                 "url": "https://example.com/mcp",
                 "enabled": True,
             },
         )
         assert r.status_code == 200
-        assert r.json()["item"]["id"] == "mock"
+        assert r.json()["item"]["id"] == sid
 
         r = client.get("/api/admin/console/mcp/servers")
         assert r.status_code == 200
-        assert any(i["id"] == "mock" for i in r.json()["items"])
+        assert any(i["id"] == sid for i in r.json()["items"])
 
-        r = client.post("/api/admin/console/mcp/servers/mock/test")
+        r = client.post(f"/api/admin/console/mcp/servers/{sid}/test")
         assert r.status_code == 200
         body = r.json()
         assert body["ok"] is True
@@ -71,7 +73,7 @@ def test_mcp_crud_and_test_import(super_admin: TenantContext, monkeypatch: pytes
         tool_names = [t["name"] for t in body["tools"]]
 
         r = client.post(
-            "/api/admin/console/mcp/servers/mock/import-tools",
+            f"/api/admin/console/mcp/servers/{sid}/import-tools",
             json={"tool_names": [tool_names[0]], "risk_overrides": {tool_names[0]: "high"}},
         )
         assert r.status_code == 200
@@ -79,7 +81,7 @@ def test_mcp_crud_and_test_import(super_admin: TenantContext, monkeypatch: pytes
         assert len(imported["registered"]) == 1
         assert imported["registered"][0]["requires_approval"] is True
 
-        r = client.delete("/api/admin/console/mcp/servers/mock")
+        r = client.delete(f"/api/admin/console/mcp/servers/{sid}")
         assert r.status_code == 200
 
 
@@ -90,29 +92,39 @@ def test_mcp_requires_super_admin(tenant_admin: TenantContext) -> None:
 
 
 def test_mcp_rejects_duplicate(super_admin: TenantContext) -> None:
+    sid = f"mcp-dup-{uuid.uuid4().hex[:10]}"
     with _client(super_admin) as client:
         payload = {
-            "id": "dup",
+            "id": sid,
             "transport": "http",
             "url": "https://example.com/mcp",
         }
         assert client.post("/api/admin/console/mcp/servers", json=payload).status_code == 200
         assert client.post("/api/admin/console/mcp/servers", json=payload).status_code == 409
+        client.delete(f"/api/admin/console/mcp/servers/{sid}")
 
 
 def test_load_all_mcp_servers_db_overrides_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    from backend.core.capability.mcp_store import load_all_mcp_servers, upsert_mcp_server_record
+    from backend.core.capability.mcp_store import (
+        delete_mcp_server_record,
+        load_all_mcp_servers,
+        upsert_mcp_server_record,
+    )
 
+    sid = f"mcp-env-{uuid.uuid4().hex[:10]}"
     monkeypatch.setenv(
         "MCP_SERVERS_JSON",
-        '[{"id":"mock","transport":"http","url":"https://example.com/mcp","timeout_s":99}]',
+        f'[{{"id":"{sid}","transport":"http","url":"https://example.com/mcp","timeout_s":99}}]',
     )
     upsert_mcp_server_record(
-        server_id="mock",
+        server_id=sid,
         transport="http",
         url="https://example.com/mcp",
         timeout_s=12,
         merge_headers=False,
     )
-    servers = {s.id: s for s in load_all_mcp_servers()}
-    assert servers["mock"].timeout_s == 12.0
+    try:
+        servers = {s.id: s for s in load_all_mcp_servers()}
+        assert servers[sid].timeout_s == 12.0
+    finally:
+        delete_mcp_server_record(sid)
