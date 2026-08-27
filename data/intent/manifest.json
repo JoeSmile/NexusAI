@@ -1,5 +1,5 @@
 {
-  "version": "v1",
+  "superseded_note": "7-class freeze (crisis/advice/chat). Canonical 8-class set is golden/golden_v8.csv; do not treat this manifest as v8 truth.",
   "built_at": "2026-08-23T03:01:58.737088+00:00",
   "golden_size": 500,
   "train_size": 2046,

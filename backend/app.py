@@ -134,6 +134,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("LangFuse init skipped: %s", e)
 
+    try:
+        from backend.core.thread_pool import install_default_executor
+
+        n = install_default_executor()
+        logger.info("✓ default executor workers=%s", n)
+    except Exception as e:
+        logger.debug("default executor skipped: %s", e)
+
     logger.info("═" * 40)
     logger.info("NexusAI 就绪")
     logger.info("═" * 40)
@@ -163,6 +171,12 @@ async def lifespan(app: FastAPI):
         from backend.services.performance_optimizer import performance_optimizer
 
         await performance_optimizer.close()
+    except Exception:
+        pass
+    try:
+        from backend.core.openai_http import aclose_openai_http_clients
+
+        await aclose_openai_http_clients()
     except Exception:
         pass
     try:

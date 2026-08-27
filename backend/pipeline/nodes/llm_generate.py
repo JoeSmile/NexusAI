@@ -96,6 +96,7 @@ async def llm_generate(state: PipelineState) -> PipelineState:
         max_tokens=max_tokens,
         temperature=float(temperature),
         provider=key_provider,
+        key_id=state.get("llm_key_id"),
     )
 
     state["total_tokens"] = result.metadata.get("input_tokens", 0) + result.metadata.get(

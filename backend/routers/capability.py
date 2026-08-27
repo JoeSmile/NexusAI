@@ -323,7 +323,14 @@ async def _sse_event_stream(
         raise
     except NexusAIException as e:
         error_code = getattr(e, "code", "SYS_001")
-        yield _sse_data({"type": "error", "code": error_code, "message": str(e)})
+        payload: dict[str, Any] = {
+            "type": "error",
+            "code": error_code,
+            "message": e.message,
+        }
+        if e.message == "llm_slot_busy":
+            payload["retry_after"] = 2
+        yield _sse_data(payload)
         yield "data: [DONE]\n\n"
     except Exception as e:
         logger.exception("capability SSE error: %s", e)

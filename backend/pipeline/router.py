@@ -541,6 +541,7 @@ async def chat_streaming(
             temperature=final.get("llm_temperature")
             if final.get("llm_temperature") is not None
             else 0.7,
+            key_id=final.get("llm_key_id"),
         )
 
         try:
@@ -588,6 +589,26 @@ async def chat_streaming(
         except asyncio.CancelledError:
             logger.info("SSE cancelled — abort LLM stream")
             raise
+        except NexusAIException as e:
+            if e.message == "llm_slot_busy":
+                yield _sse_data(
+                    {
+                        "type": "error",
+                        "code": e.code,
+                        "message": "llm_slot_busy",
+                        "retry_after": 2,
+                    }
+                )
+            else:
+                logger.exception("SSE stream error: %s", e)
+                yield _sse_data(
+                    {
+                        "type": "error",
+                        "code": e.code or "LLM_002",
+                        "message": "生成失败，请稍后重试或换个说法。",
+                    }
+                )
+            yield "data: [DONE]\n\n"
         except Exception as e:
             logger.exception("SSE stream error: %s", e)
             # 08-25 脱敏：不把 LLM 原始输出/内部细节发给前端（曾泄漏 rewrite 内容给用户）

@@ -25,10 +25,13 @@ class OpenAIProvider(BaseLLMProvider):
             base_url: API基础URL
         """
         super().__init__(api_key, base_url)
-        
+
+        from backend.core.openai_http import openai_client_kwargs
+
         self.client = AsyncOpenAI(
             api_key=api_key,
-            base_url=base_url or "https://api.openai.com/v1"
+            base_url=base_url or "https://api.openai.com/v1",
+            **openai_client_kwargs(),
         )
         
         self.provider = LLMProvider.OPENAI

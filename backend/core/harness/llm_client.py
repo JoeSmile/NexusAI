@@ -115,11 +115,12 @@ def complete_via_provider(
     tenant_id: str = "default",
     key_provider: str = "default",
     key_chain: list | None = None,
+    key_id: str | None = None,
 ) -> str:
     """按 LLM_PROVIDER 完成一次文本生成（同步）。openai/record 支持 429/401 切 key。"""
     from backend.core.llm_concurrency import llm_slot_sync
 
-    with llm_slot_sync(base_url=base_url):
+    with llm_slot_sync(base_url=base_url, key_id=key_id):
         return _complete_via_provider_unlocked(
             model,
             messages,
@@ -183,9 +184,12 @@ def _complete_via_provider_unlocked(
         ]
 
     def _call(plain_key: str, url: str) -> str:
+        from backend.core.openai_http import openai_sync_client_kwargs
+
         client = OpenAI(
             api_key=plain_key,
             base_url=url or base_url or os.getenv("LLM_BASE_URL") or None,
+            **openai_sync_client_kwargs(),
         )
         resp = client.chat.completions.create(
             model=model or "default",

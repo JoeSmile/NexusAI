@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import threading
 import time
@@ -83,7 +84,9 @@ async def test_acquire_timeout_raises_rate_001():
         async with llm_slot(timeout_s=0.15):
             pass
     assert ei.value.code == ErrorCode.RATE_LIMITED.value
-    assert ei.value.message == "llm_concurrency_limit"
+    assert ei.value.message == "llm_slot_busy"
+    assert ei.value.detail == "llm_slot_busy"
+    assert ei.value.headers.get("Retry-After") == "2"
 
     for t in holders:
         t.cancel()
@@ -171,7 +174,9 @@ async def test_aclose_releases_slot_for_next_acquire(monkeypatch: pytest.MonkeyP
         async with llm_slot(timeout_s=0.12):
             pass
     assert ei.value.code == ErrorCode.RATE_LIMITED.value
-    assert ei.value.message == "llm_concurrency_limit"
+    assert ei.value.message == "llm_slot_busy"
+    assert ei.value.detail == "llm_slot_busy"
+    assert ei.value.headers.get("Retry-After") == "2"
 
     close_it.set()
     await owner
@@ -226,7 +231,7 @@ def test_default_limits_and_env_override(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv("LLM_BUCKET_LIMIT", raising=False)
     reset_llm_concurrency_for_tests()
     assert llm_concurrency_limit() == 16
-    assert llm_bucket_limit() == 4
+    assert llm_bucket_limit() == 8
     monkeypatch.setenv("LLM_CONCURRENCY_LIMIT", "9")
     monkeypatch.setenv("LLM_BUCKET_LIMIT", "3")
     reset_llm_concurrency_for_tests()
@@ -442,3 +447,94 @@ async def test_redis_ttl_heals_ghost_counter(
     fake_inflight_redis.clock += 2.0
     async with llm_slot(timeout_s=0.3, base_url="https://other.example"):
         pass
+
+
+def test_provider_bucket_prefers_key_id():
+    from backend.core.llm_concurrency import provider_bucket_key
+
+    assert provider_bucket_key(base_url="https://same.example/v1", key_id="k1") == "key:k1"
+    assert provider_bucket_key(base_url="HTTPS://Same.example/v1/") == "url:https://same.example/v1"
+    assert provider_bucket_key() == "default"
+
+
+@pytest.mark.asyncio
+async def test_different_key_ids_same_url_independent(monkeypatch: pytest.MonkeyPatch):
+    """同 base_url、不同 LLMKey.id → 各占一桶，互不阻塞。"""
+    monkeypatch.setenv("LLM_CONCURRENCY_LIMIT", "4")
+    monkeypatch.setenv("LLM_BUCKET_LIMIT", "1")
+    reset_llm_concurrency_for_tests()
+    ready = asyncio.Event()
+    url = "https://same-provider.example/v1"
+
+    async def _hold() -> None:
+        async with llm_slot(timeout_s=2.0, base_url=url, key_id="tenant-a"):
+            ready.set()
+            await asyncio.sleep(0.25)
+
+    holder = asyncio.create_task(_hold())
+    await asyncio.wait_for(ready.wait(), timeout=1.0)
+    async with llm_slot(timeout_s=0.4, base_url=url, key_id="tenant-b"):
+        pass
+    holder.cancel()
+    await asyncio.gather(holder, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_same_key_id_bucket_cap_default_eight(monkeypatch: pytest.MonkeyPatch):
+    """同 key 超桶上限（默认语义 8，本测压到 1）→ 超时 llm_slot_busy。"""
+    monkeypatch.setenv("LLM_CONCURRENCY_LIMIT", "16")
+    monkeypatch.setenv("LLM_BUCKET_LIMIT", "1")
+    reset_llm_concurrency_for_tests()
+    ready = asyncio.Event()
+
+    async def _hold() -> None:
+        async with llm_slot(timeout_s=2.0, key_id="shared-key"):
+            ready.set()
+            await asyncio.sleep(1.0)
+
+    holder = asyncio.create_task(_hold())
+    await asyncio.wait_for(ready.wait(), timeout=1.0)
+    with pytest.raises(NexusAIException) as ei:
+        async with llm_slot(timeout_s=0.15, key_id="shared-key"):
+            pass
+    assert ei.value.message == "llm_slot_busy"
+    holder.cancel()
+    await asyncio.gather(holder, return_exceptions=True)
+
+
+def test_default_acquire_timeout_is_five_seconds(monkeypatch: pytest.MonkeyPatch):
+    from backend.core.llm_concurrency import llm_acquire_timeout_s
+
+    monkeypatch.delenv("LLM_CONCURRENCY_ACQUIRE_TIMEOUT_S", raising=False)
+    reset_llm_concurrency_for_tests()
+    assert llm_acquire_timeout_s() == 5.0
+
+
+@pytest.mark.asyncio
+async def test_slot_busy_http_retry_after_header():
+    from starlette.requests import Request
+
+    from backend.core.errors import nexusai_exception_handler
+    from backend.core.llm_concurrency import _timeout_error
+
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "POST",
+        "scheme": "http",
+        "path": "/chat",
+        "raw_path": b"/chat",
+        "query_string": b"",
+        "headers": [],
+        "client": ("127.0.0.1", 1),
+        "server": ("test", 80),
+    }
+    request = Request(scope)
+    request.state.trace_id = "t"
+    resp = await nexusai_exception_handler(request, _timeout_error())
+    assert resp.status_code == 429
+    assert resp.headers.get("retry-after") == "2"
+    body = json.loads(resp.body)
+    assert body["error"]["message"] == "llm_slot_busy"
+    assert body["error"]["detail"] == "llm_slot_busy"

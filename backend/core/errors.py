@@ -103,10 +103,17 @@ class ErrorCode(StrEnum):
 class NexusAIException(Exception):
     """业务异常 — 统一结构化"""
 
-    def __init__(self, code: str, message: str, detail: str | None = None):
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        detail: str | None = None,
+        headers: dict[str, str] | None = None,
+    ):
         self.code = code
         self.message = message
         self.detail = detail
+        self.headers = dict(headers or {})
         super().__init__(f"[{code}] {message}")
 
 
@@ -126,6 +133,7 @@ async def nexusai_exception_handler(
                 "trace_id": getattr(request.state, "trace_id", ""),
             }
         },
+        headers=dict(exc.headers or {}),
     )
 
 

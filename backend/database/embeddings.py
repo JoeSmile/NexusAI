@@ -222,10 +222,13 @@ def embed_text(text: str, tenant_id: str | None = None) -> list[float]:
         from openai import OpenAI
 
         with embed_slot_sync(base_url=ep.base_url):
+            from backend.core.openai_http import openai_sync_client_kwargs
+
             client = OpenAI(
                 api_key=ep.api_key,
                 base_url=ep.base_url,
                 timeout=embed_http_timeout_s(),
+                **openai_sync_client_kwargs(),
             )
             try:
                 resp = client.embeddings.create(

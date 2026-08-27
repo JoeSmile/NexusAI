@@ -214,10 +214,11 @@ class LLMHarness(Harness):
             )
 
         input_tokens = sum(count_message_tokens(m) for m in messages)
+        key_id = str(kwargs.get("key_id") or kwargs.get("llm_key_id") or "").strip() or None
 
         from backend.core.llm_concurrency import llm_slot
 
-        async with llm_slot(base_url=base_url):
+        async with llm_slot(base_url=base_url, key_id=key_id):
             async def _call():
                 provider = get_llm_provider()
                 prompt = "\n".join(m.get("content", "") for m in messages)
@@ -306,7 +307,8 @@ class LLMHarness(Harness):
         """真流式：优先 OpenAI-compatible astream；否则 mock/降级切片。"""
         from backend.core.llm_concurrency import llm_slot
 
-        async with llm_slot(base_url=base_url):
+        key_id = str(kwargs.get("key_id") or kwargs.get("llm_key_id") or "").strip() or None
+        async with llm_slot(base_url=base_url, key_id=key_id):
             self._stream_finish_reason = "llm_generated"
             async for chunk in self._stream_unlocked(
                 model, messages, tenant_id, api_key, base_url, **kwargs
@@ -453,9 +455,12 @@ class LLMHarness(Harness):
             ) -> AsyncIterator[str]:
                 from openai import AsyncOpenAI
 
+                from backend.core.openai_http import openai_client_kwargs
+
                 client = AsyncOpenAI(
                     api_key=plain_key,
                     base_url=url or base_url or os.getenv("LLM_BASE_URL") or None,
+                    **openai_client_kwargs(),
                 )
                 stream = await client.chat.completions.create(
                     **_completion_kwargs(
@@ -541,9 +546,12 @@ class LLMHarness(Harness):
             current_model = attempt_model
 
             async def _once(plain_key: str, url: str, *, m: str = current_model) -> str:
+                from backend.core.openai_http import openai_client_kwargs
+
                 client = AsyncOpenAI(
                     api_key=plain_key,
                     base_url=url or base_url or os.getenv("LLM_BASE_URL") or None,
+                    **openai_client_kwargs(),
                 )
                 resp = await client.chat.completions.create(
                     **_completion_kwargs(

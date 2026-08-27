@@ -10,10 +10,10 @@ import hashlib
 import json
 import time
 from collections.abc import AsyncGenerator, Callable
-from concurrent.futures import ThreadPoolExecutor
 from functools import wraps
 from typing import Any
 
+from backend.core.thread_pool import get_thread_pool
 from backend.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -27,7 +27,7 @@ class PerformanceOptimizer:
 
         self._redis_url = redis_url or resolve_redis_url()
         self._redis = None
-        self.thread_pool = ThreadPoolExecutor(max_workers=10)
+        self.thread_pool = get_thread_pool()
         self.cache_ttl = 3600
 
     async def _ensure_redis(self):

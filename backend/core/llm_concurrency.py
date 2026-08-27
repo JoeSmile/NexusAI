@@ -7,8 +7,9 @@
 
 部署注记:
 - 切片 0/1：进程内闸门；async 在事件循环上等待，禁止 ``run_in_executor`` 占默认线程池。
-- 两级：先全局 ``LLM_CONCURRENCY_LIMIT``（默认 16），后 provider 桶 ``LLM_BUCKET_LIMIT``
-  （默认 4，key=规范化 base_url）；释放先桶后全局。
+- 两级：先全局 ``LLM_CONCURRENCY_LIMIT``（默认 16），后桶 ``LLM_BUCKET_LIMIT``
+  （默认 8，key=``key:{LLMKey.id}``，无 id 时回退规范化 base_url）；释放先桶后全局。
+- acquire 超时默认 5s → RATE_001 ``llm_slot_busy`` + ``Retry-After: 2``（与租户 QPS 区分）。
 - 多 worker 后升级 Redis 分布式计数（切片 2）；勿假定多进程共享本进程内闸门。
 
 Wave H Important F3（2026-08-14 落档）: ``LLMHarness.stream`` **整段**持有并发槽
@@ -35,10 +36,15 @@ from backend.core.errors import ErrorCode, NexusAIException
 logger = logging.getLogger(__name__)
 
 _DEFAULT_LIMIT = 16
-_DEFAULT_BUCKET_LIMIT = 4
+_DEFAULT_BUCKET_LIMIT = 8
 _DEFAULT_EMBED_LIMIT = 48
 _DEFAULT_EMBED_BUCKET_LIMIT = 8
-_DEFAULT_ACQUIRE_TIMEOUT_S = 30.0
+_DEFAULT_ACQUIRE_TIMEOUT_S = 5.0
+_DEFAULT_EMBED_HTTP_TIMEOUT_S = 15.0
+_DEFAULT_INFLIGHT_TTL_S = 1200
+_REDIS_POLL_S = 0.05
+_LLM_SLOT_BUSY = "llm_slot_busy"
+_LLM_SLOT_RETRY_AFTER = "2"
 _DEFAULT_EMBED_HTTP_TIMEOUT_S = 15.0
 _DEFAULT_INFLIGHT_TTL_S = 1200
 _REDIS_POLL_S = 0.05
@@ -248,13 +254,18 @@ class _TwoLevelPool:
                 self._buckets[key] = gate
             return gate
 
-    def acquire_sync(self, timeout: float, base_url: str | None) -> tuple[str, str] | None:
-        redis_lease = _redis_acquire_sync(timeout, base_url, self)
+    def acquire_sync(
+        self,
+        timeout: float,
+        base_url: str | None,
+        key_id: str | None = None,
+    ) -> tuple[str, str] | None:
+        redis_lease = _redis_acquire_sync(timeout, base_url, self, key_id=key_id)
         if isinstance(redis_lease, tuple):
             return redis_lease
         if redis_lease is False:
             return None
-        key = provider_bucket_key(base_url)
+        key = provider_bucket_key(key_id=key_id, base_url=base_url)
         t0 = time.monotonic()
         if not self.global_gate.acquire_sync(timeout):
             return None
@@ -272,14 +283,19 @@ class _TwoLevelPool:
         return (key, "local")
 
     async def acquire_async(
-        self, timeout: float, base_url: str | None
+        self,
+        timeout: float,
+        base_url: str | None,
+        key_id: str | None = None,
     ) -> tuple[str, str] | None:
-        redis_lease = await _redis_acquire_async(timeout, base_url, self)
+        redis_lease = await _redis_acquire_async(
+            timeout, base_url, self, key_id=key_id
+        )
         if isinstance(redis_lease, tuple):
             return redis_lease
         if redis_lease is False:
             return None
-        key = provider_bucket_key(base_url)
+        key = provider_bucket_key(key_id=key_id, base_url=base_url)
         t0 = time.monotonic()
         if not await self.global_gate.acquire_async(timeout):
             return None
@@ -305,15 +321,23 @@ class _TwoLevelPool:
         self.global_gate.release()
 
 
-def provider_bucket_key(base_url: str | None) -> str:
+def provider_bucket_key(
+    base_url: str | None = None,
+    *,
+    key_id: str | None = None,
+) -> str:
+    """Bucket identity: prefer LLMKey.id (never the secret); else normalized URL."""
+    kid = str(key_id or "").strip()
+    if kid:
+        return f"key:{kid}"
     raw = (base_url or "").strip().rstrip("/")
-    return raw.lower() if raw else "default"
+    return f"url:{raw.lower()}" if raw else "default"
 
 
 def llm_inflight_redis_keys(
-    base_url: str | None, *, prefix: str = "llm"
+    bucket_key: str, *, prefix: str = "llm"
 ) -> tuple[str, str]:
-    digest = hashlib.sha256(provider_bucket_key(base_url).encode("utf-8")).hexdigest()[:16]
+    digest = hashlib.sha256(bucket_key.encode("utf-8")).hexdigest()[:16]
     return (f"{prefix}:in-flight:global", f"{prefix}:in-flight:{digest}")
 
 
@@ -328,7 +352,7 @@ def llm_concurrency_limit() -> int:
 
 
 def llm_bucket_limit() -> int:
-    """读取 ``LLM_BUCKET_LIMIT``（env），默认 4。"""
+    """读取 ``LLM_BUCKET_LIMIT``（env），默认 8。"""
     raw = os.getenv("LLM_BUCKET_LIMIT", str(_DEFAULT_BUCKET_LIMIT)).strip()
     try:
         n = int(raw)
@@ -434,10 +458,11 @@ def _ratelimit_redis() -> object | None:
 
 def _redis_eval_acquire(
     client: object,
-    base_url: str | None,
     pool: _TwoLevelPool,
+    *,
+    bucket_key: str,
 ) -> bool:
-    gkey, bkey = llm_inflight_redis_keys(base_url, prefix=pool.redis_prefix)
+    gkey, bkey = llm_inflight_redis_keys(bucket_key, prefix=pool.redis_prefix)
     n = client.eval(  # type: ignore[union-attr]
         LUA_LLM_SLOT_ACQUIRE,
         2,
@@ -463,17 +488,21 @@ def _redis_release(bucket_key: str, prefix: str = "llm") -> None:
 
 
 def _redis_acquire_sync(
-    timeout: float, base_url: str | None, pool: _TwoLevelPool
+    timeout: float,
+    base_url: str | None,
+    pool: _TwoLevelPool,
+    *,
+    key_id: str | None = None,
 ) -> tuple[str, str] | None | bool:
     """成功返回 lease；Redis 超限等到超时返回 False；Redis 不可用返回 None（回退本机）。"""
     client = _ratelimit_redis()
     if client is None:
         return None
-    key = provider_bucket_key(base_url)
+    key = provider_bucket_key(key_id=key_id, base_url=base_url)
     deadline = time.monotonic() + timeout
     try:
         while True:
-            if _redis_eval_acquire(client, base_url, pool):
+            if _redis_eval_acquire(client, pool, bucket_key=key):
                 return (key, "redis")
             remaining = deadline - time.monotonic()
             if remaining <= 0:
@@ -485,17 +514,21 @@ def _redis_acquire_sync(
 
 
 async def _redis_acquire_async(
-    timeout: float, base_url: str | None, pool: _TwoLevelPool
+    timeout: float,
+    base_url: str | None,
+    pool: _TwoLevelPool,
+    *,
+    key_id: str | None = None,
 ) -> tuple[str, str] | None | bool:
     client = _ratelimit_redis()
     if client is None:
         return None
-    key = provider_bucket_key(base_url)
+    key = provider_bucket_key(key_id=key_id, base_url=base_url)
     loop = asyncio.get_running_loop()
     deadline = loop.time() + timeout
     try:
         while True:
-            if _redis_eval_acquire(client, base_url, pool):
+            if _redis_eval_acquire(client, pool, bucket_key=key):
                 return (key, "redis")
             remaining = deadline - loop.time()
             if remaining <= 0:
@@ -509,8 +542,9 @@ async def _redis_acquire_async(
 def _timeout_error() -> NexusAIException:
     return NexusAIException(
         code=ErrorCode.RATE_LIMITED.value,
-        message="llm_concurrency_limit",
-        detail="acquire_timeout",
+        message=_LLM_SLOT_BUSY,
+        detail=_LLM_SLOT_BUSY,
+        headers={"Retry-After": _LLM_SLOT_RETRY_AFTER},
     )
 
 
@@ -531,15 +565,16 @@ def llm_slot_sync(
     timeout_s: float | None = None,
     *,
     base_url: str | None = None,
+    key_id: str | None = None,
 ) -> Iterator[None]:
-    """同步出口（``complete_via_provider``）占用全局+桶两级槽。超时 → RATE_001 / 429。"""
+    """同步出口（``complete_via_provider``）占用全局+桶两级槽。超时 → RATE_001 / llm_slot_busy。"""
     if _held.get():
         yield
         return
     pool = _get_pool()
     wait = llm_acquire_timeout_s() if timeout_s is None else timeout_s
     t0 = time.perf_counter()
-    key = pool.acquire_sync(wait, base_url)
+    key = pool.acquire_sync(wait, base_url, key_id=key_id)
     LLM_SLOT_ACQUIRE_WAIT.observe(time.perf_counter() - t0)
     if key is None:
         logger.debug("llm_slot_sync acquire timeout after %.3fs", wait)
@@ -561,8 +596,9 @@ async def llm_slot(
     timeout_s: float | None = None,
     *,
     base_url: str | None = None,
+    key_id: str | None = None,
 ) -> AsyncIterator[None]:
-    """异步出口（``LLMHarness.generate`` / ``stream``）占用同一两级池。超时 → RATE_001 / 429。
+    """异步出口（``LLMHarness.generate`` / ``stream``）占用同一两级池。超时 → RATE_001 / llm_slot_busy。
 
     可重入：stream 降级到 generate 时不二次占槽。
     等待发生在事件循环上，不占用默认 ``ThreadPoolExecutor``。
@@ -574,7 +610,7 @@ async def llm_slot(
     pool = _get_pool()
     wait = llm_acquire_timeout_s() if timeout_s is None else timeout_s
     t0 = time.perf_counter()
-    key = await pool.acquire_async(wait, base_url)
+    key = await pool.acquire_async(wait, base_url, key_id=key_id)
     LLM_SLOT_ACQUIRE_WAIT.observe(time.perf_counter() - t0)
     if key is None:
         logger.debug("llm_slot acquire timeout after %.3fs", wait)
