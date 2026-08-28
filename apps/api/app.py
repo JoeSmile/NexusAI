@@ -284,7 +284,7 @@ def create_app() -> FastAPI:
     app.mount("/metrics", make_asgi_app())
 
     # 必选路由
-    _lazy_include(app, "backend.core.health", "router", required=True)
+    _lazy_include(app, "packages.health", "router", required=True)
     _lazy_include(app, "apps.api.routers", "admin_router", prefix="/api", required=True)
     _lazy_include(
         app,
