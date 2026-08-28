@@ -64,7 +64,7 @@ def resolve_redis_url(default: str = "redis://localhost:6379") -> str:
         pass
 
     try:
-        from backend.core.config import get_config
+        from packages.config import get_config
 
         redis_cfg = getattr(get_config(), "redis", None)
         url_prop = getattr(redis_cfg, "url", None) if redis_cfg is not None else None

@@ -13,7 +13,7 @@ class TestBasicIntegration:
     def test_imports(self):
         """测试模块导入"""
         # 测试核心模块可以正常导入
-        from backend.core.config import Config, get_config
+        from packages.config import Config, get_config
         from packages.exceptions import NexusAIException
         
         assert Config is not None
@@ -23,7 +23,7 @@ class TestBasicIntegration:
     @pytest.mark.asyncio
     async def test_config_loading(self):
         """测试配置加载"""
-        from backend.core.config import get_config
+        from packages.config import get_config
         
         # 测试配置可以正常加载
         config = get_config()
