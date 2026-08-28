@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from backend.core.fallback import get_fallback
+from packages.fallback import get_fallback
 from packages.harness.llm import LLMHarness
 from packages.pipeline.router import _sse_done_payload
 

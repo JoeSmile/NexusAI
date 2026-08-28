@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import os
 
-from backend.core.fallback import get_fallback
+from packages.fallback import get_fallback
 from packages.harness import LLMHarness
 from backend.core.prompt_service import get_prompt, resolve_prompt_label, sanitize_prompt_content
 from backend.observability.decorators import enrich_span, observe

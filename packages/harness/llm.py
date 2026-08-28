@@ -17,7 +17,7 @@ from packages.cost_manager import (
     estimate_cost,
     record_consumption,
 )
-from backend.core.fallback import get_fallback
+from packages.fallback import get_fallback
 from packages.key_repository import LLMKey
 from packages.harness.base import Harness, HarnessResult
 from packages.harness.provider import (
