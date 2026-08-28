@@ -20,7 +20,7 @@ _JSON_BLOCK = re.compile(r"\{[\s\S]*\}")
 
 def _default_model() -> str:
     try:
-        from backend.core.model_registry import select_model_for_intent
+        from packages.model_registry import select_model_for_intent
 
         return select_model_for_intent("default").name
     except Exception:

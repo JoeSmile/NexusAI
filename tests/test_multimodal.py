@@ -13,7 +13,7 @@ from PIL import Image
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.guardrails.image_guard import check_image_input, image_content_hash
 from packages.harness.base import HarnessResult
-from backend.core.model_registry import get_model, list_vision_models, reload_registry
+from packages.model_registry import get_model, list_vision_models, reload_registry
 from packages.multimodal.vision import build_vision_messages
 from apps.api.routers.multimodal import router as multimodal_router
 

@@ -123,7 +123,7 @@ def _default_chat_model() -> str:
     """默认聊天模型(registry), 替代开发残留的 mock-local——record/openai 下
     mock-local 的占位成本(0.999/1k)会打爆预算检查。"""
     try:
-        from backend.core.model_registry import select_model_for_intent
+        from packages.model_registry import select_model_for_intent
 
         return select_model_for_intent("default").name
     except Exception:

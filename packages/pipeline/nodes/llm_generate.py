@@ -62,7 +62,7 @@ async def llm_generate(state: PipelineState) -> PipelineState:
 
     max_tokens = 1000
     try:
-        from backend.core.model_registry import get_model
+        from packages.model_registry import get_model
 
         spec = get_model(model)
         if spec is not None:
@@ -79,7 +79,7 @@ async def llm_generate(state: PipelineState) -> PipelineState:
     key_provider = state.get("llm_key_provider") or "default"
     if key_provider == "default":
         try:
-            from backend.core.model_registry import get_model as _get_model
+            from packages.model_registry import get_model as _get_model
 
             _spec = _get_model(model)
             if _spec is not None and _spec.provider:

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import backend.core.model_registry as registry
-from backend.core.model_registry import ModelSpec, select_model_for_intent
+import packages.model_registry as registry
+from packages.model_registry import ModelSpec, select_model_for_intent
 
 
 def _set_registry(models: dict[str, ModelSpec]) -> None:

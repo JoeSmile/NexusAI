@@ -91,7 +91,7 @@ def _completion_kwargs(
 
 
 def _models_to_try(base_model: str) -> list[str]:
-    from backend.core.model_registry import fallback_chain
+    from packages.model_registry import fallback_chain
 
     base = (base_model or "").strip() or "default"
     alts = fallback_chain(base)[:_MAX_MODEL_FALLBACKS]

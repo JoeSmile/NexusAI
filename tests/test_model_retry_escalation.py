@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.core.model_registry import (
+from packages.model_registry import (
     ModelSpec,
     escalate_model_name,
     resolve_model_for_retry,
@@ -15,9 +15,9 @@ def test_escalate_model_name_moves_one_tier(monkeypatch) -> None:
         "good-m": ModelSpec(name="good-m", provider="p", tier="good", capability="chat"),
         "best-m": ModelSpec(name="best-m", provider="p", tier="best", capability="chat"),
     }
-    monkeypatch.setattr("backend.core.model_registry.get_registry", lambda: reg)
+    monkeypatch.setattr("packages.model_registry.get_registry", lambda: reg)
     monkeypatch.setattr(
-        "backend.core.model_registry.get_model",
+        "packages.model_registry.get_model",
         lambda name: reg.get(name),
     )
     assert escalate_model_name("cheap-m") == "good-m"
@@ -30,9 +30,9 @@ def test_resolve_model_for_retry_attempt_one_unchanged(monkeypatch) -> None:
         "good-m": ModelSpec(name="good-m", provider="p", tier="good", capability="chat"),
         "best-m": ModelSpec(name="best-m", provider="p", tier="best", capability="chat"),
     }
-    monkeypatch.setattr("backend.core.model_registry.get_registry", lambda: reg)
+    monkeypatch.setattr("packages.model_registry.get_registry", lambda: reg)
     monkeypatch.setattr(
-        "backend.core.model_registry.get_model",
+        "packages.model_registry.get_model",
         lambda name: reg.get(name),
     )
     model, escalated = resolve_model_for_retry("good-m", 1)
@@ -45,9 +45,9 @@ def test_resolve_model_for_retry_attempt_two_escalates_or_same(monkeypatch) -> N
         "good-m": ModelSpec(name="good-m", provider="p", tier="good", capability="chat"),
         "best-m": ModelSpec(name="best-m", provider="p", tier="best", capability="chat"),
     }
-    monkeypatch.setattr("backend.core.model_registry.get_registry", lambda: reg)
+    monkeypatch.setattr("packages.model_registry.get_registry", lambda: reg)
     monkeypatch.setattr(
-        "backend.core.model_registry.get_model",
+        "packages.model_registry.get_model",
         lambda name: reg.get(name),
     )
     model, escalated = resolve_model_for_retry("good-m", 2)

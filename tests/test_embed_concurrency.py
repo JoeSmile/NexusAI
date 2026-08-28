@@ -70,7 +70,7 @@ def test_embed_buckets_by_base_url() -> None:
 
 
 def test_embed_hash_and_cache_skip_slot(monkeypatch: pytest.MonkeyPatch) -> None:
-    import backend.core.model_registry as mr
+    import packages.model_registry as mr
     import backend.database.embeddings as emb
 
     monkeypatch.setenv("RAG_CACHE_ENABLED", "false")
@@ -94,7 +94,7 @@ def test_embed_hash_and_cache_skip_slot(monkeypatch: pytest.MonkeyPatch) -> None
 def test_embed_http_uses_slot(monkeypatch: pytest.MonkeyPatch) -> None:
     from types import SimpleNamespace
 
-    import backend.core.model_registry as mr
+    import packages.model_registry as mr
     import backend.database.embeddings as emb
     from packages.rag import cache as rag_cache
 

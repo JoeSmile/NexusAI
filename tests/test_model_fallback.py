@@ -11,7 +11,7 @@ import packages.harness.llm as llm_mod
 import backend.core.key_failover as key_failover
 from packages.harness.llm import LLMHarness
 from backend.core.key_repository import LLMKey
-from backend.core.model_registry import fallback_chain, reload_registry
+from packages.model_registry import fallback_chain, reload_registry
 
 
 class _APIStatusError(Exception):
@@ -30,7 +30,7 @@ def _reload_models(monkeypatch):
 
 
 def test_fallback_chain_deescalates():
-    from backend.core.model_registry import _TIER_RANK, get_model
+    from packages.model_registry import _TIER_RANK, get_model
 
     chain = fallback_chain("best-model")
     assert "best-model" not in chain

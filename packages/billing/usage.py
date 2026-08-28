@@ -51,7 +51,7 @@ def _resolve_provider(model: str, explicit: str | None) -> str:
     if explicit:
         return explicit
     try:
-        from backend.core.model_registry import get_model
+        from packages.model_registry import get_model
 
         spec = get_model(model)
         if spec is not None and spec.provider:

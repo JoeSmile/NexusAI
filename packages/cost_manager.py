@@ -24,7 +24,7 @@ COST_TABLE: dict[str, float] = {
 
 def _price(model: str) -> float:
     try:
-        from backend.core.model_registry import get_model
+        from packages.model_registry import get_model
 
         spec = get_model(model)
         if spec is not None:

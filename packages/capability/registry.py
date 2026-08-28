@@ -198,7 +198,7 @@ class CapabilityRegistry:
 
     def load_from_model_registry(self) -> int:
         """兼容映射：不修改 model_registry 公共 API。"""
-        from backend.core.model_registry import get_registry
+        from packages.model_registry import get_registry
 
         n = 0
         for model in get_registry().values():

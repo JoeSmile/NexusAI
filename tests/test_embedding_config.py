@@ -10,7 +10,7 @@ import pytest
 @pytest.fixture(autouse=True)
 def _reload_registry(monkeypatch):
     """每个用例前后重置 registry 缓存与 embed 模式。"""
-    import backend.core.model_registry as mr
+    import packages.model_registry as mr
     import backend.database.embeddings as emb
     from packages.rag import cache as rag_cache
 
@@ -31,7 +31,7 @@ def _reload_registry(monkeypatch):
 
 
 def test_select_embedding_model_from_registry(monkeypatch):
-    import backend.core.model_registry as mr
+    import packages.model_registry as mr
 
     monkeypatch.setenv(
         "MODEL_REGISTRY_JSON",
@@ -49,7 +49,7 @@ def test_select_embedding_model_from_registry(monkeypatch):
 
 
 def test_select_embedding_model_env_fallback(monkeypatch):
-    import backend.core.model_registry as mr
+    import packages.model_registry as mr
 
     monkeypatch.setenv("MODEL_REGISTRY_JSON", "[]")
     monkeypatch.delenv("EMBEDDING_MODEL", raising=False)
@@ -72,7 +72,7 @@ def test_select_embedding_model_env_fallback(monkeypatch):
 
 
 def test_embed_text_calls_api_with_dimensions(monkeypatch):
-    import backend.core.model_registry as mr
+    import packages.model_registry as mr
     import backend.database.embeddings as emb
 
     monkeypatch.setenv(
@@ -116,7 +116,7 @@ def test_embed_text_calls_api_with_dimensions(monkeypatch):
 
 
 def test_embed_text_retries_without_dimensions(monkeypatch):
-    import backend.core.model_registry as mr
+    import packages.model_registry as mr
     import backend.database.embeddings as emb
 
     monkeypatch.setenv(
@@ -168,7 +168,7 @@ def test_embed_text_hash_fallback_deterministic(monkeypatch):
     ):
         monkeypatch.delenv(key, raising=False)
 
-    import backend.core.model_registry as mr
+    import packages.model_registry as mr
 
     mr.reload_registry()
     a = emb.embed_text("同一段文本")
@@ -181,7 +181,7 @@ def test_embed_text_hash_fallback_deterministic(monkeypatch):
 
 def test_api_error_label_shows_api_error(monkeypatch):
     """Important #1: API 失败后 status 不得假装真实 embedding。"""
-    import backend.core.model_registry as mr
+    import packages.model_registry as mr
     import backend.database.embeddings as emb
 
     monkeypatch.setenv(
@@ -210,7 +210,7 @@ def test_api_error_label_shows_api_error(monkeypatch):
 
 def test_dashscope_ignores_llm_api_key_alone(monkeypatch):
     """Important #2: 仅有 DeepSeek LLM_API_KEY 时不应对 DashScope 发起假调用。"""
-    import backend.core.model_registry as mr
+    import packages.model_registry as mr
     import backend.database.embeddings as emb
 
     monkeypatch.setenv(
@@ -289,7 +289,7 @@ def test_embed_text_uses_tenant_embedding_credential(monkeypatch):
 
 def test_embed_text_tenant_missing_falls_back_to_registry(monkeypatch):
     """未配租户 embedding 凭证时必须回退 env/registry，禁止静默哈希废检索。"""
-    import backend.core.model_registry as mr
+    import packages.model_registry as mr
     import backend.database.embeddings as emb
     from packages.errors import NexusAIException
 

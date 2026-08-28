@@ -106,7 +106,7 @@ def _resolve_tenant_embedding(tenant_id: str) -> _EmbedEndpoint | None:
 
 def _resolve_registry_embedding() -> _EmbedEndpoint:
     """返回 registry/env 端点（无租户凭证时）。"""
-    from backend.core.model_registry import select_embedding_model
+    from packages.model_registry import select_embedding_model
 
     spec = select_embedding_model()
     base_url = (

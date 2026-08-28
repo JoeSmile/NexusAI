@@ -114,7 +114,7 @@ class LLMKeyRepository:
         # 会被发到 LLM_BASE_URL(deepseek)端点 → 400。
         spec = None
         try:
-            from backend.core.model_registry import get_registry
+            from packages.model_registry import get_registry
 
             spec = next(
                 (s for s in get_registry().values() if s.provider == provider),

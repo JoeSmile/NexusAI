@@ -6,7 +6,7 @@ import base64
 import os
 
 from packages.errors import ErrorCode, NexusAIException
-from backend.core.model_registry import ModelSpec, get_model, get_registry
+from packages.model_registry import ModelSpec, get_model, get_registry
 
 
 def select_vision_model_name(preferred: str | None = None) -> str:

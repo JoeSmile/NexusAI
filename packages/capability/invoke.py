@@ -118,7 +118,7 @@ async def _invoke_model(
     if override:
         model_name = str(override)
     elif retry_attempt > 1:
-        from backend.core.model_registry import resolve_model_for_retry
+        from packages.model_registry import resolve_model_for_retry
 
         model_name, _ = resolve_model_for_retry(model_name, retry_attempt)
     api_key_ref = str(spec.spec.get("api_key_ref") or "")

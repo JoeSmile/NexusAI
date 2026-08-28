@@ -115,7 +115,7 @@ def test_l2_same_text_one_api_call(fake_redis, monkeypatch):
         api_key_ref="QWEN_API_KEY",
     )
     monkeypatch.setattr(
-        "backend.core.model_registry.select_embedding_model",
+        "packages.model_registry.select_embedding_model",
         lambda: spec,
     )
     a = embed_text("Hello World")
@@ -315,7 +315,7 @@ def test_miss_audit_carries_real_cost(fake_redis, monkeypatch):
 
 def test_embedding_cost_zero_on_l2_hit(fake_redis, monkeypatch):
     """L2 命中时 embedding 成本为 0(不重复计费)。"""
-    from backend.core.model_registry import select_embedding_model
+    from packages.model_registry import select_embedding_model
 
     spec = select_embedding_model()
     rag_cache.l2_set(spec.name, rag_cache.normalize("缓存命中问题"), [0.1] * 768)

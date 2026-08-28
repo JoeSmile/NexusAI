@@ -139,7 +139,7 @@ async def _run_step_once(
     if attempt > 1:
         payload["_orchestrator_retry_attempt"] = attempt
         from packages.capability.registry import get_capability_registry
-        from backend.core.model_registry import resolve_model_for_retry
+        from packages.model_registry import resolve_model_for_retry
 
         try:
             spec = get_capability_registry().get(
