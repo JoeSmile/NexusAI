@@ -337,7 +337,7 @@ async def upload_multimodal(
     统一上传：pdf / text / audio(wav|mp3|m4a) / image(png|jpg)。
     音频/图片需 `uv sync --extra multimodal`。租户取自认证上下文。
     """
-    from backend.core.file_sanitizer import file_kind, sanitize_filename, validate_file
+    from packages.file_sanitizer import file_kind, sanitize_filename, validate_file
     from backend.database.vector_ops import add_knowledge
     from packages.rag.extractors.audio import MultimodalDependencyError
 

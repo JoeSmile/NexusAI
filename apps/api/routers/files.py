@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import text
 
-from backend.core.file_sanitizer import (
+from packages.file_sanitizer import (
     MAX_FILE_SIZE,
     UPLOAD_DIR,
     sanitize_filename,

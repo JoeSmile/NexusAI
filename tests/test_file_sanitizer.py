@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.core.file_sanitizer import file_kind, sanitize_filename, validate_file
+from packages.file_sanitizer import file_kind, sanitize_filename, validate_file
 
 
 def test_file_kind_audio_image():
@@ -40,7 +40,7 @@ def test_validate_rejected_extension():
 
 
 def test_validate_too_large(monkeypatch):
-    import backend.core.file_sanitizer as fs
+    import packages.file_sanitizer as fs
 
     monkeypatch.setattr(fs, "MAX_FILE_SIZE", 8)
     ok, err = fs.validate_file("huge.txt", b"0123456789", "text/plain")

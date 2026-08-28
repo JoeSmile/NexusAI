@@ -20,7 +20,7 @@ from packages.audit import log_audit
 from packages.audit_context import bind_audit_lineage
 from packages.billing.context import bind_billing_context
 from packages.errors import ErrorCode, NexusAIException
-from backend.core.file_sanitizer import sanitize_filename, validate_file
+from packages.file_sanitizer import sanitize_filename, validate_file
 from packages.guardrails.image_guard import check_image_input
 from packages.harness import LLMHarness
 from packages.multimodal.vision import (
