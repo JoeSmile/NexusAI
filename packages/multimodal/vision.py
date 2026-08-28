@@ -54,7 +54,7 @@ async def resolve_vision_credentials(
         )
 
     try:
-        from backend.core.llm_credentials import resolve_tenant_credential
+        from packages.llm_credentials import resolve_tenant_credential
 
         key = await resolve_tenant_credential(tenant_id, name)
         return name, key.api_key, key.base_url or spec.base_url, key.provider

@@ -218,7 +218,7 @@ def auth_client(monkeypatch):
     factory = MagicMock()
     factory.Session.return_value = session
     monkeypatch.setattr(
-        "backend.core.llm_credentials.get_pg_session",
+        "packages.llm_credentials.get_pg_session",
         lambda: factory,
     )
 
@@ -434,7 +434,7 @@ def test_available_models_returns_configured(auth_client, monkeypatch):
     factory = MagicMock()
     factory.Session.return_value = session
     monkeypatch.setattr(
-        "backend.core.llm_credentials.get_pg_session",
+        "packages.llm_credentials.get_pg_session",
         lambda: factory,
     )
 
@@ -481,7 +481,7 @@ def test_available_models_skips_embedding(auth_client, monkeypatch):
     factory = MagicMock()
     factory.Session.return_value = session
     monkeypatch.setattr(
-        "backend.core.llm_credentials.get_pg_session",
+        "packages.llm_credentials.get_pg_session",
         lambda: factory,
     )
 

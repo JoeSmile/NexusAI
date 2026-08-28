@@ -107,7 +107,7 @@ def _require_chat_model(body: ChatRequest) -> None:
 
 
 async def _resolve_chat_model(body: ChatRequest, tenant_id: str) -> None:
-    from backend.core.llm_credentials import resolve_chat_model_for_request
+    from packages.llm_credentials import resolve_chat_model_for_request
 
     body.model = await resolve_chat_model_for_request(tenant_id, body.model)
 

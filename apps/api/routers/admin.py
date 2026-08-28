@@ -405,7 +405,7 @@ def _normalize_single_model(
 
 
 def _normalize_purpose(raw: str) -> str:
-    from backend.core.llm_credentials import normalize_purpose
+    from packages.llm_credentials import normalize_purpose
 
     try:
         return normalize_purpose(raw)
@@ -440,7 +440,7 @@ def _llm_key_row_dict(r) -> dict:
     )
     purpose = str(r.provider)
     try:
-        from backend.core.llm_credentials import normalize_purpose
+        from packages.llm_credentials import normalize_purpose
 
         purpose = normalize_purpose(purpose)
     except ValueError:
@@ -484,7 +484,7 @@ def _check_duplicate_active_model(
     exclude_id: int | None = None,
 ) -> None:
     """Same tenant + purpose + model name among active keys → 409."""
-    from backend.core.llm_credentials import is_chat_purpose, is_embedding_purpose
+    from packages.llm_credentials import is_chat_purpose, is_embedding_purpose
 
     sql = text(
         """

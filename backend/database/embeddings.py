@@ -86,7 +86,7 @@ class _EmbedEndpoint:
 
 def _resolve_tenant_embedding(tenant_id: str) -> _EmbedEndpoint | None:
     from packages.errors import NexusAIException
-    from backend.core.llm_credentials import (
+    from packages.llm_credentials import (
         EMBEDDING_DIMENSIONS,
         resolve_embedding_credential_sync,
     )

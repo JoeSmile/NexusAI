@@ -257,7 +257,7 @@ def test_embed_text_uses_tenant_embedding_credential(monkeypatch):
     )
 
     monkeypatch.setattr(
-        "backend.core.llm_credentials.resolve_embedding_credential_sync",
+        "packages.llm_credentials.resolve_embedding_credential_sync",
         lambda tid: (key, "text-embedding-3-small"),
     )
 
@@ -309,7 +309,7 @@ def test_embed_text_tenant_missing_falls_back_to_registry(monkeypatch):
         raise NexusAIException("LLM_KEY_001", "tenant_embedding_key_missing")
 
     monkeypatch.setattr(
-        "backend.core.llm_credentials.resolve_embedding_credential_sync",
+        "packages.llm_credentials.resolve_embedding_credential_sync",
         _missing,
     )
 

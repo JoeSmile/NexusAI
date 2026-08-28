@@ -135,7 +135,7 @@ async def test_keys_for_model_skips_model_without_credential(monkeypatch):
         return []
 
     monkeypatch.setattr(
-        "backend.core.llm_credentials.get_key_chain_for_model",
+        "packages.llm_credentials.get_key_chain_for_model",
         _chain,
     )
 

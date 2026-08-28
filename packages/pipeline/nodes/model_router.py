@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from packages.cost_manager import estimate_cost
 from packages.errors import NexusAIException
-from backend.core.llm_credentials import resolve_tenant_credential
+from packages.llm_credentials import resolve_tenant_credential
 from packages.model_registry import get_model, select_model_for_intent
 from backend.observability.decorators import enrich_span, observe
 from backend.observability.sampling import set_tracing_enabled, should_sample
@@ -84,7 +84,7 @@ async def model_router(state: PipelineState) -> PipelineState:
     # A/B 或用户显式选择可覆盖模型名
     preferred = (state.get("preferred_model") or "").strip()
     if not preferred:
-        from backend.core.llm_credentials import resolve_chat_model_for_request
+        from packages.llm_credentials import resolve_chat_model_for_request
 
         try:
             preferred = await resolve_chat_model_for_request(state["tenant_id"], None)

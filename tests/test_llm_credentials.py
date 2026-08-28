@@ -8,9 +8,9 @@ from unittest.mock import MagicMock
 import pytest
 
 import packages.key_repository as key_repo
-import backend.core.llm_credentials as llm_cred
+import packages.llm_credentials as llm_cred
 from packages.errors import NexusAIException
-from backend.core.llm_credentials import (
+from packages.llm_credentials import (
     list_available_models,
     resolve_chat_model_for_request,
     resolve_tenant_credential,
@@ -77,7 +77,7 @@ def decrypt_ok(monkeypatch):
 async def test_resolve_no_rows_is_model_not_allowed(monkeypatch):
     session = _RecordingSession(fetchall=[])
     monkeypatch.setattr(
-        "backend.core.llm_credentials.get_pg_session",
+        "packages.llm_credentials.get_pg_session",
         lambda: MagicMock(Session=lambda: session),
     )
 
@@ -92,7 +92,7 @@ async def test_resolve_model_not_allowed(monkeypatch):
         fetchall=[_cred_row(allowed_models=["deepseek-v4-flash"])]
     )
     monkeypatch.setattr(
-        "backend.core.llm_credentials.get_pg_session",
+        "packages.llm_credentials.get_pg_session",
         lambda: MagicMock(Session=lambda: session),
     )
 
@@ -166,7 +166,7 @@ async def test_resolve_success_by_model(monkeypatch, decrypt_ok):
         ]
     )
     monkeypatch.setattr(
-        "backend.core.llm_credentials.get_pg_session",
+        "packages.llm_credentials.get_pg_session",
         lambda: MagicMock(Session=lambda: cred_session),
     )
 
@@ -186,7 +186,7 @@ async def test_resolve_empty_base_url_missing(monkeypatch, decrypt_ok):
         ]
     )
     monkeypatch.setattr(
-        "backend.core.llm_credentials.get_pg_session",
+        "packages.llm_credentials.get_pg_session",
         lambda: MagicMock(Session=lambda: cred_session),
     )
 
@@ -222,7 +222,7 @@ async def test_list_available_models_chat_only(monkeypatch):
         ]
     )
     monkeypatch.setattr(
-        "backend.core.llm_credentials.get_pg_session",
+        "packages.llm_credentials.get_pg_session",
         lambda: MagicMock(Session=lambda: session),
     )
 
@@ -242,7 +242,7 @@ async def test_resolve_chat_model_auto_first_when_empty(monkeypatch):
         ]
     )
     monkeypatch.setattr(
-        "backend.core.llm_credentials.get_pg_session",
+        "packages.llm_credentials.get_pg_session",
         lambda: MagicMock(Session=lambda: session),
     )
 
@@ -259,7 +259,7 @@ async def test_resolve_chat_model_honors_valid_request(monkeypatch):
         ]
     )
     monkeypatch.setattr(
-        "backend.core.llm_credentials.get_pg_session",
+        "packages.llm_credentials.get_pg_session",
         lambda: MagicMock(Session=lambda: session),
     )
 
@@ -274,7 +274,7 @@ async def test_resolve_chat_model_replaces_stale_request(monkeypatch):
         ]
     )
     monkeypatch.setattr(
-        "backend.core.llm_credentials.get_pg_session",
+        "packages.llm_credentials.get_pg_session",
         lambda: MagicMock(Session=lambda: session),
     )
 
@@ -285,7 +285,7 @@ async def test_resolve_chat_model_replaces_stale_request(monkeypatch):
 async def test_resolve_chat_model_missing_raises(monkeypatch):
     session = _RecordingSession(fetchall=[])
     monkeypatch.setattr(
-        "backend.core.llm_credentials.get_pg_session",
+        "packages.llm_credentials.get_pg_session",
         lambda: MagicMock(Session=lambda: session),
     )
 

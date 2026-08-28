@@ -134,7 +134,7 @@ async def _keys_for_model(
     key_provider: str,
     allow_pipeline: bool,
 ) -> list[LLMKey]:
-    from backend.core.llm_credentials import get_key_chain_for_model
+    from packages.llm_credentials import get_key_chain_for_model
 
     chain = await get_key_chain_for_model(tenant_id, model, limit=3)
     if chain:
