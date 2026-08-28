@@ -12,7 +12,7 @@ from packages.capability.models import (
     CapabilityProvider,
     CapabilitySpec,
 )
-from backend.core.errors import ErrorCode, NexusAIException
+from packages.errors import ErrorCode, NexusAIException
 
 
 @pytest.fixture

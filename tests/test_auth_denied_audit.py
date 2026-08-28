@@ -7,7 +7,7 @@ import asyncio
 from starlette.exceptions import HTTPException
 from starlette.requests import Request
 
-from backend.core.errors import http_exception_audit_handler
+from packages.errors import http_exception_audit_handler
 
 
 def test_http_401_writes_audit(monkeypatch) -> None:

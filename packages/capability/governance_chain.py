@@ -11,7 +11,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-from backend.core.errors import ErrorCode, NexusAIException
+from packages.errors import ErrorCode, NexusAIException
 from packages.auth.models import TenantContext
 from packages.capability.contract import derive_idempotency_key
 from packages.capability.errors import (

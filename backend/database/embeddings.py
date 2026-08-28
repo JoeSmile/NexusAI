@@ -85,7 +85,7 @@ class _EmbedEndpoint:
 
 
 def _resolve_tenant_embedding(tenant_id: str) -> _EmbedEndpoint | None:
-    from backend.core.errors import NexusAIException
+    from packages.errors import NexusAIException
     from backend.core.llm_credentials import (
         EMBEDDING_DIMENSIONS,
         resolve_embedding_credential_sync,
@@ -215,7 +215,7 @@ def embed_text(text: str, tenant_id: str | None = None) -> list[float]:
 
     if get_redis() is not None:
         record_l2_miss()
-    from backend.core.errors import NexusAIException
+    from packages.errors import NexusAIException
     from backend.core.llm_concurrency import embed_http_timeout_s, embed_slot_sync
 
     try:

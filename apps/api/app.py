@@ -239,7 +239,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    from backend.core.errors import (
+    from packages.errors import (
         NexusAIException,
         global_exception_handler,
         http_exception_audit_handler,

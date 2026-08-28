@@ -334,7 +334,7 @@ def _minute_bucket() -> str:
 
 def check_rate_limit(tenant_id: str, *, miss: bool = False) -> None:
     """超限抛 NexusAIException RATE_001。"""
-    from backend.core.errors import ErrorCode, NexusAIException
+    from packages.errors import ErrorCode, NexusAIException
 
     r = get_redis()
     if r is None:

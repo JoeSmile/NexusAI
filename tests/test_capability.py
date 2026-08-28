@@ -23,7 +23,7 @@ from packages.capability.models import (
     CapabilityStatus,
 )
 from packages.capability.registry import CapabilityRegistry
-from backend.core.errors import NexusAIException, ErrorCode
+from packages.errors import NexusAIException, ErrorCode
 
 
 @pytest.fixture

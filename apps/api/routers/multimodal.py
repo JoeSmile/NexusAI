@@ -19,7 +19,7 @@ from fastapi import (
 from backend.core.audit import log_audit
 from backend.core.audit_context import bind_audit_lineage
 from packages.billing.context import bind_billing_context
-from backend.core.errors import ErrorCode, NexusAIException
+from packages.errors import ErrorCode, NexusAIException
 from backend.core.file_sanitizer import sanitize_filename, validate_file
 from packages.guardrails.image_guard import check_image_input
 from packages.harness import LLMHarness

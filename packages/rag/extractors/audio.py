@@ -17,7 +17,7 @@ def extract_audio_text(path: str | Path) -> list[dict]:
     返回 [{text, start, end}, ...]
     """
     path = Path(path)
-    from backend.core.errors import ErrorCode
+    from packages.errors import ErrorCode
 
     if not path.exists():
         raise MultimodalDependencyError(
@@ -30,7 +30,7 @@ def extract_audio_text(path: str | Path) -> list[dict]:
         try:
             import whisper  # type: ignore
         except ImportError as e:
-            from backend.core.errors import ErrorCode
+            from packages.errors import ErrorCode
 
             raise MultimodalDependencyError(
                 ErrorCode.RAG_DEP_MISSING.value,

@@ -9,7 +9,7 @@ import pytest
 
 import backend.core.key_repository as key_repo
 import backend.core.llm_credentials as llm_cred
-from backend.core.errors import NexusAIException
+from packages.errors import NexusAIException
 from backend.core.llm_credentials import (
     list_available_models,
     resolve_chat_model_for_request,
@@ -312,7 +312,7 @@ async def test_get_key_chain_tenant_only_skips_global(monkeypatch, decrypt_ok):
 
 @pytest.mark.asyncio
 async def test_model_router_missing_tenant_key_raises(monkeypatch):
-    from backend.core.errors import NexusAIException
+    from packages.errors import NexusAIException
     from packages.pipeline.state import make_initial_state
 
     async def _boom(tenant_id, model):

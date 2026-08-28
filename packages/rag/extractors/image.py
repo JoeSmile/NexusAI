@@ -10,7 +10,7 @@ from packages.rag.extractors.audio import MultimodalDependencyError
 def extract_image_text(path: str | Path) -> str:
     """OCR 提取图片中的文本。"""
     path = Path(path)
-    from backend.core.errors import ErrorCode
+    from packages.errors import ErrorCode
 
     if not path.exists():
         raise MultimodalDependencyError(

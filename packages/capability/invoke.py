@@ -17,7 +17,7 @@ from collections.abc import AsyncIterator
 from dataclasses import replace
 from typing import Any
 
-from backend.core.errors import ErrorCode, NexusAIException
+from packages.errors import ErrorCode, NexusAIException
 from packages.auth.models import TenantContext
 from packages.capability.errors import (
     CapabilityNotFoundError,

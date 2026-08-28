@@ -18,7 +18,7 @@ from packages.capability.models import (
     CapabilityStatus,
 )
 from packages.capability.registry import CapabilityRegistry
-from backend.core.errors import NexusAIException, nexusai_exception_handler
+from packages.errors import NexusAIException, nexusai_exception_handler
 from apps.api.routers.admin_console import router
 
 

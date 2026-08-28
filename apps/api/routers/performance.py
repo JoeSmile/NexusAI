@@ -84,7 +84,7 @@ async def health_check():
 
 def _redis_unavailable_http(exc: Exception) -> HTTPException:
     """Redis 不可达时返回结构化 503，避免裸 500（EVID-04）。"""
-    from backend.core.errors import ErrorCode
+    from packages.errors import ErrorCode
 
     return HTTPException(
         status_code=503,

@@ -12,7 +12,7 @@ from packages.capability.exec_policy import global_default_exec_policy, resolve_
 from packages.capability.governance_chain import run_governance_chain
 from packages.capability.models import CapabilityKind, CapabilitySpec
 from packages.capability.registry import CapabilityRegistry
-from backend.core.errors import ErrorCode, NexusAIException
+from packages.errors import ErrorCode, NexusAIException
 
 
 @pytest.fixture

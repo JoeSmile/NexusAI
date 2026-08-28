@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from backend.core.audit import log_audit
 from backend.core.audit_context import bind_audit_lineage
 from packages.billing.context import bind_billing_context
-from backend.core.errors import ErrorCode, NexusAIException
+from packages.errors import ErrorCode, NexusAIException
 from packages.guardrails.output_guard import DRIFT_PATTERNS, VIOLATION_PATTERNS
 from packages.plan.event_bus import (
     event_to_sse_payload,

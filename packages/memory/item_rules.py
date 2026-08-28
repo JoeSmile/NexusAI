@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from backend.core.errors import ErrorCode
+from packages.errors import ErrorCode
 from packages.memory.extractor import _is_safe_fact, _slug
 from packages.memory.types import (
     DecisionItem,

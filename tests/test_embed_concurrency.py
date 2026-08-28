@@ -6,7 +6,7 @@ import threading
 
 import pytest
 
-from backend.core.errors import ErrorCode, NexusAIException
+from packages.errors import ErrorCode, NexusAIException
 from backend.core.llm_concurrency import (
     embed_slot_sync,
     embed_slots_in_flight,

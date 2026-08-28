@@ -7,7 +7,7 @@ import re
 import unicodedata
 from typing import Any
 
-from backend.core.errors import ErrorCode
+from packages.errors import ErrorCode
 from packages.guardrails.pii_patterns import PII_PATTERNS
 from packages.memory.extractor import _UNSAFE_FACT
 from packages.memory.types import (

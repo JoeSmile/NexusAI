@@ -6,7 +6,7 @@ import asyncio
 
 from starlette.requests import Request
 
-from backend.core.errors import global_exception_handler
+from packages.errors import global_exception_handler
 
 
 def _req() -> Request:

@@ -18,7 +18,7 @@ from packages.capability.models import (
     CapabilitySpec,
 )
 from packages.capability.registry import CapabilityRegistry
-from backend.core.errors import ErrorCode
+from packages.errors import ErrorCode
 
 
 @pytest.fixture

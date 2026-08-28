@@ -8,7 +8,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from backend.core.errors import ErrorCode
+from packages.errors import ErrorCode
 from apps.api.routers import performance as perf_mod
 from apps.api.routers.agent import router as agent_router
 from apps.api.routers.performance import router as perf_router

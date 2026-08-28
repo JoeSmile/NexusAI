@@ -31,7 +31,7 @@ from contextlib import asynccontextmanager, contextmanager
 
 from prometheus_client import Gauge, Histogram
 
-from backend.core.errors import ErrorCode, NexusAIException
+from packages.errors import ErrorCode, NexusAIException
 
 logger = logging.getLogger(__name__)
 

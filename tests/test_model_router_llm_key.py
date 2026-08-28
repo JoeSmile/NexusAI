@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.core.errors import ErrorCode, NexusAIException
+from packages.errors import ErrorCode, NexusAIException
 from packages.pipeline.nodes.model_router import model_router
 from packages.pipeline.state import make_initial_state
 

@@ -9,7 +9,7 @@ from decimal import Decimal
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from backend.core.errors import ErrorCode
+from packages.errors import ErrorCode
 from backend.database.pgvector_session import get_pg_session
 
 _INSUFFICIENT = ErrorCode.INSUFFICIENT_BALANCE.value

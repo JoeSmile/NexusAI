@@ -11,7 +11,7 @@ import os
 from datetime import UTC, datetime
 from typing import Any
 
-from backend.core.errors import ErrorCode, NexusAIException
+from packages.errors import ErrorCode, NexusAIException
 from packages.guardrails.input_guard import check_input
 from packages.guardrails.output_guard import check_output
 from packages.capability.errors import (

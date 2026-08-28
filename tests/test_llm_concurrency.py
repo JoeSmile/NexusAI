@@ -10,7 +10,7 @@ import time
 
 import pytest
 
-from backend.core.errors import ErrorCode, NexusAIException
+from packages.errors import ErrorCode, NexusAIException
 from backend.core.llm_concurrency import (
     llm_bucket_limit,
     llm_concurrency_limit,
@@ -514,7 +514,7 @@ def test_default_acquire_timeout_is_five_seconds(monkeypatch: pytest.MonkeyPatch
 async def test_slot_busy_http_retry_after_header():
     from starlette.requests import Request
 
-    from backend.core.errors import nexusai_exception_handler
+    from packages.errors import nexusai_exception_handler
     from backend.core.llm_concurrency import _timeout_error
 
     scope = {

@@ -8,7 +8,7 @@ import pytest
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.requests import Request
 
-from backend.core.errors import (
+from packages.errors import (
     http_exception_audit_handler,
     internal_error_payload,
 )

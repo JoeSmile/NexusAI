@@ -291,7 +291,7 @@ def test_embed_text_tenant_missing_falls_back_to_registry(monkeypatch):
     """未配租户 embedding 凭证时必须回退 env/registry，禁止静默哈希废检索。"""
     import backend.core.model_registry as mr
     import backend.database.embeddings as emb
-    from backend.core.errors import NexusAIException
+    from packages.errors import NexusAIException
 
     monkeypatch.setenv(
         "MODEL_REGISTRY_JSON",

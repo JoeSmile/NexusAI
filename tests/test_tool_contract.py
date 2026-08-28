@@ -23,7 +23,7 @@ from packages.capability.models import (
     CapabilitySpec,
 )
 from packages.capability.registry import CapabilityRegistry
-from backend.core.errors import ErrorCode, NexusAIException
+from packages.errors import ErrorCode, NexusAIException
 
 
 def _min_contract(cap_id: str, *, output_schema: dict | None = None) -> dict:

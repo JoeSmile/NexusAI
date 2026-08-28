@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.core.errors import ErrorCode, NexusAIException
+from packages.errors import ErrorCode, NexusAIException
 from packages.rag import cache as rag_cache
 
 

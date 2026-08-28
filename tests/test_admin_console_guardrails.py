@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
-from backend.core.errors import NexusAIException, nexusai_exception_handler
+from packages.errors import NexusAIException, nexusai_exception_handler
 from packages.guardrails.config_store import reset_store_for_tests
 from apps.api.routers.admin_console import router
 

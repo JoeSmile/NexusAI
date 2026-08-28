@@ -22,7 +22,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from backend.core.audit import log_audit
-from backend.core.errors import NexusAIException
+from packages.errors import NexusAIException
 from backend.observability.decorators import observe
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext

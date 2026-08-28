@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 import os
 
-from backend.core.errors import ErrorCode, NexusAIException
+from packages.errors import ErrorCode, NexusAIException
 from backend.core.model_registry import ModelSpec, get_model, get_registry
 
 

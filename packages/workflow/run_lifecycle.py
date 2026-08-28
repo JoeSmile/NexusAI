@@ -19,7 +19,7 @@ from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from backend.core.errors import ErrorCode
+from packages.errors import ErrorCode
 from packages.org.scope import OrgScope, assert_org_access
 from backend.database.pgvector_session import Workflow, WorkflowRun, WorkflowRunNode, get_pg_session
 from packages.auth.models import TenantContext

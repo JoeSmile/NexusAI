@@ -16,7 +16,7 @@ from packages.capability.mcp_registry import (
     register_mcp_tools,
 )
 from packages.capability.registry import CapabilityRegistry
-from backend.core.errors import ErrorCode, NexusAIException
+from packages.errors import ErrorCode, NexusAIException
 
 
 @pytest.fixture

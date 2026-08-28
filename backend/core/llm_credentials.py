@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from sqlalchemy import text
 
-from backend.core.errors import ErrorCode, NexusAIException
+from packages.errors import ErrorCode, NexusAIException
 from backend.core.key_manager import KeyManager
 from backend.core.key_repository import LLMKey
 from backend.database.pgvector_session import get_pg_session

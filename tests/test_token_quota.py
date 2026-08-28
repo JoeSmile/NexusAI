@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 
 import backend.core.token_quota as tq
-from backend.core.errors import NexusAIException
+from packages.errors import NexusAIException
 from packages.pipeline.nodes import rate_limiter as rl_mod
 
 
