@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from backend.core.audit_org_scope import audit_user_filter
+from packages.audit_org_scope import audit_user_filter
 from packages.auth.models import TenantContext
 from packages.org.scope import OrgScope
 
@@ -12,7 +12,7 @@ from packages.org.scope import OrgScope
 def test_member_only_self(monkeypatch):
     session = MagicMock()
     monkeypatch.setattr(
-        "backend.core.audit_org_scope.resolve_org_scope",
+        "packages.audit_org_scope.resolve_org_scope",
         lambda *a, **k: OrgScope(
             tenant_id="acme",
             user_id="u1",
@@ -33,7 +33,7 @@ def test_member_only_self(monkeypatch):
 def test_tenant_admin_no_user_filter(monkeypatch):
     session = MagicMock()
     monkeypatch.setattr(
-        "backend.core.audit_org_scope.resolve_org_scope",
+        "packages.audit_org_scope.resolve_org_scope",
         lambda *a, **k: OrgScope(
             tenant_id="acme",
             user_id="a",
@@ -54,7 +54,7 @@ def test_tenant_admin_no_user_filter(monkeypatch):
 def test_dept_manager_users_in_subtree(monkeypatch):
     session = MagicMock()
     monkeypatch.setattr(
-        "backend.core.audit_org_scope.resolve_org_scope",
+        "packages.audit_org_scope.resolve_org_scope",
         lambda *a, **k: OrgScope(
             tenant_id="acme",
             user_id="mgr",
