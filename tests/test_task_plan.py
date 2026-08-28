@@ -20,7 +20,7 @@ from packages.pipeline.nodes.task_plan import (
     validate_task_plan,
 )
 from packages.pipeline.state import make_initial_state
-from backend.skills.base import BaseSkill
+from packages.skills.base import BaseSkill
 
 
 class _FakeSkill(BaseSkill):

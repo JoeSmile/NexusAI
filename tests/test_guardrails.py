@@ -2,8 +2,8 @@
 
 import pytest
 
-from backend.core.guardrails.input_guard import check_input
-from backend.core.guardrails.output_guard import check_output
+from packages.guardrails.input_guard import check_input
+from packages.guardrails.output_guard import check_output
 
 
 @pytest.mark.asyncio

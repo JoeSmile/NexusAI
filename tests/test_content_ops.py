@@ -103,7 +103,7 @@ async def test_generate_script_redacts_student_names():
         model="mock-local",
     )
     # mock may or may not emit 李明; force path by injecting
-    from backend.core.memory_service import redact_student_names_in_text
+    from packages.memory.memory_service import redact_student_names_in_text
 
     forced = redact_student_names_in_text(
         "请联系李明家长", tenant_id="t1", names=["李明"]

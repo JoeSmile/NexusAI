@@ -1,21 +1,2 @@
-"""Shared render helpers for builtin skills (Task 66 slice 2)."""
-
-from __future__ import annotations
-
-from typing import Any
-
-
-def render_sections(title: str, sections: list[tuple[str, str]]) -> str:
-    lines = [f"## {title}", ""]
-    for heading, body in sections:
-        lines.append(f"### {heading}")
-        lines.append(body.strip())
-        lines.append("")
-    return "\n".join(lines).strip()
-
-
-def entity_str(entities: dict[str, Any], key: str, default: str = "") -> str:
-    val = entities.get(key)
-    if val is None:
-        return default
-    return str(val).strip()
+"""Shim — prefer packages.skills.builtin._render"""
+from packages.skills.builtin._render import *  # noqa: F401,F403

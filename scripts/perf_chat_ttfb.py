@@ -2,7 +2,7 @@
 import asyncio
 import time
 
-from backend.core.harness import LLMHarness
+from packages.harness import LLMHarness
 from packages.pipeline.graph import compiled_graph
 from packages.pipeline.state import make_initial_state
 

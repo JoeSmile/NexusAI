@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from backend.core.guardrails.output_guard import check_output
+from packages.guardrails.output_guard import check_output
 from backend.observability.decorators import observe
 from packages.pipeline.state import PipelineState
 
@@ -20,7 +20,7 @@ def apply_student_output_redaction(state: PipelineState) -> None:
     if not tenant_id:
         return
     try:
-        from backend.core.memory_service import redact_student_names_in_text
+        from packages.memory.memory_service import redact_student_names_in_text
 
         warm = dict(state.get("warm_memory") or {})
         redacted = redact_student_names_in_text(

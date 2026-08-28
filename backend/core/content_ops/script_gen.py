@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from backend.core.memory_service import redact_student_names_in_text
+from packages.memory.memory_service import redact_student_names_in_text
 
 logger = logging.getLogger(__name__)
 
@@ -154,7 +154,7 @@ async def generate_script(
     )
     text = ""
     try:
-        from backend.core.harness import LLMHarness
+        from packages.harness import LLMHarness
 
         harness = LLMHarness()
         model_name = (model or "").strip() or _default_chat_model()

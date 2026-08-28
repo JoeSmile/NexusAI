@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from backend.core.memory.types import TodoItem, TodoOwnerKind, parse_memory_item
-from backend.core.memory.validators import (
+from packages.memory.types import TodoItem, TodoOwnerKind, parse_memory_item
+from packages.memory.validators import (
     REJECT_GROUNDING,
     REJECT_SCHEMA,
     REJECT_SECURITY,

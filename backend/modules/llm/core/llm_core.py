@@ -160,7 +160,7 @@ NexusAI："""
     
     def _call_api_traditional(self, user_input, history_text, long_term_context=""):
         """传统方式：走 harness 同步出口（Wave G: 禁直接 requests；纳入并发信号量）。"""
-        from backend.core.harness.llm_client import complete_via_provider
+        from packages.harness.llm_client import complete_via_provider
 
         full_prompt = build_full_prompt(
             user_input=user_input,

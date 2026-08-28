@@ -683,7 +683,7 @@ class MemoryHub:
             ctx.get("conversation_id") or ctx.get("session_id") or self._session_id or ""
         )
         try:
-            from backend.core.memory_service import get_unified_memory_service
+            from packages.memory.memory_service import get_unified_memory_service
 
             mem = get_unified_memory_service(tenant_id=self._tenant_id)
             bundle = await mem.read(

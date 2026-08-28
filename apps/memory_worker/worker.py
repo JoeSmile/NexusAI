@@ -16,13 +16,13 @@ def process_one(xid: str, data: dict, *, deliveries: int = 1) -> float:
     """处理单条；返回 score（1.0 成功落库 / 0.0 跳过或失败门控）。"""
     import hashlib
 
-    from backend.core.memory.memory_queue import (
+    from packages.memory.memory_queue import (
         MAX_DELIVERIES,
         ack,
         drop_poison,
         is_tombstoned,
     )
-    from backend.core.memory_service import get_unified_memory_service
+    from packages.memory.memory_service import get_unified_memory_service
     from backend.database.vector_ops import list_user_memories_by_prefix
 
     tenant_id = str(data.get("tenant_id") or "")
@@ -137,7 +137,7 @@ def process_one(xid: str, data: dict, *, deliveries: int = 1) -> float:
 
 def run_forever() -> None:
     from apps.memory_worker.heartbeat import WorkerHeartbeat
-    from backend.core.memory.memory_queue import claim_stale, read_group
+    from packages.memory.memory_queue import claim_stale, read_group
 
     logger.info("memory_worker started")
     hb = WorkerHeartbeat("memory")

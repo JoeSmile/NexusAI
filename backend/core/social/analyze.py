@@ -116,7 +116,7 @@ JSON 字段:
 不要 markdown,不要 JSON 以外的字。"""
 
     try:
-        from backend.core.harness import LLMHarness
+        from packages.harness import LLMHarness
 
         harness = LLMHarness()
         result = await harness.generate(
@@ -188,7 +188,7 @@ async def generate_replica_from_template(
 要求:标题含品牌或业务关键词;口播按 hook→pain→method→cta;不要markdown。"""
 
     try:
-        from backend.core.harness import LLMHarness
+        from packages.harness import LLMHarness
 
         harness = LLMHarness()
         result = await harness.generate(

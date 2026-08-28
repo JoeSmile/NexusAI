@@ -6,7 +6,7 @@ import json
 import re
 from typing import Any
 
-from backend.core.guardrails.pii_patterns import PII_PATTERNS
+from packages.guardrails.pii_patterns import PII_PATTERNS
 from packages.workflow.ir import _FORBIDDEN_PARAM_KEYS
 
 # 密钥 / 凭据启发式

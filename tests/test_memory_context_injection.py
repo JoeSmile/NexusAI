@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.core.memory_service import MEMORY_ISOLATION_HEADER
+from packages.memory.memory_service import MEMORY_ISOLATION_HEADER
 from backend.core.prompt_service import DEFAULT_CHAT_SYSTEM, render_prompt
 from packages.pipeline.context_messages import (
     build_llm_messages,
@@ -111,7 +111,7 @@ async def test_load_memory_passes_session_id(monkeypatch) -> None:
     class _Svc:
         async def read(self, **kwargs):
             seen.update(kwargs)
-            from backend.core.memory_service import MemoryBundle
+            from packages.memory.memory_service import MemoryBundle
 
             return MemoryBundle(hot=[{"role": "user", "content": "hi"}])
 

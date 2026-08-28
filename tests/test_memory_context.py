@@ -6,8 +6,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from backend.core.memory_service import MEMORY_ISOLATION_HEADER
-from backend.core.guardrails.output_guard import check_role_drift
+from packages.memory.memory_service import MEMORY_ISOLATION_HEADER
+from packages.guardrails.output_guard import check_role_drift
 from packages.pipeline.context_messages import build_llm_messages, expand_hot_messages
 from packages.pipeline.nodes import load_memory as lm
 from packages.pipeline.state import make_initial_state

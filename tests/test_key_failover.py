@@ -346,7 +346,7 @@ def test_classify_switchable_status():
 @pytest.mark.asyncio
 async def test_load_key_chain_sync_works_under_running_loop(monkeypatch):
     """Important #2: 已有 event loop 时仍能拉到候选链(线程池),不再返回空。"""
-    import backend.core.harness.llm_client as llm_client
+    import packages.harness.llm_client as llm_client
     from backend.core.key_repository import LLMKey
 
     async def _fake_chain(tid, provider, limit=3):

@@ -56,7 +56,7 @@ async def _probe_one(
     mock: bool,
 ) -> dict[str, Any]:
     from backend.core.cost_manager import count_tokens
-    from backend.core.harness import LLMHarness
+    from packages.harness import LLMHarness
     from packages.pipeline.graph import compiled_graph
     from packages.pipeline.state import make_initial_state
 

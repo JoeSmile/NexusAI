@@ -12,8 +12,8 @@ from backend.core.audit import write_audit_sync
 from backend.core.audit_context import get_audit_lineage
 from packages.capability.invoke import capability_visible_to
 from packages.capability.registry import get_capability_registry
-from backend.core.guardrails.output_guard import check_output
-from backend.core.harness import LLMHarness
+from packages.guardrails.output_guard import check_output
+from packages.harness import LLMHarness
 from packages.plan.event_bus import bus_for_state
 from packages.plan.llm_output_guard import prevalidate_llm_plan
 from packages.plan.models import plan_to_state_dict

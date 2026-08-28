@@ -7,9 +7,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from backend.core.memory import memory_queue as mq
-from backend.core.memory.extractor import is_async_key, is_sync_key
-from backend.core.memory_service import MemoryBundle, UnifiedMemoryService, _student_alias
+from packages.memory import memory_queue as mq
+from packages.memory.extractor import is_async_key, is_sync_key
+from packages.memory.memory_service import MemoryBundle, UnifiedMemoryService, _student_alias
 
 
 def test_enqueue_degrades_without_redis(monkeypatch):
@@ -77,7 +77,7 @@ def test_assemble_redacts_student_entity():
 @pytest.mark.asyncio
 async def test_memory_hub_retrieve_uses_unified():
     from backend.agent.memory_hub import MemoryHub
-    from backend.core.memory_service import MemoryBundle
+    from packages.memory.memory_service import MemoryBundle
 
     hub = MemoryHub(user_id="u1", session_id="s1", tenant_id="t1")
     fake_mem = MagicMock()
@@ -86,7 +86,7 @@ async def test_memory_hub_retrieve_uses_unified():
     )
     fake_mem.assemble_prompt_block = MagicMock(return_value="# 用户背景\n- fact:x")
     with patch(
-        "backend.core.memory_service.get_unified_memory_service",
+        "packages.memory.memory_service.get_unified_memory_service",
         return_value=fake_mem,
     ):
         out = await hub.retrieve("hello", user_id="u1")
@@ -106,16 +106,16 @@ def test_drop_poison_acks(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_persist_warm_async_enqueues(monkeypatch):
-    from backend.core.memory.write_items import persist_warm_by_key
+    from packages.memory.write_items import persist_warm_by_key
 
     mem = MagicMock()
     mem.write = AsyncMock()
     monkeypatch.setattr(
-        "backend.core.memory.memory_queue.enqueue_memory_write",
+        "packages.memory.memory_queue.enqueue_memory_write",
         lambda payload: "1-0",
     )
     monkeypatch.setattr(
-        "backend.core.memory.memory_queue.queue_depth",
+        "packages.memory.memory_queue.queue_depth",
         lambda: 1,
     )
     status = await persist_warm_by_key(
@@ -133,12 +133,12 @@ async def test_persist_warm_async_enqueues(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_persist_warm_degraded_fallback(monkeypatch):
-    from backend.core.memory.write_items import persist_warm_by_key
+    from packages.memory.write_items import persist_warm_by_key
 
     mem = MagicMock()
     mem.write = AsyncMock()
     monkeypatch.setattr(
-        "backend.core.memory.memory_queue.enqueue_memory_write",
+        "packages.memory.memory_queue.enqueue_memory_write",
         lambda payload: None,
     )
     status = await persist_warm_by_key(

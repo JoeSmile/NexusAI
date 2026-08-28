@@ -143,7 +143,7 @@ def generate_llm_hardcases(
 ) -> list[IntentSample]:
     """Optional LLM expansion — returns [] when harness unavailable."""
     try:
-        from backend.core.harness import LLMHarness
+        from packages.harness import LLMHarness
     except Exception:
         return []
 

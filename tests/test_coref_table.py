@@ -152,7 +152,7 @@ async def test_save_session_coref_writes_warm(monkeypatch):
         return {"tier": tier}
 
     monkeypatch.setattr(
-        "backend.core.memory_service.UnifiedMemoryService.write",
+        "packages.memory.memory_service.UnifiedMemoryService.write",
         _write,
     )
     monkeypatch.setattr(

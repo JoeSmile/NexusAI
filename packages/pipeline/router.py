@@ -16,7 +16,7 @@ from backend.core.audit import log_audit
 from backend.core.audit_context import bind_audit_lineage
 from backend.core.billing.context import bind_billing_context
 from backend.core.errors import ErrorCode, NexusAIException
-from backend.core.guardrails.output_guard import DRIFT_PATTERNS, VIOLATION_PATTERNS
+from packages.guardrails.output_guard import DRIFT_PATTERNS, VIOLATION_PATTERNS
 from packages.plan.event_bus import (
     event_to_sse_payload,
     get_run_bus,
@@ -461,7 +461,7 @@ async def chat_streaming(
         return JSONResponse(_chat_json_payload(final))
 
     from backend.core.billing.context import bind_billing_from_pipeline_state
-    from backend.core.harness import LLMHarness
+    from packages.harness import LLMHarness
     from packages.pipeline.context_messages import build_llm_messages
     from packages.pipeline.nodes.conversion_hook import conversion_hook
     from packages.pipeline.nodes.llm_generate import _resolve_system_template

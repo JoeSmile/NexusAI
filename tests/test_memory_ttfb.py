@@ -6,7 +6,7 @@ import asyncio
 import fnmatch
 from unittest.mock import MagicMock
 
-from backend.core.memory_service import MemoryBundle, UnifiedMemoryService
+from packages.memory.memory_service import MemoryBundle, UnifiedMemoryService
 
 
 class _FakeRedis:
@@ -88,7 +88,7 @@ def test_read_second_hit_skips_db(monkeypatch) -> None:
         "backend.core.redis_tools.get_sync_redis", lambda **_k: fake
     )
     monkeypatch.setattr(
-        "backend.core.memory_service.get_pg_session", lambda: _Factory(counter)
+        "packages.memory.memory_service.get_pg_session", lambda: _Factory(counter)
     )
     svc = UnifiedMemoryService(tenant_id="acme")
     b1 = asyncio.run(svc.read(user_id="u1", session_id="s1"))
@@ -108,7 +108,7 @@ def test_write_invalidates_bundle_cache(monkeypatch) -> None:
         "backend.core.redis_tools.get_sync_redis", lambda **_k: fake
     )
     monkeypatch.setattr(
-        "backend.core.memory_service.get_pg_session", lambda: _Factory(counter)
+        "packages.memory.memory_service.get_pg_session", lambda: _Factory(counter)
     )
     svc = UnifiedMemoryService(tenant_id="acme")
     asyncio.run(svc.read(user_id="u1", session_id="s1"))
@@ -133,7 +133,7 @@ def test_read_without_redis_still_works(monkeypatch) -> None:
         "backend.core.redis_tools.get_sync_redis", lambda **_k: None
     )
     monkeypatch.setattr(
-        "backend.core.memory_service.get_pg_session", lambda: _Factory(counter)
+        "packages.memory.memory_service.get_pg_session", lambda: _Factory(counter)
     )
     svc = UnifiedMemoryService(tenant_id="acme")
     b = asyncio.run(svc.read(user_id="u1", session_id="s1"))
@@ -150,7 +150,7 @@ def test_read_cache_does_not_mix_view_params(monkeypatch) -> None:
         "backend.core.redis_tools.get_sync_redis", lambda **_k: fake
     )
     monkeypatch.setattr(
-        "backend.core.memory_service.get_pg_session", lambda: _Factory(counter)
+        "packages.memory.memory_service.get_pg_session", lambda: _Factory(counter)
     )
     svc = UnifiedMemoryService(tenant_id="acme")
     asyncio.run(svc.read(user_id="u1", session_id="s1", hot_limit=5, include_cold=True))

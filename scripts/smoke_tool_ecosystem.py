@@ -42,7 +42,7 @@ async def _counts() -> dict[str, int]:
         BUILTIN_SKILL_ASSET_CATALOG,
         BUILTIN_SKILL_IDS,
     )
-    from backend.skills.registry import SkillRegistry
+    from packages.skills.registry import SkillRegistry
 
     reg_skill = SkillRegistry()
     reg_skill.discover()

@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 
-from backend.core.memory.item_rules import (
+from packages.memory.item_rules import (
     context_overlap_ok,
     extract_structured_items,
     pending_key,
@@ -14,7 +14,7 @@ from backend.core.memory.item_rules import (
     pronoun_hits,
     should_bind_pending,
 )
-from backend.core.memory.validators import validate_item
+from packages.memory.validators import validate_item
 
 
 def test_extract_entity_decision_todo_error():
@@ -98,7 +98,7 @@ def test_chatty_bare_mention_no_entity():
 
 def test_async_extract_smoke():
     async def _run():
-        from backend.core.memory.extractor import RuleExtractor
+        from packages.memory.extractor import RuleExtractor
 
         ex = RuleExtractor()
         return await ex.extract(user_message="请记住项目代号星火")

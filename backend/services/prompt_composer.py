@@ -154,7 +154,7 @@ class PromptComposer:
 
     def _build_memory_prompt(self) -> str:
         """构建记忆与偏好 Prompt（带 system-role 隔离标记，Task 34.06）。"""
-        from backend.core.memory_service import MEMORY_ISOLATION_HEADER
+        from packages.memory.memory_service import MEMORY_ISOLATION_HEADER
 
         prompt_parts = [MEMORY_ISOLATION_HEADER]
 

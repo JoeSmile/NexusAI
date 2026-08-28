@@ -22,7 +22,7 @@ try:
 except ImportError:  # pragma: no cover
     PromptTemplate = None
 
-from backend.core.harness import get_llm_client
+from packages.harness import get_llm_client
 from backend.logging_config import get_logger
 from config import Config
 

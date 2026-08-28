@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from backend.core.memory_service import get_unified_memory_service
+from packages.memory.memory_service import get_unified_memory_service
 
 
 class UserProfile(dict):

@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.core.memory_service import (
+from packages.memory.memory_service import (
     MEMORY_ISOLATION_HEADER,
     MemoryBundle,
     UnifiedMemoryService,
@@ -95,7 +95,7 @@ async def test_write_turn_and_read_hot() -> None:
     sess = _FakeSession()
     svc = UnifiedMemoryService(tenant_id="t1")
     with patch(
-        "backend.core.memory_service.get_pg_session",
+        "packages.memory.memory_service.get_pg_session",
         return_value=_FakeFactory(sess),
     ):
         out = await svc.write_turn(
@@ -164,7 +164,7 @@ async def test_write_cold() -> None:
     sess = _FakeSession()
     svc = UnifiedMemoryService(tenant_id="t1")
     with patch(
-        "backend.core.memory_service.get_pg_session",
+        "packages.memory.memory_service.get_pg_session",
         return_value=_FakeFactory(sess),
     ):
         out = await svc.write_cold(user_id="u1", summary="谈了供应商风险", session_id="s1")
@@ -197,7 +197,7 @@ def test_assemble_prompt_block_has_isolation_and_budget() -> None:
 
 
 def test_rule_based_session_summary() -> None:
-    from backend.core.memory_service import rule_based_session_summary
+    from packages.memory.memory_service import rule_based_session_summary
 
     text = rule_based_session_summary(
         [
@@ -219,7 +219,7 @@ def test_list_session_messages_head_tail_skips_middle() -> None:
     from types import SimpleNamespace
     from unittest.mock import MagicMock, patch
 
-    from backend.core.memory_service import (
+    from packages.memory.memory_service import (
         UnifiedMemoryService,
         rule_based_session_summary,
     )
@@ -272,7 +272,7 @@ def test_list_session_messages_head_tail_skips_middle() -> None:
 
     svc = UnifiedMemoryService(tenant_id="t1")
     with patch(
-        "backend.core.memory_service.get_pg_session",
+        "packages.memory.memory_service.get_pg_session",
         return_value=MagicMock(Session=lambda: _Sess()),
     ):
         out = svc.list_session_messages_head_tail(
@@ -289,7 +289,7 @@ async def test_maybe_cold_summarize_triggers_on_threshold() -> None:
     from types import SimpleNamespace
     from unittest.mock import MagicMock, patch
 
-    from backend.core.memory_service import UnifiedMemoryService
+    from packages.memory.memory_service import UnifiedMemoryService
 
     msgs = [
         SimpleNamespace(role="user", content=f"q{i}", created_at=None)
@@ -330,7 +330,7 @@ async def test_maybe_cold_summarize_triggers_on_threshold() -> None:
 
     svc = UnifiedMemoryService(tenant_id="t1")
     with patch(
-        "backend.core.memory_service.get_pg_session",
+        "packages.memory.memory_service.get_pg_session",
         return_value=MagicMock(Session=lambda: _Sess()),
     ):
         out = await svc.maybe_cold_summarize(
@@ -347,7 +347,7 @@ async def test_maybe_cold_summarize_triggers_on_threshold() -> None:
 
 
 def test_decay_score_matches_enhanced_curve() -> None:
-    from backend.core.memory_service import decay_score
+    from packages.memory.memory_service import decay_score
 
     assert decay_score(1.0, 0) == 1.0
     assert abs(decay_score(1.0, 1) - 0.9) < 1e-9
@@ -358,7 +358,7 @@ def test_decay_score_matches_enhanced_curve() -> None:
 async def test_forget_user_clears_warm_cold_and_redacts() -> None:
     from unittest.mock import MagicMock, patch
 
-    from backend.core.memory_service import REDACTED_MESSAGE, UnifiedMemoryService
+    from packages.memory.memory_service import REDACTED_MESSAGE, UnifiedMemoryService
 
     class _Sess:
         def __init__(self) -> None:
@@ -396,7 +396,7 @@ async def test_forget_user_clears_warm_cold_and_redacts() -> None:
     sess = _Sess()
     svc = UnifiedMemoryService(tenant_id="t1")
     with patch(
-        "backend.core.memory_service.get_pg_session",
+        "packages.memory.memory_service.get_pg_session",
         return_value=MagicMock(Session=lambda: sess),
     ):
         out = await svc.forget_user("u1")
@@ -411,7 +411,7 @@ async def test_forget_user_clears_warm_cold_and_redacts() -> None:
 
 @pytest.mark.asyncio
 async def test_build_context_strips_memory_on_role_drift() -> None:
-    from backend.core.memory_service import MEMORY_ISOLATION_HEADER
+    from packages.memory.memory_service import MEMORY_ISOLATION_HEADER
     from packages.pipeline.nodes.build_context import build_context
     from packages.pipeline.state import make_initial_state
 
@@ -427,7 +427,7 @@ async def test_build_context_strips_memory_on_role_drift() -> None:
 
 
 def test_prompt_composer_clamps_relaxed_style() -> None:
-    from backend.core.memory_service import MEMORY_ISOLATION_HEADER
+    from packages.memory.memory_service import MEMORY_ISOLATION_HEADER
     from backend.services.prompt_composer import PromptComposer
 
     text = PromptComposer(

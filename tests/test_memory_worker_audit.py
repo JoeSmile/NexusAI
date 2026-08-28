@@ -12,13 +12,13 @@ def test_process_one_audits_accepted_write():
     audits: list[dict] = []
 
     with patch(
-        "backend.core.memory.memory_queue.is_tombstoned", return_value=False
+        "packages.memory.memory_queue.is_tombstoned", return_value=False
     ), patch(
-        "backend.core.memory.memory_queue.ack"
+        "packages.memory.memory_queue.ack"
     ) as ack, patch(
         "backend.database.vector_ops.list_user_memories_by_prefix", return_value=[]
     ), patch(
-        "backend.core.memory_service.get_unified_memory_service"
+        "packages.memory.memory_service.get_unified_memory_service"
     ) as get_mem, patch(
         "backend.core.audit.write_audit_sync",
         side_effect=lambda r: audits.append(r) or True,
@@ -55,13 +55,13 @@ def test_process_one_audits_accepted_write():
 
 def test_process_one_refuses_ack_when_audit_fails():
     with patch(
-        "backend.core.memory.memory_queue.is_tombstoned", return_value=False
+        "packages.memory.memory_queue.is_tombstoned", return_value=False
     ), patch(
-        "backend.core.memory.memory_queue.ack"
+        "packages.memory.memory_queue.ack"
     ) as ack, patch(
         "backend.database.vector_ops.list_user_memories_by_prefix", return_value=[]
     ), patch(
-        "backend.core.memory_service.get_unified_memory_service"
+        "packages.memory.memory_service.get_unified_memory_service"
     ) as get_mem, patch(
         "backend.core.audit.write_audit_sync", return_value=False
     ), patch(

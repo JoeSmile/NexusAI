@@ -6,7 +6,7 @@ import os
 
 
 async def generate_text(prompt: str, model: str = "", api_key: str = "", base_url: str = "") -> str:
-    from backend.core.harness.provider import (
+    from packages.harness.provider import (
         get_llm_provider,
         load_fixture,
         mock_response,

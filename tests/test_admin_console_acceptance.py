@@ -12,8 +12,8 @@ from packages.auth.models import TenantContext
 from packages.capability.errors import CapabilityDisabledError
 from packages.capability.models import CapabilityStatus
 from packages.capability.registry import CapabilityRegistry
-from backend.core.guardrails.config_store import reset_store_for_tests
-from backend.core.guardrails.dry_run import dry_run
+from packages.guardrails.config_store import reset_store_for_tests
+from packages.guardrails.dry_run import dry_run
 from tests.test_admin_console import _client, _tool_spec
 
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.core.memory.flywheel import (
+from packages.memory.flywheel import (
     flywheel_snapshot,
     record_correction_phrase,
     record_item_outcome,

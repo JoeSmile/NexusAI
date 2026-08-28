@@ -254,7 +254,7 @@ class PersistentScopedStore(InMemoryStore):
         if not self._persist:
             return 0
         try:
-            from backend.core.memory_service import get_unified_memory_service
+            from packages.memory.memory_service import get_unified_memory_service
 
             ums = get_unified_memory_service(self._tenant_id)
             bundle = await ums.read(

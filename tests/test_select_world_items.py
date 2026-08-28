@@ -5,11 +5,11 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
-from backend.core.memory.select_world_items import (
+from packages.memory.select_world_items import (
     keyword_select,
     select_world_items,
 )
-from backend.core.memory_service import MEMORY_ISOLATION_HEADER, MemoryBundle, UnifiedMemoryService
+from packages.memory.memory_service import MEMORY_ISOLATION_HEADER, MemoryBundle, UnifiedMemoryService
 
 
 def _decision_warm() -> dict[str, str]:
@@ -111,14 +111,14 @@ def test_assemble_render_identical_for_same_selection() -> None:
     bundle = MemoryBundle(warm=warm, hot=[], cold=[])
 
     with patch(
-        "backend.core.memory.select_world_items.select_world_items",
+        "packages.memory.select_world_items.select_world_items",
         return_value=["decision:分布式锁防"],
     ):
         block_a = svc.assemble_prompt_block(
             bundle, query="任意", user_id="u1", retrieval_mode="semantic"
         )
     with patch(
-        "backend.core.memory.select_world_items.select_world_items",
+        "packages.memory.select_world_items.select_world_items",
         return_value=["decision:分布式锁防"],
     ):
         block_b = svc.assemble_prompt_block(

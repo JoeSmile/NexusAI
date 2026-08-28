@@ -69,7 +69,7 @@ async def save_session_coref(state: dict[str, Any], table: CorefTable) -> None:
     pruned = _prune_table(table)
     value = json.dumps(pruned.model_dump(mode="json"), ensure_ascii=False)
 
-    from backend.core.memory_service import get_unified_memory_service
+    from packages.memory.memory_service import get_unified_memory_service
 
     mem = get_unified_memory_service(tenant_id=tenant_id)
     await mem.write(

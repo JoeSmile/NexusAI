@@ -9,7 +9,7 @@ from typing import Any
 
 from sqlalchemy import text
 
-from backend.core.harness import LLMHarness
+from packages.harness import LLMHarness
 from backend.core.skill_assets.service import create_draft, search_published
 from backend.database.pgvector_session import get_pg_session
 

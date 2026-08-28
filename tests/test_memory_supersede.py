@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import asyncio
 
-from backend.core.memory.extractor import RuleExtractor
-from backend.core.memory.supersede import (
+from packages.memory.extractor import RuleExtractor
+from packages.memory.supersede import (
     bigram_jaccard,
     find_superseded_keys,
     same_topic,

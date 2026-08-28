@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from backend.core.guardrails.rag_sanitize import sanitize_fragment, sanitize_memory_bundle
-from backend.core.memory_service import MemoryBundle
+from packages.guardrails.rag_sanitize import sanitize_fragment, sanitize_memory_bundle
+from packages.memory.memory_service import MemoryBundle
 
 
 def test_sanitize_fragment_strips_injection() -> None:

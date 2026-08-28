@@ -72,7 +72,7 @@ async def extract_style_from_text(
         return out
 
     try:
-        from backend.core.harness import LLMHarness
+        from packages.harness import LLMHarness
 
         harness = LLMHarness()
         model_name = (model or "").strip() or "mock-local"

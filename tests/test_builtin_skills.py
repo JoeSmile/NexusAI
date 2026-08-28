@@ -11,7 +11,7 @@ from backend.core.skill_assets.bootstrap import (
     validate_builtin_catalog,
 )
 from backend.core.skill_assets.builtin_catalog import BUILTIN_SKILL_ASSET_CATALOG, BUILTIN_SKILL_IDS
-from backend.skills.registry import SkillRegistry
+from packages.skills.registry import SkillRegistry
 
 
 def test_discover_builtin_skills() -> None:

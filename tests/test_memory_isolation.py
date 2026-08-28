@@ -30,7 +30,7 @@ def test_cross_tenant_auditor_can_access():
 
 def test_no_org_unit_pretend_on_memory_module():
     """Guard: memory module must not claim dept OrgScope filtering."""
-    import backend.core.memory_service as ms
+    import packages.memory.memory_service as ms
 
     assert not hasattr(ms, "list_by_org")
     assert not hasattr(ms.UnifiedMemoryService, "list_by_org")

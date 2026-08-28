@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from backend.core.fallback import get_fallback
-from backend.core.harness.llm import LLMHarness
+from packages.harness.llm import LLMHarness
 from packages.pipeline.router import _sse_done_payload
 
 
@@ -46,11 +46,11 @@ async def test_harness_stream_finish_reason_fallback(monkeypatch):
         raise RuntimeError("exhausted")
 
     monkeypatch.setattr(harness, "_stream_with_resilience", _fail)
-    monkeypatch.setattr("backend.core.harness.llm.get_llm_provider", lambda: "openai")
-    monkeypatch.setattr("backend.core.harness.llm._terms_allows", AsyncMock(return_value=True))
-    monkeypatch.setattr("backend.core.harness.llm._wallet_allows", AsyncMock(return_value=True))
-    monkeypatch.setattr("backend.core.harness.llm._budget_allows", AsyncMock(return_value=True))
-    monkeypatch.setattr("backend.core.harness.llm.record_consumption", lambda *a, **k: None)
+    monkeypatch.setattr("packages.harness.llm.get_llm_provider", lambda: "openai")
+    monkeypatch.setattr("packages.harness.llm._terms_allows", AsyncMock(return_value=True))
+    monkeypatch.setattr("packages.harness.llm._wallet_allows", AsyncMock(return_value=True))
+    monkeypatch.setattr("packages.harness.llm._budget_allows", AsyncMock(return_value=True))
+    monkeypatch.setattr("packages.harness.llm.record_consumption", lambda *a, **k: None)
 
     chunks: list[str] = []
     async for ch in harness._stream_unlocked(

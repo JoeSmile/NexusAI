@@ -18,7 +18,7 @@ except ImportError:
     StrOutputParser = None
 
 # 导入日志配置
-from backend.core.harness import get_llm_client
+from packages.harness import get_llm_client
 from backend.logging_config import get_logger
 from backend.modules.llm.harness import resolve_llm_settings
 
@@ -200,7 +200,7 @@ class EvaluationEngine:
         self, user_message: str, bot_response: str
     ) -> str:
         """走 harness 同步出口（Wave G/H: 禁直接 requests；纳入并发信号量）。"""
-        from backend.core.harness.llm_client import complete_via_provider
+        from packages.harness.llm_client import complete_via_provider
 
         prompt = EVALUATION_PROMPT_TEMPLATE.format(
             user_message=user_message,

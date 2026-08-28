@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 from sqlalchemy import text
 
-from backend.core.memory_service import get_unified_memory_service
+from packages.memory.memory_service import get_unified_memory_service
 from backend.database.pgvector_session import CacheEntry, get_pg_session
 from backend.observability.decorators import observe
 from packages.pipeline.state import PipelineState
@@ -52,8 +52,8 @@ async def write_memory(state: PipelineState) -> PipelineState:
 
     # Task 41/42: 规则抽取 → warm（失败静默；REJECT_* 进 audit）
     try:
-        from backend.core.memory.extractor import get_extractor, min_confidence
-        from backend.core.memory.write_items import (
+        from packages.memory.extractor import get_extractor, min_confidence
+        from packages.memory.write_items import (
             persist_structured_turn,
             persist_warm_by_key,
         )

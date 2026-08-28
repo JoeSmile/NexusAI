@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from backend.skills.base import BaseSkill
-from backend.skills.registry import registry
+from packages.skills.base import BaseSkill
+from packages.skills.registry import registry
 from packages.pipeline.state import PipelineState
 
 SHORT_PATH_CONFIDENCE = 0.85

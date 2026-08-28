@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.core.memory_service import get_unified_memory_service
+from packages.memory.memory_service import get_unified_memory_service
 from backend.observability.decorators import observe
 from packages.pipeline.state import PipelineState
 

@@ -102,7 +102,7 @@ async def test_orchestrator_spawn_blocked_holds_clarification(monkeypatch):
         return {"tier": tier, "key": payload.get("key")}
 
     monkeypatch.setattr(
-        "backend.core.memory_service.UnifiedMemoryService.write",
+        "packages.memory.memory_service.UnifiedMemoryService.write",
         _write,
     )
     monkeypatch.setenv("ORCHESTRATOR_ENABLED", "true")

@@ -20,7 +20,7 @@ from backend.core.billing.wallet import (
     is_wallet_billing_enabled,
     recharge_wallet,
 )
-from backend.core.harness.llm import LLMHarness
+from packages.harness.llm import LLMHarness
 from apps.api.routers import billing as billing_mod
 from apps.api.routers.billing import router as billing_router
 
@@ -187,7 +187,7 @@ async def test_harness_blocks_insufficient_wallet(monkeypatch: pytest.MonkeyPatc
         return False
 
     monkeypatch.setattr(
-        "backend.core.harness.llm.get_llm_provider",
+        "packages.harness.llm.get_llm_provider",
         lambda: "openai",
     )
     monkeypatch.setattr("backend.core.billing.wallet.check_wallet_allows", _deny)

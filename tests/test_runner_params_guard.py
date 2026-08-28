@@ -1,6 +1,6 @@
 """Wave D5 — params injection guard."""
 
-from backend.core.guardrails.input_guard import (
+from packages.guardrails.input_guard import (
     detect_injection,
     detect_injection_in_params,
 )

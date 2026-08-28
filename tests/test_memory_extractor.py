@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.core.memory.extractor import (
+from packages.memory.extractor import (
     RuleExtractor,
     SmallModelExtractor,
     get_extractor,

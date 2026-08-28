@@ -67,7 +67,7 @@ def norm_hash(text: str) -> str:
 
 
 def contains_pii(text: str) -> bool:
-    from backend.core.guardrails.pii_patterns import PII_PATTERNS
+    from packages.guardrails.pii_patterns import PII_PATTERNS
 
     for pattern in PII_PATTERNS.values():
         if re.search(pattern, text or ""):

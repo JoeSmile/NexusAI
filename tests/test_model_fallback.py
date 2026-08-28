@@ -7,9 +7,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-import backend.core.harness.llm as llm_mod
+import packages.harness.llm as llm_mod
 import backend.core.key_failover as key_failover
-from backend.core.harness.llm import LLMHarness
+from packages.harness.llm import LLMHarness
 from backend.core.key_repository import LLMKey
 from backend.core.model_registry import fallback_chain, reload_registry
 

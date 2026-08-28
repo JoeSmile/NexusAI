@@ -16,7 +16,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from backend.core.errors import ErrorCode, NexusAIException
-from backend.core.guardrails.input_guard import detect_injection_in_params
+from packages.guardrails.input_guard import detect_injection_in_params
 from backend.core.org.scope import OrgScope, resolve_org_scope
 from backend.database.pgvector_session import Workflow, WorkflowRun, WorkflowRunNode
 from packages.auth.models import TenantContext
@@ -447,7 +447,7 @@ async def _execute_node(
             done_meta.get("op") or ""
         ) in ("script.gen", "content.script_gen"):
             try:
-                from backend.core.memory_service import redact_student_names_in_text
+                from packages.memory.memory_service import redact_student_names_in_text
 
                 names = params.get("student_names")
                 if isinstance(names, str):

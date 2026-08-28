@@ -21,8 +21,8 @@ from backend.core.audit_context import bind_audit_lineage
 from backend.core.billing.context import bind_billing_context
 from backend.core.errors import ErrorCode, NexusAIException
 from backend.core.file_sanitizer import sanitize_filename, validate_file
-from backend.core.guardrails.image_guard import check_image_input
-from backend.core.harness import LLMHarness
+from packages.guardrails.image_guard import check_image_input
+from packages.harness import LLMHarness
 from backend.core.multimodal.vision import (
     build_vision_messages,
     image_to_data_uri,

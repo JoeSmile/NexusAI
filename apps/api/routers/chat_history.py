@@ -283,7 +283,7 @@ async def post_chat_note(
     """Persist a local workflow bubble (dig/script) into chat_messages."""
     import uuid as _uuid
 
-    from backend.core.memory_service import get_unified_memory_service
+    from packages.memory.memory_service import get_unified_memory_service
 
     cid = body.client_message_id or str(_uuid.uuid4())
     mem = get_unified_memory_service(tenant_id=tenant.tenant_id)

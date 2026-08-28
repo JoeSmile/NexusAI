@@ -37,7 +37,7 @@ def resolve_step_params(
     lazy_doc_id = out.pop("lazy_doc_id", None)
     if lazy_doc_id and state:
         try:
-            from backend.core.memory_service import get_unified_memory_service
+            from packages.memory.memory_service import get_unified_memory_service
 
             svc = get_unified_memory_service(tenant_id=str(state.get("tenant_id") or "default"))
             doc = svc.load_document_by_id_sync(

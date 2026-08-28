@@ -1,7 +1,9 @@
-"""安全护栏"""
-
-from backend.core.guardrails.base import GuardResult
-from backend.core.guardrails.input_guard import check_input
-from backend.core.guardrails.output_guard import check_output
-
-__all__ = ["GuardResult", "check_input", "check_output"]
+"""Deprecated shim — use `packages.guardrails` (Task 75.6)."""
+from __future__ import annotations
+import warnings
+warnings.warn(
+    "backend.core.guardrails is deprecated; import from packages.guardrails",
+    DeprecationWarning,
+    stacklevel=2,
+)
+from packages.guardrails import *  # noqa: F401,F403

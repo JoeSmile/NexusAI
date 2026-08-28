@@ -5,8 +5,8 @@ from __future__ import annotations
 import asyncio
 import json
 
-from backend.core.guardrails.output_guard import check_role_drift
-from backend.core.memory_service import MEMORY_ISOLATION_HEADER, MemoryBundle, UnifiedMemoryService
+from packages.guardrails.output_guard import check_role_drift
+from packages.memory.memory_service import MEMORY_ISOLATION_HEADER, MemoryBundle, UnifiedMemoryService
 
 
 def test_assemble_skips_pending_and_filters_world_by_query():

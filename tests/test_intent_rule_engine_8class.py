@@ -12,7 +12,7 @@ from packages.pipeline.intent_path import (
     short_path_predicate,
 )
 from packages.pipeline.state import make_initial_state
-from backend.skills.registry import registry
+from packages.skills.registry import registry
 
 
 @pytest.fixture(scope="module", autouse=True)

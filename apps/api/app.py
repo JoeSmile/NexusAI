@@ -115,7 +115,7 @@ async def lifespan(app: FastAPI):
         logger.info("Redis 不可用（缓存降级）: %s", e)
 
     try:
-        from backend.skills.registry import registry
+        from packages.skills.registry import registry
 
         registry.discover()
         logger.info("Skill registry: %s skills loaded", len(registry._skills))

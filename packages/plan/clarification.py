@@ -117,7 +117,7 @@ async def store_pending(state: dict[str, Any], payload: ClarificationPayload) ->
     key = warm_pending_key(session_id)
     value = json.dumps(payload.to_dict(), ensure_ascii=False)
 
-    from backend.core.memory_service import get_unified_memory_service
+    from packages.memory.memory_service import get_unified_memory_service
 
     mem = get_unified_memory_service(tenant_id=tenant_id)
     await mem.write(

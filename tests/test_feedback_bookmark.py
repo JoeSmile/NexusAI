@@ -322,7 +322,7 @@ def test_bookmark_does_not_call_memory_service(tenant: TenantContext) -> None:
     with (
         patch.object(feedback_mod, "DatabaseManager", return_value=_bookmark_db()),
         patch(
-            "backend.core.memory_service.get_unified_memory_service",
+            "packages.memory.memory_service.get_unified_memory_service",
             side_effect=AssertionError("bookmark must not touch warm"),
         ),
     ):

@@ -8,7 +8,7 @@ import pytest
 
 from backend.agent.memory_hub import MemoryHub, get_memory_hub, reset_memory_hub
 from backend.agent.memory_store import PersistentScopedStore, hub_warm_key
-from backend.core.memory_service import MemoryBundle
+from packages.memory.memory_service import MemoryBundle
 
 
 @pytest.fixture(autouse=True)
@@ -58,7 +58,7 @@ async def test_persistent_store_hydrate_from_unified_read() -> None:
             return bundle
 
     with patch(
-        "backend.core.memory_service.get_unified_memory_service",
+        "packages.memory.memory_service.get_unified_memory_service",
         return_value=_Ums(),
     ):
         n = await store.hydrate()
@@ -89,7 +89,7 @@ async def test_memory_hub_survives_reinit_via_hydrate() -> None:
             return MemoryBundle(warm=dict(persisted))
 
     with patch(
-        "backend.core.memory_service.get_unified_memory_service",
+        "packages.memory.memory_service.get_unified_memory_service",
         return_value=_Ums(),
     ):
         hub2 = MemoryHub(

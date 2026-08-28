@@ -1,7 +1,7 @@
 """探针: 捕获 LLM 调用,打印 prompt 构成/大小(content ops 链路)。"""
 import asyncio
 
-from backend.core.harness import LLMHarness
+from packages.harness import LLMHarness
 
 _orig_stream = LLMHarness.stream
 _orig_generate = LLMHarness.generate

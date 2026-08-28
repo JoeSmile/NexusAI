@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from backend.core.audit import write_audit_sync
-from backend.core.guardrails.config_store import (
+from packages.guardrails.config_store import (
     RISK_LEVELS,
     create_rule,
     delete_rule,
@@ -20,7 +20,7 @@ from backend.core.guardrails.config_store import (
     update_risk_matrix,
     update_rule,
 )
-from backend.core.guardrails.dry_run import dry_run
+from packages.guardrails.dry_run import dry_run
 from packages.auth.models import TenantContext
 from packages.capability.console_access import (
     require_console_reader,

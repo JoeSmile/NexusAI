@@ -102,7 +102,7 @@ async def _invoke_model(
     payload: dict[str, Any],
     tenant: TenantContext,
 ) -> AsyncIterator[dict[str, Any]]:
-    from backend.core.harness import LLMHarness
+    from packages.harness import LLMHarness
 
     messages = _messages_from_payload(payload)
     if not messages:

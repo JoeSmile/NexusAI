@@ -16,13 +16,13 @@ def mock_provider(monkeypatch):
 def isolated_fixtures(monkeypatch, tmp_path):
     """隔离 fixture 目录，避免污染仓库 data/mock_data/llm。"""
     monkeypatch.setattr(
-        "backend.core.harness.provider.FIXTURE_DIR", tmp_path
+        "packages.harness.provider.FIXTURE_DIR", tmp_path
     )
     return tmp_path
 
 
 def test_get_llm_client_mock_invoke_without_api_key(mock_provider):
-    from backend.core.harness import get_llm_client
+    from packages.harness import get_llm_client
 
     client = get_llm_client(model="test-model")
     assert client is not None
@@ -33,7 +33,7 @@ def test_get_llm_client_mock_invoke_without_api_key(mock_provider):
 
 
 def test_get_llm_client_mock_is_deterministic(mock_provider):
-    from backend.core.harness import get_llm_client
+    from packages.harness import get_llm_client
 
     client = get_llm_client(model="det-model")
     a = getattr(client.invoke("同一问题"), "content", None)
@@ -43,7 +43,7 @@ def test_get_llm_client_mock_is_deterministic(mock_provider):
 
 @pytest.mark.asyncio
 async def test_get_llm_client_acomplete_chat_for_agent(mock_provider):
-    from backend.core.harness import get_llm_client
+    from packages.harness import get_llm_client
 
     client = get_llm_client(model="agent-model")
     text = await client.acomplete_chat(
@@ -56,8 +56,8 @@ async def test_get_llm_client_acomplete_chat_for_agent(mock_provider):
 
 
 def test_replay_hit_returns_fixture(monkeypatch, isolated_fixtures):
-    from backend.core.harness import get_llm_client
-    from backend.core.harness.provider import save_fixture
+    from packages.harness import get_llm_client
+    from packages.harness.provider import save_fixture
 
     monkeypatch.setenv("LLM_PROVIDER", "replay")
     monkeypatch.delenv("LLM_API_KEY", raising=False)
@@ -72,7 +72,7 @@ def test_replay_hit_returns_fixture(monkeypatch, isolated_fixtures):
 
 
 def test_replay_miss_falls_back_to_mock(monkeypatch, isolated_fixtures):
-    from backend.core.harness import get_llm_client
+    from packages.harness import get_llm_client
 
     monkeypatch.setenv("LLM_PROVIDER", "replay")
     monkeypatch.delenv("LLM_API_KEY", raising=False)
@@ -84,7 +84,7 @@ def test_replay_miss_falls_back_to_mock(monkeypatch, isolated_fixtures):
 
 
 def test_openai_without_api_key_raises(monkeypatch):
-    import backend.core.harness.llm_client as llm_client
+    import packages.harness.llm_client as llm_client
 
     monkeypatch.setenv("LLM_PROVIDER", "openai")
     monkeypatch.delenv("LLM_API_KEY", raising=False)
@@ -104,7 +104,7 @@ def test_openai_without_api_key_raises(monkeypatch):
 
 
 def test_record_without_api_key_raises(monkeypatch):
-    import backend.core.harness.llm_client as llm_client
+    import packages.harness.llm_client as llm_client
 
     monkeypatch.setenv("LLM_PROVIDER", "record")
     monkeypatch.delenv("LLM_API_KEY", raising=False)
@@ -159,7 +159,7 @@ def test_rag_service_llm_available_without_api_key(mock_provider, monkeypatch):
 async def test_agent_legacy_call_llm_uses_factory(mock_provider, monkeypatch):
     """Runtime 降级到 legacy 时也应走 complete_chat，不再返回固定占位文案。"""
     import backend.agent.agent_core as ac
-    from backend.core.harness import get_llm_client
+    from packages.harness import get_llm_client
 
     monkeypatch.setattr(ac, "_agent_core_instance", None)
     agent = ac.AgentCore(llm_client=get_llm_client(model="agent-legacy"))

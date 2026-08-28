@@ -748,7 +748,7 @@ def get_agent_core() -> AgentCore:
     """获取全局 AgentCore 实例"""
     global _agent_core_instance
     if _agent_core_instance is None:
-        from backend.core.harness import get_llm_client
+        from packages.harness import get_llm_client
 
         # Task 26 / EVID-08: Agent 旁路走统一 LLM_PROVIDER 抽象
         _agent_core_instance = AgentCore(llm_client=get_llm_client(temperature=0.7))

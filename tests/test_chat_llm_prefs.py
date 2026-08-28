@@ -55,7 +55,7 @@ async def test_llm_generate_passes_temperature_and_max_tokens(monkeypatch) -> No
 
 
 def test_completion_kwargs_omits_max_tokens_when_unset() -> None:
-    from backend.core.harness.llm import _completion_kwargs
+    from packages.harness.llm import _completion_kwargs
 
     p = _completion_kwargs(
         model="m",

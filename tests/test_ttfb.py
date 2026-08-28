@@ -24,7 +24,7 @@ def test_default_stream_skips_async_plan_for_ttfb(monkeypatch: pytest.MonkeyPatc
 
 
 def test_short_path_never_async_plans(monkeypatch: pytest.MonkeyPatch) -> None:
-    from backend.skills.registry import registry
+    from packages.skills.registry import registry
 
     registry.discover()
     monkeypatch.setenv("ASYNC_TASK_PLAN_ON_STREAM", "1")

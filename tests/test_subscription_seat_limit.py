@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.core.memory_service import (
+from packages.memory.memory_service import (
     UnifiedMemoryService,
     redact_student_names_in_text,
 )
@@ -172,7 +172,7 @@ async def test_warm_write_skips_stale_enqueued_at():
         "backend.database.vector_ops.list_user_memories_by_prefix",
         return_value=[],
     ), patch(
-        "backend.core.memory.supersede.supersede_user_domain", return_value=[]
+        "packages.memory.supersede.supersede_user_domain", return_value=[]
     ), patch(
         "backend.database.embeddings.embed_text", return_value=None
     ):

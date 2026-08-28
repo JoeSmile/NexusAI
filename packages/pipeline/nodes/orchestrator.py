@@ -9,7 +9,7 @@ from typing import Any
 
 from backend.core.audit_context import bind_audit_lineage
 from packages.capability.invoke import invoke
-from backend.core.harness import LLMHarness
+from packages.harness import LLMHarness
 from packages.plan.agent_spawn import (
     SpawnBlockedError,
     complete_agent_instance_for_step,

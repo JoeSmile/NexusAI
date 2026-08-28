@@ -59,7 +59,7 @@ class IChatEngine(ABC):
 class IMemoryService(ABC):
     """已废弃：勿实现 / 勿工厂注入。
 
-    记忆真源：``backend.core.memory_service.UnifiedMemoryService`` /
+    记忆真源：``packages.memory.memory_service.UnifiedMemoryService`` /
     ``get_unified_memory_service()``。本 ABC 仅保留以免旧 import 立刻炸。
     """
 
