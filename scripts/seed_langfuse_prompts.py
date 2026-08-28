@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import sys
 
-from backend.core.prompt_service import DEFAULT_CHAT_SYSTEM, normalize_chat_system_template
+from packages.prompt_service import DEFAULT_CHAT_SYSTEM, normalize_chat_system_template
 from backend.observability.langfuse_client import get_langfuse
 
 

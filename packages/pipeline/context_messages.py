@@ -94,7 +94,7 @@ def build_llm_messages(
     memory_block: str | None = None,
 ) -> list[dict[str, str]]:
     """system + warm/cold memory + hot multi-turn + current user."""
-    from backend.core.prompt_service import render_prompt
+    from packages.prompt_service import render_prompt
 
     mem = (
         memory_block

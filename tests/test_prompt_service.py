@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.core import prompt_service
+from packages import prompt_service
 
 
 class _FakePrompt:

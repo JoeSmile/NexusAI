@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from packages.memory.memory_service import MEMORY_ISOLATION_HEADER
-from backend.core.prompt_service import DEFAULT_CHAT_SYSTEM, render_prompt
+from packages.prompt_service import DEFAULT_CHAT_SYSTEM, render_prompt
 from packages.pipeline.context_messages import (
     build_llm_messages,
     current_user_content,
