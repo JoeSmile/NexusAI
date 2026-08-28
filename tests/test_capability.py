@@ -505,7 +505,7 @@ async def test_model_invoke_skips_invoke_layer_record_consumption(
             return_value=reg,
         ),
         patch("packages.capability.governance._redis", return_value=None),
-        patch("backend.core.cost_manager.record_consumption") as rec,
+        patch("packages.cost_manager.record_consumption") as rec,
     ):
         async for _ in invoke(
             "model:mock-local", {"message": "cost check"}, tenant_user

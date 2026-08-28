@@ -8,7 +8,7 @@ import os
 from collections.abc import AsyncIterator
 from typing import Any
 
-from backend.core.cost_manager import (
+from packages.cost_manager import (
     COST_TABLE,
     calculate_cost,
     check_budget,

@@ -803,7 +803,7 @@ async def get_cost_summary(
     tenant: TenantContext = Depends(require_permission("admin:*")),
 ):
     """成本聚合看板数据（来自 audit_logs）。"""
-    from backend.core.cost_manager import cost_summary
+    from packages.cost_manager import cost_summary
 
     target = tenant_id
     if not tenant.is_cross_tenant:

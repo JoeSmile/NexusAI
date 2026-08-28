@@ -199,7 +199,7 @@ def build_upstream_request(
 
 def _estimate_cost(spec: CapabilitySpec, text: str) -> tuple[float, int]:
     try:
-        from backend.core.cost_manager import calculate_cost, count_tokens
+        from packages.cost_manager import calculate_cost, count_tokens
 
         tokens = count_tokens(text) if text else 0
         per_1k = float((spec.cost_model or {}).get("cost_per_1k") or 0.0)

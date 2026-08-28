@@ -55,7 +55,7 @@ async def _probe_one(
     tenant_id: str,
     mock: bool,
 ) -> dict[str, Any]:
-    from backend.core.cost_manager import count_tokens
+    from packages.cost_manager import count_tokens
     from packages.harness import LLMHarness
     from packages.pipeline.graph import compiled_graph
     from packages.pipeline.state import make_initial_state
@@ -104,7 +104,7 @@ async def _probe_one(
             collected.append(tok)
         text = "".join(collected)
         tokens = count_tokens(prompt) + count_tokens(text)
-        from backend.core.cost_manager import calculate_cost
+        from packages.cost_manager import calculate_cost
 
         cost_usd = float(calculate_cost(model, tokens))
         fr = harness.stream_finish_reason()

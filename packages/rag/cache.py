@@ -169,7 +169,7 @@ def estimate_embedding_cost_if_miss(norm_q: str) -> float:
 
     用 l2_probe 只读探测——不计 hit/miss,避免污染 status 命中率(l2_hit 双计问题)。
     """
-    from backend.core.cost_manager import _price, count_tokens
+    from packages.cost_manager import _price, count_tokens
     from backend.core.model_registry import select_embedding_model
 
     try:

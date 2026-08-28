@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
 
-import backend.core.cost_manager as cost_manager
+import packages.cost_manager as cost_manager
 
 
 class _RecordingSession:

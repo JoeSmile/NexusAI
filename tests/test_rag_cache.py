@@ -299,7 +299,7 @@ def test_miss_audit_carries_real_cost(fake_redis, monkeypatch):
     monkeypatch.setattr(
         "packages.audit.write_audit_sync", lambda rec: records.append(rec)
     )
-    monkeypatch.setattr("backend.core.cost_manager._price", lambda _n: 0.0001)
+    monkeypatch.setattr("packages.cost_manager._price", lambda _n: 0.0001)
 
     def invoke(prompt):
         return SimpleNamespace(content="答案", metadata={"cost": 0.00042})

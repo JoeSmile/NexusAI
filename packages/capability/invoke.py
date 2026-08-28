@@ -182,7 +182,7 @@ async def _invoke_external_app(
         yield {**frame, "cost_source": "invoke"}
 
     if cost or tokens:
-        from backend.core.cost_manager import record_consumption
+        from packages.cost_manager import record_consumption
 
         # 审计带 cost_source 由 30.06 router 写入 BackgroundTasks
         record_consumption(tenant.tenant_id, cost, tokens, model=spec.id)
@@ -205,7 +205,7 @@ async def _invoke_agent(
         yield {**frame, "cost_source": "invoke"}
 
     if cost or tokens:
-        from backend.core.cost_manager import record_consumption
+        from packages.cost_manager import record_consumption
 
         record_consumption(tenant.tenant_id, cost, tokens, model=spec.id)
 
@@ -259,7 +259,7 @@ async def _invoke_rag(
     except (TypeError, ValueError):
         cost = 0.0
     if cost:
-        from backend.core.cost_manager import record_consumption
+        from packages.cost_manager import record_consumption
 
         record_consumption(tenant.tenant_id, cost, max(1, len(answer) // 4), model=spec.id)
         yield {
@@ -415,7 +415,7 @@ async def invoke(
             # 日成本桶：model 路径用粗算（harness 已记 metrics；此处仅配额计数）
             usage_cost = 0.0
             try:
-                from backend.core.cost_manager import calculate_cost, count_tokens
+                from packages.cost_manager import calculate_cost, count_tokens
 
                 usage_cost = float(
                     calculate_cost(spec.name, count_tokens(full)) if full else 0.0
@@ -468,7 +468,7 @@ async def invoke(
             # model 子路径 harness 已记成本；rag 子路径若无 usage 则上面已累加
             if usage_cost <= 0 and collected:
                 try:
-                    from backend.core.cost_manager import calculate_cost, count_tokens
+                    from packages.cost_manager import calculate_cost, count_tokens
 
                     usage_cost = float(
                         calculate_cost(

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.core.cost_manager import estimate_cost
+from packages.cost_manager import estimate_cost
 from packages.errors import NexusAIException
 from backend.core.llm_credentials import resolve_tenant_credential
 from backend.core.model_registry import get_model, select_model_for_intent
