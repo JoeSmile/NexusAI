@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from backend.modules.intent.dataset.pool import (
+from packages.intent.dataset.pool import (
     GOLDEN_SIZE,
     TRAIN_TARGET,
     build_golden_dataset,
     split_golden_pool,
 )
-from backend.modules.intent.dataset.io import load_csv, load_jsonl
+from packages.intent.dataset.io import load_csv, load_jsonl
 
 ROOT = Path(__file__).resolve().parent.parent
 SEED = ROOT / "data" / "intent" / "data_nexusai_seed.csv"

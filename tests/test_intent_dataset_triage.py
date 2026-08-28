@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.modules.intent.dataset.triage import (
+from packages.intent.dataset.triage import (
     RULE_WEAK_THRESHOLD,
     triage_query,
     triage_samples,

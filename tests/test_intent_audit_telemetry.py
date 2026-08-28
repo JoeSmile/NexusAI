@@ -56,7 +56,7 @@ async def test_analyze_parallel_sets_intent_source(monkeypatch) -> None:
         return result
 
     monkeypatch.setattr(
-        "backend.modules.intent.core.intent_classifier.IntentClassifier.detect_intent",
+        "packages.intent.core.intent_classifier.IntentClassifier.detect_intent",
         fake_detect,
     )
     state = make_initial_state("t1", "u1", "s1", "制度在哪")

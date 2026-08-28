@@ -1,13 +1,32 @@
+# Compose interpolation (${VAR}) reads the project `.env` / the shell — NOT env_file.
+# Copy `.env.example` → `.env` for passwords used below. Copy `config.env.example` → `config.env`
+# for in-container settings (JWT, LLM keys, CORS). `environment:` overrides `env_file`.
+#
+# DATABASE_URL here is built from `.env` DB_PASSWORD. A DATABASE_URL in config.env is ignored.
+# Langfuse: docker compose -f docker-compose.prod.yml -f docker-compose.langfuse.yml
+#   plus NGINX_CONF=./deploy/nginx.langfuse.conf — do not put ${LANGFUSE_*:?} in this file.
+
+x-nexus-env: &nexus-env
+  ENVIRONMENT: production
+  CORS_ALLOW_ALL: "false"
+  LLM_PROVIDER: openai
+  DATABASE_URL: postgresql://nexusai:${DB_PASSWORD:?set DB_PASSWORD}@postgres:5432/nexusai
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD}
+  USE_SQLITE_FALLBACK: "0"
+
 services:
   postgres:
     image: pgvector/pgvector:pg16
+    command: ["postgres", "-c", "max_connections=200"]
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./backend/database/init_pgvector.sql:/docker-entrypoint-initdb.d/init_pgvector.sql
     environment:
       POSTGRES_DB: nexusai
       POSTGRES_USER: nexusai
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U nexusai -d nexusai"]
       interval: 10s
@@ -32,32 +51,43 @@ services:
       retries: 5
     restart: always
 
-  nexusai:
+  # One-shot. Do not also alembic from API/workers (lock race).
+  migrate:
     build: .
-    # 生产：8000 不直接对外暴露，由 nginx 反代（80/443）收口
+    command: ["alembic", "upgrade", "head"]
     env_file: config.env
     environment:
-      ENVIRONMENT: production
-      CORS_ALLOW_ALL: "false"
-      LLM_PROVIDER: openai
-      DATABASE_URL: postgresql://nexusai:${DB_PASSWORD}@postgres:5432/nexusai
-      REDIS_HOST: redis
-      REDIS_PORT: "6379"
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      <<: *nexus-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  nexusai:
+    build: .
+    env_file: config.env
+    environment:
+      <<: *nexus-env
       LANGFUSE_ENABLED: ${LANGFUSE_ENABLED:-false}
       LANGFUSE_HOST: ${LANGFUSE_HOST:-http://langfuse-web:3000}
       LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-http://langfuse-web:3000}
       UVICORN_WORKERS: "2"
-      # Task 73 slice 6 生产建议值（代码默认仍 10/16/4→8；见全面部署指南 §6.1.1）
       THREAD_POOL_MAX_WORKERS: "64"
       LLM_CONCURRENCY_LIMIT: "${LLM_CONCURRENCY_LIMIT:-16}"
       LLM_BUCKET_LIMIT: "${LLM_BUCKET_LIMIT:-8}"
       LLM_CONCURRENCY_ACQUIRE_TIMEOUT_S: "${LLM_CONCURRENCY_ACQUIRE_TIMEOUT_S:-5}"
+      INTENT_MODEL_PATH: /app/data/models/intent_v8
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+      - ./data/models/intent_v8:/app/data/models/intent_v8:ro
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: always
     healthcheck:
       test:
@@ -82,17 +112,16 @@ services:
       start_period: 10s
     env_file: config.env
     environment:
-      ENVIRONMENT: production
-      LLM_PROVIDER: openai
-      DATABASE_URL: postgresql://nexusai:${DB_PASSWORD}@postgres:5432/nexusai
-      REDIS_HOST: redis
-      REDIS_PORT: "6379"
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      <<: *nexus-env
+    volumes:
+      - ./logs:/app/logs
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: always
 
   social-worker:
@@ -106,172 +135,30 @@ services:
       start_period: 10s
     env_file: config.env
     environment:
-      ENVIRONMENT: production
-      LLM_PROVIDER: openai
-      DATABASE_URL: postgresql://nexusai:${DB_PASSWORD}@postgres:5432/nexusai
-      REDIS_HOST: redis
-      REDIS_PORT: "6379"
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      <<: *nexus-env
       TIKHUB_API_KEY: ${TIKHUB_API_KEY:-}
       SOCIAL_TIKHUB_QPS: ${SOCIAL_TIKHUB_QPS:-2}
       SOCIAL_TIKHUB_BURST: ${SOCIAL_TIKHUB_BURST:-4}
+    volumes:
+      - ./logs:/app/logs
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    restart: always
-
-  # Langfuse OSS v4 — 默认不启动（profiles: langfuse）
-  # 开启：COMPOSE_PROFILES=langfuse ... 且 LANGFUSE_ENABLED=true
-  langfuse-postgres:
-    profiles: ["langfuse"]
-    image: docker.io/postgres:17
-    environment:
-      POSTGRES_USER: langfuse
-      POSTGRES_PASSWORD: ${LANGFUSE_DB_PASSWORD:?set LANGFUSE_DB_PASSWORD}
-      POSTGRES_DB: langfuse
-      TZ: UTC
-      PGTZ: UTC
-    volumes:
-      - langfuse_pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U langfuse -d langfuse"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: always
-
-  langfuse-redis:
-    profiles: ["langfuse"]
-    image: docker.io/redis:7
-    command: >
-      --requirepass ${LANGFUSE_REDIS_AUTH:?set LANGFUSE_REDIS_AUTH}
-      --maxmemory-policy noeviction
-    volumes:
-      - langfuse_redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${LANGFUSE_REDIS_AUTH}", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: always
-
-  langfuse-clickhouse:
-    profiles: ["langfuse"]
-    image: docker.io/clickhouse/clickhouse-server:25.12
-    user: "101:101"
-    environment:
-      CLICKHOUSE_DB: default
-      CLICKHOUSE_USER: clickhouse
-      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:?set LANGFUSE_CLICKHOUSE_PASSWORD}
-    volumes:
-      - langfuse_clickhouse_data:/var/lib/clickhouse
-      - langfuse_clickhouse_logs:/var/log/clickhouse-server
-    healthcheck:
-      test: wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 15s
-    restart: always
-
-  langfuse-minio:
-    profiles: ["langfuse"]
-    image: cgr.dev/chainguard/minio
-    entrypoint: sh
-    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
-    environment:
-      MINIO_ROOT_USER: ${LANGFUSE_S3_USER:-minio}
-      MINIO_ROOT_PASSWORD: ${LANGFUSE_S3_PASSWORD:?set LANGFUSE_S3_PASSWORD}
-    ports: ["9090:9000"]
-    volumes:
-      - langfuse_minio_data:/data
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: always
-
-  langfuse-worker:
-    profiles: ["langfuse"]
-    image: docker.io/langfuse/langfuse-worker:4
-    depends_on:
-      langfuse-postgres:
-        condition: service_healthy
-      langfuse-redis:
-        condition: service_healthy
-      langfuse-clickhouse:
-        condition: service_healthy
-      langfuse-minio:
-        condition: service_healthy
-    environment: &langfuse-env
-      DATABASE_URL: postgresql://langfuse:${LANGFUSE_DB_PASSWORD}@langfuse-postgres:5432/langfuse
-      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3001}
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?set NEXTAUTH_SECRET}
-      SALT: ${SALT:?set SALT}
-      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:?set LANGFUSE_ENCRYPTION_KEY (64 hex chars)}
-      TELEMETRY_ENABLED: "false"
-      CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000
-      CLICKHOUSE_URL: http://langfuse-clickhouse:8123
-      CLICKHOUSE_USER: clickhouse
-      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD}
-      CLICKHOUSE_CLUSTER_ENABLED: "false"
-      REDIS_HOST: langfuse-redis
-      REDIS_PORT: "6379"
-      REDIS_AUTH: ${LANGFUSE_REDIS_AUTH}
-      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
-      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
-      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${LANGFUSE_S3_USER:-minio}
-      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_S3_PASSWORD}
-      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
-      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
-      LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
-      LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
-      LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
-      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${LANGFUSE_S3_USER:-minio}
-      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_S3_PASSWORD}
-      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://langfuse-minio:9000
-      LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
-      LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
-    restart: always
-
-  langfuse-web:
-    profiles: ["langfuse"]
-    image: docker.io/langfuse/langfuse:4
-    ports: ["3001:3000"]
-    depends_on:
-      langfuse-postgres:
-        condition: service_healthy
-      langfuse-redis:
-        condition: service_healthy
-      langfuse-clickhouse:
-        condition: service_healthy
-      langfuse-minio:
-        condition: service_healthy
-      langfuse-worker:
-        condition: service_started
-    environment:
-      <<: *langfuse-env
-      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: ${LANGFUSE_S3_MEDIA_PUBLIC_ENDPOINT:-http://localhost:9090}
-      LANGFUSE_INIT_ORG_ID: ${LANGFUSE_INIT_ORG_ID:-nexusai-org}
-      LANGFUSE_INIT_ORG_NAME: ${LANGFUSE_INIT_ORG_NAME:-NexusAI}
-      LANGFUSE_INIT_PROJECT_ID: ${LANGFUSE_INIT_PROJECT_ID:-nexusai-project}
-      LANGFUSE_INIT_PROJECT_NAME: ${LANGFUSE_INIT_PROJECT_NAME:-NexusAI}
-      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
-      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
-      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-admin@nexusai.local}
-      LANGFUSE_INIT_USER_NAME: ${LANGFUSE_INIT_USER_NAME:-admin}
-      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD}
+      migrate:
+        condition: service_completed_successfully
     restart: always
 
   nginx:
     image: nginx:alpine
     ports: ["80:80", "443:443"]
     volumes:
-      - ./deploy/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ${NGINX_CONF:-./deploy/nginx.conf}:/etc/nginx/nginx.conf:ro
+      - ./deploy/nginx-boot.sh:/nginx-boot.sh:ro
       - ./deploy/ssl:/etc/nginx/ssl:ro
+      - ./frontend/dist:/usr/share/nginx/html:ro
+    command: ["sh", "/nginx-boot.sh"]
     depends_on:
       - nexusai
     restart: always
@@ -279,8 +166,3 @@ services:
 volumes:
   pgdata:
   redis_data:
-  langfuse_pgdata:
-  langfuse_redis_data:
-  langfuse_clickhouse_data:
-  langfuse_clickhouse_logs:
-  langfuse_minio_data:

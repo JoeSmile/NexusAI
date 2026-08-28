@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from backend.modules.intent.core.rule_engine import RuleBasedIntentEngine
-from backend.modules.intent.models.intent_models import IntentType
+from packages.intent.core.rule_engine import RuleBasedIntentEngine
+from packages.intent.models.intent_models import IntentType
 from backend.pipeline.intent_path import (
     SHORT_PATH_INTENTS,
     resolve_short_path_skill,

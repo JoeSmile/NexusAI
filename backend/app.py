@@ -421,7 +421,7 @@ def create_app() -> FastAPI:
             app, "backend.routers.agent", "router", label="Agent 模块"
         ),
         "intent": _lazy_include(
-            app, "backend.modules.intent.routers", "intent_router", label="意图识别"
+            app, "packages.intent.routers", "intent_router", label="意图识别"
         ),
         "performance": _lazy_include(
             app,

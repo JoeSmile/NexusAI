@@ -1,9 +1,3 @@
-"""
-意图识别路由
-Intent Recognition Routers
-"""
+"""Shim — prefer packages.intent.routers"""
 
-from .intent_router import router as intent_router
-
-__all__ = ["intent_router"]
-
+from packages.intent.routers import *  # noqa: F401,F403

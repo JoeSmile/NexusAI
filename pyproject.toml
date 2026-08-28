@@ -113,7 +113,7 @@ build-backend = "hatchling.build"
 package = false
 
 [tool.hatch.build.targets.wheel]
-packages = ["backend"]
+packages = ["backend", "packages"]
 
 [tool.uv.sources]
 # 可以在这里指定自定义源，例如阿里云镜像
@@ -213,8 +213,8 @@ files = [
 module = [
   "backend.modules.rag.*",
   "backend.modules.llm.*",
-  "backend.modules.intent.core.enhanced_input_processor",
-  "backend.modules.intent.core.input_processor",
+  "packages.intent.core.enhanced_input_processor",
+  "packages.intent.core.input_processor",
 ]
 ignore_errors = true
 

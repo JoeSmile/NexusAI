@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from backend.modules.intent.services.intent_metrics import (  # noqa: E402
+from packages.intent.services.intent_metrics import (  # noqa: E402
     default_since,
     fetch_intent_samples,
     query_intent_metrics,

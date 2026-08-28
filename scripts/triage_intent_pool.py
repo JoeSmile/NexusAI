@@ -12,8 +12,8 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from backend.modules.intent.dataset.io import load_jsonl, save_jsonl  # noqa: E402
-from backend.modules.intent.dataset.triage import triage_samples  # noqa: E402
+from packages.intent.dataset.io import load_jsonl, save_jsonl  # noqa: E402
+from packages.intent.dataset.triage import triage_samples  # noqa: E402
 
 
 def main() -> int:

@@ -42,7 +42,7 @@ def test_v8_accuracy_on_manual_holdout() -> None:
     except ImportError:
         pytest.skip("uv sync --extra intent-model required")
 
-    from backend.modules.intent.core.intent_classifier import MLIntentClassifier
+    from packages.intent.core.intent_classifier import MLIntentClassifier
 
     model_dir = ROOT / "data" / "models" / "intent_v8"
     if not (model_dir / "config.json").is_file():

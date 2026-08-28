@@ -5,7 +5,7 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-from backend.modules.intent.models.intent_models import IntentType
+from packages.intent.models.intent_models import IntentType
 
 ROOT = Path(__file__).resolve().parent.parent
 GOLDEN_V8 = ROOT / "data" / "intent" / "golden" / "golden_v8.csv"

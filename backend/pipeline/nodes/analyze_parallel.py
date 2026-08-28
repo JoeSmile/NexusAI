@@ -59,23 +59,25 @@ async def _analyze_intent(message: str) -> dict:
     异常时降级保守默认(best 档),不阻断管线。
     """
     try:
-        from backend.modules.intent.models.intent_models import confidence_tier
-        from backend.modules.intent.routers.intent_router import get_intent_service
+        from packages.intent.models.intent_models import confidence_tier
+        from packages.intent.routers.intent_router import get_intent_service
 
         result = get_intent_service().intent_classifier.detect_intent(message)
-        raw = result.intent
         intent = result.intent.value if hasattr(result.intent, "value") else str(result.intent)
         from backend.core.plan.agent_type import agent_type_for_intent
 
         at = agent_type_for_intent(intent)
         agent_type_id = at.type_id if at else None
+        from packages.intent.core.entity_extractor import extract_entities
+
+        entities = extract_entities(message, intent)
         return {
             "intent": intent,
             "confidence": float(result.confidence),
             "source": str(result.source),
             "tier": result.tier or confidence_tier(float(result.confidence)),
             "agent_type_id": agent_type_id,
-            "entities": {},
+            "entities": entities,
         }
     except Exception:
         return {

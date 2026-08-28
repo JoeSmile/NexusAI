@@ -28,7 +28,7 @@ wheels/
 .installed.cfg
 *.egg
 
-# IDE — track shared vscode recommendations
+# IDE ? track shared vscode recommendations
 .idea/
 .vscode/*
 !.vscode/extensions.json
@@ -47,10 +47,22 @@ Thumbs.db
 *.local.env
 config.env
 
-# Logs
+# TLS material (keep .gitkeep)
+deploy/ssl/*.pem
+deploy/ssl/*.key
+deploy/ssl/*.crt
+!deploy/ssl/.gitkeep
+
+# Scratch / agent temp files (repo root)
+.tmp_*
+.tmp*/
+
+# Release tarballs (local / CI output)
+artifacts/
+
+# Logs (do not commit runtime logs)
 *.log
 log/
-!log/.gitkeep
 
 # Database / local data
 *.db
@@ -69,8 +81,8 @@ uploads/
 /assets/
 .superpowers
 
-# Internal pitch/positioning — NOT open-source (do not commit)
+# Internal pitch/positioning ? NOT open-source (do not commit)
 docs/pitch/
 
-# Internal launch gap analysis — NOT open-source (do not commit)
+# Internal launch gap analysis ? NOT open-source (do not commit)
 docs/audit/2026-08-24-launch-gap-checklist.md

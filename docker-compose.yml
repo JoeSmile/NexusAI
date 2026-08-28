@@ -17,6 +17,7 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - LLM_API_KEY=${LLM_API_KEY:-${OPENAI_API_KEY:-}}
       - UVICORN_WORKERS=2
+      - USE_SQLITE_FALLBACK=0
     volumes:
       - ./logs:/app/logs
       - ./uploads:/app/uploads
@@ -91,6 +92,7 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD:-nexusai_redis}
+      - USE_SQLITE_FALLBACK=0
     depends_on:
       postgres:
         condition: service_healthy
@@ -122,6 +124,7 @@ services:
       - TIKHUB_API_KEY=${TIKHUB_API_KEY:-}
       - SOCIAL_TIKHUB_QPS=${SOCIAL_TIKHUB_QPS:-2}
       - SOCIAL_TIKHUB_BURST=${SOCIAL_TIKHUB_BURST:-4}
+      - USE_SQLITE_FALLBACK=0
     depends_on:
       postgres:
         condition: service_healthy
@@ -138,8 +141,11 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./deploy/nginx.conf:/etc/nginx/nginx.conf
-      - ./deploy/ssl:/etc/nginx/ssl
+      - ${NGINX_CONF:-./deploy/nginx.conf}:/etc/nginx/nginx.conf:ro
+      - ./deploy/nginx-boot.sh:/nginx-boot.sh:ro
+      - ./deploy/ssl:/etc/nginx/ssl:ro
+      - ./frontend/dist:/usr/share/nginx/html:ro
+    command: ["sh", "/nginx-boot.sh"]
     depends_on:
       - nexusai
     restart: unless-stopped
@@ -150,7 +156,7 @@ services:
   prometheus:
     image: prom/prometheus:latest
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
@@ -168,9 +174,9 @@ services:
   grafana:
     image: grafana/grafana:latest
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD}
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards

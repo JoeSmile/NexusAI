@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.modules.intent.dataset.quality import cohen_kappa, dual_label_kappa_report
+from packages.intent.dataset.quality import cohen_kappa, dual_label_kappa_report
 
 
 def test_cohen_kappa_perfect() -> None:

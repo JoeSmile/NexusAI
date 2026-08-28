@@ -6,11 +6,11 @@ Intent Recognition API Router
 import logging
 from typing import Any
 
-from config import get_settings
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from backend.core.auth.models import TenantContext
 from backend.core.auth.permissions import require_permission
+from config import get_settings
 
 from ..models.intent_models import IntentRequest, IntentResult, IntentType
 from ..services.intent_metrics import default_since, query_intent_metrics

@@ -12,8 +12,8 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from backend.modules.intent.dataset.io import save_jsonl  # noqa: E402
-from backend.modules.intent.dataset.synthetic import (  # noqa: E402
+from packages.intent.dataset.io import save_jsonl  # noqa: E402
+from packages.intent.dataset.synthetic import (  # noqa: E402
     generate_llm_hardcases,
     generate_synthetic_hardcases,
 )

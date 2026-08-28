@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import random
 
-from backend.modules.intent.core.label_map import normalize_sample
-from backend.modules.intent.core.rule_engine import RuleBasedIntentEngine
-from backend.modules.intent.models.intent_models import IntentType
+from packages.intent.core.label_map import normalize_sample
+from packages.intent.core.rule_engine import RuleBasedIntentEngine
+from packages.intent.models.intent_models import IntentType
 
 from .io import IntentSample
 

@@ -26,7 +26,7 @@ async def test_analyze_parallel_calls_detect_intent_once(monkeypatch):
         return result
 
     monkeypatch.setattr(
-        "backend.modules.intent.core.intent_classifier.IntentClassifier.detect_intent",
+        "packages.intent.core.intent_classifier.IntentClassifier.detect_intent",
         fake_detect,
     )
     state = make_initial_state("t1", "u1", "s1", "你好呀")
@@ -50,7 +50,7 @@ async def test_orchestrator_execution_does_not_reclassify_l0(monkeypatch):
         return result
 
     monkeypatch.setattr(
-        "backend.modules.intent.core.intent_classifier.IntentClassifier.detect_intent",
+        "packages.intent.core.intent_classifier.IntentClassifier.detect_intent",
         fake_detect,
     )
 
@@ -85,6 +85,8 @@ async def test_orchestrator_execution_does_not_reclassify_l0(monkeypatch):
         "backend.pipeline.nodes.orchestrator._collect_invoke",
         fake_collect,
     )
+    # Avoid hanging on Postgres when audit tries to connect (local/CI without DB).
+    monkeypatch.setattr("backend.core.audit._write_audit", lambda *_a, **_k: True)
     await execute_plan_ir(state, plan)
     assert len(detect_calls) == 1
 

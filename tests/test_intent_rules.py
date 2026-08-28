@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from backend.modules.intent.core.rule_engine import RuleBasedIntentEngine
-from backend.modules.intent.models.intent_models import IntentType
+from packages.intent.core.rule_engine import RuleBasedIntentEngine
+from packages.intent.models.intent_models import IntentType
 
 # Checklist B1–B8 + extras (各意图 ≥3 句)
 _RULE_CASES: list[tuple[str, IntentType]] = [

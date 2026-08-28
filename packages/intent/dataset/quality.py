@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
-from backend.modules.intent.models.intent_models import IntentType
+from packages.intent.models.intent_models import IntentType
 
 from .io import IntentSample
 

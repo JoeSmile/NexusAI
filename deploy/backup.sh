@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Task 52 P0-2 — dump Postgres to data/backups/ and keep 14 newest.
 # Non-zero exit on failure (wire to cron mail / log).
+#
+# Requires DB_PASSWORD in the environment (same value as compose `.env`).
+# Cron example:
+#   15 2 * * * set -a && . /opt/nexusai/.env && set +a && /opt/nexusai/deploy/backup.sh
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -10,6 +14,8 @@ COMPOSE_FILE="${COMPOSE_FILE:-$ROOT/docker-compose.prod.yml}"
 STAMP="$(date +%Y%m%d)"
 mkdir -p "$OUTDIR"
 DEST="$OUTDIR/nexusai-${STAMP}.sql.gz"
+
+: "${DB_PASSWORD:?set DB_PASSWORD (same as compose .env / postgres POSTGRES_PASSWORD)}"
 
 if [[ -n "${PG_CONTAINER:-}" ]]; then
   CONTAINER="$PG_CONTAINER"
@@ -23,7 +29,8 @@ if [[ -z "$CONTAINER" ]]; then
 fi
 
 echo "dumping postgres ($CONTAINER) -> $DEST"
-docker exec "$CONTAINER" pg_dump -U nexusai -d nexusai | gzip -c > "$DEST"
+docker exec -e PGPASSWORD="$DB_PASSWORD" "$CONTAINER" \
+  pg_dump -U nexusai -d nexusai | gzip -c > "$DEST"
 if [[ ! -s "$DEST" ]]; then
   echo "backup failed: empty dump $DEST" >&2
   rm -f "$DEST"

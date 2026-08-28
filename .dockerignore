@@ -29,7 +29,14 @@ config.env
 
 # 本地杂项
 logs/
+log/
 tmp/
+.tmp_*
+.tmp*/
+articles/
+learning/
+tasks/archive/
+docs/archive/
 dist/
 frontend/dist/
 *.log

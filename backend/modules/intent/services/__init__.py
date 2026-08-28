@@ -1,9 +1,3 @@
-"""
-意图识别服务层
-Intent Recognition Service Layer
-"""
+"""Shim — prefer packages.intent.services"""
 
-from .intent_service import IntentService
-
-__all__ = ["IntentService"]
-
+from packages.intent.services import *  # noqa: F401,F403

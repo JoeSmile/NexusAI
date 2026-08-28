@@ -1,13 +1,3 @@
-"""
-意图识别数据模型
-Intent Recognition Data Models
-"""
+"""Shim — prefer packages.intent.models"""
 
-from .intent_models import IntentRequest, IntentResult, IntentType
-
-__all__ = [
-    "IntentRequest",
-    "IntentResult",
-    "IntentType",
-]
-
+from packages.intent.models import *  # noqa: F401,F403

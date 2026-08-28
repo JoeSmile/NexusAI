@@ -99,6 +99,7 @@ def get_sync_redis(*, decode_responses: bool = False, db: str | int | None = Non
     """惰性同步客户端；按 (decode_responses, db) 分槽；失败后 TTL 内不再重试。
 
     I-5(评审 08-15)：``db`` 显式指定时覆盖 REDIS_DB（队列用独立 db，与缓存/限流隔离）。
+    ``socket_timeout=0.5`` 防止 Redis 半死时 EVAL/GET 无限阻塞、降级永不触发。
     """
     slot = (decode_responses, db)
     if not _should_retry(_sync_failed, slot):
@@ -115,6 +116,7 @@ def get_sync_redis(*, decode_responses: bool = False, db: str | int | None = Non
             url,
             decode_responses=decode_responses,
             socket_connect_timeout=0.5,
+            socket_timeout=0.5,
         )
         client.ping()
         _sync_clients[slot] = client
@@ -188,6 +190,8 @@ async def get_async_redis(*, decode_responses: bool = True) -> Any | None:
                 resolve_redis_url(),
                 decode_responses=decode_responses,
                 max_connections=50,
+                socket_connect_timeout=0.5,
+                socket_timeout=0.5,
             )
             await client.ping()
             _async_clients[decode_responses] = client

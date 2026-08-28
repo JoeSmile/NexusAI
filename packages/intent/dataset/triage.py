@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from backend.modules.intent.core.intent_classifier import IntentClassifier
-from backend.modules.intent.core.label_map import normalize_label
-from backend.modules.intent.core.rule_engine import RuleBasedIntentEngine
+from packages.intent.core.intent_classifier import IntentClassifier
+from packages.intent.core.label_map import normalize_label
+from packages.intent.core.rule_engine import RuleBasedIntentEngine
 
 RULE_WEAK_THRESHOLD = 0.85
 UNCERTAINTY_LOW = 0.4

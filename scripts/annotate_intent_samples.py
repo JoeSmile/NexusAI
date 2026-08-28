@@ -12,9 +12,9 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from backend.modules.intent.core.label_map import normalize_label  # noqa: E402
-from backend.modules.intent.dataset.io import load_jsonl, save_jsonl  # noqa: E402
-from backend.modules.intent.models.intent_models import IntentType
+from packages.intent.core.label_map import normalize_label  # noqa: E402
+from packages.intent.dataset.io import load_jsonl, save_jsonl  # noqa: E402
+from packages.intent.models.intent_models import IntentType
 
 
 def _load_done_keys(path: Path) -> set[str]:

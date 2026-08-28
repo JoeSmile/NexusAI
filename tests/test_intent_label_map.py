@@ -5,7 +5,7 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-from backend.modules.intent.core.label_map import (
+from packages.intent.core.label_map import (
     LEGACY_FINGPT_12_TO_PRODUCT,
     PRODUCT_INTENT_VALUES,
     is_product_label,
@@ -13,7 +13,7 @@ from backend.modules.intent.core.label_map import (
     normalize_sample,
     split_legacy_advice,
 )
-from backend.modules.intent.models.intent_models import IntentType
+from packages.intent.models.intent_models import IntentType
 
 ROOT = Path(__file__).resolve().parent.parent
 SEED_PATH = ROOT / "data" / "intent" / "data_nexusai_seed.csv"

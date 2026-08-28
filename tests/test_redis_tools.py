@@ -52,6 +52,16 @@ def test_get_sync_redis_retries_after_ttl() -> None:
         ok.ping.assert_called_once()
 
 
+def test_get_sync_redis_sets_socket_timeout() -> None:
+    ok = MagicMock()
+    ok.ping.return_value = True
+    with patch("redis.Redis.from_url", return_value=ok) as from_url:
+        assert redis_tools.get_sync_redis() is ok
+    kwargs = from_url.call_args.kwargs
+    assert kwargs["socket_connect_timeout"] == 0.5
+    assert kwargs["socket_timeout"] == 0.5
+
+
 def test_close_sync_redis_clears_clients() -> None:
     ok = MagicMock()
     ok.ping.return_value = True
@@ -130,6 +140,17 @@ async def test_get_async_redis_retries_after_ttl() -> None:
         got = await redis_tools.get_async_redis()
         assert got is client
         client.ping.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_get_async_redis_sets_socket_timeout() -> None:
+    client = AsyncMock()
+    client.ping = AsyncMock(return_value=True)
+    with patch("redis.asyncio.from_url", return_value=client) as from_url:
+        assert await redis_tools.get_async_redis() is client
+    kwargs = from_url.call_args.kwargs
+    assert kwargs["socket_connect_timeout"] == 0.5
+    assert kwargs["socket_timeout"] == 0.5
 
 
 @pytest.mark.asyncio

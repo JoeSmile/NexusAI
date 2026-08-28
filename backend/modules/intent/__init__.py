@@ -1,15 +1,16 @@
+"""Deprecated shim — use ``packages.intent`` (Task 75 / Phase 1 pilot).
+
+Kept for one Wave so leftover imports do not crash.
 """
-意图识别模块
-Intent Recognition Module
-"""
 
-from .core.intent_classifier import IntentClassifier
-from .core.rule_engine import RuleBasedIntentEngine
-from .services.intent_service import IntentService
+from __future__ import annotations
 
-__all__ = [
-    "IntentClassifier",
-    "IntentService",
-    "RuleBasedIntentEngine",
-]
+import warnings
 
+warnings.warn(
+    "backend.modules.intent is deprecated; import from packages.intent",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+from packages.intent import *  # noqa: F401,F403

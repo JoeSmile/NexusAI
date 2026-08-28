@@ -6,11 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from backend.modules.intent.core.intent_classifier import (
+from packages.intent.core.intent_classifier import (
     MLIntentClassifier,
     resolve_intent_model_path,
 )
-from backend.modules.intent.models.intent_models import IntentType, confidence_tier
+from packages.intent.models.intent_models import IntentType, confidence_tier
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_V8 = ROOT / "data" / "models" / "intent_v8"

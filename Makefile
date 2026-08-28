@@ -1,4 +1,4 @@
-.PHONY: help sync lock install up up-langfuse up-all down db-init run lint typecheck test check verify seed fmt docker-up docker-down clean backup audit
+.PHONY: help sync lock install up up-langfuse up-all down db-init run lint typecheck test check verify seed fmt docker-up docker-down clean backup audit pack-release pack-intent
 
 ROOT_DIR := $(patsubst %/,%,$(dir $(abspath $(firstword $(MAKEFILE_LIST)))))
 UV := $(shell command -v uv 2> /dev/null)
@@ -29,8 +29,11 @@ help:
 	@echo "  make fmt             ruff format"
 	@echo "  make backup          pg_dump → data/backups/ (keep 14)"
 	@echo "  make audit           uv pip audit (high/critical fail)"
+	@echo "  make pack-release    白名单上架包 → artifacts/nexusai-release-*.tar.gz"
+	@echo "  make pack-intent     意图模型包 → artifacts/intent_v8.tar.gz"
 	@echo ""
 	@echo "典型流程: make up && make sync && make db-init && make seed && make run"
+	@echo "上架: cd frontend && pnpm build && make pack-release"
 
 sync install:
 	$(require_uv)
@@ -84,7 +87,7 @@ seed:
 
 lint:
 	$(require_uv)
-	cd $(ROOT_DIR) && uv run --no-sync ruff check backend/ scripts/
+	cd $(ROOT_DIR) && uv run --no-sync ruff check backend/ packages/ scripts/ 2>/dev/null || uv run --no-sync ruff check backend/ scripts/
 
 typecheck:
 	$(require_uv)
@@ -92,7 +95,7 @@ typecheck:
 
 fmt:
 	$(require_uv)
-	cd $(ROOT_DIR) && uv run --no-sync ruff format backend/ scripts/
+	cd $(ROOT_DIR) && uv run --no-sync ruff format backend/ packages/ scripts/ 2>/dev/null || uv run --no-sync ruff format backend/ scripts/
 
 test:
 	$(require_uv)
@@ -103,6 +106,12 @@ test:
 		uv run --no-sync pytest tests/ -v
 
 check: lint typecheck
+
+pack-release:
+	bash $(ROOT_DIR)/scripts/pack_release.sh
+
+pack-intent:
+	bash $(ROOT_DIR)/scripts/pack_intent_model.sh
 
 backup:
 	bash $(ROOT_DIR)/deploy/backup.sh

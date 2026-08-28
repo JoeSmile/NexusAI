@@ -66,7 +66,7 @@ def evaluate(
     report_dir: Path,
     report_prefix: str = "intent_v8_eval",
 ) -> dict:
-    from backend.modules.intent.core.intent_classifier import MLIntentClassifier
+    from packages.intent.core.intent_classifier import MLIntentClassifier
 
     eval_path = eval_path.resolve()
     rows = load_eval_rows(eval_path)
