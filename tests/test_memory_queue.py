@@ -76,7 +76,7 @@ def test_assemble_redacts_student_entity():
 
 @pytest.mark.asyncio
 async def test_memory_hub_retrieve_uses_unified():
-    from backend.agent.memory_hub import MemoryHub
+    from packages.agent_runtime.memory_hub import MemoryHub
     from packages.memory.memory_service import MemoryBundle
 
     hub = MemoryHub(user_id="u1", session_id="s1", tenant_id="t1")

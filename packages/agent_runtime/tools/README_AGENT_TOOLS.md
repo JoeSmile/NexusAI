@@ -26,7 +26,7 @@
 
 **使用示例**:
 ```python
-from backend.agent.tools.agent_tools import get_user_mood_trend
+from packages.agent_runtime.tools.agent_tools import get_user_mood_trend
 
 result = get_user_mood_trend("user_123", days=7)
 if result["needs_intervention"]:
@@ -64,7 +64,7 @@ if result["needs_intervention"]:
 
 **使用示例**:
 ```python
-from backend.agent.tools.agent_tools import play_meditation_audio
+from packages.agent_runtime.tools.agent_tools import play_meditation_audio
 
 result = play_meditation_audio("sleep", user_id="user_123")
 if result["success"]:
@@ -95,7 +95,7 @@ if result["success"]:
 
 **使用示例**:
 ```python
-from backend.agent.tools.agent_tools import set_daily_reminder
+from packages.agent_runtime.tools.agent_tools import set_daily_reminder
 
 result = set_daily_reminder(
     time="21:30",
@@ -131,7 +131,7 @@ if result["success"]:
 
 **使用示例**:
 ```python
-from backend.agent.tools.agent_tools import search_mental_health_resources
+from packages.agent_runtime.tools.agent_tools import search_mental_health_resources
 
 result = search_mental_health_resources("焦虑", resource_type="article")
 print(f"找到 {result['count']} 个相关资源")
@@ -163,7 +163,7 @@ for resource in result["resources"]:
 
 **使用示例**:
 ```python
-from backend.agent.tools.agent_tools import send_follow_up_message
+from packages.agent_runtime.tools.agent_tools import send_follow_up_message
 
 result = send_follow_up_message(
     user_id="user_123",
@@ -181,7 +181,7 @@ if result["success"]:
 这些工具函数已经注册到 `ToolCaller` 中，可以通过Agent系统调用：
 
 ```python
-from backend.agent.tool_caller import get_tool_caller
+from packages.agent_runtime.tool_caller import get_tool_caller
 
 tool_caller = get_tool_caller()
 

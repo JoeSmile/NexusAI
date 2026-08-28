@@ -30,12 +30,12 @@ import time
 from datetime import datetime
 from typing import Any
 
-from backend.agent.activity_distiller import (
+from packages.agent_runtime.activity_distiller import (
     PREFS_TOPICS_PATH,
     TurnDigest,
     distill_turn,
 )
-from backend.agent.memory_store import (
+from packages.agent_runtime.memory_store import (
     InMemoryStore,
     PersistentScopedStore,
 )
@@ -640,7 +640,7 @@ class MemoryHub:
             # 同步路径：直接填缓存 + persist（避免 encode 变成 async）
             import hashlib as _hashlib
 
-            from backend.agent.memory_store import MemoryEntry
+            from packages.agent_runtime.memory_store import MemoryEntry
 
             sha256 = _hashlib.sha256(str(content).encode()).hexdigest()
             existing = store._entries.get(path)

@@ -5,7 +5,7 @@ Production tool execution path:
   → invoke() governance chain → handler
 
 Legacy path (this package):
-  backend.agent.tool_caller.ToolRegistry — agent /agent/* only; converge in slice 1.
+  packages.agent_runtime.tool_caller.ToolRegistry — agent /agent/* only; converge in slice 1.
 """
 
 from __future__ import annotations

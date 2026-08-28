@@ -6,7 +6,7 @@ Agent Service - Agent服务层
 
 from typing import Any
 
-from backend.agent import AgentCore, get_agent_core
+from packages.agent_runtime import AgentCore, get_agent_core
 
 
 class AgentService:

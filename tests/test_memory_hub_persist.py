@@ -6,8 +6,8 @@ from unittest.mock import patch
 
 import pytest
 
-from backend.agent.memory_hub import MemoryHub, get_memory_hub, reset_memory_hub
-from backend.agent.memory_store import PersistentScopedStore, hub_warm_key
+from packages.agent_runtime.memory_hub import MemoryHub, get_memory_hub, reset_memory_hub
+from packages.agent_runtime.memory_store import PersistentScopedStore, hub_warm_key
 from packages.memory.memory_service import MemoryBundle
 
 
@@ -114,7 +114,7 @@ async def test_agent_core_passes_tenant_to_hub() -> None:
     from datetime import datetime
     from unittest.mock import AsyncMock, MagicMock, patch
 
-    from backend.agent.agent_core import AgentCore
+    from packages.agent_runtime.agent_core import AgentCore
 
     captured: dict = {}
 
@@ -152,7 +152,7 @@ async def test_agent_core_passes_tenant_to_hub() -> None:
     )
 
     with patch(
-        "backend.agent.memory_hub.get_memory_hub_async",
+        "packages.agent_runtime.memory_hub.get_memory_hub_async",
         side_effect=fake_hub,
     ):
         await core._process_with_runtime(

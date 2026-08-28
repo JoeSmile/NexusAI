@@ -14,7 +14,7 @@ Agent模块 - 智能Agent核心 (Runtime + Skills 版)
   新版 AgentCore (V2) → ConversationRuntime + Skill-based ReAct 循环
 
 使用方式：
-  from backend.agent import get_agent_core  # 自动使用 V2
+  from packages.agent_runtime import get_agent_core  # 自动使用 V2
   agent = get_agent_core()
   result = await agent.process(user_input="...", user_id="...")
 """

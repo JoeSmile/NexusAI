@@ -158,7 +158,7 @@ def test_rag_service_llm_available_without_api_key(mock_provider, monkeypatch):
 @pytest.mark.asyncio
 async def test_agent_legacy_call_llm_uses_factory(mock_provider, monkeypatch):
     """Runtime 降级到 legacy 时也应走 complete_chat，不再返回固定占位文案。"""
-    import backend.agent.agent_core as ac
+    import packages.agent_runtime.agent_core as ac
     from packages.harness import get_llm_client
 
     monkeypatch.setattr(ac, "_agent_core_instance", None)

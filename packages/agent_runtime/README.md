@@ -2,13 +2,13 @@
 
 ## 唯一实现入口
 
-Agent 运行时只在本目录（`backend.agent`）。经 `backend.services.agent_service` →
+Agent 运行时只在本目录（`packages.agent_runtime`）。经 `backend.services.agent_service` →
 `backend.routers.agent` 挂载为 `/agent/*`。**内部消息协议（legacy，非 Anthropic MCP）** 在
-`backend.modules.agent.protocol.mcp`；新工具走 `CapabilityRegistry` + `invoke.py`（Task 66）。
+`packages.agent.protocol.mcp`；新工具走 `CapabilityRegistry` + `invoke.py`（Task 66）。
 
 ```python
-from backend.agent import get_agent_core, AgentCore
-from backend.modules.agent.protocol.mcp import MCPContext
+from packages.agent_runtime import get_agent_core, AgentCore
+from packages.agent.protocol.mcp import MCPContext
 ```
 
 ## 概述
@@ -103,7 +103,7 @@ Agent核心控制器，协调所有模块：
 ### 基本使用
 
 ```python
-from backend.agent import get_agent_core
+from packages.agent_runtime import get_agent_core
 
 agent = get_agent_core()
 result = await agent.process(
@@ -125,7 +125,7 @@ mcp_message = await agent.process_with_mcp(
 ### 单独使用模块
 
 ```python
-from backend.agent import get_memory_hub, get_tool_caller
+from packages.agent_runtime import get_memory_hub, get_tool_caller
 
 # 使用记忆中枢
 memory_hub = get_memory_hub()
