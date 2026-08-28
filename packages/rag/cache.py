@@ -45,7 +45,7 @@ def _env_int(name: str, default: int) -> int:
 def _inc_metric(kind: str, cache_type: str, tenant: str = "*") -> None:
     """Prometheus 埋点(kind=hit|miss);指标缺失/失败不得影响业务。"""
     try:
-        from backend.core.metrics import cache_hits, cache_misses
+        from packages.metrics import cache_hits, cache_misses
 
         counter = cache_hits if kind == "hit" else cache_misses
         counter.labels(tenant=tenant, cache_type=cache_type).inc()

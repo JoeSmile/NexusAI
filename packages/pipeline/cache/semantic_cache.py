@@ -247,7 +247,7 @@ def try_apply_semantic_cache(state: PipelineState) -> bool:
     state["response"] = hit
     state["finish_reason"] = "semantic_cache_hit"
     try:
-        from backend.core.metrics import cache_hits
+        from packages.metrics import cache_hits
 
         cache_hits.labels(tenant=state["tenant_id"], cache_type="semantic").inc()
     except Exception:

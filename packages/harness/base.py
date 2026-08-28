@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from backend.core.circuit_breaker import CircuitBreaker
-from backend.core.metrics import errors_total
+from packages.metrics import errors_total
 
 
 @dataclass
@@ -98,7 +98,7 @@ class Harness:
         errors_total.labels(tenant=tenant_id, error_code=f"{type}.{reason}"[:64]).inc()
 
     def _record_metrics(self, type: str, name: str, latency_ms: float) -> None:
-        from backend.core.metrics import request_duration
+        from packages.metrics import request_duration
 
         request_duration.labels(
             method=type, endpoint=name, status="2xx"

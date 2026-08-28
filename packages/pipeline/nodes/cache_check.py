@@ -42,7 +42,7 @@ async def cache_check(state: PipelineState) -> PipelineState:
             "cache_check: cache_bypass (tenant=%s); skip read",
             tenant_id,
         )
-        from backend.core.metrics import cache_misses
+        from packages.metrics import cache_misses
 
         cache_misses.labels(tenant=tenant_id, cache_type="bypass").inc()
         return state
@@ -53,7 +53,7 @@ async def cache_check(state: PipelineState) -> PipelineState:
             "cache_check: missing query_hash (tenant=%s); treating as miss",
             tenant_id,
         )
-        from backend.core.metrics import cache_misses
+        from packages.metrics import cache_misses
 
         cache_misses.labels(tenant=tenant_id, cache_type="pipeline").inc()
         return state
@@ -74,7 +74,7 @@ async def cache_check(state: PipelineState) -> PipelineState:
             state["cache_value"] = exact.value
             state["response"] = exact.value
             state["finish_reason"] = "cache_hit"
-            from backend.core.metrics import cache_hits
+            from packages.metrics import cache_hits
 
             cache_hits.labels(tenant=tenant_id, cache_type="exact").inc()
             return state
@@ -96,14 +96,14 @@ async def cache_check(state: PipelineState) -> PipelineState:
                 state["cache_value"] = template.value
                 state["response"] = template.value
                 state["finish_reason"] = "cache_hit"
-                from backend.core.metrics import cache_hits
+                from packages.metrics import cache_hits
 
                 cache_hits.labels(tenant=tenant_id, cache_type="template").inc()
                 return state
 
     # Task 72：语义缓存在 model_router（D4：需 model + intent + context_hash）。
 
-    from backend.core.metrics import cache_misses
+    from packages.metrics import cache_misses
 
     cache_misses.labels(tenant=tenant_id, cache_type="pipeline").inc()
     return state

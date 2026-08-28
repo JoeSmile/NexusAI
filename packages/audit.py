@@ -330,7 +330,7 @@ def _record_audit_write_failure(record: dict) -> None:
     global _audit_write_failure_count
     _audit_write_failure_count += 1
     try:
-        from backend.core.metrics import audit_write_failures_total
+        from packages.metrics import audit_write_failures_total
 
         audit_write_failures_total.inc()
     except Exception:

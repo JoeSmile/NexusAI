@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from packages.guardrails.input_guard import check_input
-from backend.core.metrics import guardrails_blocked
+from packages.metrics import guardrails_blocked
 from backend.observability.decorators import observe
 from packages.pipeline.state import PipelineState
 

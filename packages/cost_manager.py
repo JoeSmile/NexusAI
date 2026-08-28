@@ -6,7 +6,7 @@ import re
 
 from sqlalchemy import text
 
-from backend.core.metrics import cost_total, tokens_total
+from packages.metrics import cost_total, tokens_total
 from backend.database.pgvector_session import get_pg_session
 
 COST_TABLE: dict[str, float] = {

@@ -271,7 +271,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    from backend.core.metrics import MetricsMiddleware
+    from packages.metrics import MetricsMiddleware
     from packages.tenant import TenantMiddleware
     from packages.auth.signature_auth import SignatureMiddleware
 

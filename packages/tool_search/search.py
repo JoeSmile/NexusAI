@@ -84,7 +84,7 @@ def _record_metrics(
     zero_recall: bool,
 ) -> None:
     try:
-        from backend.core.metrics import (
+        from packages.metrics import (
             tool_search_bm25_recall_total,
             tool_search_queries_total,
             tool_search_vector_recall_total,
