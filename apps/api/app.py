@@ -135,7 +135,7 @@ async def lifespan(app: FastAPI):
         logger.warning("LangFuse init skipped: %s", e)
 
     try:
-        from backend.core.thread_pool import install_default_executor
+        from packages.thread_pool import install_default_executor
 
         n = install_default_executor()
         logger.info("✓ default executor workers=%s", n)

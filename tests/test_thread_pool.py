@@ -7,7 +7,7 @@ import asyncio
 import pytest
 
 from backend.config.performance_config import PerformanceConfig
-from backend.core.thread_pool import (
+from packages.thread_pool import (
     get_thread_pool,
     install_default_executor,
     reset_thread_pool_for_tests,

@@ -13,7 +13,7 @@ from collections.abc import AsyncGenerator, Callable
 from functools import wraps
 from typing import Any
 
-from backend.core.thread_pool import get_thread_pool
+from packages.thread_pool import get_thread_pool
 from backend.logging_config import get_logger
 
 logger = get_logger(__name__)
