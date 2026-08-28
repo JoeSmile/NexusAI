@@ -272,7 +272,7 @@ def create_app() -> FastAPI:
     )
 
     from backend.core.metrics import MetricsMiddleware
-    from backend.core.tenant import TenantMiddleware
+    from packages.tenant import TenantMiddleware
     from packages.auth.signature_auth import SignatureMiddleware
 
     app.add_middleware(SignatureMiddleware)
