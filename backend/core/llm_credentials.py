@@ -6,7 +6,7 @@ from sqlalchemy import text
 
 from packages.errors import ErrorCode, NexusAIException
 from backend.core.key_manager import KeyManager
-from backend.core.key_repository import LLMKey
+from packages.key_repository import LLMKey
 from backend.database.pgvector_session import get_pg_session
 
 _LLM_KEY_MISSING = ErrorCode.LLM_KEY_MISSING.value
@@ -120,7 +120,7 @@ def _fetch_tenant_chain_rows(tenant_id: str, cooldown: int) -> list:
 
 def _key_cooldown_seconds() -> int:
     try:
-        from backend.core.key_repository import _cooldown_seconds
+        from packages.key_repository import _cooldown_seconds
 
         return int(_cooldown_seconds())
     except Exception:

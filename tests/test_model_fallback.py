@@ -10,7 +10,7 @@ import pytest
 import packages.harness.llm as llm_mod
 import backend.core.key_failover as key_failover
 from packages.harness.llm import LLMHarness
-from backend.core.key_repository import LLMKey
+from packages.key_repository import LLMKey
 from packages.model_registry import fallback_chain, reload_registry
 
 

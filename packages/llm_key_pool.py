@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from backend.core.key_repository import LLMKey
+from packages.key_repository import LLMKey
 
 logger = logging.getLogger(__name__)
 

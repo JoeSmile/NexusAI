@@ -87,7 +87,7 @@ def _load_key_chain_sync(
     import asyncio
     import concurrent.futures
 
-    from backend.core.key_repository import LLMKeyRepository
+    from packages.key_repository import LLMKeyRepository
 
     async def _load():
         return await LLMKeyRepository().get_key_chain(
@@ -160,7 +160,7 @@ def _complete_via_provider_unlocked(
     from openai import OpenAI
 
     from backend.core.key_failover import call_with_key_failover_sync
-    from backend.core.key_repository import LLMKey
+    from packages.key_repository import LLMKey
 
     keys = list(key_chain) if key_chain else _load_key_chain_sync(tenant_id, key_provider)
     if not keys:
@@ -277,7 +277,7 @@ def _build_langchain_chat_model(
             self, messages: list[dict], system: str | None = None
         ) -> str:
             """异步路径:await 预载候选链再调用,不依赖线程池同步加载。"""
-            from backend.core.key_repository import LLMKeyRepository
+            from packages.key_repository import LLMKeyRepository
 
             chain = await LLMKeyRepository().get_key_chain(
                 self.tenant_id, self.key_provider, limit=3
@@ -352,7 +352,7 @@ class _FallbackLLMClient:
     async def acomplete_chat(
         self, messages: list[dict], system: str | None = None
     ) -> str:
-        from backend.core.key_repository import LLMKeyRepository
+        from packages.key_repository import LLMKeyRepository
 
         chain = await LLMKeyRepository().get_key_chain(
             self.tenant_id, self.key_provider, limit=3

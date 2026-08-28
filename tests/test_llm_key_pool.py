@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 
 import backend.core.llm_credentials as llm_cred
-from backend.core.key_repository import LLMKey
+from packages.key_repository import LLMKey
 from backend.core.llm_credentials import get_key_chain_for_model, resolve_tenant_credential
 from packages.llm_key_pool import pick_key_from_chain
 

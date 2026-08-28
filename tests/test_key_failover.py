@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 import pytest
 
 import backend.core.key_failover as key_failover
-import backend.core.key_repository as key_repo
+import packages.key_repository as key_repo
 
 
 class _APIStatusError(Exception):
@@ -270,7 +270,7 @@ async def test_clear_key_failure_resets(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_failover_429_switches_to_second_key(monkeypatch):
-    from backend.core.key_repository import LLMKey
+    from packages.key_repository import LLMKey
 
     marks: list[str] = []
     clears: list[str] = []
@@ -306,7 +306,7 @@ async def test_failover_429_switches_to_second_key(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_failover_5xx_does_not_switch(monkeypatch):
-    from backend.core.key_repository import LLMKey
+    from packages.key_repository import LLMKey
 
     marks: list[str] = []
 
@@ -347,7 +347,7 @@ def test_classify_switchable_status():
 async def test_load_key_chain_sync_works_under_running_loop(monkeypatch):
     """Important #2: 已有 event loop 时仍能拉到候选链(线程池),不再返回空。"""
     import packages.harness.llm_client as llm_client
-    from backend.core.key_repository import LLMKey
+    from packages.key_repository import LLMKey
 
     async def _fake_chain(tid, provider, limit=3):
         return [
@@ -359,7 +359,7 @@ async def test_load_key_chain_sync_works_under_running_loop(monkeypatch):
             return await _fake_chain(tid, provider, limit)
 
     monkeypatch.setattr(
-        "backend.core.key_repository.LLMKeyRepository",
+        "packages.key_repository.LLMKeyRepository",
         _Repo,
     )
     chain = llm_client._load_key_chain_sync("t1", "deepseek", limit=3)
@@ -476,7 +476,7 @@ async def test_verify_key_failed_marks_and_may_deactivate(monkeypatch):
 
 
 def test_failover_sync_401_switches():
-    from backend.core.key_repository import LLMKey
+    from packages.key_repository import LLMKey
 
     marks: list[str] = []
     clears: list[str] = []

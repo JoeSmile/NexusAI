@@ -18,7 +18,7 @@ from packages.cost_manager import (
     record_consumption,
 )
 from backend.core.fallback import get_fallback
-from backend.core.key_repository import LLMKey
+from packages.key_repository import LLMKey
 from packages.harness.base import Harness, HarnessResult
 from packages.harness.provider import (
     get_llm_provider,
@@ -431,7 +431,7 @@ class LLMHarness(Harness):
         key_provider: str,
     ) -> AsyncIterator[str]:
         from backend.core.key_failover import should_try_next_model, stream_with_key_failover
-        from backend.core.key_repository import LLMKeyRepository
+        from packages.key_repository import LLMKeyRepository
 
         repo = LLMKeyRepository()
         last_err: BaseException | None = None
@@ -522,7 +522,7 @@ class LLMHarness(Harness):
         from openai import AsyncOpenAI
 
         from backend.core.key_failover import call_with_key_failover, should_try_next_model
-        from backend.core.key_repository import LLMKeyRepository
+        from packages.key_repository import LLMKeyRepository
         from packages.harness.provider import get_llm_provider, save_fixture
 
         repo = LLMKeyRepository()

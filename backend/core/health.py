@@ -82,7 +82,7 @@ async def health_check():
 
     # 3. LLM API（可选 — Batch 8 前可能无 KeyRepository）
     try:
-        from backend.core.key_repository import LLMKeyRepository  # type: ignore
+        from packages.key_repository import LLMKeyRepository  # type: ignore
 
         repo = LLMKeyRepository()
         key = await repo.get_key("default", "default")

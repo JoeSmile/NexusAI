@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-import backend.core.key_repository as key_repo
+import packages.key_repository as key_repo
 import backend.core.llm_credentials as llm_cred
 from packages.errors import NexusAIException
 from backend.core.llm_credentials import (
@@ -341,7 +341,7 @@ async def test_model_router_missing_tenant_key_raises(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_model_router_resolves_tenant_credential(monkeypatch):
-    from backend.core.key_repository import LLMKey
+    from packages.key_repository import LLMKey
     from packages.pipeline.state import make_initial_state
 
     key = LLMKey(

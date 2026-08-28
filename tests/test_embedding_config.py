@@ -240,7 +240,7 @@ def test_dashscope_ignores_llm_api_key_alone(monkeypatch):
 
 def test_embed_text_uses_tenant_embedding_credential(monkeypatch):
     import backend.database.embeddings as emb
-    from backend.core.key_repository import LLMKey
+    from packages.key_repository import LLMKey
 
     monkeypatch.setenv("QWEN_API_KEY", "sk-should-not-use")
     monkeypatch.setenv("EMBEDDING_DIMENSIONS", "768")

@@ -10,7 +10,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import datetime
 from typing import TypeVar
 
-from backend.core.key_repository import LLMKey, LLMKeyRepository
+from packages.key_repository import LLMKey, LLMKeyRepository
 
 logger = logging.getLogger(__name__)
 
