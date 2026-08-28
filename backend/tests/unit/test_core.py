@@ -9,7 +9,7 @@ from unittest.mock import patch
 import pytest
 
 from backend.core.config import Config, Environment, get_config
-from backend.core.exceptions import (
+from packages.exceptions import (
     ConfigurationError,
     DatabaseError,
     NexusAIException,

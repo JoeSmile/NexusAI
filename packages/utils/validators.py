@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from backend.core.exceptions import ValidationError
+from packages.exceptions import ValidationError
 
 # 正则表达式模式
 EMAIL_PATTERN = re.compile(

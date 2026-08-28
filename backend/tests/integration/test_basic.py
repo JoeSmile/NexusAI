@@ -14,7 +14,7 @@ class TestBasicIntegration:
         """测试模块导入"""
         # 测试核心模块可以正常导入
         from backend.core.config import Config, get_config
-        from backend.core.exceptions import NexusAIException
+        from packages.exceptions import NexusAIException
         
         assert Config is not None
         assert get_config is not None
@@ -33,7 +33,7 @@ class TestBasicIntegration:
     
     def test_exception_handling(self):
         """测试异常处理"""
-        from backend.core.exceptions import DatabaseError, NexusAIException, ValidationError
+        from packages.exceptions import DatabaseError, NexusAIException, ValidationError
         
         # 测试异常可以正常创建
         exc = NexusAIException("测试错误")

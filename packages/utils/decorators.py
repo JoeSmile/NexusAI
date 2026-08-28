@@ -13,7 +13,7 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import Any
 
-from backend.core.exceptions import RateLimitError, ValidationError
+from packages.exceptions import RateLimitError, ValidationError
 
 
 def retry(
