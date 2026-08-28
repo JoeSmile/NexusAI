@@ -2,7 +2,7 @@
 
 import pytest
 
-from backend.core.circuit_breaker import CircuitBreaker
+from packages.circuit_breaker import CircuitBreaker
 
 
 @pytest.mark.asyncio

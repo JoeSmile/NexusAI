@@ -242,7 +242,7 @@ async def test_invoke_external_mock_and_circuit(
 ) -> None:
     from packages.capability.connectors import external_app as ext
     from packages.capability.errors import CapabilityUpstreamError
-    from backend.core.circuit_breaker import CircuitState
+    from packages.circuit_breaker import CircuitState
 
     monkeypatch.setenv("CAPABILITY_UPSTREAM_MOCK", "true")
     monkeypatch.setenv("LLM_PROVIDER", "mock")

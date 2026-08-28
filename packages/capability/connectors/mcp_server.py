@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any
 
-from backend.core.circuit_breaker import CircuitBreaker, CircuitState
+from packages.circuit_breaker import CircuitBreaker, CircuitState
 from packages.security.url_guard import UrlValidationError, validate_base_url
 from packages.auth.models import TenantContext
 from packages.capability.errors import CapabilityUpstreamError

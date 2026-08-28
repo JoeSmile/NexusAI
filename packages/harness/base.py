@@ -8,7 +8,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from backend.core.circuit_breaker import CircuitBreaker
+from packages.circuit_breaker import CircuitBreaker
 from packages.metrics import errors_total
 
 
