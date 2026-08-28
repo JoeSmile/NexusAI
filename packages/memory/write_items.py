@@ -37,7 +37,7 @@ async def persist_warm_by_key(
     embed: bool = True,
 ) -> str:
     """I1：按 is_sync_key 分流。返回 queued | synced | degraded。"""
-    from backend.core.metrics_memory import (
+    from packages.metrics_memory import (
         observe_queue_depth,
         record_backlog_trigger,
         record_degraded,

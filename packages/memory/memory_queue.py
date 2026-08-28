@@ -180,7 +180,7 @@ def drop_poison(xid: str, data: dict[str, Any], *, deliveries: int) -> None:
     ack(xid)
     try:
         from packages.audit import write_audit_sync
-        from backend.core.metrics_memory import record_dropped
+        from packages.metrics_memory import record_dropped
 
         write_audit_sync(
             {

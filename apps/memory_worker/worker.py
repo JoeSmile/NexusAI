@@ -127,7 +127,7 @@ def process_one(xid: str, data: dict, *, deliveries: int = 1) -> float:
     except Exception:
         pass
     try:
-        from backend.core.metrics_memory import record_worker_heartbeat
+        from packages.metrics_memory import record_worker_heartbeat
 
         record_worker_heartbeat()
     except Exception:

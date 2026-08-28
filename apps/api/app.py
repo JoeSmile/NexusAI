@@ -81,7 +81,7 @@ async def lifespan(app: FastAPI):
 
     try:
         # I2：显式 import 注册 Prometheus gauges（不 import 不进 /metrics）
-        import backend.core.metrics_memory as _metrics_memory  # noqa: F401
+        import packages.metrics_memory as _metrics_memory  # noqa: F401
 
         logger.info("✓ memory metrics gauges registered")
     except Exception as e:
