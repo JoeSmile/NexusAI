@@ -6,7 +6,7 @@ import logging
 
 from sqlalchemy import text
 
-from backend.core.text_normalize import make_normalized_query_hash
+from packages.text_normalize import make_normalized_query_hash
 from backend.database.pgvector_session import get_pg_session
 from backend.observability.decorators import observe
 from packages.pipeline.state import PipelineState

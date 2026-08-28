@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.core.text_normalize import make_normalized_query_hash, normalize_text
+from packages.text_normalize import make_normalized_query_hash, normalize_text
 from packages.rag import cache as rag_cache
 
 

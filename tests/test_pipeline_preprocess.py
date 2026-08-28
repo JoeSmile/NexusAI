@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.core.text_normalize import make_normalized_query_hash, normalize_text
+from packages.text_normalize import make_normalized_query_hash, normalize_text
 from packages.pipeline.nodes.preprocess import (
     preprocess,
     should_cache_bypass,

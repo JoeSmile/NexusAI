@@ -12,7 +12,7 @@ import math
 import os
 import time
 
-from backend.core.text_normalize import make_normalized_query_hash, normalize_text
+from packages.text_normalize import make_normalized_query_hash, normalize_text
 from packages.pipeline.state import PipelineState
 
 logger = logging.getLogger(__name__)

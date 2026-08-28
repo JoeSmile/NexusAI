@@ -14,7 +14,7 @@ import time
 from datetime import datetime
 from typing import Any
 
-from backend.core.text_normalize import (
+from packages.text_normalize import (
     make_normalized_query_hash,
     normalize_text,
 )
