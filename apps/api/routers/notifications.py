@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from backend.modules.notification.service import list_inbox, mark_read, unread_count
+from packages.notification.service import list_inbox, mark_read, unread_count
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
 

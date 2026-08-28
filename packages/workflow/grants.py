@@ -560,7 +560,7 @@ def expire_stale_approvals_for_node(
         )
         # TTL 过期重申请 → 审批人（相关方）；新 pending 由调用方 create
         try:
-            from backend.modules.notification.service import (
+            from packages.notification.service import (
                 list_tenant_admin_user_ids,
                 notify_many,
             )

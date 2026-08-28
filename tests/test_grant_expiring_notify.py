@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from unittest.mock import patch
 
 from packages.workflow.subscription import get_subscription, set_subscription
-from backend.modules.notification.service import refs_only
+from packages.notification.service import refs_only
 
 
 def test_payload_allowlist_includes_expiry_fields():

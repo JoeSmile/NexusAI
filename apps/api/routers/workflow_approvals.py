@@ -451,7 +451,7 @@ async def approve(
     # 批 → 申请人（self_approve 不另发用户通知，对齐 auto-grant 只审计）
     try:
         if action == "workflow.approve":
-            from backend.modules.notification.service import notify
+            from packages.notification.service import notify
 
             notify(
                 tenant.tenant_id,
@@ -548,7 +548,7 @@ async def reject(
             output_text=(body.reason or "rejected")[:200],
         )
     try:
-        from backend.modules.notification.service import notify
+        from packages.notification.service import notify
 
         notify(
             tenant.tenant_id,

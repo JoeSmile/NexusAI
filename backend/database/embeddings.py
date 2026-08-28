@@ -188,7 +188,7 @@ def embed_text(text: str, tenant_id: str | None = None) -> list[float]:
 
     L2 缓存(Task 29):归一化文本 → redis `rag:e:{model}:{hash}`;命中补零到 1536。
     """
-    from backend.modules.rag.cache import (
+    from packages.rag.cache import (
         get_redis,
         l2_get,
         l2_set,

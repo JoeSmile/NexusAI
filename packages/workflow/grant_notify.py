@@ -21,7 +21,7 @@ def scan_expiring_grants(
         WorkflowGrant,
         get_pg_session,
     )
-    from backend.modules.notification.service import notify
+    from packages.notification.service import notify
     from packages.workflow.grants import normalize_request_policy
 
     now = now or datetime.utcnow()

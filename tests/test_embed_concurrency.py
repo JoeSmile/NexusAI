@@ -96,7 +96,7 @@ def test_embed_http_uses_slot(monkeypatch: pytest.MonkeyPatch) -> None:
 
     import backend.core.model_registry as mr
     import backend.database.embeddings as emb
-    from backend.modules.rag import cache as rag_cache
+    from packages.rag import cache as rag_cache
 
     monkeypatch.setenv("RAG_CACHE_ENABLED", "false")
     rag_cache.reset_redis_for_tests()
@@ -132,7 +132,7 @@ def test_embed_cache_hit_skips_slot(monkeypatch: pytest.MonkeyPatch) -> None:
     import backend.database.embeddings as emb
 
     monkeypatch.setattr(
-        "backend.modules.rag.cache.l2_get",
+        "packages.rag.cache.l2_get",
         lambda model, text: [0.3] * 768,
     )
     monkeypatch.setattr(

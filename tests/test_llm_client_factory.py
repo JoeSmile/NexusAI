@@ -92,7 +92,7 @@ def test_openai_without_api_key_raises(monkeypatch):
     monkeypatch.setattr(llm_client, "_load_key_chain_sync", lambda *a, **k: [])
     # Config 可能仍有密钥,强制走空
     monkeypatch.setattr(
-        "backend.modules.llm.harness.Config.LLM_API_KEY", "", raising=False
+        "packages.llm.harness.Config.LLM_API_KEY", "", raising=False
     )
 
     with pytest.raises(RuntimeError, match="LLM_API_KEY"):
@@ -146,7 +146,7 @@ def test_rag_service_llm_available_without_api_key(mock_provider, monkeypatch):
             raise RuntimeError("not needed")
 
     monkeypatch.setenv("LLM_PROVIDER", "mock")
-    from backend.modules.rag.services.rag_service import RAGService
+    from packages.rag.services.rag_service import RAGService
 
     svc = RAGService(kb_manager=_FakeKB())
     assert svc.llm is not None

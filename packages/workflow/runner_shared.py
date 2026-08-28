@@ -164,7 +164,7 @@ def _count_inflight_roots(
 
 def _notify_run_done(run: WorkflowRun, *, status: str) -> None:
     try:
-        from backend.modules.notification.service import notify_run_terminal
+        from packages.notification.service import notify_run_terminal
 
         inputs = _run_inputs_from_context(run)
         notify_run_terminal(

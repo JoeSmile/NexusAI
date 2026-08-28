@@ -11,7 +11,7 @@ from fastapi import HTTPException
 from packages.auth.models import TenantContext
 from packages.org.models import OrgUnitDTO
 from packages.org.scope import OrgScope
-from backend.modules.rag.org_tag import chunk_visible_to_scope, require_primary_org_for_ingest
+from packages.rag.org_tag import chunk_visible_to_scope, require_primary_org_for_ingest
 
 
 def test_null_chunk_only_governance():
@@ -59,7 +59,7 @@ def test_manager_subtree_chunk():
 def test_require_primary_org_400(monkeypatch):
     session = MagicMock()
     monkeypatch.setattr(
-        "backend.modules.rag.org_tag.resolve_org_scope",
+        "packages.rag.org_tag.resolve_org_scope",
         lambda *a, **k: OrgScope(
             tenant_id="acme",
             user_id="u",
@@ -80,7 +80,7 @@ def test_require_primary_org_400(monkeypatch):
 def test_require_primary_org_ok(monkeypatch):
     session = MagicMock()
     monkeypatch.setattr(
-        "backend.modules.rag.org_tag.resolve_org_scope",
+        "packages.rag.org_tag.resolve_org_scope",
         lambda *a, **k: OrgScope(
             tenant_id="acme",
             user_id="u",

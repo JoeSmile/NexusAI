@@ -12,7 +12,7 @@ def _reload_registry(monkeypatch):
     """每个用例前后重置 registry 缓存与 embed 模式。"""
     import backend.core.model_registry as mr
     import backend.database.embeddings as emb
-    from backend.modules.rag import cache as rag_cache
+    from packages.rag import cache as rag_cache
 
     # Task 29: 避免本地 redis-stack 污染 L2 命中,导致 API mock 未被调用
     monkeypatch.setenv("RAG_CACHE_ENABLED", "false")

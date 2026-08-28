@@ -15,7 +15,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
-from backend.modules.channel.inbound import InboundMessage
+from packages.channel.inbound import InboundMessage
 
 logger = logging.getLogger(__name__)
 

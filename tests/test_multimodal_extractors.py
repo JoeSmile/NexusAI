@@ -7,11 +7,11 @@ import builtins
 import pytest
 
 from backend.core.errors import ErrorCode
-from backend.modules.rag.extractors.audio import (
+from packages.rag.extractors.audio import (
     MultimodalDependencyError,
     extract_audio_text,
 )
-from backend.modules.rag.extractors.image import extract_image_text
+from packages.rag.extractors.image import extract_image_text
 
 
 @pytest.fixture

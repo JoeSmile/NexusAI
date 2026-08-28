@@ -341,8 +341,8 @@ def _record_audit_write_failure(record: dict) -> None:
 def _alert_audit_write_failure(record: dict) -> None:
     """Task 44 通知通道 — 失败静默，不阻断业务。"""
     try:
-        from backend.modules.notification import notify
-        from backend.modules.notification.service import refs_only
+        from packages.notification import notify
+        from packages.notification.service import refs_only
 
         tenant_id = str(record.get("tenant_id") or "system")
         user_id = str(record.get("user_id") or "system")

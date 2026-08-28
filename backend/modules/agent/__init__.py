@@ -1,30 +1,9 @@
-"""Agent 包：仅保留 protocol（MCP）。
-
-Agent 运行时实现见 ``backend.agent``（经 ``backend.services.agent_service`` /
-``apps.api.routers.agent`` 挂载为 ``/agent/*``）。本包不再导出 AgentCore /
-AgentService / 路由副本（Task 31 已删除孤儿树）。
-"""
-
-from backend.modules.agent.protocol import (
-    MCPContext,
-    MCPLogger,
-    MCPMessage,
-    MCPMessageType,
-    MCPProtocol,
-    MCPToolCall,
-    MCPToolResponse,
-    create_mcp_protocol_with_context,
-    get_mcp_logger,
+"""Deprecated shim — use ``packages.agent`` (Task 75.9)."""
+from __future__ import annotations
+import warnings
+warnings.warn(
+    "backend.modules.agent is deprecated; import from packages.agent",
+    DeprecationWarning,
+    stacklevel=2,
 )
-
-__all__ = [
-    "MCPContext",
-    "MCPLogger",
-    "MCPMessage",
-    "MCPMessageType",
-    "MCPProtocol",
-    "MCPToolCall",
-    "MCPToolResponse",
-    "create_mcp_protocol_with_context",
-    "get_mcp_logger",
-]
+from packages.agent import *  # noqa: F401,F403

@@ -15,7 +15,7 @@ if os.name == "nt" and hasattr(sys.stdout, "reconfigure"):
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
-from backend.modules.rag import EnterpriseKnowledgeLoader, KnowledgeBaseManager
+from packages.rag import EnterpriseKnowledgeLoader, KnowledgeBaseManager
 
 
 def main():

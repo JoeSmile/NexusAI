@@ -584,7 +584,7 @@ def cancel_run(
     )
     # 撤销 → 审批人（dept_manager / tenant_admin）
     try:
-        from backend.modules.notification.service import (
+        from packages.notification.service import (
             list_tenant_admin_user_ids,
             notify_many,
         )

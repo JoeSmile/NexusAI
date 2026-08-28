@@ -93,7 +93,7 @@ def test_agent_memory_awaits_summary():
 
 
 def test_rag_init_sample_uses_add_documents(monkeypatch):
-    from backend.modules.rag.routers import rag_router as rag_mod
+    from packages.rag.routers import rag_router as rag_mod
 
     app = FastAPI()
     app.include_router(rag_mod.router)
@@ -116,7 +116,7 @@ def test_rag_init_sample_uses_add_documents(monkeypatch):
 
         def load_sample_knowledge(self):
             # 与生产路径一致: Document + add_documents
-            from backend.modules.rag.core.langchain_compat import Document
+            from packages.rag.core.langchain_compat import Document
 
             self.called = True
             self.kb_manager.add_documents(

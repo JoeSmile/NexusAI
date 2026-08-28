@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from backend.core.errors import ErrorCode, NexusAIException
-from backend.modules.rag import cache as rag_cache
+from packages.rag import cache as rag_cache
 
 
 class FakeRedis:
@@ -138,7 +138,7 @@ def test_l2_model_key_isolation(fake_redis):
 def _make_rag_service(llm_invoke, retrieve_docs=None):
     from langchain_core.prompts import PromptTemplate
 
-    from backend.modules.rag.services.rag_service import RAGService
+    from packages.rag.services.rag_service import RAGService
 
     svc = RAGService.__new__(RAGService)
     svc.kb_manager = MagicMock()

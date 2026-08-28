@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from backend.modules.llm.harness import resolve_llm_settings
+from packages.llm.harness import resolve_llm_settings
 from packages.harness.provider import (
     get_llm_provider,
     load_fixture,

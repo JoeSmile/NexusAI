@@ -8,8 +8,8 @@ from datetime import datetime
 import pytest
 
 from backend.database.pgvector_session import Notification, get_pg_session
-from backend.modules.notification import channels as ch
-from backend.modules.notification.service import (
+from packages.notification import channels as ch
+from packages.notification.service import (
     list_inbox,
     mark_read,
     notify,
@@ -102,7 +102,7 @@ def test_unavailable_provider_skipped(ensure_table, monkeypatch):
 
 
 def test_refs_only_strips_reason():
-    from backend.modules.notification.service import refs_only
+    from packages.notification.service import refs_only
 
     clean = refs_only(
         {
@@ -132,7 +132,7 @@ def test_notify_failure_does_not_raise(ensure_table, monkeypatch):
         return [Dead()]
 
     monkeypatch.setattr(
-        "backend.modules.notification.service.list_available_providers",
+        "packages.notification.service.list_available_providers",
         boom_providers,
     )
     out = notify("t", "u", "hang.pending", {"run_id": "x"})
@@ -194,7 +194,7 @@ def test_hang_pending_wires_inbox(ensure_table, monkeypatch):
 
 def test_notify_run_terminal_lifecycle(ensure_table):
     """44.4: run_completed / run_failed carry conversation_id; 4A no raw errors."""
-    from backend.modules.notification.service import notify_run_terminal
+    from packages.notification.service import notify_run_terminal
 
     tid = f"n44r-{uuid.uuid4().hex[:8]}"
     uid = f"u_{uuid.uuid4().hex[:6]}"

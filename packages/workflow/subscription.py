@@ -185,7 +185,7 @@ def scan_subscription_expiring(
     now: datetime | None = None,
 ) -> dict[str, int]:
     from backend.database.pgvector_session import TenantConfig, get_pg_session
-    from backend.modules.notification.service import list_tenant_admin_user_ids, notify
+    from packages.notification.service import list_tenant_admin_user_ids, notify
 
     now = now or datetime.utcnow()
     horizon = now + timedelta(days=within_days)

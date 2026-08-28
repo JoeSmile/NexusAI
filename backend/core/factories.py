@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from functools import lru_cache
 from typing import Any, TypeVar
 
-from backend.modules.rag import RAGService
+from packages.rag import RAGService
 
 from .config import get_config
 from .exceptions import ConfigurationError

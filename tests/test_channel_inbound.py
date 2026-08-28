@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from backend.modules.channel.inbound import InboundMessage
+from packages.channel.inbound import InboundMessage
 from apps.api.routers.channel_webhooks import router
 
 

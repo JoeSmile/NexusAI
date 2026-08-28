@@ -21,7 +21,7 @@ from typing import Any
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 sys.path.insert(0, project_root)
 
-from backend.modules.agent.protocol.mcp import (
+from packages.agent.protocol.mcp import (
     MCPMessage,
     MCPProtocol,
     MCPToolResponse,

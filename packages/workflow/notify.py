@@ -165,7 +165,7 @@ def mark_escalated(
     )
     # Task 44: 升级 → 相关方（tenant_admin）；失败不阻断
     try:
-        from backend.modules.notification.service import (
+        from packages.notification.service import (
             list_tenant_admin_user_ids,
             notify_many,
         )
@@ -216,7 +216,7 @@ def notify_hang_pending(run_id: str, node_id: str) -> HangRoute | None:
                 session.commit()
                 # 先 route，再投递待批（升级路径由 mark_escalated 发 hang.escalated）
                 try:
-                    from backend.modules.notification.service import notify_many
+                    from packages.notification.service import notify_many
 
                     notify_many(
                         req.tenant_id,

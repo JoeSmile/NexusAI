@@ -12,7 +12,7 @@ from apps.api.routers.memory import router as memory_router
 from apps.api.routers.personalization import router as personalization_router
 
 try:
-    from backend.modules.rag.routers.rag_router import router as rag_router
+    from packages.rag.routers.rag_router import router as rag_router
 except Exception:  # pragma: no cover
     rag_router = None
 

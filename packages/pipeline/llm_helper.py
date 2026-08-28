@@ -27,7 +27,7 @@ async def generate_text(prompt: str, model: str = "", api_key: str = "", base_ur
     # record / openai:真实调用(record 落盘 fixture)
     result = "系统暂时繁忙，请稍后再试。"
     try:
-        from backend.modules.llm.core.llm_core import ChatEngine
+        from packages.llm.core.llm_core import ChatEngine
 
         engine = ChatEngine()
         # ChatEngine.chat is sync request-shaped; fall back to requests via engine internals

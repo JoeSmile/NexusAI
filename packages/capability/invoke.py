@@ -216,7 +216,7 @@ async def _invoke_rag(
     tenant: TenantContext,
 ) -> AsyncIterator[dict[str, Any]]:
     """tool/rag：与 ``POST /api/rag/ask`` 同源的 ``RAGService.ask``。"""
-    from backend.modules.rag.routers.rag_router import get_rag_service
+    from packages.rag.routers.rag_router import get_rag_service
 
     messages = _messages_from_payload(payload)
     if not messages:

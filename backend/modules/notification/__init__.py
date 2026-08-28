@@ -1,12 +1,9 @@
-"""Multi-channel notification skeleton (Task 44)."""
-
+"""Deprecated shim — use ``packages.notification`` (Task 75.9)."""
 from __future__ import annotations
-
-from backend.modules.notification.service import (
-    mark_read,
-    notify,
-    notify_many,
-    unread_count,
+import warnings
+warnings.warn(
+    "backend.modules.notification is deprecated; import from packages.notification",
+    DeprecationWarning,
+    stacklevel=2,
 )
-
-__all__ = ["notify", "notify_many", "mark_read", "unread_count"]
+from packages.notification import *  # noqa: F401,F403

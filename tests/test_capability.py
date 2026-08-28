@@ -410,7 +410,7 @@ async def test_tool_executor_rag_uses_rag_service(
         ),
         patch("packages.capability.governance._redis", return_value=None),
         patch(
-            "backend.modules.rag.routers.rag_router.get_rag_service",
+            "packages.rag.routers.rag_router.get_rag_service",
             return_value=_FakeRag(),
         ),
     ):

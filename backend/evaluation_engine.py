@@ -20,7 +20,7 @@ except ImportError:
 # 导入日志配置
 from packages.harness import get_llm_client
 from backend.logging_config import get_logger
-from backend.modules.llm.harness import resolve_llm_settings
+from packages.llm.harness import resolve_llm_settings
 
 logger = get_logger(__name__)
 

@@ -29,7 +29,7 @@ _CAP_RATE_LIMIT_PER_MIN = int(os.getenv("CAP_RATE_LIMIT_PER_MIN", "60") or 60)
 def _redis():
     """优先复用 RAG cache 的 redis 客户端。"""
     try:
-        from backend.modules.rag.cache import get_redis
+        from packages.rag.cache import get_redis
 
         return get_redis()
     except Exception as exc:

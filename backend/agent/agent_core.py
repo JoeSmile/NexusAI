@@ -566,7 +566,7 @@ class AgentCore:
 
         # 尝试返回 MCP 消息格式
         try:
-            from backend.modules.agent.protocol.mcp import MCPContext, MCPMessage, MCPMessageType
+            from packages.agent.protocol.mcp import MCPContext, MCPMessage, MCPMessageType
             return MCPMessage(
                 message_type=MCPMessageType.AGENT_RESPONSE,
                 content=result.get("response", ""),

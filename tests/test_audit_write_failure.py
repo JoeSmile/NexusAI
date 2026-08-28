@@ -29,7 +29,7 @@ def test_write_audit_failure_triggers_notify(monkeypatch: pytest.MonkeyPatch) ->
     session_factory.Session.side_effect = RuntimeError("db down")
     monkeypatch.setattr(audit_mod, "get_pg_session", lambda: session_factory)
     notify = MagicMock(return_value=True)
-    monkeypatch.setattr("backend.modules.notification.notify", notify)
+    monkeypatch.setattr("packages.notification.notify", notify)
     audit_mod.write_audit_sync(
         {
             "tenant_id": "t1",

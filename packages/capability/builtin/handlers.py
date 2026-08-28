@@ -8,7 +8,7 @@ import time
 from typing import Any
 
 from packages.memory.memory_service import get_unified_memory_service
-from backend.modules.notification.service import notify
+from packages.notification.service import notify
 from packages.auth.models import TenantContext
 from packages.capability.exec_policy import resolve_exec_policy
 
