@@ -216,7 +216,7 @@ def embed_text(text: str, tenant_id: str | None = None) -> list[float]:
     if get_redis() is not None:
         record_l2_miss()
     from packages.errors import NexusAIException
-    from backend.core.llm_concurrency import embed_http_timeout_s, embed_slot_sync
+    from packages.llm_concurrency import embed_http_timeout_s, embed_slot_sync
 
     try:
         from openai import OpenAI

@@ -11,7 +11,7 @@ import time
 import pytest
 
 from packages.errors import ErrorCode, NexusAIException
-from backend.core.llm_concurrency import (
+from packages.llm_concurrency import (
     llm_bucket_limit,
     llm_concurrency_limit,
     llm_slot,
@@ -431,7 +431,7 @@ async def test_redis_error_does_not_500(monkeypatch: pytest.MonkeyPatch):
 async def test_redis_ttl_heals_ghost_counter(
     fake_inflight_redis: _FakeInflightRedis, monkeypatch: pytest.MonkeyPatch
 ):
-    from backend.core.llm_concurrency import LUA_LLM_SLOT_ACQUIRE, llm_inflight_redis_keys
+    from packages.llm_concurrency import LUA_LLM_SLOT_ACQUIRE, llm_inflight_redis_keys
 
     monkeypatch.setenv("LLM_CONCURRENCY_LIMIT", "1")
     monkeypatch.setenv("LLM_BUCKET_LIMIT", "4")
@@ -450,7 +450,7 @@ async def test_redis_ttl_heals_ghost_counter(
 
 
 def test_provider_bucket_prefers_key_id():
-    from backend.core.llm_concurrency import provider_bucket_key
+    from packages.llm_concurrency import provider_bucket_key
 
     assert provider_bucket_key(base_url="https://same.example/v1", key_id="k1") == "key:k1"
     assert provider_bucket_key(base_url="HTTPS://Same.example/v1/") == "url:https://same.example/v1"
@@ -503,7 +503,7 @@ async def test_same_key_id_bucket_cap_default_eight(monkeypatch: pytest.MonkeyPa
 
 
 def test_default_acquire_timeout_is_five_seconds(monkeypatch: pytest.MonkeyPatch):
-    from backend.core.llm_concurrency import llm_acquire_timeout_s
+    from packages.llm_concurrency import llm_acquire_timeout_s
 
     monkeypatch.delenv("LLM_CONCURRENCY_ACQUIRE_TIMEOUT_S", raising=False)
     reset_llm_concurrency_for_tests()
@@ -515,7 +515,7 @@ async def test_slot_busy_http_retry_after_header():
     from starlette.requests import Request
 
     from packages.errors import nexusai_exception_handler
-    from backend.core.llm_concurrency import _timeout_error
+    from packages.llm_concurrency import _timeout_error
 
     scope = {
         "type": "http",
