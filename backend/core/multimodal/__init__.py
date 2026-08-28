@@ -1,15 +1,9 @@
-"""Multimodal helpers (Task 58)."""
-
-from backend.core.multimodal.vision import (
-    build_vision_messages,
-    image_to_data_uri,
-    resolve_vision_credentials,
-    select_vision_model_name,
+"""Deprecated shim — use `packages.multimodal` (Task 75.8)."""
+from __future__ import annotations
+import warnings
+warnings.warn(
+    "backend.core.multimodal is deprecated; import from packages.multimodal",
+    DeprecationWarning,
+    stacklevel=2,
 )
-
-__all__ = [
-    "build_vision_messages",
-    "image_to_data_uri",
-    "resolve_vision_credentials",
-    "select_vision_model_name",
-]
+from packages.multimodal import *  # noqa: F401,F403

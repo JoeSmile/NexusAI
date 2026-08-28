@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from packages.auth.models import TenantContext
-from backend.core.org.scope import OrgScope, resolve_org_scope, unit_visible
+from packages.org.scope import OrgScope, resolve_org_scope, unit_visible
 
 
 def require_primary_org_for_ingest(
@@ -30,7 +30,7 @@ def require_primary_org_for_ingest(
                 "hint": "assign_primary_department_before_upload",
             },
         )
-    from backend.core.org.service import get_unit
+    from packages.org.service import get_unit
 
     unit = get_unit(session, tenant_id=tenant.tenant_id, unit_id=oid)
     if unit is None or unit.deleted_at is not None:

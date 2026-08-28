@@ -17,9 +17,9 @@ from sqlalchemy.pool import StaticPool
 
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
-from backend.core.social.exceptions import SocialCostAlertError
-from backend.core.social.export_xlsx import HEADERS, build_analysis_xlsx
-from backend.core.social.service import (
+from packages.social.exceptions import SocialCostAlertError
+from packages.social.export_xlsx import HEADERS, build_analysis_xlsx
+from packages.social.service import (
     RETRY_ANALYZE_ONLY,
     create_analysis_task,
     hint_previous_task_id,
@@ -398,7 +398,7 @@ def test_list_contents_filters(db_session):
 
 
 def test_process_analyze_only_skips_tikhub(db_session, monkeypatch):
-    from backend.core.social import pipeline as pl
+    from packages.social import pipeline as pl
 
     monkeypatch.setenv("LLM_PROVIDER", "mock")
 
@@ -480,8 +480,8 @@ def test_router_get_task_tenant_isolation(db_session):
 
 
 def test_probe_adds_tenant_follow(db_session, monkeypatch):
-    from backend.core.social.service import list_followed_accounts, probe_account
-    from backend.core.social.types import AccountInfo
+    from packages.social.service import list_followed_accounts, probe_account
+    from packages.social.types import AccountInfo
 
     monkeypatch.setenv("SOCIAL_COST_ALERT_USD", "999")
 
@@ -500,8 +500,8 @@ def test_probe_adds_tenant_follow(db_session, monkeypatch):
                 nickname="老丁",
             )
 
-    monkeypatch.setattr("backend.core.social.service.TikHubConnector", lambda: FakeConn())
-    monkeypatch.setattr("backend.core.social.service.acquire_for_probe", lambda: True)
+    monkeypatch.setattr("packages.social.service.TikHubConnector", lambda: FakeConn())
+    monkeypatch.setattr("packages.social.service.acquire_for_probe", lambda: True)
 
     row = probe_account(
         db_session,

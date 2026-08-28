@@ -7,7 +7,7 @@ import uuid
 import pytest
 from fastapi import HTTPException
 
-from backend.core.skill_assets import service as svc
+from packages.skill_assets import service as svc
 from backend.database.pgvector_session import SkillAsset, get_pg_session
 
 
@@ -28,7 +28,7 @@ def ensure_table(monkeypatch: pytest.MonkeyPatch):
             vec[2] = 1.0
         return vec
 
-    monkeypatch.setattr("backend.core.skill_assets.service.embed_text", _fake_embed)
+    monkeypatch.setattr("packages.skill_assets.service.embed_text", _fake_embed)
     sf = get_pg_session()
     SkillAsset.__table__.create(sf.engine, checkfirst=True)
     yield sf

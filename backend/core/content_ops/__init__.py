@@ -1,17 +1,9 @@
-"""Task 45 content ops — hotspot, style dual-track, script.gen."""
-
-from backend.core.content_ops.style import (
-    DEFAULT_CONTENT_STYLE,
-    get_content_style,
-    list_content_styles,
-    resolve_style_for_generate,
-    upsert_content_style,
+"""Deprecated shim — use `packages.content_ops` (Task 75.8)."""
+from __future__ import annotations
+import warnings
+warnings.warn(
+    "backend.core.content_ops is deprecated; import from packages.content_ops",
+    DeprecationWarning,
+    stacklevel=2,
 )
-
-__all__ = [
-    "DEFAULT_CONTENT_STYLE",
-    "get_content_style",
-    "list_content_styles",
-    "resolve_style_for_generate",
-    "upsert_content_style",
-]
+from packages.content_ops import *  # noqa: F401,F403

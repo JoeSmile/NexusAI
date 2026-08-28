@@ -1,15 +1,9 @@
-"""Agent-driven UI render directives (Task 63)."""
-
-from backend.core.render.directive import (
-    ALLOWED_COMPONENTS,
-    RenderDirective,
-    extract_render_directive,
-    render_directive_to_dict,
+"""Deprecated shim — use `packages.render` (Task 75.8)."""
+from __future__ import annotations
+import warnings
+warnings.warn(
+    "backend.core.render is deprecated; import from packages.render",
+    DeprecationWarning,
+    stacklevel=2,
 )
-
-__all__ = [
-    "ALLOWED_COMPONENTS",
-    "RenderDirective",
-    "extract_render_directive",
-    "render_directive_to_dict",
-]
+from packages.render import *  # noqa: F401,F403

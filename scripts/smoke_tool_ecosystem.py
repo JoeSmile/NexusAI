@@ -22,7 +22,7 @@ def _run_py(args: list[str]) -> int:
 
 def _gold_line_demo() -> None:
     """Skill catalog weekly_report PlanIR (no DB)."""
-    from backend.core.skill_assets.builtin_catalog import BUILTIN_SKILL_ASSET_CATALOG
+    from packages.skill_assets.builtin_catalog import BUILTIN_SKILL_ASSET_CATALOG
 
     entry = next(e for e in BUILTIN_SKILL_ASSET_CATALOG if e["skill_id"] == "weekly_report")
     steps = entry["ir_skeleton"]["steps"]
@@ -37,8 +37,8 @@ def _gold_line_demo() -> None:
 async def _counts() -> dict[str, int]:
     from packages.capability.builtin.register import register_builtin_tools
     from packages.capability.builtin.specs import BUILTIN_TOOL_SPECS
-    from backend.core.skill_assets.bootstrap import validate_builtin_catalog
-    from backend.core.skill_assets.builtin_catalog import (
+    from packages.skill_assets.bootstrap import validate_builtin_catalog
+    from packages.skill_assets.builtin_catalog import (
         BUILTIN_SKILL_ASSET_CATALOG,
         BUILTIN_SKILL_IDS,
     )

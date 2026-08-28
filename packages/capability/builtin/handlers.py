@@ -115,7 +115,7 @@ async def _web_search(payload: dict[str, Any], tenant: TenantContext) -> dict[st
     query = str(payload.get("query") or "").strip()
     url = payload.get("url")
     if url:
-        from backend.core.security.url_guard import UrlValidationError, validate_base_url
+        from packages.security.url_guard import UrlValidationError, validate_base_url
 
         try:
             validate_base_url(str(url))

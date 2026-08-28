@@ -9,7 +9,7 @@ import pytest
 from fastapi import HTTPException
 
 from packages.auth.models import TenantContext
-from backend.core.org.scope import OrgScope
+from packages.org.scope import OrgScope
 from packages.workflow.composition import (
     MAX_COMPOSITION_DEPTH,
     CompositionDepthExceeded,

@@ -8,7 +8,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Any
 
-from backend.core.security.url_guard import UrlValidationError, validate_base_url
+from packages.security.url_guard import UrlValidationError, validate_base_url
 from packages.capability.contract import stub_contract_dict
 from packages.capability.errors import CapabilityNotFoundError
 from packages.capability.mcp_errors import McpError, McpErrorCode

@@ -1,18 +1,9 @@
-"""Security helpers (SSRF guards, etc.)."""
-
-from backend.core.security.url_guard import UrlValidationError, validate_base_url
-from backend.core.security.audit_crypto import (
-    AuditTextCipher,
-    audit_encryption_enabled,
-    prepare_audit_text_fields,
-    resolve_audit_text,
+"""Deprecated shim — use `packages.security` (Task 75.8)."""
+from __future__ import annotations
+import warnings
+warnings.warn(
+    "backend.core.security is deprecated; import from packages.security",
+    DeprecationWarning,
+    stacklevel=2,
 )
-
-__all__ = [
-    "UrlValidationError",
-    "validate_base_url",
-    "AuditTextCipher",
-    "audit_encryption_enabled",
-    "prepare_audit_text_fields",
-    "resolve_audit_text",
-]
+from packages.security import *  # noqa: F401,F403

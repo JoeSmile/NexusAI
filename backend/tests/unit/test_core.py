@@ -15,13 +15,13 @@ from backend.core.exceptions import (
     NexusAIException,
     ValidationError,
 )
-from backend.core.utils.formatters import format_error, format_response, format_timestamp
-from backend.core.utils.helpers import (
+from packages.utils.formatters import format_error, format_response, format_timestamp
+from packages.utils.helpers import (
     calculate_similarity,
     generate_id,
     sanitize_text,
 )
-from backend.core.utils.validators import (
+from packages.utils.validators import (
     validate_email,
     validate_phone,
     validate_session_id,

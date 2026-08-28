@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.core.security.audit_crypto import (
+from packages.security.audit_crypto import (
     AuditTextCipher,
     prepare_audit_text_fields,
     resolve_audit_text,

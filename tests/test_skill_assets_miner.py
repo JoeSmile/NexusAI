@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from backend.core.skill_assets import miner
+from packages.skill_assets import miner
 from backend.database.pgvector_session import SkillAsset, get_pg_session
 
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from backend.core.tool_search.search import hybrid_search_enabled, search_tools_hybrid
+from packages.tool_search.search import hybrid_search_enabled, search_tools_hybrid
 
 _TOKEN_RE = re.compile(r"[\w\u4e00-\u9fff]+", re.UNICODE)
 

@@ -6,8 +6,8 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from backend.core.skill_assets.builtin_catalog import BUILTIN_SKILL_ASSET_CATALOG
-from backend.core.skill_assets.service import (
+from packages.skill_assets.builtin_catalog import BUILTIN_SKILL_ASSET_CATALOG
+from packages.skill_assets.service import (
     deprecate,
     evolution_stats,
     get_skill_asset,

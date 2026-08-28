@@ -87,7 +87,7 @@ def record_consumption(
     elif output_tokens is None:
         output_tokens = max(0, tokens - int(input_tokens or 0))
     try:
-        from backend.core.billing.usage import record_metered_usage
+        from packages.billing.usage import record_metered_usage
 
         record_metered_usage(
             tenant_id=tenant_id,
@@ -97,7 +97,7 @@ def record_consumption(
             cost=float(cost),
         )
     except Exception as exc:
-        from backend.core.billing.wallet import InsufficientBalanceError
+        from packages.billing.wallet import InsufficientBalanceError
 
         if isinstance(exc, InsufficientBalanceError):
             raise

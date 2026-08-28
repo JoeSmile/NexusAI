@@ -11,7 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from backend.core.audit import write_audit_sync
-from backend.core.org.scope import OrgScope, assert_org_access, resolve_org_scope
+from packages.org.scope import OrgScope, assert_org_access, resolve_org_scope
 from backend.database.pgvector_session import (
     PermissionRequest,
     Workflow,

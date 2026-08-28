@@ -7,7 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from backend.core.social.templates import (
+from packages.social.templates import (
     template_key_from_structure,
     upsert_template,
 )

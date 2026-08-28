@@ -9,11 +9,11 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 
 from backend.core.audit import write_audit_sync
-from backend.core.content_ops.dig_persist import persist_dig_result
-from backend.core.content_ops.hotspot import HotspotCrawlError, dig_hotspots
-from backend.core.content_ops.offerings import get_offering, list_offerings
-from backend.core.content_ops.script_gen import generate_script
-from backend.core.content_ops.style import (
+from packages.content_ops.dig_persist import persist_dig_result
+from packages.content_ops.hotspot import HotspotCrawlError, dig_hotspots
+from packages.content_ops.offerings import get_offering, list_offerings
+from packages.content_ops.script_gen import generate_script
+from packages.content_ops.style import (
     DEFAULT_CREATOR_ID,
     delete_content_style,
     get_org_content_profile,
@@ -22,7 +22,7 @@ from backend.core.content_ops.style import (
     set_org_content_profile,
     upsert_content_style,
 )
-from backend.core.content_ops.workflow_seed import ensure_builtin_hotspot_workflow
+from packages.content_ops.workflow_seed import ensure_builtin_hotspot_workflow
 from backend.core.rate_limiter import check_endpoint_rate_limit
 from backend.database.pgvector_session import ContentArtifact, get_pg_session
 from packages.auth.dual_auth import verify_human_or_legacy_key
@@ -152,7 +152,7 @@ async def api_extract_style(
     body: StyleExtractBody,
     tenant: TenantContext = Depends(verify_human_or_legacy_key),
 ) -> dict[str, Any]:
-    from backend.core.content_ops.style_extract import extract_style_from_text
+    from packages.content_ops.style_extract import extract_style_from_text
 
     extracted = await extract_style_from_text(
         tenant_id=tenant.tenant_id,
@@ -179,12 +179,12 @@ async def api_upload_style_speech(
 
     Not RAG / company knowledge ingest — separate button, separate path.
     """
-    from backend.core.content_ops.file_text import (
+    from packages.content_ops.file_text import (
         StyleUploadRejected,
         extract_text_from_bytes,
         validate_style_upload,
     )
-    from backend.core.content_ops.style_extract import extract_style_from_text
+    from packages.content_ops.style_extract import extract_style_from_text
 
     data = await file.read()
     _enforce_rate(tenant.tenant_id, "content_upload", _UPLOAD_PER_MIN)
@@ -356,7 +356,7 @@ async def api_generate_script(
             session, tenant.tenant_id, body.creator_id
         )
         org = get_org_content_profile(session, tenant.tenant_id)
-        from backend.core.content_ops.script_gen import build_script_prompt
+        from packages.content_ops.script_gen import build_script_prompt
         from backend.logging_config import get_logger
 
         _log = get_logger(__name__)
@@ -424,8 +424,8 @@ async def exclude_hotspot_from_day(
     """Soft-delete a title from today\'s hotspot pool; dig will skip it later."""
     from datetime import date
 
-    from backend.core.content_ops.dig_persist import _title_excluded
-    from backend.core.content_ops.hotspot import day_collection_hash
+    from packages.content_ops.dig_persist import _title_excluded
+    from packages.content_ops.hotspot import day_collection_hash
 
     day = date.today().isoformat()
     day_hash = day_collection_hash(tenant.tenant_id, day)

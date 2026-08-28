@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from backend.core.org.scope import OrgScope, assert_org_access, visible_org_filter
+from packages.org.scope import OrgScope, assert_org_access, visible_org_filter
 from backend.database.pgvector_session import Workflow
 from packages.auth.models import TenantContext
 from packages.capability.models import CapabilitySpec, CapabilityStatus

@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from packages.auth.models import TenantContext
-from backend.core.org.scope import OrgScope
+from packages.org.scope import OrgScope
 from backend.database.pgvector_session import (
     PermissionRequest,
     Workflow,

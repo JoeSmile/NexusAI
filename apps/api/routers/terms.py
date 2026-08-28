@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Request
 
-from backend.core.billing.context import get_billing_context
-from backend.core.terms.service import (
+from packages.billing.context import get_billing_context
+from packages.terms.service import (
     get_current_terms,
     list_pending_terms,
     record_acceptance,

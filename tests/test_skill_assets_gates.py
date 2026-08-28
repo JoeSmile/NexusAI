@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.core.skill_assets.gates import GateReject, run_publish_gates
+from packages.skill_assets.gates import GateReject, run_publish_gates
 
 
 def test_gate_rejects_pii_phone():

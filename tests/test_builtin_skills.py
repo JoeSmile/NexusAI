@@ -6,11 +6,11 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from backend.core.skill_assets.bootstrap import (
+from packages.skill_assets.bootstrap import (
     bootstrap_builtin_skill_assets,
     validate_builtin_catalog,
 )
-from backend.core.skill_assets.builtin_catalog import BUILTIN_SKILL_ASSET_CATALOG, BUILTIN_SKILL_IDS
+from packages.skill_assets.builtin_catalog import BUILTIN_SKILL_ASSET_CATALOG, BUILTIN_SKILL_IDS
 from packages.skills.registry import SkillRegistry
 
 

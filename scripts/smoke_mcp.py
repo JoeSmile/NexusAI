@@ -55,7 +55,7 @@ async def _run_smoke(*, with_governance: bool = True) -> dict[str, Any]:
         refresh_mcp_servers_from_env,
     )
     from packages.capability.registry import CapabilityRegistry
-    from backend.core.tool_search import get_tool_search_index
+    from packages.tool_search import get_tool_search_index
 
     report: dict[str, Any] = {
         "mode": "live" if os.getenv("CAPABILITY_UPSTREAM_MOCK", "").lower() not in ("1", "true", "yes") else "mock",

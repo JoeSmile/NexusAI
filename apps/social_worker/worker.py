@@ -22,8 +22,8 @@ def _session_factory() -> Any:
 
 def process_once(session_factory: Callable[[], Any] | None = None) -> bool:
     """Claim and process one task. Returns True if work was done."""
-    from backend.core.social.pipeline import process_task
-    from backend.core.social.queue import claim_next_task, reclaim_stale_running
+    from packages.social.pipeline import process_task
+    from packages.social.queue import claim_next_task, reclaim_stale_running
     from backend.database.pgvector_session import SocialTask
 
     Session = session_factory or _session_factory()

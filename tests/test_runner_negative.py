@@ -9,7 +9,7 @@ import pytest
 from fastapi import HTTPException
 
 from packages.auth.models import TenantContext
-from backend.core.org.scope import OrgScope
+from packages.org.scope import OrgScope
 from packages.workflow.runner import execute_run, start_run
 from backend.database.pgvector_session import Workflow, WorkflowRun, get_pg_session
 

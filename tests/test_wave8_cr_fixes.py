@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 
 from packages.auth.models import TenantContext
-from backend.core.org.scope import OrgScope
+from packages.org.scope import OrgScope
 from packages.workflow.runner import cancel_run, recover_waiting_child_parents, wake_parent
 from backend.database.pgvector_session import (
     Workflow,

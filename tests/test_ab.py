@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.core.ab.service import _pick_variant, _stable_bucket
+from packages.ab.service import _pick_variant, _stable_bucket
 
 
 def test_pick_variant_deterministic():

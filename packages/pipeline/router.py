@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 from backend.core.audit import log_audit
 from backend.core.audit_context import bind_audit_lineage
-from backend.core.billing.context import bind_billing_context
+from packages.billing.context import bind_billing_context
 from backend.core.errors import ErrorCode, NexusAIException
 from packages.guardrails.output_guard import DRIFT_PATTERNS, VIOLATION_PATTERNS
 from packages.plan.event_bus import (
@@ -113,7 +113,7 @@ async def _resolve_chat_model(body: ChatRequest, tenant_id: str) -> None:
 
 
 def _enforce_terms(request: Request, tenant: TenantContext) -> None:
-    from backend.core.terms.service import enforce_terms_for_chat
+    from packages.terms.service import enforce_terms_for_chat
 
     enforce_terms_for_chat(
         tenant_id=tenant.tenant_id,
@@ -460,7 +460,7 @@ async def chat_streaming(
         _release_run()
         return JSONResponse(_chat_json_payload(final))
 
-    from backend.core.billing.context import bind_billing_from_pipeline_state
+    from packages.billing.context import bind_billing_from_pipeline_state
     from packages.harness import LLMHarness
     from packages.pipeline.context_messages import build_llm_messages
     from packages.pipeline.nodes.conversion_hook import conversion_hook

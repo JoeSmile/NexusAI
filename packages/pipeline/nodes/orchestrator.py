@@ -38,7 +38,7 @@ from packages.plan.slot_gate import evaluate_required_slots
 from packages.plan.spawn_budget import SpawnBudget, resolve_spawn_budget
 from packages.plan.tool_output_guard import sanitize_tool_output
 from packages.plan.validator import topological_sort_steps, validate_plan_ir
-from backend.core.render.directive import extract_render_directive, render_directive_to_dict
+from packages.render.directive import extract_render_directive, render_directive_to_dict
 from backend.observability.decorators import enrich_span, observe
 from packages.auth.models import TenantContext
 from packages.auth.subagent import is_sub_agent

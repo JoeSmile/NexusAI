@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from backend.core.security.url_guard import UrlValidationError
+from packages.security.url_guard import UrlValidationError
 from packages.auth.models import TenantContext
 from packages.capability.connectors.mcp_server import (
     list_server_tools,

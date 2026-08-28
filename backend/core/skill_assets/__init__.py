@@ -1,19 +1,9 @@
-"""skill_assets package (Task 43)."""
-
+"""Deprecated shim — use `packages.skill_assets` (Task 75.8)."""
 from __future__ import annotations
-
-from backend.core.skill_assets.service import (
-    create_draft,
-    deprecate,
-    publish,
-    reject_draft,
-    search_published,
+import warnings
+warnings.warn(
+    "backend.core.skill_assets is deprecated; import from packages.skill_assets",
+    DeprecationWarning,
+    stacklevel=2,
 )
-
-__all__ = [
-    "create_draft",
-    "publish",
-    "deprecate",
-    "reject_draft",
-    "search_published",
-]
+from packages.skill_assets import *  # noqa: F401,F403

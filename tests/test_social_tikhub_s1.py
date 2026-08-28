@@ -7,17 +7,17 @@ import json
 import httpx
 import pytest
 
-from backend.core.social.adapters.douyin import (
+from packages.social.adapters.douyin import (
     DouyinAdapter,
     extract_text_and_source,
 )
-from backend.core.social.connector import TikHubConnector
-from backend.core.social.exceptions import (
+from packages.social.connector import TikHubConnector
+from packages.social.exceptions import (
     PlatformNotOpenError,
     TikHubBalanceError,
     TikHubConfigError,
 )
-from backend.core.social.http_client import CURL_UA, TikHubHttpClient
+from packages.social.http_client import CURL_UA, TikHubHttpClient
 
 
 def _profile_payload(sec_uid: str = "MS4wLjABAAAAtest") -> dict:

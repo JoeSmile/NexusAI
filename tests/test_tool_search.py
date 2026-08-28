@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from backend.core.tool_search import search as search_mod
-from backend.core.tool_search.bm25 import BM25Index
-from backend.core.tool_search.rrf import reciprocal_rank_fusion
-from backend.core.tool_search.search import ToolSearchIndex, search_tools_hybrid
-from backend.core.tool_search.vector_index import LocalToolEmbedder, VectorToolIndex
+from packages.tool_search import search as search_mod
+from packages.tool_search.bm25 import BM25Index
+from packages.tool_search.rrf import reciprocal_rank_fusion
+from packages.tool_search.search import ToolSearchIndex, search_tools_hybrid
+from packages.tool_search.vector_index import LocalToolEmbedder, VectorToolIndex
 
 
 @pytest.fixture(autouse=True)

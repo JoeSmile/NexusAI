@@ -10,11 +10,11 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend.core.skill_assets.bootstrap import (
+from packages.skill_assets.bootstrap import (
     bootstrap_builtin_skill_assets,
     validate_builtin_catalog,
 )
-from backend.core.skill_assets.builtin_catalog import BUILTIN_SKILL_ASSET_CATALOG
+from packages.skill_assets.builtin_catalog import BUILTIN_SKILL_ASSET_CATALOG
 from packages.skills.registry import SkillRegistry
 
 

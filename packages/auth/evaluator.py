@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from backend.core.org.scope import OrgScope
+from packages.org.scope import OrgScope
 from packages.auth.models import ROLES, _perm_matches
 
 

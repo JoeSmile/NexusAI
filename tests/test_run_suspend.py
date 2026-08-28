@@ -15,7 +15,7 @@ from packages.capability.models import (
     CapabilitySpec,
 )
 from packages.capability.registry import CapabilityRegistry
-from backend.core.org.scope import OrgScope
+from packages.org.scope import OrgScope
 from packages.workflow.run_state import can_node_transition, can_transition
 from packages.workflow.runner import execute_run, start_run
 from backend.database.pgvector_session import (

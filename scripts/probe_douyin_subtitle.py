@@ -9,8 +9,8 @@ for line in open("config.env", encoding="utf-8"):
         os.environ["TIKHUB_API_KEY"] = m.group(1)
         break
 
-from backend.core.social.adapters.douyin import DouyinAdapter
-from backend.core.social.http_client import TikHubHttpClient
+from packages.social.adapters.douyin import DouyinAdapter
+from packages.social.http_client import TikHubHttpClient
 
 
 def walk(obj, prefix="", hits=None, depth=0):

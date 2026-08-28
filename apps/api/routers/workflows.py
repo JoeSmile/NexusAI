@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
-from backend.core.org.scope import resolve_org_scope
+from packages.org.scope import resolve_org_scope
 from backend.database.pgvector_session import get_pg_session
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext

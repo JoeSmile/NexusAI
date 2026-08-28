@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from packages.auth.evaluator import evaluate_permission
 from packages.auth.models import TenantContext
-from backend.core.org.scope import OrgScope
+from packages.org.scope import OrgScope
 
 
 def _scope(**kwargs) -> OrgScope:

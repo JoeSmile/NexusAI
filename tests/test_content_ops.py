@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from backend.core.content_ops.hotspot import dig_hotspots
-from backend.core.content_ops.script_gen import build_script_prompt, generate_script
-from backend.core.content_ops.style import (
+from packages.content_ops.hotspot import dig_hotspots
+from packages.content_ops.script_gen import build_script_prompt, generate_script
+from packages.content_ops.style import (
     DEFAULT_CONTENT_STYLE,
     resolve_style_for_generate,
 )
@@ -51,7 +51,7 @@ def test_hotspot_exclude_keywords():
 
 
 def test_normalize_title_token_order_and_near_miss():
-    from backend.core.content_ops.hotspot import (
+    from packages.content_ops.hotspot import (
         annotate_similar_to_previous,
         merge_hotspot_pool,
         titles_are_duplicate,
@@ -127,7 +127,7 @@ async def test_generate_script_never_requires_style():
 
 @pytest.mark.asyncio
 async def test_style_extract_heuristic_short_and_long():
-    from backend.core.content_ops.style_extract import extract_style_from_text
+    from packages.content_ops.style_extract import extract_style_from_text
 
     short = await extract_style_from_text(
         tenant_id="t1", creator_id="c1", text="太短"

@@ -11,8 +11,8 @@ from fastapi.testclient import TestClient
 
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
-from backend.core.billing.context import bind_billing_context, clear_billing_context
-from backend.core.billing.wallet import (
+from packages.billing.context import bind_billing_context, clear_billing_context
+from packages.billing.wallet import (
     InsufficientBalanceError,
     check_wallet_allows,
     deduct_balance_in_session,
@@ -190,7 +190,7 @@ async def test_harness_blocks_insufficient_wallet(monkeypatch: pytest.MonkeyPatc
         "packages.harness.llm.get_llm_provider",
         lambda: "openai",
     )
-    monkeypatch.setattr("backend.core.billing.wallet.check_wallet_allows", _deny)
+    monkeypatch.setattr("packages.billing.wallet.check_wallet_allows", _deny)
     bind_billing_context(user_id="u1", trace_id="tr1", credential_kind="company")
     result = await LLMHarness().generate(
         model="gpt-4o",

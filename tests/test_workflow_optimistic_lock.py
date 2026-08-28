@@ -14,7 +14,7 @@ from packages.capability.models import (
     CapabilitySpec,
 )
 from packages.capability.registry import CapabilityRegistry
-from backend.core.org.scope import OrgScope
+from packages.org.scope import OrgScope
 from packages.workflow import service as wf_svc
 from backend.database.pgvector_session import Workflow, get_pg_session
 

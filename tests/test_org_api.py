@@ -12,8 +12,8 @@ from fastapi.testclient import TestClient
 
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
-from backend.core.org.models import normalize_business_roles
-from backend.core.org.service import compute_child_path, rewrite_subtree_paths
+from packages.org.models import normalize_business_roles
+from packages.org.service import compute_child_path, rewrite_subtree_paths
 from apps.api.routers import org as org_mod
 from apps.api.routers.org import router
 

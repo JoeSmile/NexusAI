@@ -1,9 +1,9 @@
 """探针: 热点 dig + 口播 generate 两条路复现。"""
 import asyncio
 
-from backend.core.content_ops.hotspot import dig_hotspots
-from backend.core.content_ops.script_gen import generate_script
-from backend.core.content_ops.style import resolve_style_for_generate
+from packages.content_ops.hotspot import dig_hotspots
+from packages.content_ops.script_gen import generate_script
+from packages.content_ops.style import resolve_style_for_generate
 
 
 async def main() -> None:

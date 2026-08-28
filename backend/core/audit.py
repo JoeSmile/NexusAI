@@ -274,7 +274,7 @@ def _write_audit(record: dict) -> bool:
             "created_at": datetime.utcnow(),
             **record,
         }
-        from backend.core.security.audit_crypto import prepare_audit_text_fields
+        from packages.security.audit_crypto import prepare_audit_text_fields
 
         record = prepare_audit_text_fields(record)
         dedupe_key = record.get("dedupe_key") or None

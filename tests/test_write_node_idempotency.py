@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from packages.auth.models import TenantContext
-from backend.core.org.scope import OrgScope
+from packages.org.scope import OrgScope
 from packages.workflow.runner import _execute_node
 from backend.database.pgvector_session import WorkflowRun, WorkflowRunNode, get_pg_session
 

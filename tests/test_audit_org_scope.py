@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 from backend.core.audit_org_scope import audit_user_filter
 from packages.auth.models import TenantContext
-from backend.core.org.scope import OrgScope
+from packages.org.scope import OrgScope
 
 
 def test_member_only_self(monkeypatch):

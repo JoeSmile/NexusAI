@@ -225,7 +225,7 @@ def create_app() -> FastAPI:
     from packages.auth.jwt_session import assert_jwt_secret_strength
 
     assert_jwt_secret_strength()
-    from backend.core.security.audit_crypto import assert_audit_encryption_config
+    from packages.security.audit_crypto import assert_audit_encryption_config
 
     assert_audit_encryption_config()
     assert_production_security()

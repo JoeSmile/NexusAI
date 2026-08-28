@@ -2,7 +2,7 @@
 import asyncio
 
 from packages.auth.models import TenantContext
-from backend.core.org.scope import resolve_org_scope
+from packages.org.scope import resolve_org_scope
 from packages.workflow import runner as run_svc
 from backend.database.pgvector_session import Workflow, get_pg_session
 

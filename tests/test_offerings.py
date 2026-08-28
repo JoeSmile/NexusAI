@@ -5,7 +5,7 @@ from __future__ import annotations
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from backend.core.content_ops.offerings import (
+from packages.content_ops.offerings import (
     DEFAULT_OFFERINGS,
     ensure_default_offerings,
     list_offerings,

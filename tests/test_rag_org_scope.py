@@ -9,8 +9,8 @@ import pytest
 from fastapi import HTTPException
 
 from packages.auth.models import TenantContext
-from backend.core.org.models import OrgUnitDTO
-from backend.core.org.scope import OrgScope
+from packages.org.models import OrgUnitDTO
+from packages.org.scope import OrgScope
 from backend.modules.rag.org_tag import chunk_visible_to_scope, require_primary_org_for_ingest
 
 
@@ -92,7 +92,7 @@ def test_require_primary_org_ok(monkeypatch):
         ),
     )
     monkeypatch.setattr(
-        "backend.core.org.service.get_unit",
+        "packages.org.service.get_unit",
         lambda *a, **k: OrgUnitDTO(
             id="fin",
             tenant_id="acme",

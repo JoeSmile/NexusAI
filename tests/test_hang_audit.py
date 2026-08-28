@@ -15,7 +15,7 @@ from packages.capability.models import (
     CapabilitySpec,
 )
 from packages.capability.registry import CapabilityRegistry
-from backend.core.org.scope import OrgScope
+from packages.org.scope import OrgScope
 from packages.workflow.notify import mark_escalated
 from packages.workflow.runner import execute_run, start_run
 from backend.database.pgvector_session import (

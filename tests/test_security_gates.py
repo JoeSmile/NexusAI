@@ -10,7 +10,7 @@ from packages.capability.models import (
     CapabilityProvider,
     CapabilitySpec,
 )
-from backend.core.org.scope import OrgScope
+from packages.org.scope import OrgScope
 from packages.workflow.security_gates import (
     HangGateError,
     assert_hang_wait_allowed,

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.core.ab.service import record_event
+from packages.ab.service import record_event
 from backend.observability.decorators import observe
 from packages.pipeline.state import PipelineState
 

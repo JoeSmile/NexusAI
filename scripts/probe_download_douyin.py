@@ -8,7 +8,7 @@ for line in open("config.env", encoding="utf-8"):
         os.environ["TIKHUB_API_KEY"] = m.group(1)
         break
 
-from backend.core.social.http_client import TikHubHttpClient
+from packages.social.http_client import TikHubHttpClient
 
 SHARE_URL = "https://v.douyin.com/osrxbNIzUho/"
 

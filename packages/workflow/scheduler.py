@@ -103,7 +103,7 @@ def validate_grants_before_execute(
 def _resolve_schedule_scope(session, sched):
     """F2(评审 08-15):created_by 无 primary org → 用创建时快照的 org_unit_id 构造
     scope(教育版主播可能未绑 org,resolve_org_scope 失败会静默 skip)。"""
-    from backend.core.org.scope import OrgScope, resolve_org_scope
+    from packages.org.scope import OrgScope, resolve_org_scope
 
     try:
         return resolve_org_scope(

@@ -10,8 +10,8 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from backend.core.audit import log_audit
-from backend.core.social import service as social_svc
-from backend.core.social.exceptions import (
+from packages.social import service as social_svc
+from packages.social.exceptions import (
     PlatformNotOpenError,
     SocialCostAlertError,
     TikHubBalanceError,
@@ -19,7 +19,7 @@ from backend.core.social.exceptions import (
     TikHubRateLimitError,
     TikHubUpstreamError,
 )
-from backend.core.social.export_xlsx import build_analysis_xlsx
+from packages.social.export_xlsx import build_analysis_xlsx
 from backend.database.pgvector_session import (
     PGVectorSession,
     SocialContent,

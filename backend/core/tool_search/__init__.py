@@ -1,15 +1,9 @@
-"""Hybrid tool search (Task 60)."""
-
-from backend.core.tool_search.search import (
-    get_tool_search_index,
-    hybrid_search_enabled,
-    rebuild_tool_search_from_specs,
-    search_tools_hybrid,
+"""Deprecated shim — use `packages.tool_search` (Task 75.8)."""
+from __future__ import annotations
+import warnings
+warnings.warn(
+    "backend.core.tool_search is deprecated; import from packages.tool_search",
+    DeprecationWarning,
+    stacklevel=2,
 )
-
-__all__ = [
-    "get_tool_search_index",
-    "hybrid_search_enabled",
-    "rebuild_tool_search_from_specs",
-    "search_tools_hybrid",
-]
+from packages.tool_search import *  # noqa: F401,F403

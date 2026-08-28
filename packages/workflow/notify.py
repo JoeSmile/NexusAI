@@ -16,7 +16,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from backend.core.audit import write_audit_sync
-from backend.core.org.service import get_unit, list_memberships_for_unit
+from packages.org.service import get_unit, list_memberships_for_unit
 from backend.database.pgvector_session import PermissionRequest, get_pg_session
 
 logger = logging.getLogger(__name__)

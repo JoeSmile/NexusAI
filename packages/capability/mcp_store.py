@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from backend.core.security.url_guard import validate_base_url
+from packages.security.url_guard import validate_base_url
 from packages.capability.mcp_registry import McpServerConfig, load_mcp_servers_from_env
 
 logger = logging.getLogger(__name__)

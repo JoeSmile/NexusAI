@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timedelta
 
 from packages.auth.models import TenantContext
-from backend.core.org.scope import OrgScope
+from packages.org.scope import OrgScope
 from packages.workflow.grants import (
     cap_entry,
     expire_stale_approvals_for_node,

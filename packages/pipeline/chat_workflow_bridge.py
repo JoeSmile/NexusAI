@@ -126,7 +126,7 @@ def try_bridge_start_run(state: PipelineState) -> PipelineState:
 
         # 确保内置热点 workflow 存在（幂等）
         try:
-            from backend.core.content_ops.workflow_seed import (
+            from packages.content_ops.workflow_seed import (
                 ensure_builtin_hotspot_workflow,
             )
 
@@ -153,7 +153,7 @@ def try_bridge_start_run(state: PipelineState) -> PipelineState:
         if wf is None:
             return state
 
-        from backend.core.org.scope import resolve_org_scope
+        from packages.org.scope import resolve_org_scope
         from packages.workflow import runner as run_svc
         from packages.auth.models import TenantContext
 

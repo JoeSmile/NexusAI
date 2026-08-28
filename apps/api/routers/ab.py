@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
-from backend.core.ab.service import assign_variant, get_active_experiment, record_event
+from packages.ab.service import assign_variant, get_active_experiment, record_event
 from backend.database.pgvector_session import get_pg_session
 from packages.auth.models import TenantContext
 from packages.auth.permissions import require_permission

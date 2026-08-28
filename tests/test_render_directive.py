@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from backend.core.render.directive import (
+from packages.render.directive import (
     ALLOWED_COMPONENTS,
     extract_render_directive,
     render_directive_to_dict,

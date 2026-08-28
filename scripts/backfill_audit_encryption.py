@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import sys
 
-from backend.core.security.audit_crypto import (
+from packages.security.audit_crypto import (
     audit_encryption_enabled,
     backfill_encrypted_rows,
 )

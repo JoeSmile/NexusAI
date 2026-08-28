@@ -11,8 +11,8 @@ from fastapi.testclient import TestClient
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
 from backend.core.errors import NexusAIException
-from backend.core.terms import service as terms_mod
-from backend.core.terms.service import (
+from packages.terms import service as terms_mod
+from packages.terms.service import (
     enforce_terms_for_chat,
     get_current_terms,
     list_pending_terms,

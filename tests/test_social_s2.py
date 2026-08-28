@@ -9,8 +9,8 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from backend.core.social.rate_limit import BUCKET_KEY, acquire_tikhub_token
-from backend.core.social.types import Content
+from packages.social.rate_limit import BUCKET_KEY, acquire_tikhub_token
+from packages.social.types import Content
 from backend.database.pgvector_session import (
     Base,
     SocialAccount,
@@ -64,8 +64,8 @@ def test_token_bucket_limits_to_burst(monkeypatch):
 
 
 def test_acquire_for_probe_raises_429(monkeypatch):
-    from backend.core.social.exceptions import TikHubRateLimitError
-    from backend.core.social.rate_limit import acquire_for_probe
+    from packages.social.exceptions import TikHubRateLimitError
+    from packages.social.rate_limit import acquire_for_probe
 
     monkeypatch.setenv("SOCIAL_TIKHUB_BURST", "1")
     monkeypatch.setenv("SOCIAL_PROBE_MAX_WAIT_S", "0.05")
@@ -92,7 +92,7 @@ def test_redis_down_degraded_allows(caplog):
 
 
 def test_process_task_rate_limit_requeues_until_cap(db_session, monkeypatch):
-    from backend.core.social import pipeline as pl
+    from packages.social import pipeline as pl
 
     monkeypatch.setenv("SOCIAL_RATE_LIMIT_RETRIES", "3")
     acct = SocialAccount(platform="douyin", account_key="x", external_id="SEC")
@@ -162,7 +162,7 @@ def test_mark_task_progress_visible_to_other_session():
     """API poll uses another connection; flush-only progress stays stuck at claim=5%."""
     from sqlalchemy.pool import StaticPool
 
-    from backend.core.social.queue import mark_task
+    from packages.social.queue import mark_task
 
     engine = create_engine(
         "sqlite://",
@@ -212,8 +212,8 @@ def db_session():
 
 
 def test_pipeline_upsert_and_analyze(db_session, monkeypatch):
-    from backend.core.social import pipeline as pl
-    from backend.core.social.types import AccountInfo
+    from packages.social import pipeline as pl
+    from packages.social.types import AccountInfo
 
     monkeypatch.setenv("LLM_PROVIDER", "mock")
 
@@ -299,9 +299,9 @@ def test_pipeline_upsert_and_analyze(db_session, monkeypatch):
 
 
 def test_process_fetch_only_persists_without_llm(db_session, monkeypatch):
-    from backend.core.social import pipeline as pl
-    from backend.core.social.service import FETCH_ONLY
-    from backend.core.social.types import Content as C
+    from packages.social import pipeline as pl
+    from packages.social.service import FETCH_ONLY
+    from packages.social.types import Content as C
 
     monkeypatch.setenv("LLM_PROVIDER", "openai")  # would fail if analyze ran
     acct = SocialAccount(platform="douyin", account_key="ak", external_id="SEC")
@@ -356,8 +356,8 @@ def test_process_fetch_only_persists_without_llm(db_session, monkeypatch):
 
 
 def test_process_fetch_only_respects_limit(db_session, monkeypatch):
-    from backend.core.social import pipeline as pl
-    from backend.core.social.types import Content as C
+    from packages.social import pipeline as pl
+    from packages.social.types import Content as C
 
     monkeypatch.setenv("LLM_PROVIDER", "openai")
     acct = SocialAccount(platform="douyin", account_key="ak", external_id="SEC")
@@ -402,7 +402,7 @@ def test_process_fetch_only_respects_limit(db_session, monkeypatch):
 
 
 def test_reclaim_stale_uses_leased_at(db_session):
-    from backend.core.social.queue import reclaim_stale_running
+    from packages.social.queue import reclaim_stale_running
 
     acct = SocialAccount(platform="douyin", account_key="a", external_id="s")
     db_session.add(acct)
@@ -425,7 +425,7 @@ def test_reclaim_stale_uses_leased_at(db_session):
 
 
 def test_usage_price_multiplier(db_session, monkeypatch):
-    from backend.core.social.usage import record_usage
+    from packages.social.usage import record_usage
 
     monkeypatch.setenv("SOCIAL_PRICE_MULTIPLIER", "3.0")
     row = record_usage(

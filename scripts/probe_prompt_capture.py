@@ -41,16 +41,16 @@ LLMHarness.generate = patched_generate  # type: ignore[method-assign]
 
 
 async def main() -> None:
-    from backend.core.content_ops.hotspot import dig_hotspots
-    from backend.core.content_ops.script_gen import generate_script
-    from backend.core.content_ops.style import resolve_style_for_generate
+    from packages.content_ops.hotspot import dig_hotspots
+    from packages.content_ops.script_gen import generate_script
+    from packages.content_ops.style import resolve_style_for_generate
     from backend.database.pgvector_session import get_pg_session
 
     sf = get_pg_session()
     with sf.Session() as session:
         org = None
         try:
-            from backend.core.content_ops.offerings import get_org_content_profile
+            from packages.content_ops.offerings import get_org_content_profile
 
             org = get_org_content_profile(session, "acme")
         except Exception:

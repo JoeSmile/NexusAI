@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
-from backend.core.org import service as org_svc
+from packages.org import service as org_svc
 from backend.database.pgvector_session import get_pg_session
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
@@ -108,7 +108,7 @@ async def get_units_tree(
             },
         )
 
-    from backend.core.org.scope import resolve_org_scope, visible_org_filter
+    from packages.org.scope import resolve_org_scope, visible_org_filter
 
     sf = get_pg_session()
     with sf.Session() as session:
@@ -178,7 +178,7 @@ async def unit_memberships(
     unit_id: str,
     tenant: TenantContext = Depends(verify_human_or_legacy_key),
 ) -> list[dict[str, Any]]:
-    from backend.core.org.scope import assert_org_access, resolve_org_scope
+    from packages.org.scope import assert_org_access, resolve_org_scope
 
     sf = get_pg_session()
     with sf.Session() as session:

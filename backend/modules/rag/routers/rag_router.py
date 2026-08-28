@@ -98,7 +98,7 @@ def _bind_ingest_org(tenant: TenantContext) -> str:
 def _attach_org_scope_to_kb(
     kb_manager: KnowledgeBaseManager, tenant: TenantContext
 ) -> None:
-    from backend.core.org.scope import resolve_org_scope
+    from packages.org.scope import resolve_org_scope
     from backend.database.pgvector_session import get_pg_session
 
     sf = get_pg_session()

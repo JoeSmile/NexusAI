@@ -20,7 +20,7 @@ from urllib.parse import urlparse
 import httpx
 
 from backend.core.circuit_breaker import CircuitBreaker, CircuitState
-from backend.core.security.url_guard import UrlValidationError, validate_base_url
+from packages.security.url_guard import UrlValidationError, validate_base_url
 from packages.auth.models import TenantContext
 from packages.capability.errors import CapabilityUpstreamError
 from packages.capability.models import CapabilityProvider, CapabilitySpec

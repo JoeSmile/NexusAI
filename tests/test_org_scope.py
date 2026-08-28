@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi import HTTPException
 
-from backend.core.org.scope import (
+from packages.org.scope import (
     OrgScope,
     assert_org_access,
     resolve_org_scope,
@@ -81,7 +81,7 @@ def test_resolve_org_scope_manager_loads_paths(monkeypatch):
     session = MagicMock()
     mems = [_mem("fin", primary=True, roles=["dept_manager"])]
     monkeypatch.setattr(
-        "backend.core.org.scope.list_memberships_for_user",
+        "packages.org.scope.list_memberships_for_user",
         lambda *a, **k: mems,
     )
     session.execute.return_value.fetchone.return_value = SimpleNamespace(

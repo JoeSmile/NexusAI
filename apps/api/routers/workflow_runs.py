@@ -8,7 +8,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from backend.core.errors import ErrorCode
-from backend.core.org.scope import assert_org_access, resolve_org_scope, visible_org_filter
+from packages.org.scope import assert_org_access, resolve_org_scope, visible_org_filter
 from backend.database.pgvector_session import Workflow, WorkflowRun, WorkflowRunNode, get_pg_session
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext

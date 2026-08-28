@@ -80,7 +80,7 @@ class TenantContext:
 
     def has_permission(self, permission: str, *, org_scope: object | None = None) -> bool:
         """平台 ∪ extra ∪ 业务角色 — 委托 evaluate_permission（Wave B）。"""
-        from backend.core.org.scope import OrgScope
+        from packages.org.scope import OrgScope
         from packages.auth.evaluator import evaluate_permission
 
         scope = org_scope if isinstance(org_scope, OrgScope) else None

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.core.ab.service import assign_variant, record_event
+from packages.ab.service import assign_variant, record_event
 from backend.observability.decorators import langfuse_context, observe
 from packages.pipeline.state import PipelineState
 

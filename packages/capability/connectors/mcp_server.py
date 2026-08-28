@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from backend.core.circuit_breaker import CircuitBreaker, CircuitState
-from backend.core.security.url_guard import UrlValidationError, validate_base_url
+from packages.security.url_guard import UrlValidationError, validate_base_url
 from packages.auth.models import TenantContext
 from packages.capability.errors import CapabilityUpstreamError
 from packages.capability.mcp_errors import McpError, McpErrorCode

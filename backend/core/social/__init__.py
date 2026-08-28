@@ -1,25 +1,9 @@
-"""Social / TikHub connector package (Task 52).
-
-Lifecycle (拍板 A): use ``with TikHubConnector() as c:`` — no process singleton.
-"""
-
-from backend.core.social.connector import TikHubConnector
-from backend.core.social.exceptions import (
-    PlatformNotOpenError,
-    TikHubBalanceError,
-    TikHubConfigError,
-    TikHubRateLimitError,
-    TikHubUpstreamError,
+"""Deprecated shim — use `packages.social` (Task 75.8)."""
+from __future__ import annotations
+import warnings
+warnings.warn(
+    "backend.core.social is deprecated; import from packages.social",
+    DeprecationWarning,
+    stacklevel=2,
 )
-from backend.core.social.types import AccountInfo, Content
-
-__all__ = [
-    "AccountInfo",
-    "Content",
-    "PlatformNotOpenError",
-    "TikHubBalanceError",
-    "TikHubConfigError",
-    "TikHubConnector",
-    "TikHubRateLimitError",
-    "TikHubUpstreamError",
-]
+from packages.social import *  # noqa: F401,F403

@@ -12,8 +12,8 @@ from fastapi.testclient import TestClient
 
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
-from backend.core.billing.context import bind_billing_context, clear_billing_context
-from backend.core.billing.usage import make_idempotency_key, record_metered_usage
+from packages.billing.context import bind_billing_context, clear_billing_context
+from packages.billing.usage import make_idempotency_key, record_metered_usage
 from apps.api.routers import billing as billing_mod
 from apps.api.routers.billing import router as billing_router
 
@@ -67,7 +67,7 @@ def test_record_metered_usage_inserts(monkeypatch) -> None:
     factory = MagicMock()
     factory.Session.return_value = _Sess()
     monkeypatch.setattr(
-        "backend.core.billing.usage.get_pg_session", lambda: factory
+        "packages.billing.usage.get_pg_session", lambda: factory
     )
     bind_billing_context(user_id="u1", trace_id="tr_x", key_id="7")
 

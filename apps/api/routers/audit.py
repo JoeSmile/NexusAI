@@ -42,7 +42,7 @@ def _can_decrypt_audit_text(tenant: TenantContext) -> bool:
 
 
 def _resolve_row_texts(row: object, tenant: TenantContext) -> tuple[str, str]:
-    from backend.core.security.audit_crypto import resolve_audit_text
+    from packages.security.audit_crypto import resolve_audit_text
 
     return resolve_audit_text(row, can_decrypt=_can_decrypt_audit_text(tenant))
 

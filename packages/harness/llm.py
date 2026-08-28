@@ -43,8 +43,8 @@ async def _budget_allows(tenant_id: str, estimated: float) -> bool:
 async def _wallet_allows(tenant_id: str, estimated: float) -> bool:
     if get_llm_provider() in ("mock", "replay"):
         return True
-    from backend.core.billing.context import get_billing_context
-    from backend.core.billing.wallet import check_wallet_allows
+    from packages.billing.context import get_billing_context
+    from packages.billing.wallet import check_wallet_allows
 
     ctx = get_billing_context()
     return await check_wallet_allows(tenant_id, estimated, ctx.credential_kind)
@@ -53,8 +53,8 @@ async def _wallet_allows(tenant_id: str, estimated: float) -> bool:
 async def _terms_allows(tenant_id: str) -> bool:
     if get_llm_provider() in ("mock", "replay"):
         return True
-    from backend.core.billing.context import get_billing_context
-    from backend.core.terms.service import is_terms_enforcement_enabled, list_pending_terms
+    from packages.billing.context import get_billing_context
+    from packages.terms.service import is_terms_enforcement_enabled, list_pending_terms
 
     if not is_terms_enforcement_enabled():
         return True

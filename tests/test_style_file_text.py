@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.core.content_ops.file_text import (
+from packages.content_ops.file_text import (
     StyleUploadRejected,
     allowed_style_suffix,
     extract_text_from_bytes,

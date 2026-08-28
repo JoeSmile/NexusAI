@@ -9,8 +9,8 @@ for line in open("config.env", encoding="utf-8"):
         os.environ["TIKHUB_API_KEY"] = m.group(1)
         break
 
-from backend.core.social.adapters.douyin import DouyinAdapter
-from backend.core.social.http_client import TikHubHttpClient
+from packages.social.adapters.douyin import DouyinAdapter
+from packages.social.http_client import TikHubHttpClient
 
 
 def main() -> None:
@@ -27,7 +27,7 @@ def main() -> None:
         print(f"    content前150: {content[:150]!r}")
 
     print("\n=== enrich(详情接口, desc<100 才调) ===")
-    from backend.core.social.adapters.douyin import enrich_missing_content
+    from packages.social.adapters.douyin import enrich_missing_content
 
     merged = enrich_missing_content(client, items, adapter=adapter)
     n_sub = sum(1 for c in merged if c.content_source == "subtitle")

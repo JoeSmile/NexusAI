@@ -140,7 +140,7 @@ async def model_router(state: PipelineState) -> PipelineState:
     state["llm_key_id"] = key_data.id
     state["llm_key_version"] = key_data.key_version
 
-    from backend.core.billing.context import bind_billing_from_pipeline_state
+    from packages.billing.context import bind_billing_from_pipeline_state
 
     bind_billing_from_pipeline_state(state)
 

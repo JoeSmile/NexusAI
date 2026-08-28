@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.core.security.url_guard import UrlValidationError, validate_base_url
+from packages.security.url_guard import UrlValidationError, validate_base_url
 
 
 @pytest.fixture(autouse=True)

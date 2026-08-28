@@ -342,7 +342,7 @@ async def _produce_plan_ir(state: PipelineState) -> dict[str, Any] | None:
 
     if not state.get("skill_asset_hit"):
         try:
-            from backend.core.skill_assets.service import search_published
+            from packages.skill_assets.service import search_published
 
             hits = search_published(
                 tenant_id=state["tenant_id"],
@@ -359,7 +359,7 @@ async def _produce_plan_ir(state: PipelineState) -> dict[str, Any] | None:
                     "score": score,
                 }
                 try:
-                    from backend.core.skill_assets.service import bump_usage_by_id
+                    from packages.skill_assets.service import bump_usage_by_id
 
                     bump_usage_by_id(
                         tenant_id=state["tenant_id"],

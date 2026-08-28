@@ -20,7 +20,7 @@ for line in open("config.env", encoding="utf-8"):
         QWEN_KEY = m.group(1).strip()
         os.environ["QWEN_API_KEY"] = QWEN_KEY
 
-from backend.core.social.http_client import TikHubHttpClient
+from packages.social.http_client import TikHubHttpClient
 
 SHARE_URL = "https://v.douyin.com/osrxbNIzUho/"
 WS_URL = "wss://dashscope.aliyuncs.com/api-ws/v1/inference"

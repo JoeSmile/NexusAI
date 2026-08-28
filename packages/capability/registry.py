@@ -91,7 +91,7 @@ class CapabilityRegistry:
         validate_agent_spec(spec)
         self._by_id[spec.id] = spec
         try:
-            from backend.core.tool_search import get_tool_search_index
+            from packages.tool_search import get_tool_search_index
 
             nested = dict(spec.spec or {})
             get_tool_search_index().upsert_cap(
@@ -280,7 +280,7 @@ class CapabilityRegistry:
             len(self._by_id),
         )
         try:
-            from backend.core.tool_search import rebuild_tool_search_from_specs
+            from packages.tool_search import rebuild_tool_search_from_specs
 
             rebuild_tool_search_from_specs(self.list(include_disabled=True))
         except Exception:
