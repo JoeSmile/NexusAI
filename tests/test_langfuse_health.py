@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.core import health as health_mod
+from packages import health as health_mod
 from backend.observability import langfuse_client as lf
 
 
