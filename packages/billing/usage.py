@@ -9,7 +9,7 @@ from decimal import Decimal
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
-from backend.core.audit_context import get_audit_lineage
+from packages.audit_context import get_audit_lineage
 from backend.database.pgvector_session import get_pg_session
 from packages.billing.context import get_billing_context
 from packages.billing.wallet import (

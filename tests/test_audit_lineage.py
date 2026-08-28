@@ -7,7 +7,7 @@ from datetime import datetime
 from types import SimpleNamespace
 
 import packages.audit as audit_mod
-from backend.core.audit_context import bind_audit_lineage, clear_audit_lineage, get_audit_lineage
+from packages.audit_context import bind_audit_lineage, clear_audit_lineage, get_audit_lineage
 from packages.capability.governance_chain import DecisionExplain
 
 

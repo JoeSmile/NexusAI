@@ -17,7 +17,7 @@ from fastapi import (
 )
 
 from packages.audit import log_audit
-from backend.core.audit_context import bind_audit_lineage
+from packages.audit_context import bind_audit_lineage
 from packages.billing.context import bind_billing_context
 from packages.errors import ErrorCode, NexusAIException
 from backend.core.file_sanitizer import sanitize_filename, validate_file

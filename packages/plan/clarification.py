@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from packages.audit import write_audit_sync
-from backend.core.audit_context import get_audit_lineage
+from packages.audit_context import get_audit_lineage
 
 logger = logging.getLogger(__name__)
 

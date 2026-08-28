@@ -9,7 +9,7 @@ import re
 from typing import Any
 
 from packages.audit import write_audit_sync
-from backend.core.audit_context import get_audit_lineage
+from packages.audit_context import get_audit_lineage
 from packages.capability.invoke import capability_visible_to
 from packages.capability.registry import get_capability_registry
 from packages.guardrails.output_guard import check_output

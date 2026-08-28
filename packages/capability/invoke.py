@@ -375,7 +375,7 @@ async def invoke(
         check_permission=_check_permission,
     )
     from packages.audit import write_governance_audit
-    from backend.core.audit_context import bind_audit_lineage, get_audit_lineage
+    from packages.audit_context import bind_audit_lineage, get_audit_lineage
     from backend.observability.langfuse_client import current_langfuse_trace_ids
 
     lineage = get_audit_lineage()

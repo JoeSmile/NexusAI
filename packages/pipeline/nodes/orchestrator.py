@@ -7,7 +7,7 @@ import logging
 import os
 from typing import Any
 
-from backend.core.audit_context import bind_audit_lineage
+from packages.audit_context import bind_audit_lineage
 from packages.capability.invoke import invoke
 from packages.harness import LLMHarness
 from packages.plan.agent_spawn import (
