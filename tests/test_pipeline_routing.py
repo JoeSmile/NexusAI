@@ -2,9 +2,9 @@
 
 import pytest
 
-from backend.pipeline.nodes.conversion_hook import conversion_hook
-from backend.pipeline.nodes.model_router import route_short_or_long
-from backend.pipeline.nodes.orchestrator import route_after_orchestrator
+from packages.pipeline.nodes.conversion_hook import conversion_hook
+from packages.pipeline.nodes.model_router import route_short_or_long
+from packages.pipeline.nodes.orchestrator import route_after_orchestrator
 
 # ── route_short_or_long: 反向判断(仅非流式长路径去 llm_generate)──
 
@@ -67,7 +67,7 @@ def test_route_orchestrator_fallback_still_model_router():
 async def test_conversion_no_experiment_skips(monkeypatch):
     calls: list = []
     monkeypatch.setattr(
-        "backend.pipeline.nodes.conversion_hook.record_event",
+        "packages.pipeline.nodes.conversion_hook.record_event",
         lambda **kw: calls.append(kw),
     )
     state = {"user_id": "u1", "response": "hi", "session_id": "s1"}
@@ -80,7 +80,7 @@ async def test_conversion_no_experiment_skips(monkeypatch):
 async def test_conversion_experiment_no_response_skips(monkeypatch):
     calls: list = []
     monkeypatch.setattr(
-        "backend.pipeline.nodes.conversion_hook.record_event",
+        "packages.pipeline.nodes.conversion_hook.record_event",
         lambda **kw: calls.append(kw),
     )
     state = {"user_id": "u1", "ab_experiment_id": "exp1", "ab_variant": "A"}
@@ -92,7 +92,7 @@ async def test_conversion_experiment_no_response_skips(monkeypatch):
 async def test_conversion_recorded(monkeypatch):
     calls: list = []
     monkeypatch.setattr(
-        "backend.pipeline.nodes.conversion_hook.record_event",
+        "packages.pipeline.nodes.conversion_hook.record_event",
         lambda **kw: calls.append(kw),
     )
     state = {
@@ -117,7 +117,7 @@ async def test_conversion_db_failure_silent(monkeypatch):
     def boom(**kw):
         raise RuntimeError("db down")
 
-    monkeypatch.setattr("backend.pipeline.nodes.conversion_hook.record_event", boom)
+    monkeypatch.setattr("packages.pipeline.nodes.conversion_hook.record_event", boom)
     state = {
         "user_id": "u1",
         "ab_experiment_id": "exp1",

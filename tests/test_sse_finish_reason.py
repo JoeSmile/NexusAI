@@ -9,7 +9,7 @@ import pytest
 
 from backend.core.fallback import get_fallback
 from backend.core.harness.llm import LLMHarness
-from backend.pipeline.router import _sse_done_payload
+from packages.pipeline.router import _sse_done_payload
 
 
 def test_sse_done_payload_includes_finish_reason():
@@ -66,8 +66,8 @@ async def test_harness_stream_finish_reason_fallback(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_llm_generate_finish_reason_fallback(monkeypatch):
-    from backend.pipeline.nodes import llm_generate as lg
-    from backend.pipeline.state import make_initial_state
+    from packages.pipeline.nodes import llm_generate as lg
+    from packages.pipeline.state import make_initial_state
 
     class _H:
         async def generate(self, **kwargs):

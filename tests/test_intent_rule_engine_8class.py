@@ -6,12 +6,12 @@ import pytest
 
 from packages.intent.core.rule_engine import RuleBasedIntentEngine
 from packages.intent.models.intent_models import IntentType
-from backend.pipeline.intent_path import (
+from packages.pipeline.intent_path import (
     SHORT_PATH_INTENTS,
     resolve_short_path_skill,
     short_path_predicate,
 )
-from backend.pipeline.state import make_initial_state
+from packages.pipeline.state import make_initial_state
 from backend.skills.registry import registry
 
 

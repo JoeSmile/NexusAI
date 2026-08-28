@@ -1,6 +1,6 @@
 """Task 63 — render_action message augmentation."""
 
-from backend.pipeline.router import ChatRequest, _apply_render_action_message
+from packages.pipeline.router import ChatRequest, _apply_render_action_message
 
 
 def test_render_action_script_gen_augment_message() -> None:

@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 
 from backend.core.errors import ErrorCode, NexusAIException
-from backend.pipeline.nodes.model_router import model_router
-from backend.pipeline.state import make_initial_state
+from packages.pipeline.nodes.model_router import model_router
+from packages.pipeline.state import make_initial_state
 
 
 @pytest.mark.asyncio
@@ -15,14 +15,14 @@ async def test_missing_credential_sets_llm_key_001(monkeypatch) -> None:
         raise NexusAIException(ErrorCode.LLM_KEY_MISSING.value, "missing")
 
     monkeypatch.setattr(
-        "backend.pipeline.nodes.model_router.resolve_tenant_credential", _boom
+        "packages.pipeline.nodes.model_router.resolve_tenant_credential", _boom
     )
     monkeypatch.setattr(
-        "backend.pipeline.nodes.model_router.select_model_for_intent",
+        "packages.pipeline.nodes.model_router.select_model_for_intent",
         lambda _intent: type("S", (), {"name": "deepseek-v4-flash", "provider": "deepseek", "max_tokens": 100, "base_url": ""})(),
     )
     monkeypatch.setattr(
-        "backend.pipeline.nodes.model_router.get_model", lambda _n: None
+        "packages.pipeline.nodes.model_router.get_model", lambda _n: None
     )
     state = make_initial_state("t1", "u1", "s1", "hello")
     state["intent"] = "default"
@@ -47,7 +47,7 @@ async def test_credential_ok_still_routes(monkeypatch) -> None:
         return _Key()
 
     monkeypatch.setattr(
-        "backend.pipeline.nodes.model_router.resolve_tenant_credential", _ok
+        "packages.pipeline.nodes.model_router.resolve_tenant_credential", _ok
     )
     spec = type(
         "S",
@@ -60,11 +60,11 @@ async def test_credential_ok_still_routes(monkeypatch) -> None:
         },
     )()
     monkeypatch.setattr(
-        "backend.pipeline.nodes.model_router.select_model_for_intent",
+        "packages.pipeline.nodes.model_router.select_model_for_intent",
         lambda _intent: spec,
     )
     monkeypatch.setattr(
-        "backend.pipeline.nodes.model_router.get_model", lambda _n: spec
+        "packages.pipeline.nodes.model_router.get_model", lambda _n: spec
     )
     state = make_initial_state("t1", "u1", "s1", "hello")
     state["intent_confidence"] = 0.1

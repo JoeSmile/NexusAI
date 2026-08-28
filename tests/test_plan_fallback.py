@@ -7,8 +7,8 @@ import asyncio
 import pytest
 
 from backend.core.plan.event_bus import get_run_bus
-from backend.pipeline.nodes.task_plan import run_async_task_plan_for_stream
-from backend.pipeline.state import make_initial_state
+from packages.pipeline.nodes.task_plan import run_async_task_plan_for_stream
+from packages.pipeline.state import make_initial_state
 
 
 @pytest.mark.asyncio
@@ -22,10 +22,10 @@ async def test_plan_timeout_degrades_to_direct_answer(monkeypatch: pytest.Monkey
         return {"goal": "late"}
 
     monkeypatch.setattr(
-        "backend.pipeline.nodes.task_plan._produce_plan_ir", slow
+        "packages.pipeline.nodes.task_plan._produce_plan_ir", slow
     )
     monkeypatch.setattr(
-        "backend.pipeline.intent_path.registry.get_skill_for_intent",
+        "packages.pipeline.intent_path.registry.get_skill_for_intent",
         lambda *a, **k: None,
     )
 

@@ -6,10 +6,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.pipeline.cache.fingerprint_cache import make_fingerprint
-from backend.pipeline.nodes.analyze_parallel import analyze_parallel
-from backend.pipeline.nodes.orchestrator import execute_plan_ir
-from backend.pipeline.state import make_initial_state
+from packages.pipeline.cache.fingerprint_cache import make_fingerprint
+from packages.pipeline.nodes.analyze_parallel import analyze_parallel
+from packages.pipeline.nodes.orchestrator import execute_plan_ir
+from packages.pipeline.state import make_initial_state
 from backend.core.plan.models import PlanIR, PlanStep
 
 
@@ -82,7 +82,7 @@ async def test_orchestrator_execution_does_not_reclassify_l0(monkeypatch):
         }
 
     monkeypatch.setattr(
-        "backend.pipeline.nodes.orchestrator._collect_invoke",
+        "packages.pipeline.nodes.orchestrator._collect_invoke",
         fake_collect,
     )
     # Avoid hanging on Postgres when audit tries to connect (local/CI without DB).
@@ -93,7 +93,7 @@ async def test_orchestrator_execution_does_not_reclassify_l0(monkeypatch):
 
 def test_graph_has_single_l0_entrypoint():
   import inspect
-  from backend.pipeline import graph as graph_mod
+  from packages.pipeline import graph as graph_mod
 
   src = inspect.getsource(graph_mod.build_pipeline)
   assert src.count('"analyze_parallel"') >= 2

@@ -9,8 +9,8 @@ import pytest
 from backend.core.plan.loop_guard import LoopGuardError
 from backend.core.plan.models import PlanIR, PlanStep
 from backend.core.plan.spawn_budget import SpawnBudget
-from backend.pipeline.nodes.orchestrator import OrchestratorError, execute_plan_ir
-from backend.pipeline.state import make_initial_state
+from packages.pipeline.nodes.orchestrator import OrchestratorError, execute_plan_ir
+from packages.pipeline.state import make_initial_state
 
 
 def _state():
@@ -52,11 +52,11 @@ async def test_execute_plan_loop_guard_stops_on_dup(monkeypatch: pytest.MonkeyPa
         }
 
     monkeypatch.setattr(
-        "backend.pipeline.nodes.orchestrator._collect_invoke",
+        "packages.pipeline.nodes.orchestrator._collect_invoke",
         fake_collect,
     )
     monkeypatch.setattr(
-        "backend.pipeline.nodes.orchestrator._list_visible_capabilities",
+        "packages.pipeline.nodes.orchestrator._list_visible_capabilities",
         lambda s: [{"id": "cap.a", "param_spec": {}}],
     )
 

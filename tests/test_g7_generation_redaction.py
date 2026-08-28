@@ -6,8 +6,8 @@ import json
 
 import pytest
 
-from backend.pipeline.nodes.guardrails_output import apply_student_output_redaction
-from backend.pipeline.state import make_initial_state
+from packages.pipeline.nodes.guardrails_output import apply_student_output_redaction
+from packages.pipeline.state import make_initial_state
 
 
 def test_apply_student_output_redaction_strips_name():
@@ -25,7 +25,7 @@ def test_apply_student_output_redaction_strips_name():
 
 @pytest.mark.asyncio
 async def test_guardrails_output_runs_redaction():
-    from backend.pipeline.nodes.guardrails_output import guardrails_output
+    from packages.pipeline.nodes.guardrails_output import guardrails_output
 
     state = make_initial_state("t1", "u1", "s1", "hi")
     state["response"] = "学员张伟表现很好"

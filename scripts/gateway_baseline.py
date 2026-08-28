@@ -57,8 +57,8 @@ async def _probe_one(
 ) -> dict[str, Any]:
     from backend.core.cost_manager import count_tokens
     from backend.core.harness import LLMHarness
-    from backend.pipeline.graph import compiled_graph
-    from backend.pipeline.state import make_initial_state
+    from packages.pipeline.graph import compiled_graph
+    from packages.pipeline.state import make_initial_state
 
     if mock:
         os.environ.setdefault("LLM_PROVIDER", "mock")

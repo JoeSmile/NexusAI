@@ -6,8 +6,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from backend.pipeline.nodes import llm_generate as lg
-from backend.pipeline.state import make_initial_state
+from packages.pipeline.nodes import llm_generate as lg
+from packages.pipeline.state import make_initial_state
 
 
 @pytest.mark.asyncio

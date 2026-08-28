@@ -1,6 +1,6 @@
 """Capability invoke 核心分发（Task 30.04 / 30b）。
 
-分层约束: 本模块禁止 import ``backend.pipeline``。
+分层约束: 本模块禁止 import ``packages.pipeline``。
 SSE 组帧 / LangFuse 根注入在 routers 层（30.06）。
 
 成本幂等: kind=model 由 harness 内部 ``record_consumption``;

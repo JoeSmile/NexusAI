@@ -370,8 +370,8 @@ async def test_load_key_chain_sync_works_under_running_loop(monkeypatch):
 @pytest.mark.asyncio
 async def test_llm_generate_passes_key_provider(monkeypatch):
     """Important #1: harness.generate 收到 model registry provider,非写死 default。"""
-    from backend.pipeline.nodes import llm_generate as lg
-    from backend.pipeline.state import make_initial_state
+    from packages.pipeline.nodes import llm_generate as lg
+    from packages.pipeline.state import make_initial_state
 
     captured: dict = {}
 

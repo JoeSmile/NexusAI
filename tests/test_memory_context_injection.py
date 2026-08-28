@@ -6,14 +6,14 @@ import pytest
 
 from backend.core.memory_service import MEMORY_ISOLATION_HEADER
 from backend.core.prompt_service import DEFAULT_CHAT_SYSTEM, render_prompt
-from backend.pipeline.context_messages import (
+from packages.pipeline.context_messages import (
     build_llm_messages,
     current_user_content,
     expand_hot_messages,
 )
-from backend.pipeline.nodes import load_memory as lm
-from backend.pipeline.nodes import llm_generate as lg
-from backend.pipeline.state import make_initial_state
+from packages.pipeline.nodes import load_memory as lm
+from packages.pipeline.nodes import llm_generate as lg
+from packages.pipeline.state import make_initial_state
 
 
 def test_render_prompt_whitelist_only() -> None:
@@ -129,7 +129,7 @@ async def test_load_memory_passes_session_id(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_build_context_splits_memory_and_user() -> None:
-    from backend.pipeline.nodes.build_context import build_context
+    from packages.pipeline.nodes.build_context import build_context
 
     state = make_initial_state("t1", "u1", "s1", "你好")
     state["warm_memory"] = {"identity:name": "小明"}

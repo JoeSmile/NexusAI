@@ -412,8 +412,8 @@ async def test_forget_user_clears_warm_cold_and_redacts() -> None:
 @pytest.mark.asyncio
 async def test_build_context_strips_memory_on_role_drift() -> None:
     from backend.core.memory_service import MEMORY_ISOLATION_HEADER
-    from backend.pipeline.nodes.build_context import build_context
-    from backend.pipeline.state import make_initial_state
+    from packages.pipeline.nodes.build_context import build_context
+    from packages.pipeline.state import make_initial_state
 
     state = make_initial_state("t1", "u1", "s1", "你好")
     state["warm_memory"] = {"note": "家人们快来直播间"}

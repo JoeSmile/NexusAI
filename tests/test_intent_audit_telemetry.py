@@ -7,8 +7,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from backend.core import audit as audit_mod
-from backend.pipeline.nodes.analyze_parallel import analyze_parallel
-from backend.pipeline.state import make_initial_state
+from packages.pipeline.nodes.analyze_parallel import analyze_parallel
+from packages.pipeline.state import make_initial_state
 
 
 def test_write_audit_sync_accepts_intent_fields(monkeypatch) -> None:

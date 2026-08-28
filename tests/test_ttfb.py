@@ -6,8 +6,8 @@ import time
 
 import pytest
 
-from backend.pipeline.nodes.task_plan import should_async_plan_on_stream
-from backend.pipeline.state import make_initial_state
+from packages.pipeline.nodes.task_plan import should_async_plan_on_stream
+from packages.pipeline.state import make_initial_state
 
 
 def test_default_stream_skips_async_plan_for_ttfb(monkeypatch: pytest.MonkeyPatch) -> None:

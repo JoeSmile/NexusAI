@@ -7,13 +7,13 @@ import pytest
 from backend.core.plan.models import OnFailMode, PlanIR, PlanStep, PlanStepRetry
 from backend.core.plan.blackboard import Blackboard
 from backend.core.plan.spawn_budget import SpawnBudget
-from backend.pipeline.nodes.orchestrator import (
+from packages.pipeline.nodes.orchestrator import (
     OrchestratorError,
     execute_plan_ir,
     orchestrator,
     should_run_orchestrator,
 )
-from backend.pipeline.state import make_initial_state
+from packages.pipeline.state import make_initial_state
 
 
 def _plan_two_parallel() -> PlanIR:
@@ -75,11 +75,11 @@ async def test_execute_plan_parallel_steps(monkeypatch):
         return {"ok": True, "output": cap_id, "text": cap_id, "capability_id": cap_id}
 
     monkeypatch.setattr(
-        "backend.pipeline.nodes.orchestrator._collect_invoke",
+        "packages.pipeline.nodes.orchestrator._collect_invoke",
         fake_collect,
     )
     monkeypatch.setattr(
-        "backend.pipeline.nodes.orchestrator._list_visible_capabilities",
+        "packages.pipeline.nodes.orchestrator._list_visible_capabilities",
         lambda s: [
             {"id": "cap.a", "param_spec": {}},
             {"id": "cap.b", "param_spec": {}},
@@ -115,11 +115,11 @@ async def test_execute_plan_spawn_budget_serializes(monkeypatch):
         return {"ok": True, "output": cap_id, "text": cap_id, "capability_id": cap_id}
 
     monkeypatch.setattr(
-        "backend.pipeline.nodes.orchestrator._collect_invoke",
+        "packages.pipeline.nodes.orchestrator._collect_invoke",
         fake_collect,
     )
     monkeypatch.setattr(
-        "backend.pipeline.nodes.orchestrator._list_visible_capabilities",
+        "packages.pipeline.nodes.orchestrator._list_visible_capabilities",
         lambda s: [
             {"id": "cap.a", "param_spec": {}},
             {"id": "cap.b", "param_spec": {}},
@@ -150,9 +150,9 @@ async def test_execute_plan_skip_on_fail(monkeypatch):
     async def boom(*a, **k):
         raise RuntimeError("fail")
 
-    monkeypatch.setattr("backend.pipeline.nodes.orchestrator._collect_invoke", boom)
+    monkeypatch.setattr("packages.pipeline.nodes.orchestrator._collect_invoke", boom)
     monkeypatch.setattr(
-        "backend.pipeline.nodes.orchestrator._list_visible_capabilities",
+        "packages.pipeline.nodes.orchestrator._list_visible_capabilities",
         lambda s: [{"id": "cap.a", "param_spec": {}}],
     )
 
@@ -172,9 +172,9 @@ async def test_execute_plan_fail_raises(monkeypatch):
     async def boom(*a, **k):
         raise RuntimeError("fail")
 
-    monkeypatch.setattr("backend.pipeline.nodes.orchestrator._collect_invoke", boom)
+    monkeypatch.setattr("packages.pipeline.nodes.orchestrator._collect_invoke", boom)
     monkeypatch.setattr(
-        "backend.pipeline.nodes.orchestrator._list_visible_capabilities",
+        "packages.pipeline.nodes.orchestrator._list_visible_capabilities",
         lambda s: [{"id": "cap.a", "param_spec": {}}],
     )
 
@@ -206,9 +206,9 @@ async def test_execute_plan_retry(monkeypatch):
             raise RuntimeError("transient")
         return {"ok": True, "output": "ok", "text": "ok", "capability_id": "cap.a"}
 
-    monkeypatch.setattr("backend.pipeline.nodes.orchestrator._collect_invoke", flaky)
+    monkeypatch.setattr("packages.pipeline.nodes.orchestrator._collect_invoke", flaky)
     monkeypatch.setattr(
-        "backend.pipeline.nodes.orchestrator._list_visible_capabilities",
+        "packages.pipeline.nodes.orchestrator._list_visible_capabilities",
         lambda s: [{"id": "cap.a", "param_spec": {}}],
     )
 
@@ -231,15 +231,15 @@ async def test_orchestrator_node_sets_response(monkeypatch):
         )
 
     monkeypatch.setattr(
-        "backend.pipeline.nodes.orchestrator.execute_plan_ir",
+        "packages.pipeline.nodes.orchestrator.execute_plan_ir",
         fake_exec,
     )
     monkeypatch.setattr(
-        "backend.pipeline.nodes.orchestrator._caps_index",
+        "packages.pipeline.nodes.orchestrator._caps_index",
         lambda s: {"cap.a": {}, "cap.b": {}, "cap.c": {}},
     )
     monkeypatch.setattr(
-        "backend.pipeline.nodes.orchestrator.validate_plan_ir",
+        "packages.pipeline.nodes.orchestrator.validate_plan_ir",
         lambda raw, **kw: _plan_two_parallel(),
     )
 

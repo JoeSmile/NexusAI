@@ -1,8 +1,8 @@
 """探针: chat→bridge 触发 + hotspot run 执行(问题1/2 复测)。"""
 import asyncio
 
-from backend.pipeline.nodes.task_plan import task_plan
-from backend.pipeline.state import make_initial_state
+from packages.pipeline.nodes.task_plan import task_plan
+from packages.pipeline.state import make_initial_state
 
 
 async def main() -> None:

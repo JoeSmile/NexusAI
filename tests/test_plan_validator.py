@@ -6,7 +6,7 @@ import pytest
 
 from backend.core.plan.tool_index import search_capabilities
 from backend.core.plan.validator import PlanValidationError, validate_plan_ir
-from backend.pipeline.nodes.query_rewrite import attach_query_rewrite_to_plan
+from packages.pipeline.nodes.query_rewrite import attach_query_rewrite_to_plan
 
 
 def _caps() -> dict[str, dict]:

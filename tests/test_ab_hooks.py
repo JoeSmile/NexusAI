@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from backend.pipeline.nodes.conversion_hook import conversion_hook
-from backend.pipeline.nodes.experiment_hook import experiment_hook
-from backend.pipeline.state import make_initial_state
+from packages.pipeline.nodes.conversion_hook import conversion_hook
+from packages.pipeline.nodes.experiment_hook import experiment_hook
+from packages.pipeline.state import make_initial_state
 
 
 @pytest.mark.asyncio
@@ -14,7 +14,7 @@ async def test_experiment_hook_assigns_and_records_exposure(monkeypatch):
     calls: list[dict] = []
 
     monkeypatch.setattr(
-        "backend.pipeline.nodes.experiment_hook.assign_variant",
+        "packages.pipeline.nodes.experiment_hook.assign_variant",
         lambda user_id: {
             "experiment_id": "exp1",
             "variant": "B",
@@ -26,7 +26,7 @@ async def test_experiment_hook_assigns_and_records_exposure(monkeypatch):
         calls.append(kwargs)
 
     monkeypatch.setattr(
-        "backend.pipeline.nodes.experiment_hook.record_event", _record
+        "packages.pipeline.nodes.experiment_hook.record_event", _record
     )
 
     state = make_initial_state("acme", "u1", "s1", "hello")
@@ -43,7 +43,7 @@ async def test_experiment_hook_assigns_and_records_exposure(monkeypatch):
 @pytest.mark.asyncio
 async def test_experiment_hook_no_assignment(monkeypatch):
     monkeypatch.setattr(
-        "backend.pipeline.nodes.experiment_hook.assign_variant",
+        "packages.pipeline.nodes.experiment_hook.assign_variant",
         lambda user_id: None,
     )
     state = make_initial_state("acme", "u1", "s1", "hello")
@@ -67,7 +67,7 @@ async def test_conversion_hook_skips_without_response(monkeypatch):
         called["n"] += 1
 
     monkeypatch.setattr(
-        "backend.pipeline.nodes.conversion_hook.record_event", _record
+        "packages.pipeline.nodes.conversion_hook.record_event", _record
     )
     state = make_initial_state("acme", "u1", "s1", "hello")
     state["ab_experiment_id"] = "exp1"
@@ -82,7 +82,7 @@ async def test_conversion_hook_records(monkeypatch):
     calls: list[dict] = []
 
     monkeypatch.setattr(
-        "backend.pipeline.nodes.conversion_hook.record_event",
+        "packages.pipeline.nodes.conversion_hook.record_event",
         lambda **kwargs: calls.append(kwargs),
     )
     state = make_initial_state("acme", "u1", "s1", "hello")
@@ -100,7 +100,7 @@ async def test_conversion_hook_swallows_db_errors(monkeypatch):
         raise RuntimeError("db down")
 
     monkeypatch.setattr(
-        "backend.pipeline.nodes.conversion_hook.record_event", _boom
+        "packages.pipeline.nodes.conversion_hook.record_event", _boom
     )
     state = make_initial_state("acme", "u1", "s1", "hello")
     state["ab_experiment_id"] = "exp1"

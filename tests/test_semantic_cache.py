@@ -7,8 +7,8 @@ import time
 
 import pytest
 
-from backend.pipeline.cache import semantic_cache as sc
-from backend.pipeline.state import make_initial_state
+from packages.pipeline.cache import semantic_cache as sc
+from packages.pipeline.state import make_initial_state
 
 
 class _FakeRedis:

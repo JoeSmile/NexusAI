@@ -17,7 +17,7 @@ from backend.core.plan.coref import (
     warm_coref_key,
 )
 from backend.core.plan.models import CorefEntry, CorefTable
-from backend.pipeline.state import make_initial_state
+from packages.pipeline.state import make_initial_state
 
 
 def test_apply_coref_replaces_pronoun():

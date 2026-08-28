@@ -7,8 +7,8 @@ import pytest
 from packages.auth.models import TenantContext
 from backend.core.plan.models import PlanIR, PlanStep
 from backend.core.plan.validator import validate_plan_ir
-from backend.pipeline.nodes.orchestrator import _run_step_once
-from backend.pipeline.state import make_initial_state
+from packages.pipeline.nodes.orchestrator import _run_step_once
+from packages.pipeline.state import make_initial_state
 
 
 def _caps() -> dict[str, dict]:
@@ -54,7 +54,7 @@ async def test_sub_query_merged_into_invoke_payload(monkeypatch):
         return {"ok": True, "output": "ok", "text": "ok", "capability_id": cap_id}
 
     monkeypatch.setattr(
-        "backend.pipeline.nodes.orchestrator._collect_invoke",
+        "packages.pipeline.nodes.orchestrator._collect_invoke",
         fake_collect,
     )
     step = PlanStep(

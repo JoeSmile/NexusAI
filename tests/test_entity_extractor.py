@@ -7,9 +7,9 @@ from unittest.mock import MagicMock
 import pytest
 
 from packages.intent.core.entity_extractor import extract_entities, map_agent_type_slots
-from backend.pipeline.cache.fingerprint_cache import make_fingerprint
-from backend.pipeline.nodes.analyze_parallel import analyze_parallel
-from backend.pipeline.state import make_initial_state
+from packages.pipeline.cache.fingerprint_cache import make_fingerprint
+from packages.pipeline.nodes.analyze_parallel import analyze_parallel
+from packages.pipeline.state import make_initial_state
 
 
 @pytest.mark.parametrize(

@@ -1,11 +1,11 @@
-"""LangGraph 管线包 — 避免在 import 时拉起完整图（防循环依赖）"""
+"""Deprecated shim — use `packages.pipeline` (Task 75.2)."""
+from __future__ import annotations
 
-__all__ = ["compiled_graph"]
+import warnings
 
-
-def __getattr__(name: str):
-    if name == "compiled_graph":
-        from backend.pipeline.graph import compiled_graph
-
-        return compiled_graph
-    raise AttributeError(name)
+warnings.warn(
+    "backend.pipeline is deprecated; import from packages.pipeline",
+    DeprecationWarning,
+    stacklevel=2,
+)
+from packages.pipeline import *  # noqa: F401,F403

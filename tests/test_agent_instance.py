@@ -17,7 +17,7 @@ from backend.core.plan.agent_spawn import (
     fail_agent_instance_for_step,
     spawn_sub_agent_instance,
 )
-from backend.pipeline.state import make_initial_state
+from packages.pipeline.state import make_initial_state
 
 
 def test_spawn_trace_id_is_child_of_parent() -> None:

@@ -315,7 +315,7 @@ def create_app() -> FastAPI:
     )
     _lazy_include(app, "backend.routers.files", "router", required=True)
     _lazy_include(
-        app, "backend.pipeline.router", "router", required=True, label="LangGraph 管线"
+        app, "packages.pipeline.router", "router", required=True, label="LangGraph 管线"
     )
     _lazy_include(
         app,

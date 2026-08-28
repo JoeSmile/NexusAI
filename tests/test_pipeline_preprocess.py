@@ -5,12 +5,12 @@ from __future__ import annotations
 import pytest
 
 from backend.core.text_normalize import make_normalized_query_hash, normalize_text
-from backend.pipeline.nodes.preprocess import (
+from packages.pipeline.nodes.preprocess import (
     preprocess,
     should_cache_bypass,
     should_gate_block,
 )
-from backend.pipeline.state import make_initial_state
+from packages.pipeline.state import make_initial_state
 
 
 @pytest.mark.asyncio
@@ -82,7 +82,7 @@ async def test_preprocess_sets_cache_bypass():
 
 @pytest.mark.asyncio
 async def test_cache_check_skips_on_bypass():
-    from backend.pipeline.nodes.cache_check import cache_check
+    from packages.pipeline.nodes.cache_check import cache_check
 
     state = make_initial_state("t1", "u1", "s1", "热点")
     state["query_hash"] = "deadbeefdeadbeef"

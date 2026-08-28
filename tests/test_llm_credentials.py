@@ -313,20 +313,20 @@ async def test_get_key_chain_tenant_only_skips_global(monkeypatch, decrypt_ok):
 @pytest.mark.asyncio
 async def test_model_router_missing_tenant_key_raises(monkeypatch):
     from backend.core.errors import NexusAIException
-    from backend.pipeline.state import make_initial_state
+    from packages.pipeline.state import make_initial_state
 
     async def _boom(tenant_id, model):
         raise NexusAIException("LLM_KEY_001", "tenant_llm_key_missing")
 
     monkeypatch.setattr(
-        "backend.pipeline.nodes.model_router.resolve_tenant_credential",
+        "packages.pipeline.nodes.model_router.resolve_tenant_credential",
         _boom,
     )
     monkeypatch.setattr(
-        "backend.pipeline.nodes.model_router.resolve_short_path_skill",
+        "packages.pipeline.nodes.model_router.resolve_short_path_skill",
         lambda state: None,
     )
-    from backend.pipeline.nodes.model_router import model_router
+    from packages.pipeline.nodes.model_router import model_router
 
     state = make_initial_state(
         "t1", "u1", "s1", "hello", preferred_model="deepseek-v4-flash"
@@ -342,7 +342,7 @@ async def test_model_router_missing_tenant_key_raises(monkeypatch):
 @pytest.mark.asyncio
 async def test_model_router_resolves_tenant_credential(monkeypatch):
     from backend.core.key_repository import LLMKey
-    from backend.pipeline.state import make_initial_state
+    from packages.pipeline.state import make_initial_state
 
     key = LLMKey(
         id="42",
@@ -361,14 +361,14 @@ async def test_model_router_resolves_tenant_credential(monkeypatch):
         return key
 
     monkeypatch.setattr(
-        "backend.pipeline.nodes.model_router.resolve_tenant_credential",
+        "packages.pipeline.nodes.model_router.resolve_tenant_credential",
         _resolve,
     )
     monkeypatch.setattr(
-        "backend.pipeline.nodes.model_router.resolve_short_path_skill",
+        "packages.pipeline.nodes.model_router.resolve_short_path_skill",
         lambda state: None,
     )
-    from backend.pipeline.nodes.model_router import model_router
+    from packages.pipeline.nodes.model_router import model_router
 
     state = make_initial_state(
         "t1", "u1", "s1", "hello", preferred_model="deepseek-v4-flash"

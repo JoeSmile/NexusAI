@@ -167,7 +167,7 @@ warn_unused_configs = false
 follow_imports = "silent"
 # 存量类型债务巨大(删 plugins 后暴露 ~760)。门禁严查 NexusAI 主路径。
 files = [
-  "backend/pipeline",
+  "packages/pipeline",
   "backend/skills",
   "backend/observability",
   "packages/auth",

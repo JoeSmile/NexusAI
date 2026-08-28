@@ -6,20 +6,20 @@ from types import SimpleNamespace
 
 import pytest
 
-from backend.pipeline.intent_path import (
+from packages.pipeline.intent_path import (
     resolve_short_path_skill,
     short_path_predicate,
     should_task_plan,
     skill_to_state,
 )
 from backend.core.plan.validator import PlanValidationError
-from backend.pipeline.nodes.task_plan import (
+from packages.pipeline.nodes.task_plan import (
     audit_task_plan_on_success,
     plan_for_audit,
     task_plan,
     validate_task_plan,
 )
-from backend.pipeline.state import make_initial_state
+from packages.pipeline.state import make_initial_state
 from backend.skills.base import BaseSkill
 
 
@@ -47,7 +47,7 @@ def fake_skill(monkeypatch):
                 return skill
             return None
 
-    monkeypatch.setattr("backend.pipeline.intent_path.registry", Reg())
+    monkeypatch.setattr("packages.pipeline.intent_path.registry", Reg())
     return skill
 
 
@@ -77,7 +77,7 @@ async def test_task_plan_skips_short_path(fake_skill, monkeypatch):
         raise AssertionError("should not call llm")
 
     monkeypatch.setattr(
-        "backend.pipeline.nodes.task_plan.harness.generate", boom
+        "packages.pipeline.nodes.task_plan.harness.generate", boom
     )
     state = make_initial_state("t", "u", "s", "hello")
     state["intent"] = "greeting"
@@ -98,10 +98,10 @@ async def test_task_plan_skips_streaming_path(monkeypatch):
         raise AssertionError("should not call llm on streaming path")
 
     monkeypatch.setattr(
-        "backend.pipeline.nodes.task_plan.harness.generate", boom
+        "packages.pipeline.nodes.task_plan.harness.generate", boom
     )
     monkeypatch.setattr(
-        "backend.pipeline.intent_path.registry.get_skill_for_intent",
+        "packages.pipeline.intent_path.registry.get_skill_for_intent",
         lambda *a, **k: None,
     )
     state = make_initial_state("t", "u", "s", "stream this")
@@ -123,14 +123,14 @@ async def test_task_plan_skips_without_bridge_target(monkeypatch):
         raise AssertionError("should not call llm without bridge target")
 
     monkeypatch.setattr(
-        "backend.pipeline.nodes.task_plan.harness.generate", boom
+        "packages.pipeline.nodes.task_plan.harness.generate", boom
     )
     monkeypatch.setattr(
-        "backend.pipeline.nodes.task_plan._tenant_has_bridge_targets",
+        "packages.pipeline.nodes.task_plan._tenant_has_bridge_targets",
         lambda tid: False,
     )
     monkeypatch.setattr(
-        "backend.pipeline.intent_path.registry.get_skill_for_intent",
+        "packages.pipeline.intent_path.registry.get_skill_for_intent",
         lambda *a, **k: None,
     )
     state = make_initial_state("t", "u", "s", "no bridge here")
@@ -159,23 +159,23 @@ async def test_task_plan_produces_plan_on_long_path(monkeypatch):
         )
 
     monkeypatch.setattr(
-        "backend.pipeline.nodes.task_plan.harness.generate", fake_gen
+        "packages.pipeline.nodes.task_plan.harness.generate", fake_gen
     )
     monkeypatch.setattr(
-        "backend.pipeline.nodes.task_plan._list_visible_capabilities",
+        "packages.pipeline.nodes.task_plan._list_visible_capabilities",
         lambda state: [
             {"id": "cap.a", "name": "A", "permission": "chat:write", "param_spec": {}}
         ],
     )
     monkeypatch.setattr(
-        "backend.pipeline.intent_path.registry.get_skill_for_intent",
+        "packages.pipeline.intent_path.registry.get_skill_for_intent",
         lambda *a, **k: None,
     )
 
     state = make_initial_state("t", "u", "s", "plan this")
     state["intent"] = "complex"
     monkeypatch.setattr(
-        "backend.pipeline.nodes.task_plan._tenant_has_bridge_targets",
+        "packages.pipeline.nodes.task_plan._tenant_has_bridge_targets",
         lambda tid: True,
     )
     state["intent_confidence"] = 0.4
@@ -205,20 +205,20 @@ async def test_task_plan_runs_on_stream_when_forced(monkeypatch):
 
     monkeypatch.setenv("FORCE_TASK_PLAN_ON_STREAM", "1")
     monkeypatch.setattr(
-        "backend.pipeline.nodes.task_plan.harness.generate", fake_gen
+        "packages.pipeline.nodes.task_plan.harness.generate", fake_gen
     )
     monkeypatch.setattr(
-        "backend.pipeline.nodes.task_plan._list_visible_capabilities",
+        "packages.pipeline.nodes.task_plan._list_visible_capabilities",
         lambda state: [
             {"id": "cap.a", "name": "A", "permission": "chat:write", "param_spec": {}}
         ],
     )
     monkeypatch.setattr(
-        "backend.pipeline.nodes.task_plan._tenant_has_bridge_targets",
+        "packages.pipeline.nodes.task_plan._tenant_has_bridge_targets",
         lambda tid: True,
     )
     monkeypatch.setattr(
-        "backend.pipeline.intent_path.registry.get_skill_for_intent",
+        "packages.pipeline.intent_path.registry.get_skill_for_intent",
         lambda *a, **k: None,
     )
     state = make_initial_state("t", "u", "s", "stream plan")
@@ -241,18 +241,18 @@ async def test_task_plan_degrades_on_bad_json(monkeypatch):
         )
 
     monkeypatch.setattr(
-        "backend.pipeline.nodes.task_plan.harness.generate", fake_gen
+        "packages.pipeline.nodes.task_plan.harness.generate", fake_gen
     )
     monkeypatch.setattr(
-        "backend.pipeline.nodes.task_plan._list_visible_capabilities",
+        "packages.pipeline.nodes.task_plan._list_visible_capabilities",
         lambda state: [],
     )
     monkeypatch.setattr(
-        "backend.pipeline.nodes.task_plan._tenant_has_bridge_targets",
+        "packages.pipeline.nodes.task_plan._tenant_has_bridge_targets",
         lambda tid: True,
     )
     monkeypatch.setattr(
-        "backend.pipeline.intent_path.registry.get_skill_for_intent",
+        "packages.pipeline.intent_path.registry.get_skill_for_intent",
         lambda *a, **k: None,
     )
 
@@ -308,23 +308,23 @@ async def test_task_plan_blocks_on_output_guard(monkeypatch):
         return SimpleNamespace(action="blocked", reason="sensitive_content:sk-", redacted_text="")
 
     monkeypatch.setattr(
-        "backend.pipeline.nodes.task_plan.harness.generate", fake_gen
+        "packages.pipeline.nodes.task_plan.harness.generate", fake_gen
     )
     monkeypatch.setattr(
-        "backend.pipeline.nodes.task_plan._list_visible_capabilities",
+        "packages.pipeline.nodes.task_plan._list_visible_capabilities",
         lambda state: [
             {"id": "cap.a", "name": "A", "permission": "chat:write", "param_spec": {}}
         ],
     )
     monkeypatch.setattr(
-        "backend.pipeline.nodes.task_plan.check_output", blocked
+        "packages.pipeline.nodes.task_plan.check_output", blocked
     )
     monkeypatch.setattr(
-        "backend.pipeline.nodes.task_plan._tenant_has_bridge_targets",
+        "packages.pipeline.nodes.task_plan._tenant_has_bridge_targets",
         lambda tid: True,
     )
     monkeypatch.setattr(
-        "backend.pipeline.intent_path.registry.get_skill_for_intent",
+        "packages.pipeline.intent_path.registry.get_skill_for_intent",
         lambda *a, **k: None,
     )
     state = make_initial_state("t", "u", "s", "x")
@@ -340,7 +340,7 @@ def test_audit_only_on_llm_success(monkeypatch):
         calls.append(rec)
 
     monkeypatch.setattr(
-        "backend.pipeline.nodes.task_plan.write_audit_sync", fake_audit
+        "packages.pipeline.nodes.task_plan.write_audit_sync", fake_audit
     )
     state = make_initial_state("t", "u", "s", "hi")
     state["task_plan"] = {
@@ -358,7 +358,7 @@ def test_audit_only_on_llm_success(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_async_plan_skipped_when_flag_off(monkeypatch):
-    from backend.pipeline.nodes.task_plan import run_async_task_plan_for_stream
+    from packages.pipeline.nodes.task_plan import run_async_task_plan_for_stream
 
     monkeypatch.delenv("ASYNC_TASK_PLAN_ON_STREAM", raising=False)
     monkeypatch.delenv("ORCHESTRATOR_ENABLED", raising=False)
@@ -368,7 +368,7 @@ async def test_async_plan_skipped_when_flag_off(monkeypatch):
         raise AssertionError("should not plan when async flag off")
 
     monkeypatch.setattr(
-        "backend.pipeline.nodes.task_plan._produce_plan_ir", boom
+        "packages.pipeline.nodes.task_plan._produce_plan_ir", boom
     )
     state = make_initial_state("t", "u", "s", "complex please")
     state["stream_mode"] = True
@@ -382,7 +382,7 @@ async def test_async_plan_skipped_when_flag_off(monkeypatch):
 @pytest.mark.asyncio
 async def test_async_plan_ok_emits_done(monkeypatch):
     from backend.core.plan.event_bus import get_run_bus
-    from backend.pipeline.nodes.task_plan import run_async_task_plan_for_stream
+    from packages.pipeline.nodes.task_plan import run_async_task_plan_for_stream
 
     monkeypatch.setenv("ASYNC_TASK_PLAN_ON_STREAM", "1")
     monkeypatch.delenv("ORCHESTRATOR_ENABLED", raising=False)
@@ -408,10 +408,10 @@ async def test_async_plan_ok_emits_done(monkeypatch):
         return plan
 
     monkeypatch.setattr(
-        "backend.pipeline.nodes.task_plan._produce_plan_ir", fake_produce
+        "packages.pipeline.nodes.task_plan._produce_plan_ir", fake_produce
     )
     monkeypatch.setattr(
-        "backend.pipeline.intent_path.registry.get_skill_for_intent",
+        "packages.pipeline.intent_path.registry.get_skill_for_intent",
         lambda *a, **k: None,
     )
 
@@ -438,7 +438,7 @@ async def test_async_plan_timeout_degrades(monkeypatch):
     import asyncio
 
     from backend.core.plan.event_bus import get_run_bus
-    from backend.pipeline.nodes.task_plan import run_async_task_plan_for_stream
+    from packages.pipeline.nodes.task_plan import run_async_task_plan_for_stream
 
     monkeypatch.setenv("ASYNC_TASK_PLAN_ON_STREAM", "1")
     monkeypatch.delenv("ORCHESTRATOR_ENABLED", raising=False)
@@ -448,10 +448,10 @@ async def test_async_plan_timeout_degrades(monkeypatch):
         return {"goal": "late"}
 
     monkeypatch.setattr(
-        "backend.pipeline.nodes.task_plan._produce_plan_ir", slow_produce
+        "packages.pipeline.nodes.task_plan._produce_plan_ir", slow_produce
     )
     monkeypatch.setattr(
-        "backend.pipeline.intent_path.registry.get_skill_for_intent",
+        "packages.pipeline.intent_path.registry.get_skill_for_intent",
         lambda *a, **k: None,
     )
 

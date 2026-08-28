@@ -17,11 +17,11 @@ from backend.core.plan.clarification import (
     try_resolve_pending,
     warm_pending_key,
 )
-from backend.pipeline.nodes.clarification_gate import (
+from packages.pipeline.nodes.clarification_gate import (
     clarification_gate,
     route_after_clarification,
 )
-from backend.pipeline.state import make_initial_state
+from packages.pipeline.state import make_initial_state
 
 
 def _seed_warm(state: dict, payload: ClarificationPayload) -> None:

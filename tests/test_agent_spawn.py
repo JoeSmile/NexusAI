@@ -13,7 +13,7 @@ from backend.core.plan.agent_spawn import (
     resolve_step_tenant,
 )
 from backend.core.plan.blackboard import Blackboard
-from backend.pipeline.state import make_initial_state
+from packages.pipeline.state import make_initial_state
 
 
 @pytest.fixture(autouse=True)
@@ -89,7 +89,7 @@ async def test_orchestrator_spawn_blocked_holds_clarification(monkeypatch):
     from backend.core.plan.agent_spawn import SpawnBlockedError
     from backend.core.plan.clarification import get_pending
     from backend.core.plan.slot_gate import evaluate_required_slots
-    from backend.pipeline.nodes.orchestrator import (
+    from packages.pipeline.nodes.orchestrator import (
         orchestrator,
         route_after_orchestrator,
     )
@@ -131,11 +131,11 @@ async def test_orchestrator_spawn_blocked_holds_clarification(monkeypatch):
         raise SpawnBlockedError(payload.question, payload=payload)
 
     monkeypatch.setattr(
-        "backend.pipeline.nodes.orchestrator.execute_plan_ir",
+        "packages.pipeline.nodes.orchestrator.execute_plan_ir",
         _boom,
     )
     monkeypatch.setattr(
-        "backend.pipeline.nodes.orchestrator._caps_index",
+        "packages.pipeline.nodes.orchestrator._caps_index",
         lambda s: {"rag.search": {"spec": {}}},
     )
 

@@ -14,7 +14,7 @@ from backend.database.pgvector_session import (
     WorkflowRunNode,
     get_pg_session,
 )
-from backend.pipeline.exact_cache import exact_cache_key, invalidate_exact_cache
+from packages.pipeline.exact_cache import exact_cache_key, invalidate_exact_cache
 from backend.routers.workflow_runs import _run_dict
 
 

@@ -2,8 +2,8 @@
 import asyncio
 import time
 
-from backend.pipeline.graph import compiled_graph
-from backend.pipeline.state import make_initial_state
+from packages.pipeline.graph import compiled_graph
+from packages.pipeline.state import make_initial_state
 
 
 async def main() -> None:

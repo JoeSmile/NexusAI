@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from backend.pipeline.chat_workflow_bridge import (
+from packages.pipeline.chat_workflow_bridge import (
     _plan_tags,
     match_published_workflow,
     message_intent_tags,
     should_skip_workflow_bridge,
 )
-from backend.pipeline.exact_cache import exact_cache_key, invalidate_exact_cache
+from packages.pipeline.exact_cache import exact_cache_key, invalidate_exact_cache
 
 
 def test_plan_tags_from_intent_and_steps() -> None:
@@ -67,7 +67,7 @@ def test_match_requires_overlap_or_none_without_db_rows(monkeypatch) -> None:
             return _S()
 
     monkeypatch.setattr(
-        "backend.pipeline.chat_workflow_bridge.get_pg_session",
+        "packages.pipeline.chat_workflow_bridge.get_pg_session",
         lambda: _SF(),
     )
     assert (

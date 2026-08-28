@@ -1,5 +1,2 @@
-"""管线缓存辅助"""
-
-from backend.pipeline.cache.fingerprint_cache import make_fingerprint
-
-__all__ = ["make_fingerprint"]
+"""Shim — prefer packages.pipeline.cache"""
+from packages.pipeline.cache import *  # noqa: F401,F403

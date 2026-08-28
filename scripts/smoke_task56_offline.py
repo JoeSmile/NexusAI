@@ -16,8 +16,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.core.audit import audit_row_to_ndjson_events, write_governance_audit
 from backend.core.plan.event_bus import get_run_bus, release_run_bus
 from backend.core.plan.models import PlanIR, PlanStep
-from backend.pipeline.nodes.orchestrator import execute_plan_ir
-from backend.pipeline.state import make_initial_state
+from packages.pipeline.nodes.orchestrator import execute_plan_ir
+from packages.pipeline.state import make_initial_state
 
 
 async def _main() -> None:
@@ -55,7 +55,7 @@ async def _main() -> None:
           "capability_id": cap_id,
       }
 
-  import backend.pipeline.nodes.orchestrator as orch
+  import packages.pipeline.nodes.orchestrator as orch
 
   orch._collect_invoke = fake_collect  # type: ignore[method-assign]
   orch._list_visible_capabilities = lambda s: [{"id": "cap.a", "param_spec": {}}]  # type: ignore
