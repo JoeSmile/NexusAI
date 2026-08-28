@@ -269,7 +269,7 @@ class LLMHarness(Harness):
             output_tokens=output_tokens,
         )
         try:
-            from backend.core.token_quota import record_token_usage
+            from packages.token_quota import record_token_usage
 
             record_token_usage(tenant_id, input_tokens + output_tokens)
         except Exception:
@@ -401,7 +401,7 @@ class LLMHarness(Harness):
             output_tokens=output_tokens,
         )
         try:
-            from backend.core.token_quota import record_token_usage
+            from packages.token_quota import record_token_usage
 
             record_token_usage(tenant_id, input_tokens + output_tokens)
         except Exception:
