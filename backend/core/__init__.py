@@ -1,17 +1,18 @@
 """
-核心模块
-包含系统的核心组件和基础设施
+遗留 re-export：原 backend.core 包入口。
+
+真源已迁至 packages.*；保留此模块以免旧 ``from backend.core import …`` 立刻炸。
 """
 
-from .config import Config, get_config
-from .exceptions import (
+from packages.config import Config, get_config
+from packages.exceptions import (
     ConfigurationError,
     DatabaseError,
     NexusAIException,
     RAGError,
     ValidationError,
 )
-from .interfaces import IChatEngine, IContextService, IMemoryService, IRAGService
+from packages.interfaces import IChatEngine, IContextService, IMemoryService, IRAGService
 
 __all__ = [
     "Config",
@@ -24,5 +25,5 @@ __all__ = [
     "IRAGService",
     "RAGError",
     "ValidationError",
-    "get_config"
+    "get_config",
 ]

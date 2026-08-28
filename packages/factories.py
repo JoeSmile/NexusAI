@@ -11,9 +11,9 @@ from typing import Any, TypeVar
 
 from packages.rag import RAGService
 
-from .config import get_config
-from .exceptions import ConfigurationError
-from .interfaces import (
+from packages.config import get_config
+from packages.exceptions import ConfigurationError
+from packages.interfaces import (
     IChatEngine,
     IContextService,
     IDatabaseService,
@@ -43,7 +43,7 @@ class ChatEngineFactory(ServiceFactory):
     def create_service(self, *args, **kwargs) -> IChatEngine:
         """创建聊天引擎实例"""
         try:
-            from ..modules.llm.core.llm_core import ChatEngine
+            from packages.llm.core.llm_core import ChatEngine
             return ChatEngine(*args, **kwargs)
         except ImportError as e:
             raise ConfigurationError(f"无法导入聊天引擎: {e}")
@@ -58,7 +58,7 @@ class ContextServiceFactory(ServiceFactory):
     def create_service(self, memory_service: Any | None = None, *args, **kwargs) -> IContextService:
         """创建上下文服务实例（memory_service 参数已废弃，忽略）。"""
         try:
-            from ..services.context_service import ContextService
+            from backend.services.context_service import ContextService
 
             _ = memory_service
             return ContextService(*args, **kwargs)
@@ -86,7 +86,7 @@ class DatabaseServiceFactory(ServiceFactory):
     def create_service(self, *args, **kwargs) -> IDatabaseService:
         """创建数据库服务实例"""
         try:
-            from ..database import DatabaseManager
+            from backend.database import DatabaseManager
             return DatabaseManager(*args, **kwargs)
         except ImportError as e:
             raise ConfigurationError(f"无法导入数据库服务: {e}")
@@ -101,7 +101,7 @@ class LoggerFactory(ServiceFactory):
     def create_service(self, name: str = __name__, *args, **kwargs) -> ILogger:
         """创建日志服务实例"""
         try:
-            from ..logging_config import get_logger
+            from backend.logging_config import get_logger
             return get_logger(name)
         except ImportError as e:
             raise ConfigurationError(f"无法导入日志服务: {e}")
@@ -116,12 +116,12 @@ class ValidationServiceFactory(ServiceFactory):
     def create_service(self, *args, **kwargs) -> IValidationService:
         """创建验证服务实例"""
         try:
-            from ..validation_service import ValidationService  # type: ignore
+            from backend.validation_service import ValidationService  # type: ignore
             return ValidationService(*args, **kwargs)
         except ImportError:
             # 如果主要验证服务不可用，尝试使用简单验证器
             try:
-                from .utils.simple_validator import SimpleValidationService  # type: ignore
+                from packages.utils.simple_validator import SimpleValidationService  # type: ignore
                 return SimpleValidationService(*args, **kwargs)
             except ImportError:
                 raise ConfigurationError(

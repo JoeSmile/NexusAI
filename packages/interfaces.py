@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
-from ..models import ChatRequest, ChatResponse
+from backend.models import ChatRequest, ChatResponse
 
 
 @dataclass
