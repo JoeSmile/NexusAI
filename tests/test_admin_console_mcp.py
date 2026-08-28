@@ -13,7 +13,7 @@ from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
 from packages.capability.mcp_store import reset_mcp_store_for_tests
 from backend.core.errors import NexusAIException, nexusai_exception_handler
-from backend.routers.admin_console import router
+from apps.api.routers.admin_console import router
 
 
 @pytest.fixture(autouse=True)

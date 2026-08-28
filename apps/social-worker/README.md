@@ -1,5 +1,11 @@
-# apps/social-worker — 目标入口（未搬家）
+# apps/social-worker — 部署名（进程）
 
-运行时仍在：`python -m backend.workers.social_worker`
+可 import 包：`apps.social_worker`（下划线）。
 
-见 [`tasks/75-layout-packages-wave.md`](../../tasks/75-layout-packages-wave.md)。
+```bash
+python -m apps.social_worker
+# 兼容 shim：
+python -m backend.workers.social_worker
+```
+
+代码：`apps/social_worker/worker.py`

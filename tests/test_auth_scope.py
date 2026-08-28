@@ -48,7 +48,7 @@ def test_require_tenant_admin() -> None:
 
 
 def test_memory_router_exports_admin_alias() -> None:
-    from backend.routers.memory import _require_memory_admin
+    from apps.api.routers.memory import _require_memory_admin
 
     _require_memory_admin(_ctx("super_admin"))
 

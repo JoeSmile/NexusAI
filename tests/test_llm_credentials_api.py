@@ -14,9 +14,9 @@ from fastapi.testclient import TestClient
 
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
-from backend.routers import admin as admin_mod
-from backend.routers.admin import router as admin_router
-from backend.routers.llm_public import router as llm_public_router
+from apps.api.routers import admin as admin_mod
+from apps.api.routers.admin import router as admin_router
+from apps.api.routers.llm_public import router as llm_public_router
 
 
 class _StoreSession:

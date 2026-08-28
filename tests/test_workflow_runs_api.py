@@ -12,7 +12,7 @@ from packages.auth.models import TenantContext
 from backend.core.org.scope import OrgScope
 from packages.workflow.runner import start_run
 from backend.database.pgvector_session import Workflow, WorkflowRun, get_pg_session
-from backend.routers.workflow_runs import router
+from apps.api.routers.workflow_runs import router
 
 
 def test_list_and_get_run_api(monkeypatch):
@@ -59,7 +59,7 @@ def test_list_and_get_run_api(monkeypatch):
 
     app.dependency_overrides[verify_human_or_legacy_key] = _auth
     monkeypatch.setattr(
-        "backend.routers.workflow_runs.resolve_org_scope",
+        "apps.api.routers.workflow_runs.resolve_org_scope",
         lambda *a, **k: scope,
     )
     monkeypatch.setattr(
@@ -127,7 +127,7 @@ def test_draft_cannot_start(monkeypatch):
 
     app.dependency_overrides[verify_human_or_legacy_key] = _auth
     monkeypatch.setattr(
-        "backend.routers.workflow_runs.resolve_org_scope",
+        "apps.api.routers.workflow_runs.resolve_org_scope",
         lambda *a, **k: scope,
     )
 

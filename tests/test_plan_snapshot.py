@@ -9,7 +9,7 @@ from packages.auth.models import TenantContext
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.plan.event_bus import get_run_bus, release_run_bus
 from packages.plan.run_cancel import clear_cancel, register_run, unregister_run
-from backend.routers.plan_snapshot import router
+from apps.api.routers.plan_snapshot import router
 
 
 def _tenant() -> TenantContext:

@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
-from backend.routers.chat_history import router as chat_history_router
+from apps.api.routers.chat_history import router as chat_history_router
 
 
 def _row(
@@ -108,7 +108,7 @@ def _client(rows: list[Any], tenant: TenantContext) -> TestClient:
 
     app.dependency_overrides[verify_human_or_legacy_key] = _auth
     with patch(
-        "backend.routers.chat_history.get_pg_session",
+        "apps.api.routers.chat_history.get_pg_session",
         return_value=_Factory(rows),
     ):
         yield TestClient(app)
@@ -529,7 +529,7 @@ def test_history_filters_by_tenant_user_in_query(tenant_a: TenantContext) -> Non
 
     app.dependency_overrides[verify_human_or_legacy_key] = _auth
     with patch(
-        "backend.routers.chat_history.get_pg_session",
+        "apps.api.routers.chat_history.get_pg_session",
         return_value=_CaptureFactory(),
     ):
         client = TestClient(app)

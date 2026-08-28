@@ -1,27 +1,14 @@
-"""API 入口：按 UVICORN_WORKERS 起进程；--reload 强制 1 worker。"""
-
+"""Deprecated shim — use `python -m apps.api.run_api` (Task 75.5)."""
 from __future__ import annotations
 
-import os
+import warnings
 
-import uvicorn
-
-from backend.core.uvicorn_workers import resolve_uvicorn_workers
-
-
-def main() -> None:
-    host = os.getenv("API_HOST", "0.0.0.0")
-    port = int(os.getenv("API_PORT", "8000"))
-    reload = os.getenv("UVICORN_RELOAD", "").strip().lower() in ("1", "true", "yes")
-    workers = resolve_uvicorn_workers(reload=reload)
-    uvicorn.run(
-        "backend.app:app",
-        host=host,
-        port=port,
-        reload=reload,
-        workers=1 if reload else workers,
-    )
-
+warnings.warn(
+    "backend.run_api is deprecated; use apps.api.run_api",
+    DeprecationWarning,
+    stacklevel=2,
+)
+from apps.api.run_api import main
 
 if __name__ == "__main__":
     main()

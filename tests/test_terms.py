@@ -18,7 +18,7 @@ from backend.core.terms.service import (
     list_pending_terms,
     record_acceptance,
 )
-from backend.routers.terms import router as terms_router
+from apps.api.routers.terms import router as terms_router
 
 
 @pytest.fixture

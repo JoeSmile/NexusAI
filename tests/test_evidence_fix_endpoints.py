@@ -9,9 +9,9 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from backend.core.errors import ErrorCode
-from backend.routers import performance as perf_mod
-from backend.routers.agent import router as agent_router
-from backend.routers.performance import router as perf_router
+from apps.api.routers import performance as perf_mod
+from apps.api.routers.agent import router as agent_router
+from apps.api.routers.performance import router as perf_router
 from backend.services.agent_service import get_agent_service
 
 

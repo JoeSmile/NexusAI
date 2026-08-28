@@ -16,7 +16,7 @@ from backend.database.pgvector_session import (
     WorkflowRun,
     get_pg_session,
 )
-from backend.routers import workflow_approvals as apr
+from apps.api.routers import workflow_approvals as apr
 
 
 def _scope_for(tid: str) -> OrgScope:

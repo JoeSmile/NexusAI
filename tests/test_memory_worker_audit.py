@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from backend.workers import memory_worker as mw
+from apps.memory_worker import worker as mw
 
 
 def test_process_one_audits_accepted_write():

@@ -56,7 +56,7 @@ async def test_tenant_admin_cannot_put_seat_limit():
     from fastapi import HTTPException
 
     from packages.auth.models import TenantContext
-    from backend.routers.tenant_subscription import SubscriptionBody, put_subscription
+    from apps.api.routers.tenant_subscription import SubscriptionBody, put_subscription
 
     tenant = TenantContext(
         tenant_id="t1",
@@ -79,7 +79,7 @@ async def test_tenant_admin_cannot_put_plan():
     from fastapi import HTTPException
 
     from packages.auth.models import TenantContext
-    from backend.routers.tenant_subscription import SubscriptionBody, put_subscription
+    from apps.api.routers.tenant_subscription import SubscriptionBody, put_subscription
 
     tenant = TenantContext(
         tenant_id="t1",
@@ -102,7 +102,7 @@ async def test_tenant_admin_cannot_put_freeform_expires():
     from fastapi import HTTPException
 
     from packages.auth.models import TenantContext
-    from backend.routers.tenant_subscription import SubscriptionBody, put_subscription
+    from apps.api.routers.tenant_subscription import SubscriptionBody, put_subscription
 
     tenant = TenantContext(
         tenant_id="t1",
@@ -121,7 +121,7 @@ async def test_tenant_admin_cannot_put_freeform_expires():
 
 
 def test_resolve_tenant_admin_expires_trial_and_years():
-    from backend.routers.tenant_subscription import resolve_tenant_admin_expires
+    from apps.api.routers.tenant_subscription import resolve_tenant_admin_expires
 
     now = datetime(2026, 3, 1, 12, 0, 0)
     assert resolve_tenant_admin_expires(

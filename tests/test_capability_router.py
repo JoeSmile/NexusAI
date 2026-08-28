@@ -17,7 +17,7 @@ from packages.capability.models import (
 )
 from packages.capability.registry import CapabilityRegistry
 from backend.core.errors import NexusAIException, nexusai_exception_handler
-from backend.routers.capability import router
+from apps.api.routers.capability import router
 
 
 @pytest.fixture
@@ -72,7 +72,7 @@ def test_list_capabilities_role_filter(
     user_tenant: TenantContext, cap_reg: CapabilityRegistry
 ) -> None:
     with patch(
-        "backend.routers.capability.get_capability_registry",
+        "apps.api.routers.capability.get_capability_registry",
         return_value=cap_reg,
     ):
         client = _client(user_tenant, cap_reg)
@@ -101,7 +101,7 @@ def test_invoke_short_json(
     monkeypatch.setenv("LLM_PROVIDER", "mock")
     with (
         patch(
-            "backend.routers.capability.get_capability_registry",
+            "apps.api.routers.capability.get_capability_registry",
             return_value=cap_reg,
         ),
         patch(
@@ -109,7 +109,7 @@ def test_invoke_short_json(
             return_value=cap_reg,
         ),
         patch("packages.capability.governance._redis", return_value=None),
-        patch("backend.routers.capability.log_audit"),
+        patch("apps.api.routers.capability.log_audit"),
     ):
         client = _client(user_tenant, cap_reg)
         r = client.post(
@@ -128,7 +128,7 @@ def test_invoke_forbidden_for_auditor(
 ) -> None:
     with (
         patch(
-            "backend.routers.capability.get_capability_registry",
+            "apps.api.routers.capability.get_capability_registry",
             return_value=cap_reg,
         ),
         patch("packages.capability.governance._redis", return_value=None),

@@ -9,7 +9,7 @@ from packages.capability.models import (
     CapabilityStatus,
 )
 from packages.capability.registry import CapabilityRegistry
-from backend.routers.capability import _spec_public
+from apps.api.routers.capability import _spec_public
 
 
 def test_capability_spec_accepts_param_spec() -> None:

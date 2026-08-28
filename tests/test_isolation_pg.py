@@ -13,8 +13,8 @@ from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
 from backend.core.memory_service import UnifiedMemoryService
 from backend.database.pgvector_session import ChatMessage, UserMemory, get_pg_session
-from backend.routers.chat_history import router as chat_history_router
-from backend.routers.memory import router as memory_router
+from apps.api.routers.chat_history import router as chat_history_router
+from apps.api.routers.memory import router as memory_router
 
 
 def _sf():

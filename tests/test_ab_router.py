@@ -13,8 +13,8 @@ from fastapi.testclient import TestClient
 
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
-from backend.routers import ab as ab_mod
-from backend.routers.ab import router
+from apps.api.routers import ab as ab_mod
+from apps.api.routers.ab import router
 
 
 @pytest.fixture

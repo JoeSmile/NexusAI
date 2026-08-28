@@ -1,9 +1,9 @@
-# apps/api — 目标入口（未搬家）
+# apps/api — API 进程入口（Task 75.5）
 
-运行时仍在：
+- `apps/api/app.py` — FastAPI 应用
+- `apps/api/run_api.py` — uvicorn 入口（`python -m apps.api.run_api`）
+- `apps/api/routers/` — HTTP 路由
 
-- `backend/app.py` / `backend/run_api.py`
-- `backend/routers/`
-- `backend/pipeline/router.py`（Chat / SSE）
+兼容 shim（1 Wave）：`backend.app` / `backend.run_api` / `backend.routers` 仍可用；compose 可继续 `python -m backend.run_api`。
 
-物理迁入本目录见 [`tasks/75-layout-packages-wave.md`](../../tasks/75-layout-packages-wave.md)。
+地图：[`docs/REPO_LAYOUT.md`](../../docs/REPO_LAYOUT.md)

@@ -39,7 +39,7 @@ from backend.database.pgvector_session import (
     SocialUsage,
     TenantConfig,
 )
-from backend.routers.social import router as social_router
+from apps.api.routers.social import router as social_router
 
 
 @pytest.fixture()
@@ -472,8 +472,8 @@ def test_router_get_task_tenant_isolation(db_session):
         return _tenant()
 
     app.dependency_overrides[verify_human_or_legacy_key] = _auth
-    with patch("backend.routers.social._db_session", lambda: _SessCtx()):
-        with patch("backend.routers.social.log_audit", MagicMock()):
+    with patch("apps.api.routers.social._db_session", lambda: _SessCtx()):
+        with patch("apps.api.routers.social.log_audit", MagicMock()):
             client = TestClient(app)
             r = client.get(f"/api/social/analysis-tasks/{task.id}")
             assert r.status_code == 404
@@ -537,8 +537,8 @@ def test_router_follows_tenant_isolation(db_session):
         return _tenant()
 
     app.dependency_overrides[verify_human_or_legacy_key] = _auth
-    with patch("backend.routers.social._db_session", lambda: _SessCtx()):
-        with patch("backend.routers.social.log_audit", MagicMock()):
+    with patch("apps.api.routers.social._db_session", lambda: _SessCtx()):
+        with patch("apps.api.routers.social.log_audit", MagicMock()):
             client = TestClient(app)
             r = client.get("/api/social/follows")
             assert r.status_code == 200

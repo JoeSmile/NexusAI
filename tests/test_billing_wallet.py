@@ -21,8 +21,8 @@ from backend.core.billing.wallet import (
     recharge_wallet,
 )
 from backend.core.harness.llm import LLMHarness
-from backend.routers import billing as billing_mod
-from backend.routers.billing import router as billing_router
+from apps.api.routers import billing as billing_mod
+from apps.api.routers.billing import router as billing_router
 
 
 @pytest.fixture(autouse=True)

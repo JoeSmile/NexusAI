@@ -29,7 +29,7 @@ def main() -> int:
     from backend.core.memory import memory_queue as mq
     from backend.core.memory_service import get_unified_memory_service
     from backend.database.vector_ops import list_user_memories_by_prefix
-    from backend.workers.memory_worker import process_one
+    from apps.memory_worker.worker import process_one
 
     tenant_id = "shipgate"
     user_id = f"g9_{uuid.uuid4().hex[:10]}"

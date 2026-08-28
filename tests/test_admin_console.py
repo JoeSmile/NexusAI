@@ -19,7 +19,7 @@ from packages.capability.models import (
 )
 from packages.capability.registry import CapabilityRegistry
 from backend.core.errors import NexusAIException, nexusai_exception_handler
-from backend.routers.admin_console import router
+from apps.api.routers.admin_console import router
 
 
 def _tool_spec(
@@ -85,7 +85,7 @@ def _client(tenant: TenantContext, reg: CapabilityRegistry):
         return tenant
 
     app.dependency_overrides[verify_human_or_legacy_key] = _auth
-    with patch("backend.routers.admin_console.get_capability_registry", return_value=reg), patch(
+    with patch("apps.api.routers.admin_console.get_capability_registry", return_value=reg), patch(
         "packages.capability.admin_store.get_capability_registry", return_value=reg
     ):
         yield TestClient(app)
@@ -134,7 +134,7 @@ def test_user_forbidden(user: TenantContext, tool_reg: CapabilityRegistry) -> No
 
 def test_super_admin_can_disable_tool(super_admin: TenantContext, tool_reg: CapabilityRegistry) -> None:
     with (
-        patch("backend.routers.admin_console.write_audit_sync"),
+        patch("apps.api.routers.admin_console.write_audit_sync"),
         patch("packages.capability.admin_store._upsert_db_row"),
         _client(super_admin, tool_reg) as client,
     ):

@@ -13,7 +13,7 @@ from packages.auth.models import TenantContext
 from backend.core.org.scope import OrgScope
 from packages.workflow.grants import can_review_request
 from backend.database.pgvector_session import PermissionRequest, get_pg_session
-from backend.routers import workflow_approvals as apr
+from apps.api.routers import workflow_approvals as apr
 
 
 @pytest.mark.asyncio

@@ -130,7 +130,7 @@ def test_require_permission_still_accepts_api_key(monkeypatch):
 
 def test_capabilities_list_accepts_bearer(monkeypatch):
     """Mount capability list route with dual auth."""
-    from backend.routers import capability as cap_mod
+    from apps.api.routers import capability as cap_mod
 
     _patch_session_perms(monkeypatch)
     monkeypatch.setattr(

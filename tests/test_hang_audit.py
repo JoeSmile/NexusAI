@@ -25,7 +25,7 @@ from backend.database.pgvector_session import (
     WorkflowRunNode,
     get_pg_session,
 )
-from backend.routers import workflow_approvals as apr
+from apps.api.routers import workflow_approvals as apr
 
 
 @pytest.mark.asyncio

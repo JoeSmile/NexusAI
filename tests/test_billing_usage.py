@@ -14,8 +14,8 @@ from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
 from backend.core.billing.context import bind_billing_context, clear_billing_context
 from backend.core.billing.usage import make_idempotency_key, record_metered_usage
-from backend.routers import billing as billing_mod
-from backend.routers.billing import router as billing_router
+from apps.api.routers import billing as billing_mod
+from apps.api.routers.billing import router as billing_router
 
 
 @pytest.fixture(autouse=True)

@@ -13,7 +13,7 @@ from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
 from backend.core.errors import NexusAIException, nexusai_exception_handler
 from backend.core.guardrails.config_store import reset_store_for_tests
-from backend.routers.admin_console import router
+from apps.api.routers.admin_console import router
 
 
 @pytest.fixture(autouse=True)
@@ -55,7 +55,7 @@ def test_guardrail_rules_list_includes_builtin(super_admin: TenantContext) -> No
 
 def test_guardrail_rule_crud_and_audit(super_admin: TenantContext) -> None:
     with (
-        patch("backend.routers.admin_console_guardrails.write_audit_sync") as audit,
+        patch("apps.api.routers.admin_console_guardrails.write_audit_sync") as audit,
         _client(super_admin) as client,
     ):
         r = client.post(
@@ -95,7 +95,7 @@ def test_guardrail_builtin_readonly(super_admin: TenantContext) -> None:
 
 def test_guardrail_risk_matrix(super_admin: TenantContext) -> None:
     with (
-        patch("backend.routers.admin_console_guardrails.write_audit_sync"),
+        patch("apps.api.routers.admin_console_guardrails.write_audit_sync"),
         _client(super_admin) as client,
     ):
         r = client.get("/api/admin/console/guardrails/risk-matrix")

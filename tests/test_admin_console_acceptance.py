@@ -34,7 +34,7 @@ def test_golden_line_disable_tool_blocks_invoke(
 ) -> None:
     """Admin disables tool → registry updated → invoke preflight (registry.get) raises CAP_DISABLED."""
     with (
-        patch("backend.routers.admin_console.write_audit_sync"),
+        patch("apps.api.routers.admin_console.write_audit_sync"),
         _client(super_admin, tool_reg) as client,
     ):
         r = client.patch(
@@ -52,7 +52,7 @@ def test_golden_line_disable_writes_audit(
     tool_reg: CapabilityRegistry,
 ) -> None:
     with (
-        patch("backend.routers.admin_console.write_audit_sync") as audit,
+        patch("apps.api.routers.admin_console.write_audit_sync") as audit,
         _client(super_admin, tool_reg) as client,
     ):
         r = client.patch(
@@ -98,7 +98,7 @@ def test_tenant_admin_reads_tools_not_guardrails(
     tool_reg: CapabilityRegistry,
 ) -> None:
     with (
-        patch("backend.routers.admin_console_skills.list_skill_assets", return_value=[]),
+        patch("apps.api.routers.admin_console_skills.list_skill_assets", return_value=[]),
         _client(tenant_admin, tool_reg) as client,
     ):
         assert client.get("/api/admin/console/tools").status_code == 200

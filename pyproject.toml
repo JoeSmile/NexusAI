@@ -113,7 +113,7 @@ build-backend = "hatchling.build"
 package = false
 
 [tool.hatch.build.targets.wheel]
-packages = ["backend", "packages"]
+packages = ["backend", "packages", "apps"]
 
 [tool.uv.sources]
 # 可以在这里指定自定义源，例如阿里云镜像

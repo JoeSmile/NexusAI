@@ -1,5 +1,11 @@
-# apps/memory-worker — 目标入口（未搬家）
+# apps/memory-worker — 部署名（进程）
 
-运行时仍在：`python -m backend.workers.memory_worker`
+可 import 包：`apps.memory_worker`（下划线）。
 
-见 [`tasks/75-layout-packages-wave.md`](../../tasks/75-layout-packages-wave.md)。
+```bash
+python -m apps.memory_worker
+# 兼容 shim：
+python -m backend.workers.memory_worker
+```
+
+代码：`apps/memory_worker/worker.py` · `heartbeat.py`

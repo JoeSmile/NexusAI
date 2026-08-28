@@ -1,7 +1,7 @@
 """Task 38.03 — 账号认证路由单测。
 
 镜像 `tests/test_ab_router.py` 的桩模式: FastAPI() + include auth router +
-MagicMock session + monkeypatch `backend.routers.auth.get_pg_session`。
+MagicMock session + monkeypatch `apps.api.routers.auth.get_pg_session`。
 失败计数走进程内降级 (monkeypatch `get_sync_redis` → None),fixture 清 `_fail_fallback`。
 """
 
@@ -16,8 +16,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from packages.auth import password as pw_mod
-from backend.routers import auth as auth_mod
-from backend.routers.auth import router
+from apps.api.routers import auth as auth_mod
+from apps.api.routers.auth import router
 
 
 # ── password 工具单测(无 DB) ────────────────────────────────────

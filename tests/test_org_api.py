@@ -14,8 +14,8 @@ from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
 from backend.core.org.models import normalize_business_roles
 from backend.core.org.service import compute_child_path, rewrite_subtree_paths
-from backend.routers import org as org_mod
-from backend.routers.org import router
+from apps.api.routers import org as org_mod
+from apps.api.routers.org import router
 
 
 def test_compute_child_path():

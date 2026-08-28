@@ -15,7 +15,7 @@ from backend.database.pgvector_session import (
     get_pg_session,
 )
 from packages.pipeline.exact_cache import exact_cache_key, invalidate_exact_cache
-from backend.routers.workflow_runs import _run_dict
+from apps.api.routers.workflow_runs import _run_dict
 
 
 def _tenant(tid: str) -> tuple[TenantContext, OrgScope]:

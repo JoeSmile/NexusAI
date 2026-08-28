@@ -10,8 +10,8 @@ from fastapi.testclient import TestClient
 
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
-from backend.routers import memory as memory_mod
-from backend.routers.memory import router as memory_router
+from apps.api.routers import memory as memory_mod
+from apps.api.routers.memory import router as memory_router
 
 
 @pytest.fixture

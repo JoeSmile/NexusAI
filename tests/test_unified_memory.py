@@ -449,7 +449,7 @@ def test_require_memory_admin_roles() -> None:
     from fastapi import HTTPException
 
     from packages.auth.models import TenantContext
-    from backend.routers.memory import _require_memory_admin
+    from apps.api.routers.memory import _require_memory_admin
 
     admin = TenantContext(
         tenant_id="t1",

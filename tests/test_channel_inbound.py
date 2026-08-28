@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from backend.modules.channel.inbound import InboundMessage
-from backend.routers.channel_webhooks import router
+from apps.api.routers.channel_webhooks import router
 
 
 def test_inbound_conversation_id_normalized() -> None:

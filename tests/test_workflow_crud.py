@@ -20,7 +20,7 @@ from packages.capability.registry import CapabilityRegistry
 from backend.core.org.scope import OrgScope
 from packages.workflow import service as wf_svc
 from backend.database.pgvector_session import Workflow, get_pg_session
-from backend.routers.workflows import router
+from apps.api.routers.workflows import router
 
 
 @pytest.fixture
@@ -329,7 +329,7 @@ def test_api_list_and_get(admin, org_scope, cap_reg, monkeypatch):
     app.dependency_overrides[verify_human_or_legacy_key] = _auth
 
     monkeypatch.setattr(
-        "backend.routers.workflows.resolve_org_scope",
+        "apps.api.routers.workflows.resolve_org_scope",
         lambda *a, **k: org_scope,
     )
 

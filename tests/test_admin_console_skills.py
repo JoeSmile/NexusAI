@@ -14,7 +14,7 @@ from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
 from backend.core.errors import NexusAIException, nexusai_exception_handler
 from backend.database.pgvector_session import SkillAsset
-from backend.routers.admin_console import router
+from apps.api.routers.admin_console import router
 
 
 def _row(
@@ -62,11 +62,11 @@ def test_skill_list_and_detail(super_admin: TenantContext) -> None:
     row = _row()
     with (
         patch(
-            "backend.routers.admin_console_skills.list_skill_assets",
+            "apps.api.routers.admin_console_skills.list_skill_assets",
             return_value=[row],
         ),
         patch(
-            "backend.routers.admin_console_skills.evolution_stats",
+            "apps.api.routers.admin_console_skills.evolution_stats",
             return_value={
                 "total": 1,
                 "by_status": {"draft": 1, "published": 0, "deprecated": 0},
@@ -76,7 +76,7 @@ def test_skill_list_and_detail(super_admin: TenantContext) -> None:
             },
         ),
         patch(
-            "backend.routers.admin_console_skills._resolve_asset",
+            "apps.api.routers.admin_console_skills._resolve_asset",
             return_value=row,
         ),
         _client(super_admin) as client,
@@ -99,15 +99,15 @@ def test_skill_publish_and_deprecate(super_admin: TenantContext) -> None:
     deprecated = _row(status="deprecated", name="console_skill")
     with (
         patch(
-            "backend.routers.admin_console_skills._resolve_asset",
+            "apps.api.routers.admin_console_skills._resolve_asset",
             side_effect=[draft, draft, published, published],
         ),
         patch(
-            "backend.routers.admin_console_skills.publish",
+            "apps.api.routers.admin_console_skills.publish",
             return_value=published,
         ) as pub,
         patch(
-            "backend.routers.admin_console_skills.deprecate",
+            "apps.api.routers.admin_console_skills.deprecate",
             return_value=deprecated,
         ) as dep,
         _client(super_admin) as client,
@@ -127,11 +127,11 @@ def test_skill_reject_draft(super_admin: TenantContext) -> None:
     draft = _row(status="draft")
     with (
         patch(
-            "backend.routers.admin_console_skills._resolve_asset",
+            "apps.api.routers.admin_console_skills._resolve_asset",
             return_value=draft,
         ),
         patch(
-            "backend.routers.admin_console_skills.reject_draft",
+            "apps.api.routers.admin_console_skills.reject_draft",
             return_value=True,
         ) as rej,
         _client(super_admin) as client,
@@ -145,11 +145,11 @@ def test_skill_publish_gate_error(super_admin: TenantContext) -> None:
     draft = _row(status="draft")
     with (
         patch(
-            "backend.routers.admin_console_skills._resolve_asset",
+            "apps.api.routers.admin_console_skills._resolve_asset",
             return_value=draft,
         ),
         patch(
-            "backend.routers.admin_console_skills.publish",
+            "apps.api.routers.admin_console_skills.publish",
             side_effect=HTTPException(
                 status_code=400,
                 detail={"code": "GATE_SECRET", "message": "secret_detected"},
