@@ -204,7 +204,7 @@ async def resolve_chat_model_for_request(
 
 async def resolve_tenant_credential(tenant_id: str, model: str) -> LLMKey:
     """Resolve chat credential by exact model name; no env fallback."""
-    from backend.core.llm_key_pool import pick_key_from_chain
+    from packages.llm_key_pool import pick_key_from_chain
 
     model = (model or "").strip()
     if not model:
