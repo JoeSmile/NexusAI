@@ -455,7 +455,7 @@ class LLMHarness(Harness):
             ) -> AsyncIterator[str]:
                 from openai import AsyncOpenAI
 
-                from backend.core.openai_http import openai_client_kwargs
+                from packages.openai_http import openai_client_kwargs
 
                 client = AsyncOpenAI(
                     api_key=plain_key,
@@ -546,7 +546,7 @@ class LLMHarness(Harness):
             current_model = attempt_model
 
             async def _once(plain_key: str, url: str, *, m: str = current_model) -> str:
-                from backend.core.openai_http import openai_client_kwargs
+                from packages.openai_http import openai_client_kwargs
 
                 client = AsyncOpenAI(
                     api_key=plain_key,

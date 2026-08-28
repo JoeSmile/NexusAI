@@ -174,7 +174,7 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
     try:
-        from backend.core.openai_http import aclose_openai_http_clients
+        from packages.openai_http import aclose_openai_http_clients
 
         await aclose_openai_http_clients()
     except Exception:

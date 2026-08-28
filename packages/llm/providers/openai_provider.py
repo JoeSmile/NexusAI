@@ -26,7 +26,7 @@ class OpenAIProvider(BaseLLMProvider):
         """
         super().__init__(api_key, base_url)
 
-        from backend.core.openai_http import openai_client_kwargs
+        from packages.openai_http import openai_client_kwargs
 
         self.client = AsyncOpenAI(
             api_key=api_key,

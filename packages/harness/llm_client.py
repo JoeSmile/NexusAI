@@ -184,7 +184,7 @@ def _complete_via_provider_unlocked(
         ]
 
     def _call(plain_key: str, url: str) -> str:
-        from backend.core.openai_http import openai_sync_client_kwargs
+        from packages.openai_http import openai_sync_client_kwargs
 
         client = OpenAI(
             api_key=plain_key,

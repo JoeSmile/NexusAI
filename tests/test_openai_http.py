@@ -1,6 +1,6 @@
 """Shared OpenAI httpx clients are process-level, not per request."""
 
-from backend.core.openai_http import (
+from packages.openai_http import (
     _LIMITS,
     openai_async_http_client,
     openai_sync_http_client,
