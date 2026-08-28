@@ -72,7 +72,7 @@ def _encrypt_headers(headers: dict[str, str]) -> str | None:
     if not headers:
         return None
     try:
-        from backend.core.key_manager import KeyManager
+        from packages.key_manager import KeyManager
 
         return KeyManager().encrypt(json.dumps(headers, ensure_ascii=False))
     except Exception as exc:
@@ -84,7 +84,7 @@ def _decrypt_headers(blob: str | None) -> dict[str, str]:
     if not blob:
         return {}
     try:
-        from backend.core.key_manager import KeyManager
+        from packages.key_manager import KeyManager
 
         raw = json.loads(KeyManager().decrypt(blob))
         if isinstance(raw, dict):

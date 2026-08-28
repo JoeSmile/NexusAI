@@ -450,7 +450,7 @@ def _llm_key_row_dict(r) -> dict:
     enc = getattr(r, "encrypted_key", None)
     if enc:
         try:
-            from backend.core.key_manager import KeyManager
+            from packages.key_manager import KeyManager
 
             key_preview = _mask_api_key(KeyManager().decrypt(enc), edge=8)
         except Exception:
@@ -528,7 +528,7 @@ async def create_llm_key(
     tenant: TenantContext = Depends(require_permission("admin:llm_key")),
 ):
     """创建单条凭证：备注名 + Key + 模型名 + Base URL；provider=chat|embedding。"""
-    from backend.core.key_manager import KeyManager
+    from packages.key_manager import KeyManager
 
     purpose = _normalize_purpose(req.provider)
     allowed_models = _normalize_single_model(
@@ -638,7 +638,7 @@ async def patch_llm_key(
     tenant: TenantContext = Depends(require_permission("admin:llm_key")),
 ):
     """更新凭证元数据（可选轮换明文 key）；不可改 purpose。"""
-    from backend.core.key_manager import KeyManager
+    from packages.key_manager import KeyManager
 
     params: dict[str, object] = {"id": key_id}
 

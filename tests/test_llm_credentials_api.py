@@ -187,7 +187,7 @@ def admin_client(monkeypatch, store_session: _StoreSession):
         enc[4:] if isinstance(enc, str) and enc.startswith("enc-") else "sk-abcdefghijklmnop"
     )
     monkeypatch.setattr(
-        "backend.core.key_manager.KeyManager",
+        "packages.key_manager.KeyManager",
         lambda *a, **k: km,
     )
 

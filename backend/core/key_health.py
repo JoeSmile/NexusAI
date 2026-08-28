@@ -8,7 +8,7 @@ from datetime import datetime
 
 from sqlalchemy import text
 
-from backend.core.key_manager import KeyManager
+from packages.key_manager import KeyManager
 from packages.key_repository import (
     LLMKeyRepository,
     _max_consecutive_failures,

@@ -96,7 +96,7 @@ async def lifespan(app: FastAPI):
         logger.debug("schedule scanner skipped: %s", e)
 
     try:
-        from backend.core.key_manager import KeyManager
+        from packages.key_manager import KeyManager
 
         KeyManager()
         logger.info("✓ KeyManager 就绪")
