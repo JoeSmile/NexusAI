@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-import backend.core.key_failover as key_failover
+import packages.key_failover as key_failover
 import packages.key_repository as key_repo
 
 

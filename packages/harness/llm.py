@@ -430,7 +430,7 @@ class LLMHarness(Harness):
         max_tokens: int | None,
         key_provider: str,
     ) -> AsyncIterator[str]:
-        from backend.core.key_failover import should_try_next_model, stream_with_key_failover
+        from packages.key_failover import should_try_next_model, stream_with_key_failover
         from packages.key_repository import LLMKeyRepository
 
         repo = LLMKeyRepository()
@@ -521,7 +521,7 @@ class LLMHarness(Harness):
         """OpenAI-compatible API with model-scoped key chain + model fallback (Task 72)."""
         from openai import AsyncOpenAI
 
-        from backend.core.key_failover import call_with_key_failover, should_try_next_model
+        from packages.key_failover import call_with_key_failover, should_try_next_model
         from packages.key_repository import LLMKeyRepository
         from packages.harness.provider import get_llm_provider, save_fixture
 

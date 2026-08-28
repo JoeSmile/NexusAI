@@ -159,7 +159,7 @@ def _complete_via_provider_unlocked(
 
     from openai import OpenAI
 
-    from backend.core.key_failover import call_with_key_failover_sync
+    from packages.key_failover import call_with_key_failover_sync
     from packages.key_repository import LLMKey
 
     keys = list(key_chain) if key_chain else _load_key_chain_sync(tenant_id, key_provider)
