@@ -20,7 +20,7 @@ MAX_DELIVERIES = int(os.getenv("MEMORY_MAX_DELIVERIES", "3") or "3")
 
 
 def _client():
-    from backend.core.redis_tools import get_sync_redis
+    from packages.redis_tools import get_sync_redis
 
     # I-5(评审 08-15)：队列独立 db(1)，与缓存/限流(db 0)隔离
     return get_sync_redis(decode_responses=True, db=1)

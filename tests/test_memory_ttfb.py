@@ -85,7 +85,7 @@ def test_read_second_hit_skips_db(monkeypatch) -> None:
     fake = _FakeRedis()
     counter = {"queries": 0}
     monkeypatch.setattr(
-        "backend.core.redis_tools.get_sync_redis", lambda **_k: fake
+        "packages.redis_tools.get_sync_redis", lambda **_k: fake
     )
     monkeypatch.setattr(
         "packages.memory.memory_service.get_pg_session", lambda: _Factory(counter)
@@ -105,7 +105,7 @@ def test_write_invalidates_bundle_cache(monkeypatch) -> None:
     fake = _FakeRedis()
     counter = {"queries": 0}
     monkeypatch.setattr(
-        "backend.core.redis_tools.get_sync_redis", lambda **_k: fake
+        "packages.redis_tools.get_sync_redis", lambda **_k: fake
     )
     monkeypatch.setattr(
         "packages.memory.memory_service.get_pg_session", lambda: _Factory(counter)
@@ -130,7 +130,7 @@ def test_write_invalidates_bundle_cache(monkeypatch) -> None:
 def test_read_without_redis_still_works(monkeypatch) -> None:
     counter = {"queries": 0}
     monkeypatch.setattr(
-        "backend.core.redis_tools.get_sync_redis", lambda **_k: None
+        "packages.redis_tools.get_sync_redis", lambda **_k: None
     )
     monkeypatch.setattr(
         "packages.memory.memory_service.get_pg_session", lambda: _Factory(counter)
@@ -147,7 +147,7 @@ def test_read_cache_does_not_mix_view_params(monkeypatch) -> None:
     fake = _FakeRedis()
     counter = {"queries": 0}
     monkeypatch.setattr(
-        "backend.core.redis_tools.get_sync_redis", lambda **_k: fake
+        "packages.redis_tools.get_sync_redis", lambda **_k: fake
     )
     monkeypatch.setattr(
         "packages.memory.memory_service.get_pg_session", lambda: _Factory(counter)

@@ -23,7 +23,7 @@ class PerformanceOptimizer:
     """使用 redis.asyncio 的性能优化器（惰性连接，失败降级；Task 35 经 redis_tools）。"""
 
     def __init__(self, redis_url: str | None = None):
-        from backend.core.redis_tools import resolve_redis_url
+        from packages.redis_tools import resolve_redis_url
 
         self._redis_url = redis_url or resolve_redis_url()
         self._redis = None
@@ -33,7 +33,7 @@ class PerformanceOptimizer:
     async def _ensure_redis(self):
         if self._redis is not None:
             return self._redis
-        from backend.core.redis_tools import get_async_redis
+        from packages.redis_tools import get_async_redis
 
         # 共享进程级 async 客户端；URL 已由 redis_tools 解析
         self._redis = await get_async_redis(decode_responses=True)
@@ -321,7 +321,7 @@ class CacheManager:
         *,
         tenant_id: str = "default",
     ) -> Any:
-        from backend.core.redis_tools import async_acquire_lock, async_release_lock
+        from packages.redis_tools import async_acquire_lock, async_release_lock
 
         ttl = ttl or self.default_ttl
         tid = tenant_id or "default"

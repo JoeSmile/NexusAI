@@ -22,7 +22,7 @@ class _FakeRedis:
 def fake_redis(monkeypatch: pytest.MonkeyPatch) -> _FakeRedis:
     fake = _FakeRedis()
     monkeypatch.setattr(
-        "backend.core.redis_tools.get_sync_redis", lambda **_k: fake
+        "packages.redis_tools.get_sync_redis", lambda **_k: fake
     )
     return fake
 
@@ -49,7 +49,7 @@ def test_chat_limit_sets_ttl(fake_redis: _FakeRedis, monkeypatch: pytest.MonkeyP
 def test_chat_limit_redis_down_allows(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CHAT_RATE_LIMIT_PER_MIN", "1")
     monkeypatch.setattr(
-        "backend.core.redis_tools.get_sync_redis", lambda **_k: None
+        "packages.redis_tools.get_sync_redis", lambda **_k: None
     )
     from backend.core.rate_limiter import check_rate_limit
 

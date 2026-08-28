@@ -26,7 +26,7 @@ def _reset_sem(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("LLM_CONCURRENCY_LIMIT", "2")
     monkeypatch.setenv("LLM_CONCURRENCY_ACQUIRE_TIMEOUT_S", "0.3")
     monkeypatch.setattr(
-        "backend.core.redis_tools.get_ratelimit_sync_redis",
+        "packages.redis_tools.get_ratelimit_sync_redis",
         lambda **_k: None,
     )
     reset_llm_concurrency_for_tests()
@@ -358,7 +358,7 @@ class _FakeInflightRedis:
 def fake_inflight_redis(monkeypatch: pytest.MonkeyPatch) -> _FakeInflightRedis:
     fake = _FakeInflightRedis()
     monkeypatch.setattr(
-        "backend.core.redis_tools.get_ratelimit_sync_redis",
+        "packages.redis_tools.get_ratelimit_sync_redis",
         lambda **_k: fake,
     )
     return fake
@@ -418,7 +418,7 @@ async def test_redis_error_does_not_500(monkeypatch: pytest.MonkeyPatch):
             raise ConnectionError("redis down")
 
     monkeypatch.setattr(
-        "backend.core.redis_tools.get_ratelimit_sync_redis",
+        "packages.redis_tools.get_ratelimit_sync_redis",
         lambda **_k: _Boom(),
     )
     monkeypatch.setenv("LLM_CONCURRENCY_LIMIT", "2")

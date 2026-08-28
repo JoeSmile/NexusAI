@@ -42,7 +42,7 @@ def check_endpoint_rate_limit(
     if limit_per_min <= 0:
         return None
     try:
-        from backend.core.redis_tools import get_sync_redis
+        from packages.redis_tools import get_sync_redis
 
         client = get_sync_redis(decode_responses=True)
     except Exception:

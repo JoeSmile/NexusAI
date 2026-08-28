@@ -180,7 +180,7 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
     try:
-        from backend.core.redis_tools import close_async_redis
+        from packages.redis_tools import close_async_redis
 
         await close_async_redis()
     except Exception:

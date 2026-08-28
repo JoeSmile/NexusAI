@@ -17,7 +17,7 @@ def _reload_registry(monkeypatch):
     # Task 29: 避免本地 redis-stack 污染 L2 命中,导致 API mock 未被调用
     monkeypatch.setenv("RAG_CACHE_ENABLED", "false")
     monkeypatch.setattr(
-        "backend.core.redis_tools.get_ratelimit_sync_redis",
+        "packages.redis_tools.get_ratelimit_sync_redis",
         lambda **_k: None,
     )
     rag_cache.reset_redis_for_tests()

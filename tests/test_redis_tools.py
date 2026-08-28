@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from backend.core import redis_tools
+from packages import redis_tools
 
 
 @pytest.fixture(autouse=True)
@@ -33,7 +33,7 @@ def test_get_sync_redis_retries_after_ttl() -> None:
     ok.ping.return_value = True
     t0 = 1000.0
     with (
-        patch("backend.core.redis_tools.time.monotonic", side_effect=[t0, t0 + 1.0]),
+        patch("packages.redis_tools.time.monotonic", side_effect=[t0, t0 + 1.0]),
         patch("redis.Redis.from_url", return_value=boom),
     ):
         assert redis_tools.get_sync_redis() is None
@@ -42,7 +42,7 @@ def test_get_sync_redis_retries_after_ttl() -> None:
 
     with (
         patch(
-            "backend.core.redis_tools.time.monotonic",
+            "packages.redis_tools.time.monotonic",
             return_value=t0 + redis_tools.RETRY_AFTER_SEC + 1.0,
         ),
         patch("redis.Redis.from_url", return_value=ok),
@@ -119,7 +119,7 @@ async def test_get_async_redis_degrades() -> None:
 async def test_get_async_redis_retries_after_ttl() -> None:
     t0 = 2000.0
     with (
-        patch("backend.core.redis_tools.time.monotonic", side_effect=[t0, t0 + 1.0]),
+        patch("packages.redis_tools.time.monotonic", side_effect=[t0, t0 + 1.0]),
         patch(
             "redis.asyncio.from_url",
             side_effect=ConnectionError("down"),
@@ -132,7 +132,7 @@ async def test_get_async_redis_retries_after_ttl() -> None:
     client.ping = AsyncMock(return_value=True)
     with (
         patch(
-            "backend.core.redis_tools.time.monotonic",
+            "packages.redis_tools.time.monotonic",
             return_value=t0 + redis_tools.RETRY_AFTER_SEC + 1.0,
         ),
         patch("redis.asyncio.from_url", return_value=client),

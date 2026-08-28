@@ -20,7 +20,7 @@ import os
 import time
 from typing import Any
 
-from backend.core.redis_tools import get_sync_redis
+from packages.redis_tools import get_sync_redis
 from packages.social.exceptions import TikHubRateLimitError
 
 logger = logging.getLogger(__name__)

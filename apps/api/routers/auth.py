@@ -17,7 +17,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from packages.audit import log_audit
-from backend.core.redis_tools import get_sync_redis
+from packages.redis_tools import get_sync_redis
 from backend.database.pgvector_session import get_pg_session
 from packages.auth.jwt_session import issue_access_token, jwt_ttl_seconds
 from packages.auth.password import hash_password, verify_password

@@ -67,7 +67,7 @@ def test_pick_key_round_robin_with_redis(monkeypatch):
     client = MagicMock()
     client.incr.side_effect = [1, 2, 3]
     monkeypatch.setattr(
-        "backend.core.redis_tools.get_sync_redis",
+        "packages.redis_tools.get_sync_redis",
         lambda decode_responses=True: client,
     )
     assert pick_key_from_chain(chain, tenant_id="t1", model="m1").id == "1"
@@ -81,7 +81,7 @@ def test_pick_key_no_redis_returns_first(monkeypatch):
         LLMKey("2", "t1", "chat", "https://b", "k2", 2, True, None),
     ]
     monkeypatch.setattr(
-        "backend.core.redis_tools.get_sync_redis",
+        "packages.redis_tools.get_sync_redis",
         lambda decode_responses=True: None,
     )
     assert pick_key_from_chain(chain, tenant_id="t1", model="m1").id == "1"
@@ -132,7 +132,7 @@ async def test_resolve_tenant_credential_round_robin(monkeypatch, decrypt_ok):
     client = MagicMock()
     client.incr.side_effect = [1, 2]
     monkeypatch.setattr(
-        "backend.core.redis_tools.get_sync_redis",
+        "packages.redis_tools.get_sync_redis",
         lambda decode_responses=True: client,
     )
 

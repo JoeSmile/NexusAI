@@ -79,7 +79,7 @@ def get_redis():
     """惰性同步 redis 客户端;失败返回 None(静默降级)。"""
     if not rag_cache_enabled():
         return None
-    from backend.core.redis_tools import get_sync_redis
+    from packages.redis_tools import get_sync_redis
 
     return get_sync_redis(decode_responses=False)
 
@@ -87,7 +87,7 @@ def get_redis():
 def reset_redis_for_tests() -> None:
     """测试用:重置惰性连接与失败标志。"""
     global _stats
-    from backend.core.redis_tools import reset_redis_clients_for_tests
+    from packages.redis_tools import reset_redis_clients_for_tests
 
     reset_redis_clients_for_tests()
     _stats = {"l1_hit": 0, "l1_miss": 0, "l2_hit": 0, "l2_miss": 0}

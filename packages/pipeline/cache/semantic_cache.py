@@ -92,7 +92,7 @@ def _cosine(a: list[float], b: list[float]) -> float:
 
 
 def _redis():
-    from backend.core.redis_tools import get_sync_redis
+    from packages.redis_tools import get_sync_redis
 
     return get_sync_redis(decode_responses=True)
 
@@ -257,6 +257,6 @@ def try_apply_semantic_cache(state: PipelineState) -> bool:
 
 def reset_semantic_cache_for_tests() -> None:
     """测试用：清 redis 惰性连接。"""
-    from backend.core.redis_tools import reset_redis_clients_for_tests
+    from packages.redis_tools import reset_redis_clients_for_tests
 
     reset_redis_clients_for_tests()

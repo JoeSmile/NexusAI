@@ -56,7 +56,7 @@ def _day_bucket() -> str:
 
 def _redis():
     try:
-        from backend.core.redis_tools import get_sync_redis
+        from packages.redis_tools import get_sync_redis
 
         return get_sync_redis(decode_responses=True)
     except Exception as exc:

@@ -448,7 +448,7 @@ def _note_release() -> None:
 
 def _ratelimit_redis() -> object | None:
     try:
-        from backend.core.redis_tools import get_ratelimit_sync_redis
+        from packages.redis_tools import get_ratelimit_sync_redis
 
         return get_ratelimit_sync_redis(decode_responses=True)
     except Exception as exc:

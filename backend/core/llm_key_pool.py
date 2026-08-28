@@ -25,7 +25,7 @@ def pick_key_from_chain(
     tid = tenant_id or "default"
     m = (model or "").strip() or "default"
     try:
-        from backend.core.redis_tools import get_sync_redis
+        from packages.redis_tools import get_sync_redis
 
         client = get_sync_redis(decode_responses=True)
         if client is not None:

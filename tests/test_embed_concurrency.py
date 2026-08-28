@@ -20,7 +20,7 @@ def _reset(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("EMBED_BUCKET_LIMIT", "1")
     monkeypatch.setenv("LLM_CONCURRENCY_ACQUIRE_TIMEOUT_S", "0.3")
     monkeypatch.setattr(
-        "backend.core.redis_tools.get_ratelimit_sync_redis",
+        "packages.redis_tools.get_ratelimit_sync_redis",
         lambda **_k: None,
     )
     reset_llm_concurrency_for_tests()

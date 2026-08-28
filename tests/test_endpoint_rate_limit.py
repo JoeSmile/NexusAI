@@ -17,7 +17,7 @@ def test_endpoint_limit_independent_tenants(monkeypatch) -> None:
 
     fake = _R()
     monkeypatch.setattr(
-        "backend.core.redis_tools.get_sync_redis", lambda **_k: fake
+        "packages.redis_tools.get_sync_redis", lambda **_k: fake
     )
     from backend.core.rate_limiter import check_endpoint_rate_limit
 
@@ -28,7 +28,7 @@ def test_endpoint_limit_independent_tenants(monkeypatch) -> None:
 
 def test_endpoint_limit_redis_down_allows(monkeypatch) -> None:
     monkeypatch.setattr(
-        "backend.core.redis_tools.get_sync_redis", lambda **_k: None
+        "packages.redis_tools.get_sync_redis", lambda **_k: None
     )
     from backend.core.rate_limiter import check_endpoint_rate_limit
 

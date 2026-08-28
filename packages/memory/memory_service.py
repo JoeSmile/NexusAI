@@ -220,7 +220,7 @@ class UnifiedMemoryService:
         视图参数必须进 key：load_memory 与 hydrate 的 hot/cold 开关不同，
         短 key 会 30s 串包（拍板 2026-08-21 A）。失效仍扫 ``uid:*``。
         """
-        from backend.core.redis_tools import cache_key
+        from packages.redis_tools import cache_key
 
         view = (
             f"{session_id or '-'}:{int(hot_limit)}:"
@@ -229,7 +229,7 @@ class UnifiedMemoryService:
         return cache_key("mem", "bundle", self.tenant_id, f"{user_id}:{view}")
 
     def _invalidate_mem_bundle(self, user_id: str) -> None:
-        from backend.core.redis_tools import cache_key, get_sync_redis
+        from packages.redis_tools import cache_key, get_sync_redis
 
         client = get_sync_redis(decode_responses=True)
         if client is None:
@@ -252,7 +252,7 @@ class UnifiedMemoryService:
         include_cold: bool,
         cold_limit: int,
     ) -> MemoryBundle | None:
-        from backend.core.redis_tools import get_sync_redis
+        from packages.redis_tools import get_sync_redis
 
         client = get_sync_redis(decode_responses=True)
         if client is None:
@@ -291,7 +291,7 @@ class UnifiedMemoryService:
         include_cold: bool,
         cold_limit: int,
     ) -> None:
-        from backend.core.redis_tools import get_sync_redis
+        from packages.redis_tools import get_sync_redis
 
         client = get_sync_redis(decode_responses=True)
         if client is None:
