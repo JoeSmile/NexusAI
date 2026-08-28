@@ -9,12 +9,7 @@ from unittest.mock import patch
 import pytest
 
 from packages.config import Config, Environment, get_config
-from packages.exceptions import (
-    ConfigurationError,
-    DatabaseError,
-    NexusAIException,
-    ValidationError,
-)
+from packages.errors import ErrorCode, NexusAIException
 from packages.utils.formatters import format_error, format_response, format_timestamp
 from packages.utils.helpers import (
     calculate_similarity,
@@ -66,39 +61,28 @@ class TestConfig:
 
 
 class TestExceptions:
-    """异常测试"""
-    
-    def test_context_gate_exception(self):
-        """测试基础异常"""
-        exc = NexusAIException("测试错误", "TEST_ERROR")
+    """异常测试（统一 packages.errors）"""
+
+    def test_nexusai_exception(self):
+        """测试结构化业务异常"""
+        exc = NexusAIException("TEST_ERROR", "测试错误", detail="d1")
+        assert exc.code == "TEST_ERROR"
         assert exc.message == "测试错误"
-        assert exc.error_code == "TEST_ERROR"
-        
-        error_dict = exc.to_dict()
-        assert error_dict["error_code"] == "TEST_ERROR"
-        assert error_dict["message"] == "测试错误"
-    
-    def test_validation_error(self):
-        """测试验证异常"""
-        exc = ValidationError("验证失败", field="email", value="invalid")
-        assert exc.field == "email"
-        assert exc.value == "invalid"
-        
-        error_dict = exc.to_dict()
-        assert error_dict["field"] == "email"
-        assert error_dict["value"] == "invalid"
-    
-    def test_configuration_error(self):
-        """测试配置异常"""
-        exc = ConfigurationError("配置错误")
+        assert exc.detail == "d1"
+        assert "[TEST_ERROR]" in str(exc)
+
+    def test_validation_via_req_invalid(self):
+        """校验失败走 REQ_INVALID"""
+        exc = NexusAIException(ErrorCode.REQ_INVALID, "验证失败", detail="email")
+        assert exc.code == ErrorCode.REQ_INVALID
+        assert exc.message == "验证失败"
+
+    def test_internal_error(self):
+        """配置/内部失败走 SYS_001"""
+        exc = NexusAIException(ErrorCode.INTERNAL_ERROR, "配置错误")
         assert isinstance(exc, NexusAIException)
+        assert exc.code == ErrorCode.INTERNAL_ERROR
         assert exc.message == "配置错误"
-    
-    def test_database_error(self):
-        """测试数据库异常"""
-        exc = DatabaseError("数据库连接失败")
-        assert isinstance(exc, NexusAIException)
-        assert exc.message == "数据库连接失败"
 
 
 class TestValidators:
@@ -276,11 +260,10 @@ class TestIntegration:
     def test_exception_handling_chain(self):
         """测试异常处理链"""
         try:
-            raise ValidationError("测试验证错误", field="test")
-        except ValidationError as e:
-            error_dict = e.to_dict()
-            assert error_dict["error_code"] == "ValidationError"
-            assert error_dict["field"] == "test"
+            raise NexusAIException(ErrorCode.REQ_INVALID, "测试验证错误", detail="test")
+        except NexusAIException as e:
+            assert e.code == ErrorCode.REQ_INVALID
+            assert e.detail == "test"
     
     def test_validator_and_formatter_integration(self):
         """测试验证器和格式化器集成"""

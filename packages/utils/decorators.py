@@ -13,7 +13,7 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import Any
 
-from packages.exceptions import RateLimitError, ValidationError
+from packages.errors import ErrorCode, NexusAIException
 
 
 def retry(
@@ -140,9 +140,10 @@ def rate_limit(
             
             if not allowed:
                 retry_after = time_window
-                raise RateLimitError(
-                    message=f"Rate limit exceeded for {func.__name__}",
-                    retry_after=retry_after
+                raise NexusAIException(
+                    ErrorCode.RATE_LIMITED,
+                    f"Rate limit exceeded for {func.__name__}",
+                    headers={"Retry-After": str(int(retry_after))},
                 )
             
             return await func(*args, **kwargs)
@@ -250,20 +251,32 @@ def _validate_string(
 ):
     """验证字符串"""
     if min_length and len(text) < min_length:
-        raise ValidationError(f"Text too short. Minimum length: {min_length}")
-    
+        raise NexusAIException(
+            ErrorCode.REQ_INVALID,
+            f"Text too short. Minimum length: {min_length}",
+        )
+
     if max_length and len(text) > max_length:
-        raise ValidationError(f"Text too long. Maximum length: {max_length}")
-    
+        raise NexusAIException(
+            ErrorCode.REQ_INVALID,
+            f"Text too long. Maximum length: {max_length}",
+        )
+
     if allowed_chars:
         if not all(c in allowed_chars for c in text):
-            raise ValidationError(f"Text contains invalid characters. Allowed: {allowed_chars}")
-    
+            raise NexusAIException(
+                ErrorCode.REQ_INVALID,
+                f"Text contains invalid characters. Allowed: {allowed_chars}",
+            )
+
     if forbidden_words:
         text_lower = text.lower()
         for word in forbidden_words:
             if word.lower() in text_lower:
-                raise ValidationError(f"Forbidden word detected: {word}")
+                raise NexusAIException(
+                    ErrorCode.REQ_INVALID,
+                    f"Forbidden word detected: {word}",
+                )
 
 
 def log_execution(

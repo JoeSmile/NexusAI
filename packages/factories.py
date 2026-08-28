@@ -12,7 +12,7 @@ from typing import Any, TypeVar
 from packages.rag import RAGService
 
 from packages.config import get_config
-from packages.exceptions import ConfigurationError
+from packages.errors import ErrorCode, NexusAIException
 from packages.interfaces import (
     IChatEngine,
     IContextService,
@@ -46,7 +46,7 @@ class ChatEngineFactory(ServiceFactory):
             from packages.llm.core.llm_core import ChatEngine
             return ChatEngine(*args, **kwargs)
         except ImportError as e:
-            raise ConfigurationError(f"无法导入聊天引擎: {e}")
+            raise NexusAIException(ErrorCode.INTERNAL_ERROR, f"无法导入聊天引擎: {e}")
     
     def get_service_type(self) -> type[IChatEngine]:
         return IChatEngine
@@ -63,7 +63,7 @@ class ContextServiceFactory(ServiceFactory):
             _ = memory_service
             return ContextService(*args, **kwargs)
         except ImportError as e:
-            raise ConfigurationError(f"无法导入上下文服务: {e}") from e
+            raise NexusAIException(ErrorCode.INTERNAL_ERROR, f"无法导入上下文服务: {e}") from e
 
     def get_service_type(self) -> type[IContextService]:
         return IContextService
@@ -89,7 +89,7 @@ class DatabaseServiceFactory(ServiceFactory):
             from backend.database import DatabaseManager
             return DatabaseManager(*args, **kwargs)
         except ImportError as e:
-            raise ConfigurationError(f"无法导入数据库服务: {e}")
+            raise NexusAIException(ErrorCode.INTERNAL_ERROR, f"无法导入数据库服务: {e}")
     
     def get_service_type(self) -> type[IDatabaseService]:
         return IDatabaseService
@@ -104,7 +104,7 @@ class LoggerFactory(ServiceFactory):
             from backend.logging_config import get_logger
             return get_logger(name)
         except ImportError as e:
-            raise ConfigurationError(f"无法导入日志服务: {e}")
+            raise NexusAIException(ErrorCode.INTERNAL_ERROR, f"无法导入日志服务: {e}")
     
     def get_service_type(self) -> type[ILogger]:
         return ILogger
@@ -124,9 +124,10 @@ class ValidationServiceFactory(ServiceFactory):
                 from packages.utils.simple_validator import SimpleValidationService  # type: ignore
                 return SimpleValidationService(*args, **kwargs)
             except ImportError:
-                raise ConfigurationError(
+                raise NexusAIException(
+                    ErrorCode.INTERNAL_ERROR,
                     "无法导入验证服务: ValidationService 和 SimpleValidationService 都不可用。"
-                    "请确保 validation_service.py 或 core/utils/simple_validator.py 存在。"
+                    "请确保 validation_service.py 或 core/utils/simple_validator.py 存在。",
                 )
     
     def get_service_type(self) -> type[IValidationService]:
@@ -157,14 +158,14 @@ class ServiceRegistry:
                 if self._singletons[service_type] is None:
                     factory = self._factories.get(service_type)
                     if not factory:
-                        raise ConfigurationError(f"未注册的服务类型: {service_type}")
+                        raise NexusAIException(ErrorCode.INTERNAL_ERROR, f"未注册的服务类型: {service_type}")
                     self._singletons[service_type] = factory.create_service(*args, **kwargs)
                 return self._singletons[service_type]
             
             # 非单例，创建新实例
             factory = self._factories.get(service_type)
             if not factory:
-                raise ConfigurationError(f"未注册的服务类型: {service_type}")
+                raise NexusAIException(ErrorCode.INTERNAL_ERROR, f"未注册的服务类型: {service_type}")
             
             return factory.create_service(*args, **kwargs)
     

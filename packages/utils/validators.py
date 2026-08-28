@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from packages.exceptions import ValidationError
+from packages.errors import ErrorCode, NexusAIException
 
 # 正则表达式模式
 EMAIL_PATTERN = re.compile(
@@ -289,7 +289,7 @@ def validate_request_data(schema: dict[str, Any]):
             if request_data:
                 valid, error = validate_json_schema(request_data, schema)
                 if not valid:
-                    raise ValidationError(error)
+                    raise NexusAIException(ErrorCode.REQ_INVALID, error)
             
             return func(*args, **kwargs)
         
