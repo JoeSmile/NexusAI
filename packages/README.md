@@ -10,6 +10,6 @@
 | rag / llm / notification / channel / agent | 原 `backend/modules/*`（agent=MCP protocol） |
 | **agent_runtime** | 原 `backend/agent` 会话运行时（AgentCore / MemoryHub） |
 
-进程入口见 `apps/`。未搬：`backend/core` 其余散文件（`config`、`metrics_memory`、LLM key 族…）。已迁散文件含 `packages.metrics`、`packages.tenant` 等（见 `docs/REPO_LAYOUT.md` 对照表）。
+进程入口见 `apps/`。未搬：`backend/core` 其余散文件（`config`、`prompt_service`、`health`、`thread_pool`…）。已迁对照见 [`docs/REPO_LAYOUT.md`](../docs/REPO_LAYOUT.md)。
 
 地图：[`docs/REPO_LAYOUT.md`](../docs/REPO_LAYOUT.md)

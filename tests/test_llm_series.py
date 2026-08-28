@@ -1,4 +1,4 @@
-from backend.core.llm_series import (
+from packages.llm_series import (
     SERIES_DEFAULT_BASE_URL,
     default_base_url,
     infer_series_from_model,
