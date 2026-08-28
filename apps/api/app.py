@@ -221,7 +221,7 @@ def _lazy_include(
 
 def create_app() -> FastAPI:
     """创建并配置 FastAPI 应用实例。"""
-    from backend.core.production_guard import assert_production_security
+    from packages.production_guard import assert_production_security
     from packages.auth.jwt_session import assert_jwt_secret_strength
 
     assert_jwt_secret_strength()

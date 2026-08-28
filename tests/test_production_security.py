@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.core.production_guard import ProductionConfigError, assert_production_security
+from packages.production_guard import ProductionConfigError, assert_production_security
 
 
 def _strong() -> str:
@@ -52,7 +52,7 @@ def test_prod_compose_does_not_open_cors_or_record() -> None:
 def test_uploads_not_served_as_static() -> None:
     from pathlib import Path
 
-    text = Path("backend/app.py").read_text(encoding="utf-8")
+    text = Path("apps/api/app.py").read_text(encoding="utf-8")
     assert 'mount("/uploads"' not in text
     assert "StaticFiles(directory" in text  # playground only
 
