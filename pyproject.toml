@@ -178,7 +178,7 @@ files = [
   "backend/core/rate_limiter.py",
   "backend/core/metrics.py",
   "backend/core/cost_manager.py",
-  "backend/core/errors.py",
+  "packages/errors.py",
   "backend/core/tenant.py",
   "backend/core/health.py",
   "backend/core/circuit_breaker.py",
