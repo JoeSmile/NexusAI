@@ -7,7 +7,7 @@ import os
 
 from packages.guardrails.deny_list import deny_list_hit
 from backend.core.metrics import guardrails_blocked
-from backend.core.rate_limiter import check_rate_limit
+from packages.rate_limiter import check_rate_limit
 from backend.core.text_normalize import make_normalized_query_hash, normalize_text
 from backend.observability.decorators import observe
 from packages.pipeline.state import PipelineState

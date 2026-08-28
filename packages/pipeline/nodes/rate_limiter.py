@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from packages.errors import NexusAIException
-from backend.core.rate_limiter import check_rate_limit
+from packages.rate_limiter import check_rate_limit
 from backend.core.token_quota import check_token_quota, estimate_request_tokens
 from backend.observability.decorators import observe
 from packages.pipeline.state import PipelineState

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
-from backend.core.rate_limiter import check_endpoint_rate_limit
+from packages.rate_limiter import check_endpoint_rate_limit
 from backend.database import DatabaseManager
 from backend.logging_config import get_logger
 from backend.models import (

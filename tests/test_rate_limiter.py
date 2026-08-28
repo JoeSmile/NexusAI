@@ -29,7 +29,7 @@ def fake_redis(monkeypatch: pytest.MonkeyPatch) -> _FakeRedis:
 
 def test_chat_limit_shared_across_calls(fake_redis: _FakeRedis, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CHAT_RATE_LIMIT_PER_MIN", "2")
-    from backend.core.rate_limiter import check_rate_limit
+    from packages.rate_limiter import check_rate_limit
 
     assert check_rate_limit("t1") is True
     assert check_rate_limit("t1") is True
@@ -39,7 +39,7 @@ def test_chat_limit_shared_across_calls(fake_redis: _FakeRedis, monkeypatch: pyt
 
 def test_chat_limit_sets_ttl(fake_redis: _FakeRedis, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CHAT_RATE_LIMIT_PER_MIN", "10")
-    from backend.core.rate_limiter import check_rate_limit
+    from packages.rate_limiter import check_rate_limit
 
     check_rate_limit("t1")
     assert fake_redis.expires
@@ -51,7 +51,7 @@ def test_chat_limit_redis_down_allows(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "packages.redis_tools.get_sync_redis", lambda **_k: None
     )
-    from backend.core.rate_limiter import check_rate_limit
+    from packages.rate_limiter import check_rate_limit
 
     for _ in range(50):
         assert check_rate_limit("t1") is True
@@ -59,7 +59,7 @@ def test_chat_limit_redis_down_allows(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_chat_limit_disabled(fake_redis: _FakeRedis, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CHAT_RATE_LIMIT_PER_MIN", "0")
-    from backend.core.rate_limiter import check_rate_limit
+    from packages.rate_limiter import check_rate_limit
 
     for _ in range(5):
         assert check_rate_limit("t1") is True

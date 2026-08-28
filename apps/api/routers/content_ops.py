@@ -23,7 +23,7 @@ from packages.content_ops.style import (
     upsert_content_style,
 )
 from packages.content_ops.workflow_seed import ensure_builtin_hotspot_workflow
-from backend.core.rate_limiter import check_endpoint_rate_limit
+from packages.rate_limiter import check_endpoint_rate_limit
 from backend.database.pgvector_session import ContentArtifact, get_pg_session
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext

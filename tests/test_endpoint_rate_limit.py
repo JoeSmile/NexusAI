@@ -19,7 +19,7 @@ def test_endpoint_limit_independent_tenants(monkeypatch) -> None:
     monkeypatch.setattr(
         "packages.redis_tools.get_sync_redis", lambda **_k: fake
     )
-    from backend.core.rate_limiter import check_endpoint_rate_limit
+    from packages.rate_limiter import check_endpoint_rate_limit
 
     assert check_endpoint_rate_limit("t1", "dig", limit_per_min=1) is None
     assert check_endpoint_rate_limit("t1", "dig", limit_per_min=1) == 60
@@ -30,6 +30,6 @@ def test_endpoint_limit_redis_down_allows(monkeypatch) -> None:
     monkeypatch.setattr(
         "packages.redis_tools.get_sync_redis", lambda **_k: None
     )
-    from backend.core.rate_limiter import check_endpoint_rate_limit
+    from packages.rate_limiter import check_endpoint_rate_limit
 
     assert check_endpoint_rate_limit("t1", "dig", limit_per_min=1) is None
