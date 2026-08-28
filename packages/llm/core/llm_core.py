@@ -20,7 +20,7 @@ from backend.database import DatabaseManager, create_tables
 from backend.models import ChatResponse
 
 # 导入NexusAIPrompt配置
-from backend.system_prompt import (
+from packages.system_prompt import (
     SYSTEM_PROMPT,
     build_full_prompt,
     validate_and_filter_input,
