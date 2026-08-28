@@ -10,7 +10,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 
 from backend.database import ChatMessage, DatabaseManager, ResponseEvaluation
-from backend.evaluation_engine import EvaluationEngine
+from packages.evaluation_engine import EvaluationEngine
 from backend.logging_config import get_logger
 from backend.models import (
     BatchEvaluationRequest,

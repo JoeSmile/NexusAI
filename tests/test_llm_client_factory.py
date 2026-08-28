@@ -120,7 +120,7 @@ def test_record_without_api_key_raises(monkeypatch):
 
 
 def test_evaluation_engine_works_without_api_key(mock_provider):
-    from backend.evaluation_engine import EvaluationEngine
+    from packages.evaluation_engine import EvaluationEngine
 
     engine = EvaluationEngine()
     result = engine.evaluate_response(
