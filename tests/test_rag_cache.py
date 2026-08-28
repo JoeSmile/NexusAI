@@ -161,7 +161,7 @@ def _make_rag_service(llm_invoke, retrieve_docs=None):
 
 def test_l1_ask_second_hit(fake_redis, monkeypatch):
     monkeypatch.setattr(
-        "backend.core.audit.write_audit_sync", lambda *a, **k: None
+        "packages.audit.write_audit_sync", lambda *a, **k: None
     )
     calls = {"n": 0}
 
@@ -180,7 +180,7 @@ def test_l1_ask_second_hit(fake_redis, monkeypatch):
 
 def test_epoch_invalidates_l1(fake_redis, monkeypatch):
     monkeypatch.setattr(
-        "backend.core.audit.write_audit_sync", lambda *a, **k: None
+        "packages.audit.write_audit_sync", lambda *a, **k: None
     )
     calls = {"n": 0}
 
@@ -199,7 +199,7 @@ def test_epoch_invalidates_l1(fake_redis, monkeypatch):
 
 def test_single_flight_one_llm(fake_redis, monkeypatch):
     monkeypatch.setattr(
-        "backend.core.audit.write_audit_sync", lambda *a, **k: None
+        "packages.audit.write_audit_sync", lambda *a, **k: None
     )
     calls = {"n": 0}
     barrier = threading.Barrier(2)
@@ -228,7 +228,7 @@ def test_single_flight_one_llm(fake_redis, monkeypatch):
 def test_rate_limit_miss(fake_redis, monkeypatch):
     monkeypatch.setenv("RAG_RATE_LIMIT_MISS", "2")
     monkeypatch.setattr(
-        "backend.core.audit.write_audit_sync", lambda *a, **k: None
+        "packages.audit.write_audit_sync", lambda *a, **k: None
     )
 
     def invoke(prompt):
@@ -249,7 +249,7 @@ def test_redis_down_silent_degrade(monkeypatch):
     monkeypatch.setenv("RAG_CACHE_ENABLED", "true")
     monkeypatch.setattr(rag_cache, "get_redis", lambda: None)
     monkeypatch.setattr(
-        "backend.core.audit.write_audit_sync", lambda *a, **k: None
+        "packages.audit.write_audit_sync", lambda *a, **k: None
     )
 
     def invoke(prompt):
@@ -274,7 +274,7 @@ def test_cache_stats_entries_from_scan(fake_redis):
 
 def test_pii_skips_l1_cache(fake_redis, monkeypatch):
     monkeypatch.setattr(
-        "backend.core.audit.write_audit_sync", lambda *a, **k: None
+        "packages.audit.write_audit_sync", lambda *a, **k: None
     )
     calls = {"n": 0}
 
@@ -297,7 +297,7 @@ def test_miss_audit_carries_real_cost(fake_redis, monkeypatch):
     """miss 审计 cost 必须 = LLM 成本 + embedding 成本,不得硬编码 0(Task 29 review)。"""
     records: list[dict] = []
     monkeypatch.setattr(
-        "backend.core.audit.write_audit_sync", lambda rec: records.append(rec)
+        "packages.audit.write_audit_sync", lambda rec: records.append(rec)
     )
     monkeypatch.setattr("backend.core.cost_manager._price", lambda _n: 0.0001)
 
@@ -322,7 +322,7 @@ def test_embedding_cost_zero_on_l2_hit(fake_redis, monkeypatch):
 
     records: list[dict] = []
     monkeypatch.setattr(
-        "backend.core.audit.write_audit_sync", lambda rec: records.append(rec)
+        "packages.audit.write_audit_sync", lambda rec: records.append(rec)
     )
 
     def invoke(prompt):

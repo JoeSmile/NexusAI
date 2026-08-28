@@ -84,7 +84,7 @@ def audit_intent_drift(
     trace_id: str,
     assessment: DriftAssessment,
 ) -> None:
-    from backend.core.audit import write_audit_sync
+    from packages.audit import write_audit_sync
 
     explain = json.dumps(
         {

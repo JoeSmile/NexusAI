@@ -159,7 +159,7 @@ def _audit_schedule(
     output_text: str = "",
     error_code: str | None = None,
 ) -> None:
-    from backend.core.audit import write_audit_sync
+    from packages.audit import write_audit_sync
 
     write_audit_sync(
         {

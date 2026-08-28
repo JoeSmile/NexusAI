@@ -128,7 +128,7 @@ def _audit_failover(
     reason: str,
 ) -> None:
     try:
-        from backend.core.audit import write_audit_sync
+        from packages.audit import write_audit_sync
 
         write_audit_sync(
             {

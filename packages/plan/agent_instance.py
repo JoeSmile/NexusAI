@@ -10,7 +10,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from backend.core.audit import write_audit_sync
+from packages.audit import write_audit_sync
 
 
 class AgentInstanceStatus(StrEnum):

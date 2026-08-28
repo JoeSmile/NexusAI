@@ -83,7 +83,7 @@ async def test_vendor_risk_call_chain_and_audits(
             "packages.capability.registry.get_capability_registry",
             return_value=reg,
         ),
-        patch("backend.core.audit.write_audit_sync", side_effect=fake_audit),
+        patch("packages.audit.write_audit_sync", side_effect=fake_audit),
         patch(
             "backend.services.agent_service.get_agent_service",
             return_value=type(
@@ -140,7 +140,7 @@ async def test_non_leaf_child_uses_real_invoke(tenant: TenantContext) -> None:
             return_value=reg,
         ),
         patch("packages.capability.governance._redis", return_value=None),
-        patch("backend.core.audit.write_audit_sync"),
+        patch("packages.audit.write_audit_sync"),
         patch(
             "backend.services.agent_service.get_agent_service",
             return_value=type(
@@ -187,7 +187,7 @@ async def test_agent_depth_limit(
             "packages.capability.registry.get_capability_registry",
             return_value=reg,
         ),
-        patch("backend.core.audit.write_audit_sync"),
+        patch("packages.audit.write_audit_sync"),
         patch(
             "backend.services.agent_service.get_agent_service",
             return_value=type(

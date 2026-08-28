@@ -98,7 +98,7 @@ async def test_memory_hub_retrieve_uses_unified():
 def test_drop_poison_acks(monkeypatch):
     acked: list[str] = []
     monkeypatch.setattr(mq, "ack", lambda xid: acked.append(xid))
-    with patch("backend.core.audit.write_audit_sync"):
+    with patch("packages.audit.write_audit_sync"):
         with patch("backend.core.metrics_memory.record_dropped"):
             mq.drop_poison("9-0", {"tenant_id": "t", "user_id": "u", "key": "entity:x"}, deliveries=4)
     assert acked == ["9-0"]

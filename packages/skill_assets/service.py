@@ -12,7 +12,7 @@ from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from backend.core.audit import write_audit_sync
+from packages.audit import write_audit_sync
 from backend.database.embeddings import embed_text
 from backend.database.pgvector_session import SkillAsset, get_pg_session
 from packages.skill_assets.gates import GateReject, run_publish_gates

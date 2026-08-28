@@ -79,7 +79,7 @@ def process_one(xid: str, data: dict, *, deliveries: int = 1) -> float:
     import asyncio
     from datetime import datetime
 
-    from backend.core.audit import write_audit_sync
+    from packages.audit import write_audit_sync
 
     write_result = asyncio.run(
         mem.write(

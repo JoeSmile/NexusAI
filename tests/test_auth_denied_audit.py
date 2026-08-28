@@ -17,7 +17,7 @@ def test_http_401_writes_audit(monkeypatch) -> None:
         seen.append(record)
         return True
 
-    monkeypatch.setattr("backend.core.audit.write_audit_sync", _write)
+    monkeypatch.setattr("packages.audit.write_audit_sync", _write)
     req = Request({"type": "http", "method": "GET", "path": "/", "headers": []})
     exc = HTTPException(status_code=401, detail="missing_key")
     resp = asyncio.run(http_exception_audit_handler(req, exc))

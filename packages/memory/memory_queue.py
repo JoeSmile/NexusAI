@@ -179,7 +179,7 @@ def drop_poison(xid: str, data: dict[str, Any], *, deliveries: int) -> None:
     """超重试上限：XACK + 审计 memory.dropped + 指标。"""
     ack(xid)
     try:
-        from backend.core.audit import write_audit_sync
+        from packages.audit import write_audit_sync
         from backend.core.metrics_memory import record_dropped
 
         write_audit_sync(

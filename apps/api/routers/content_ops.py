@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 
-from backend.core.audit import write_audit_sync
+from packages.audit import write_audit_sync
 from packages.content_ops.dig_persist import persist_dig_result
 from packages.content_ops.hotspot import HotspotCrawlError, dig_hotspots
 from packages.content_ops.offerings import get_offering, list_offerings

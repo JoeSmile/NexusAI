@@ -12,7 +12,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from backend.core.audit import log_audit
+from packages.audit import log_audit
 from backend.core.audit_context import bind_audit_lineage
 from packages.billing.context import bind_billing_context
 from packages.errors import ErrorCode, NexusAIException

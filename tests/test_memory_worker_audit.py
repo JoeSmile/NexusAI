@@ -20,7 +20,7 @@ def test_process_one_audits_accepted_write():
     ), patch(
         "packages.memory.memory_service.get_unified_memory_service"
     ) as get_mem, patch(
-        "backend.core.audit.write_audit_sync",
+        "packages.audit.write_audit_sync",
         side_effect=lambda r: audits.append(r) or True,
     ), patch(
         "backend.core.metrics_memory.record_worker_heartbeat"
@@ -63,7 +63,7 @@ def test_process_one_refuses_ack_when_audit_fails():
     ), patch(
         "packages.memory.memory_service.get_unified_memory_service"
     ) as get_mem, patch(
-        "backend.core.audit.write_audit_sync", return_value=False
+        "packages.audit.write_audit_sync", return_value=False
     ), patch(
         "backend.core.metrics_memory.record_worker_heartbeat"
     ):

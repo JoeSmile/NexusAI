@@ -249,7 +249,7 @@ class RAGService:
         """
         import uuid
 
-        from backend.core.audit import write_audit_sync
+        from packages.audit import write_audit_sync
         from packages.rag.cache import (
             acquire_lock,
             check_rate_limit,

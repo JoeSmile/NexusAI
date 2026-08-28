@@ -9,7 +9,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from backend.core.audit import write_audit_sync
+from packages.audit import write_audit_sync
 from packages.guardrails.config_store import (
     RISK_LEVELS,
     create_rule,

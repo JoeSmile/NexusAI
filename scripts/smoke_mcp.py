@@ -108,7 +108,7 @@ async def _run_smoke(*, with_governance: bool = True) -> dict[str, Any]:
             patch("packages.capability.invoke.get_capability_registry", return_value=reg),
             patch("packages.capability.governance._redis", return_value=None),
             patch(
-                "backend.core.audit.write_governance_audit",
+                "packages.audit.write_governance_audit",
                 side_effect=_capture_audit,
             ),
         ):

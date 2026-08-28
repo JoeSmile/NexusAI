@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.core import audit as audit_mod
+import packages.audit as audit_mod
 
 
 @pytest.fixture(autouse=True)

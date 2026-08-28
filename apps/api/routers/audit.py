@@ -196,7 +196,7 @@ async def trace_replay_events(
     """单 trace 回放事件（audit:read；脱敏预览；不需 export 权限 — Task 63 拍板 1A）。"""
     from fastapi import HTTPException
 
-    from backend.core.audit import build_trace_replay_events
+    from packages.audit import build_trace_replay_events
 
     if not _can_query_audit(tenant):
         raise HTTPException(
@@ -257,7 +257,7 @@ async def export_audit(
     """导出审计日志：默认 CSV；format=ndjson 为回放事件流（Task 56）。"""
     from fastapi import HTTPException
 
-    from backend.core.audit import ndjson_lines_from_rows
+    from packages.audit import ndjson_lines_from_rows
 
     if not _can_export_audit(tenant):
         raise HTTPException(

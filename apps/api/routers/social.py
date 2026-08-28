@@ -9,7 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from backend.core.audit import log_audit
+from packages.audit import log_audit
 from packages.social import service as social_svc
 from packages.social.exceptions import (
     PlatformNotOpenError,

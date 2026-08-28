@@ -8,7 +8,7 @@ import os
 import re
 from typing import Any
 
-from backend.core.audit import write_audit_sync
+from packages.audit import write_audit_sync
 from backend.core.audit_context import get_audit_lineage
 from packages.capability.invoke import capability_visible_to
 from packages.capability.registry import get_capability_registry

@@ -374,7 +374,7 @@ async def invoke(
         payload if isinstance(payload, dict) else {},
         check_permission=_check_permission,
     )
-    from backend.core.audit import write_governance_audit
+    from packages.audit import write_governance_audit
     from backend.core.audit_context import bind_audit_lineage, get_audit_lineage
     from backend.observability.langfuse_client import current_langfuse_trace_ids
 

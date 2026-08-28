@@ -109,7 +109,7 @@ async def health_check():
 
     # 6. 审计写入失败计数（Task 59 S3）
     try:
-        from backend.core.audit import audit_write_failure_count
+        from packages.audit import audit_write_failure_count
 
         failures = audit_write_failure_count()
         checks["audit"] = {"write_failures": failures}

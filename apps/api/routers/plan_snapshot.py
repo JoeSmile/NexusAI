@@ -6,7 +6,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from backend.core.audit import write_audit_sync
+from packages.audit import write_audit_sync
 from packages.auth.models import TenantContext
 from packages.auth.permissions import require_permission
 from packages.plan.event_bus import event_to_dict, get_run_bus_optional

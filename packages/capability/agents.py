@@ -98,7 +98,7 @@ def _audit_agent_invoke(
     error_code: str | None = None,
     trace_id: str = "",
 ) -> None:
-    from backend.core.audit import write_audit_sync
+    from packages.audit import write_audit_sync
 
     write_audit_sync(
         {

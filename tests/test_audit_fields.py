@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from unittest.mock import MagicMock
 
-from backend.core import audit as audit_mod
+import packages.audit as audit_mod
 
 
 def test_write_audit_sync_accepts_new_fields(monkeypatch) -> None:

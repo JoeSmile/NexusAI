@@ -86,7 +86,7 @@ async def test_orchestrator_execution_does_not_reclassify_l0(monkeypatch):
         fake_collect,
     )
     # Avoid hanging on Postgres when audit tries to connect (local/CI without DB).
-    monkeypatch.setattr("backend.core.audit._write_audit", lambda *_a, **_k: True)
+    monkeypatch.setattr("packages.audit._write_audit", lambda *_a, **_k: True)
     await execute_plan_ir(state, plan)
     assert len(detect_calls) == 1
 

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from backend.core.audit import write_audit_sync
+from packages.audit import write_audit_sync
 
 
 class LoopGuardError(Exception):

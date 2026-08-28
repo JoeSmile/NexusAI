@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 def _audit_health(action: str, key_id: int, detail: str) -> None:
     try:
-        from backend.core.audit import write_audit_sync
+        from packages.audit import write_audit_sync
 
         write_audit_sync(
             {

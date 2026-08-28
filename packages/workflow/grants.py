@@ -350,7 +350,7 @@ def renew_grant(
         origin=renew_origin,
     )
     session.add(new_grant)
-    from backend.core.audit import write_audit_sync
+    from packages.audit import write_audit_sync
 
     write_audit_sync(
         {
@@ -533,7 +533,7 @@ def expire_stale_approvals_for_node(
             f"{reason};grant_ttl_expired" if reason else "grant_ttl_expired"
         )
         n += 1
-        from backend.core.audit import write_audit_sync
+        from packages.audit import write_audit_sync
 
         write_audit_sync(
             {

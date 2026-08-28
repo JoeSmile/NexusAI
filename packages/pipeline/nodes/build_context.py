@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from backend.core.audit import write_audit_sync
+from packages.audit import write_audit_sync
 from packages.guardrails.output_guard import check_role_drift
 from packages.guardrails.rag_sanitize import sanitize_memory_bundle
 from packages.memory.memory_service import (

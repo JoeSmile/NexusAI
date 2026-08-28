@@ -176,7 +176,7 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
 
 def _audit_auth_failure(request: Request, code: str, message: str) -> None:
     try:
-        from backend.core.audit import write_audit_sync
+        from packages.audit import write_audit_sync
 
         tenant = getattr(request.state, "tenant_context", None)
         write_audit_sync(

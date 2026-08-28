@@ -9,7 +9,7 @@ import uuid
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-from backend.core.audit import write_audit_sync
+from packages.audit import write_audit_sync
 from packages.guardrails.rag_sanitize import sanitize_fragment
 
 from .blackboard_preprocess import preprocess_blackboard_write

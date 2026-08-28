@@ -8,7 +8,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from backend.core.audit import write_audit_sync
+from packages.audit import write_audit_sync
 from backend.database.pgvector_session import ApiKey, Notification, get_pg_session
 from packages.notification.channels import (
     ensure_default_providers,

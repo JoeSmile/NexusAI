@@ -346,7 +346,7 @@ async def invoke_mcp(
 
     subprocess_pid = result.pop("mcp_subprocess_pid", None)
     if subprocess_pid is not None:
-        from backend.core.audit import write_audit_sync
+        from packages.audit import write_audit_sync
         from backend.core.audit_context import get_audit_lineage
 
         lineage = get_audit_lineage()

@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.core import audit as audit_mod
+import packages.audit as audit_mod
 from packages.pipeline.nodes.analyze_parallel import analyze_parallel
 from packages.pipeline.state import make_initial_state
 
