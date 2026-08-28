@@ -7,7 +7,7 @@ RAG分块策略选择器
 import re
 from typing import Any
 
-from backend.logging_config import get_logger
+from packages.logging_config import get_logger
 
 from .chunking_strategies import (
     CharacterTextSplitter,

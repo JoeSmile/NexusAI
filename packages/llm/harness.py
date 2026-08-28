@@ -13,7 +13,7 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
-from backend.logging_config import get_logger
+from packages.logging_config import get_logger
 from config import Config
 
 logger = get_logger(__name__)

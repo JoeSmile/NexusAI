@@ -11,7 +11,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from backend.logging_config import get_logger
+from packages.logging_config import get_logger
 from backend.services.performance_optimizer import (
     cache_manager,
     performance_optimizer,

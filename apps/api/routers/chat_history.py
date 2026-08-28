@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from backend.database.pgvector_session import ChatMessage, get_pg_session
-from backend.logging_config import get_logger
+from packages.logging_config import get_logger
 from packages.auth.models import TenantContext
 from packages.auth.permissions import require_permission
 

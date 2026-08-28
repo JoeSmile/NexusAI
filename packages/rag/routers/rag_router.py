@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, ConfigDict
 
 from packages.errors import ErrorCode, NexusAIException
-from backend.logging_config import get_logger
+from packages.logging_config import get_logger
 from packages.auth.models import TenantContext
 from packages.auth.permissions import require_permission
 from packages.rag.cache import bump_epoch

@@ -11,7 +11,7 @@ from typing import Any
 
 from packages.errors import ErrorCode, NexusAIException
 from backend.database import vector_ops
-from backend.logging_config import get_logger
+from packages.logging_config import get_logger
 
 from .chunking_selector import ChunkingStrategySelector
 

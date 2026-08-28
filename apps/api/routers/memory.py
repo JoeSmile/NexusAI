@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from packages.audit import log_audit
 from packages.memory.memory_service import get_unified_memory_service
-from backend.logging_config import get_logger
+from packages.logging_config import get_logger
 from backend.services.context_service import ContextService
 from packages.auth.models import TenantContext
 from packages.auth.permissions import require_permission

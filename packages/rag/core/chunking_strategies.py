@@ -7,7 +7,7 @@ RAG分块策略模块
 import re
 from typing import Any
 
-from backend.logging_config import get_logger
+from packages.logging_config import get_logger
 
 from .langchain_compat import Document
 

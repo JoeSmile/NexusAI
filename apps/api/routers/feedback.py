@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
 from packages.rate_limiter import check_endpoint_rate_limit
 from backend.database import DatabaseManager
-from backend.logging_config import get_logger
+from packages.logging_config import get_logger
 from backend.models import (
     FeedbackListResponse,
     FeedbackMineItem,

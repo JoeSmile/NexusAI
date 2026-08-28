@@ -357,7 +357,7 @@ async def api_generate_script(
         )
         org = get_org_content_profile(session, tenant.tenant_id)
         from packages.content_ops.script_gen import build_script_prompt
-        from backend.logging_config import get_logger
+        from packages.logging_config import get_logger
 
         _log = get_logger(__name__)
         _prompt = build_script_prompt(

@@ -14,7 +14,7 @@ from functools import wraps
 from typing import Any
 
 from packages.thread_pool import get_thread_pool
-from backend.logging_config import get_logger
+from packages.logging_config import get_logger
 
 logger = get_logger(__name__)
 
