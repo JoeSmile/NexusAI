@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from backend.core.backup_prune import DEFAULT_KEEP, prune_backup_dir  # noqa: E402
+from packages.backup_prune import DEFAULT_KEEP, prune_backup_dir  # noqa: E402
 
 
 def main() -> int:

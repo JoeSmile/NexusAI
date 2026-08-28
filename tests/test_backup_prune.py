@@ -6,7 +6,7 @@ import os
 import time
 from pathlib import Path
 
-from backend.core.backup_prune import prune_backup_dir
+from packages.backup_prune import prune_backup_dir
 
 
 def test_prune_keeps_newest_14(tmp_path: Path) -> None:
