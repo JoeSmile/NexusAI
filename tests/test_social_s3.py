@@ -15,8 +15,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from backend.core.auth.dual_auth import verify_human_or_legacy_key
-from backend.core.auth.models import TenantContext
+from packages.auth.dual_auth import verify_human_or_legacy_key
+from packages.auth.models import TenantContext
 from backend.core.social.exceptions import SocialCostAlertError
 from backend.core.social.export_xlsx import HEADERS, build_analysis_xlsx
 from backend.core.social.service import (

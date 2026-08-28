@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from backend.core.auth.models import TenantContext
+from packages.auth.models import TenantContext
 from backend.core.capability.connectors.mcp_server import _sanitize_tool_arguments
 from backend.core.capability.governance_chain import run_governance_chain
 from backend.core.capability.mcp_registry import (

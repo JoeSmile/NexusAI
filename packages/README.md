@@ -3,8 +3,8 @@
 | 包 | 状态 | 现状路径 |
 |----|------|----------|
 | **intent** | ✅ 已落地 `packages/intent/` | 原 `backend/modules/intent` |
+| **auth** | ✅ 已落地 `packages/auth/`（75.1） | 原 `backend/core/auth` |
 | pipeline | 未搬 | `backend/pipeline` |
-| auth | 未搬 | `backend/core/auth` |
 | capability | 未搬 | `backend/core/capability` |
 | plan | 未搬 | `backend/core/plan` |
 | workflow | 未搬 | `backend/core/workflow` |

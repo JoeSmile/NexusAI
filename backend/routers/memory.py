@@ -7,9 +7,9 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from backend.core.audit import log_audit
-from backend.core.auth.models import TenantContext
-from backend.core.auth.permissions import require_permission
-from backend.core.auth.scope import assert_user_access, require_tenant_admin
+from packages.auth.models import TenantContext
+from packages.auth.permissions import require_permission
+from packages.auth.scope import assert_user_access, require_tenant_admin
 from backend.core.memory_service import get_unified_memory_service
 from backend.logging_config import get_logger
 from backend.services.context_service import ContextService

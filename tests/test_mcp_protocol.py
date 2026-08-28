@@ -117,7 +117,7 @@ def test_map_jsonrpc_error_codes() -> None:
 
 @pytest.mark.asyncio
 async def test_invoke_mcp_mock_echo(monkeypatch: pytest.MonkeyPatch) -> None:
-    from backend.core.auth.models import TenantContext
+    from packages.auth.models import TenantContext
     from backend.core.capability.connectors.mcp_server import invoke_mcp
     from backend.core.capability.models import CapabilitySpec, CapabilityStatus
 

@@ -7,8 +7,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
-from backend.core.auth.dual_auth import verify_human_or_legacy_key
-from backend.core.auth.models import TenantContext
+from packages.auth.dual_auth import verify_human_or_legacy_key
+from packages.auth.models import TenantContext
 from backend.core.org.scope import resolve_org_scope
 from backend.core.workflow import service as wf_svc
 from backend.core.workflow.models import WorkflowCreateBody, WorkflowPatchBody

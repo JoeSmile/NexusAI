@@ -8,8 +8,8 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import text
 
-from backend.core.auth.models import TenantContext
-from backend.core.auth.permissions import require_permission
+from packages.auth.models import TenantContext
+from packages.auth.permissions import require_permission
 from backend.core.file_sanitizer import (
     MAX_FILE_SIZE,
     UPLOAD_DIR,

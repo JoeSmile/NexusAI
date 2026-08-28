@@ -9,10 +9,10 @@ import pytest
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 
-from backend.core.auth import jwt_session as js
-from backend.core.auth.dual_auth import verify_human_or_legacy_key
-from backend.core.auth.models import TenantContext
-from backend.core.auth.permissions import require_permission
+from packages.auth import jwt_session as js
+from packages.auth.dual_auth import verify_human_or_legacy_key
+from packages.auth.models import TenantContext
+from packages.auth.permissions import require_permission
 
 
 @pytest.fixture(autouse=True)

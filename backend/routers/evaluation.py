@@ -9,8 +9,8 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from backend.core.auth.models import TenantContext
-from backend.core.auth.permissions import require_permission
+from packages.auth.models import TenantContext
+from packages.auth.permissions import require_permission
 from backend.database import ChatMessage, DatabaseManager, ResponseEvaluation
 from backend.evaluation_engine import EvaluationEngine
 from backend.logging_config import get_logger

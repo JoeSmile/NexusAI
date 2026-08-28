@@ -11,8 +11,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
 
-from backend.core.auth.models import TenantContext
-from backend.core.auth.permissions import require_permission
+from packages.auth.models import TenantContext
+from packages.auth.permissions import require_permission
 from backend.core.security.url_guard import UrlValidationError, validate_base_url
 from backend.database.pgvector_session import get_pg_session
 

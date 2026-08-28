@@ -11,8 +11,8 @@ import tempfile
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, ConfigDict
 
-from backend.core.auth.models import TenantContext
-from backend.core.auth.permissions import require_permission
+from packages.auth.models import TenantContext
+from packages.auth.permissions import require_permission
 from backend.core.errors import ErrorCode, NexusAIException
 from backend.logging_config import get_logger
 from backend.modules.rag.cache import bump_epoch

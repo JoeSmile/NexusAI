@@ -19,7 +19,7 @@ from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from backend.core.auth.models import TenantContext
+from packages.auth.models import TenantContext
 from backend.core.errors import ErrorCode
 from backend.core.org.scope import OrgScope, assert_org_access
 from backend.core.workflow.composition import CompositionDepthExceeded, check_composition_budget

@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from backend.core.auth.models import TenantContext
+from packages.auth.models import TenantContext
 from backend.core.capability.agents import MAX_AGENT_DEPTH, invoke_agent
 from backend.core.capability.errors import (
     CapabilityGovernanceRequiredError,

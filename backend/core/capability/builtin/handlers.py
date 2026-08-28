@@ -7,7 +7,7 @@ import logging
 import time
 from typing import Any
 
-from backend.core.auth.models import TenantContext
+from packages.auth.models import TenantContext
 from backend.core.capability.exec_policy import resolve_exec_policy
 from backend.core.memory_service import get_unified_memory_service
 from backend.modules.notification.service import notify

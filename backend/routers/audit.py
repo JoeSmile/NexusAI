@@ -11,8 +11,8 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import text
 
 from backend.core.audit_org_scope import audit_user_filter
-from backend.core.auth.dual_auth import verify_human_or_legacy_key
-from backend.core.auth.models import TenantContext
+from packages.auth.dual_auth import verify_human_or_legacy_key
+from packages.auth.models import TenantContext
 from backend.database.pgvector_session import get_pg_session
 
 router = APIRouter(prefix="/audit", tags=["audit"])

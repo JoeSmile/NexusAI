@@ -19,7 +19,7 @@ from urllib.parse import urlparse
 
 import httpx
 
-from backend.core.auth.models import TenantContext
+from packages.auth.models import TenantContext
 from backend.core.capability.errors import CapabilityUpstreamError
 from backend.core.capability.models import CapabilityProvider, CapabilitySpec
 from backend.core.capability.registry import resolve_credential

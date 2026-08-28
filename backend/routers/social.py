@@ -10,8 +10,8 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from backend.core.audit import log_audit
-from backend.core.auth.models import TenantContext
-from backend.core.auth.permissions import require_permission
+from packages.auth.models import TenantContext
+from packages.auth.permissions import require_permission
 from backend.core.social import service as social_svc
 from backend.core.social.exceptions import (
     PlatformNotOpenError,

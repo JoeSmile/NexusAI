@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Request
 
-from backend.core.auth.dual_auth import verify_human_or_legacy_key
-from backend.core.auth.models import TenantContext
+from packages.auth.dual_auth import verify_human_or_legacy_key
+from packages.auth.models import TenantContext
 from backend.core.billing.context import get_billing_context
 from backend.core.terms.service import (
     get_current_terms,

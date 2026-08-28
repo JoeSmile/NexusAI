@@ -11,8 +11,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
-from backend.core.auth.dual_auth import verify_human_or_legacy_key
-from backend.core.auth.models import TenantContext
+from packages.auth.dual_auth import verify_human_or_legacy_key
+from packages.auth.models import TenantContext
 from backend.core.billing.wallet import get_wallet_summary, recharge_wallet
 from backend.database.pgvector_session import get_pg_session
 

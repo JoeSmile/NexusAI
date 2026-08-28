@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from backend.core.auth.models import TenantContext
-from backend.core.auth.subagent import is_sub_agent
+from packages.auth.models import TenantContext
+from packages.auth.subagent import is_sub_agent
 from backend.core.plan.agent_spawn import (
     SpawnBlockedError,
     boost_capabilities_for_agent_type,

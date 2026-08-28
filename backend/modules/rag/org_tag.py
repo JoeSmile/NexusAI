@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from backend.core.auth.models import TenantContext
+from packages.auth.models import TenantContext
 from backend.core.org.scope import OrgScope, resolve_org_scope, unit_visible
 
 

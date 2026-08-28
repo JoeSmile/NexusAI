@@ -15,7 +15,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from backend.core.auth import password as pw_mod
+from packages.auth import password as pw_mod
 from backend.routers import auth as auth_mod
 from backend.routers.auth import router
 

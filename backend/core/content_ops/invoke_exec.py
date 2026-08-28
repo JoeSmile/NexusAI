@@ -6,7 +6,7 @@ import json
 from collections.abc import AsyncIterator
 from typing import Any
 
-from backend.core.auth.models import TenantContext
+from packages.auth.models import TenantContext
 from backend.core.capability.models import CapabilitySpec
 from backend.core.content_ops.hotspot import HotspotCrawlError, dig_hotspots
 from backend.core.content_ops.script_gen import generate_script

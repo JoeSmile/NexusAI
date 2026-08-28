@@ -448,7 +448,7 @@ def test_prompt_composer_clamps_relaxed_style() -> None:
 def test_require_memory_admin_roles() -> None:
     from fastapi import HTTPException
 
-    from backend.core.auth.models import TenantContext
+    from packages.auth.models import TenantContext
     from backend.routers.memory import _require_memory_admin
 
     admin = TenantContext(

@@ -20,8 +20,8 @@ from backend.core.plan.clarification import (
     hold_for_clarification,
 )
 from backend.core.plan.slot_gate import evaluate_required_slots
-from backend.core.auth.models import TenantContext
-from backend.core.auth.subagent import is_sub_agent
+from packages.auth.models import TenantContext
+from packages.auth.subagent import is_sub_agent
 from backend.core.capability.invoke import invoke
 from backend.core.harness import LLMHarness
 from backend.core.plan.blackboard import Blackboard, entry_from_step_result

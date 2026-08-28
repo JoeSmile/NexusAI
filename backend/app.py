@@ -221,8 +221,8 @@ def _lazy_include(
 
 def create_app() -> FastAPI:
     """创建并配置 FastAPI 应用实例。"""
-    from backend.core.auth.jwt_session import assert_jwt_secret_strength
     from backend.core.production_guard import assert_production_security
+    from packages.auth.jwt_session import assert_jwt_secret_strength
 
     assert_jwt_secret_strength()
     from backend.core.security.audit_crypto import assert_audit_encryption_config
@@ -271,9 +271,9 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    from backend.core.auth.signature_auth import SignatureMiddleware
     from backend.core.metrics import MetricsMiddleware
     from backend.core.tenant import TenantMiddleware
+    from packages.auth.signature_auth import SignatureMiddleware
 
     app.add_middleware(SignatureMiddleware)
     app.add_middleware(MetricsMiddleware)

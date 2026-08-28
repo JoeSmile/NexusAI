@@ -7,8 +7,8 @@ from datetime import datetime
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from backend.core.auth.dual_auth import verify_human_or_legacy_key
-from backend.core.auth.models import TenantContext
+from packages.auth.dual_auth import verify_human_or_legacy_key
+from packages.auth.models import TenantContext
 from backend.core.org.scope import OrgScope
 from backend.core.workflow.runner import start_run
 from backend.database.pgvector_session import Workflow, WorkflowRun, get_pg_session

@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta
 
-from backend.core.auth.models import TenantContext
+from packages.auth.models import TenantContext
 from backend.core.org.scope import OrgScope
 from backend.core.workflow.grants import (
     cap_entry,

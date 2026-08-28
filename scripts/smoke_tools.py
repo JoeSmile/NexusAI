@@ -11,7 +11,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend.core.auth.models import TenantContext
+from packages.auth.models import TenantContext
 from backend.core.capability.builtin.handlers import invoke_builtin_handler
 from backend.core.capability.builtin.register import register_builtin_tools
 from backend.core.capability.builtin.specs import BUILTIN_TOOL_SPECS

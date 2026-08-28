@@ -15,7 +15,7 @@ from typing import Any
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from backend.core.auth.models import TenantContext
+from packages.auth.models import TenantContext
 from backend.core.capability.errors import CapabilityNotFoundError
 from backend.core.capability.invoke import invoke
 from backend.core.capability.registry import get_capability_registry

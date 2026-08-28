@@ -20,7 +20,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from backend.core.audit import write_audit_sync
-from backend.core.auth.models import TenantContext
+from packages.auth.models import TenantContext
 from backend.core.errors import ErrorCode
 from backend.core.org.scope import OrgScope, resolve_org_scope
 from backend.core.workflow.composition import CompositionDepthExceeded
@@ -122,7 +122,7 @@ def rebuild_tenant_context(
             detail={"code": ErrorCode.RUN_ACTING_USER_NOT_FOUND, "message": "acting_user_not_found"},
         )
     role = str(row.role)
-    from backend.core.auth.session_auth import _load_extra_permissions
+    from packages.auth.session_auth import _load_extra_permissions
 
     extras = _load_extra_permissions(user_id=acting_user_id, tenant_id=tenant_id)
     scope = resolve_org_scope(

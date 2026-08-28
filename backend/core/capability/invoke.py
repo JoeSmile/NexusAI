@@ -17,7 +17,7 @@ from collections.abc import AsyncIterator
 from dataclasses import replace
 from typing import Any
 
-from backend.core.auth.models import TenantContext
+from packages.auth.models import TenantContext
 from backend.core.capability.errors import (
     CapabilityNotFoundError,
     CapabilityUpstreamError,

@@ -46,7 +46,7 @@ def _live_env() -> None:
 
 
 async def _run_smoke(*, with_governance: bool = True) -> dict[str, Any]:
-    from backend.core.auth.models import TenantContext
+    from packages.auth.models import TenantContext
     from backend.core.capability.connectors.mcp_server import list_server_tools
     from backend.core.capability.invoke import invoke
     from backend.core.capability.mcp_registry import (

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.core.auth.models import TenantContext
+from packages.auth.models import TenantContext
 from backend.core.plan.models import PlanIR, PlanStep
 from backend.core.plan.validator import validate_plan_ir
 from backend.pipeline.nodes.orchestrator import _run_step_once

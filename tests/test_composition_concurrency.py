@@ -8,7 +8,7 @@ from datetime import datetime
 import pytest
 from fastapi import HTTPException
 
-from backend.core.auth.models import TenantContext
+from packages.auth.models import TenantContext
 from backend.core.org.scope import OrgScope
 from backend.core.workflow.composition import (
     MAX_COMPOSITION_DEPTH,

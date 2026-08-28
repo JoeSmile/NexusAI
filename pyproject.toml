@@ -170,7 +170,7 @@ files = [
   "backend/pipeline",
   "backend/skills",
   "backend/observability",
-  "backend/core/auth",
+  "packages/auth",
   "backend/core/guardrails",
   "backend/core/harness",
   "backend/core/social",

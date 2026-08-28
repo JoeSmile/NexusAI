@@ -16,7 +16,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from backend.core.auth.models import TenantContext
+from packages.auth.models import TenantContext
 from backend.core.org.scope import OrgScope, assert_org_access
 from backend.core.workflow.security_gates import RequestableMode
 from backend.database.pgvector_session import PermissionRequest, WorkflowGrant

@@ -8,8 +8,8 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi import HTTPException
 
-from backend.core.auth import api_key_auth as auth_mod
-from backend.core.auth.models import TenantContext
+from packages.auth import api_key_auth as auth_mod
+from packages.auth.models import TenantContext
 
 
 @pytest.mark.asyncio

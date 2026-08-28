@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.core.auth.jwt_session import (
+from packages.auth.jwt_session import (
     JwtSecretError,
     assert_jwt_secret_strength,
     validate_jwt_secret_strength,

@@ -10,8 +10,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from backend.core.auth.dual_auth import verify_human_or_legacy_key
-from backend.core.auth.models import TenantContext
+from packages.auth.dual_auth import verify_human_or_legacy_key
+from packages.auth.models import TenantContext
 from backend.core.billing.context import bind_billing_context, clear_billing_context
 from backend.core.billing.usage import make_idempotency_key, record_metered_usage
 from backend.routers import billing as billing_mod

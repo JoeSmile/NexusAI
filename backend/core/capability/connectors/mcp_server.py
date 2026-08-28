@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any
 
-from backend.core.auth.models import TenantContext
+from packages.auth.models import TenantContext
 from backend.core.capability.errors import CapabilityUpstreamError
 from backend.core.capability.mcp_errors import McpError, McpErrorCode
 from backend.core.capability.mcp_registry import (

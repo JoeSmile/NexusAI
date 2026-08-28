@@ -11,8 +11,8 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from backend.core.audit import write_audit_sync
-from backend.core.auth.dual_auth import verify_human_or_legacy_key
-from backend.core.auth.models import TenantContext
+from packages.auth.dual_auth import verify_human_or_legacy_key
+from packages.auth.models import TenantContext
 from backend.core.org.scope import OrgScope, assert_org_access, resolve_org_scope
 from backend.core.workflow import runner as run_svc
 from backend.core.workflow.grants import can_review_request, issue_approval_grant

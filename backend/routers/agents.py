@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from backend.core.auth.api_key_auth import verify_api_key
-from backend.core.auth.models import TenantContext
+from packages.auth.api_key_auth import verify_api_key
+from packages.auth.models import TenantContext
 from backend.core.capability.agents import agent_spec_from_capability
 from backend.core.capability.models import CapabilityKind
 from backend.core.capability.registry import get_capability_registry

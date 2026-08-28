@@ -6,7 +6,7 @@ import time
 
 import pytest
 
-from backend.core.auth import jwt_session as js
+from packages.auth import jwt_session as js
 
 
 @pytest.fixture(autouse=True)

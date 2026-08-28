@@ -55,7 +55,7 @@ def test_assert_seat_available_ok_with_extra():
 async def test_tenant_admin_cannot_put_seat_limit():
     from fastapi import HTTPException
 
-    from backend.core.auth.models import TenantContext
+    from packages.auth.models import TenantContext
     from backend.routers.tenant_subscription import SubscriptionBody, put_subscription
 
     tenant = TenantContext(
@@ -78,7 +78,7 @@ async def test_tenant_admin_cannot_put_seat_limit():
 async def test_tenant_admin_cannot_put_plan():
     from fastapi import HTTPException
 
-    from backend.core.auth.models import TenantContext
+    from packages.auth.models import TenantContext
     from backend.routers.tenant_subscription import SubscriptionBody, put_subscription
 
     tenant = TenantContext(
@@ -101,7 +101,7 @@ async def test_tenant_admin_cannot_put_plan():
 async def test_tenant_admin_cannot_put_freeform_expires():
     from fastapi import HTTPException
 
-    from backend.core.auth.models import TenantContext
+    from packages.auth.models import TenantContext
     from backend.routers.tenant_subscription import SubscriptionBody, put_subscription
 
     tenant = TenantContext(

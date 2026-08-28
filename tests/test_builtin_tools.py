@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.core.auth.models import TenantContext
+from packages.auth.models import TenantContext
 from backend.core.capability.builtin.register import register_builtin_tools
 from backend.core.capability.builtin.specs import BUILTIN_TOOL_SPECS
 from backend.core.capability.contract import validate_capability_contract

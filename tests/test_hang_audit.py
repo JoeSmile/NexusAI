@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from backend.core.auth.models import TenantContext
+from packages.auth.models import TenantContext
 from backend.core.capability.models import (
     CapabilityKind,
     CapabilityProvider,

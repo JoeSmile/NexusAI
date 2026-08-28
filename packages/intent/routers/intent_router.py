@@ -8,8 +8,8 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from backend.core.auth.models import TenantContext
-from backend.core.auth.permissions import require_permission
+from packages.auth.models import TenantContext
+from packages.auth.permissions import require_permission
 from config import get_settings
 
 from ..models.intent_models import IntentRequest, IntentResult, IntentType

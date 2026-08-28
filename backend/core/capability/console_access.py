@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from fastapi import Depends, HTTPException
 
-from backend.core.auth.dual_auth import verify_human_or_legacy_key
-from backend.core.auth.models import TenantContext
+from packages.auth.dual_auth import verify_human_or_legacy_key
+from packages.auth.models import TenantContext
 
 
 def is_console_super_admin(tenant: TenantContext) -> bool:

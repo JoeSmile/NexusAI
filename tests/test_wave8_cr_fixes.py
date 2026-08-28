@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from backend.core.auth.models import TenantContext
+from packages.auth.models import TenantContext
 from backend.core.org.scope import OrgScope
 from backend.core.workflow.runner import cancel_run, recover_waiting_child_parents, wake_parent
 from backend.database.pgvector_session import (

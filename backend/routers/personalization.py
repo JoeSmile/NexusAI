@@ -10,9 +10,9 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from backend.core.auth.models import TenantContext
-from backend.core.auth.permissions import require_permission
-from backend.core.auth.scope import assert_user_access
+from packages.auth.models import TenantContext
+from packages.auth.permissions import require_permission
+from packages.auth.scope import assert_user_access
 from backend.database import UserPersonalization, get_db
 from backend.models import (
     PersonalizationUpdateRequest,

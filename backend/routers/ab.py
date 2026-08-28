@@ -10,8 +10,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from backend.core.ab.service import assign_variant, get_active_experiment, record_event
-from backend.core.auth.models import TenantContext
-from backend.core.auth.permissions import require_permission
+from packages.auth.models import TenantContext
+from packages.auth.permissions import require_permission
 from backend.database.pgvector_session import get_pg_session
 
 router = APIRouter(prefix="/ab", tags=["ab"])

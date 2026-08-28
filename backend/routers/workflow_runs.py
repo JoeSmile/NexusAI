@@ -7,8 +7,8 @@ from typing import Any
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from backend.core.auth.dual_auth import verify_human_or_legacy_key
-from backend.core.auth.models import TenantContext
+from packages.auth.dual_auth import verify_human_or_legacy_key
+from packages.auth.models import TenantContext
 from backend.core.errors import ErrorCode
 from backend.core.org.scope import assert_org_access, resolve_org_scope, visible_org_filter
 from backend.core.workflow import runner as run_svc

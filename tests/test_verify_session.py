@@ -8,8 +8,8 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi import HTTPException
 
-from backend.core.auth import jwt_session as js
-from backend.core.auth import session_auth as sa
+from packages.auth import jwt_session as js
+from packages.auth import session_auth as sa
 
 
 @pytest.fixture(autouse=True)

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from backend.core.auth.evaluator import evaluate_permission
-from backend.core.auth.models import TenantContext
+from packages.auth.evaluator import evaluate_permission
+from packages.auth.models import TenantContext
 from backend.core.org.scope import OrgScope
 
 

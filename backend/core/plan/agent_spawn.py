@@ -6,8 +6,8 @@ import json
 from dataclasses import replace
 from typing import Any
 
-from backend.core.auth.models import TenantContext
-from backend.core.auth.subagent import is_sub_agent, make_sub_agent_context
+from packages.auth.models import TenantContext
+from packages.auth.subagent import is_sub_agent, make_sub_agent_context
 
 from .agent_instance import (
     AgentInstance,

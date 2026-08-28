@@ -14,8 +14,8 @@ from pydantic import BaseModel, Field
 
 from backend.core.audit import log_audit
 from backend.core.audit_context import bind_audit_lineage
-from backend.core.auth.models import TenantContext
-from backend.core.auth.permissions import require_permission
+from packages.auth.models import TenantContext
+from packages.auth.permissions import require_permission
 from backend.core.billing.context import bind_billing_context
 from backend.core.errors import ErrorCode, NexusAIException
 from backend.core.guardrails.output_guard import DRIFT_PATTERNS, VIOLATION_PATTERNS

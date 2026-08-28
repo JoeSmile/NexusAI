@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import text
 
-from backend.core.auth.password import hash_password
+from packages.auth.password import hash_password
 from backend.database.pgvector_session import get_pg_session
 
 # 测试账号统一密码(本地方便);生产 seed 必须设强 TEST_PASSWORD

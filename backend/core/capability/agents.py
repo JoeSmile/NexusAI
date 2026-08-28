@@ -20,8 +20,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from backend.core.auth.models import TenantContext
-from backend.core.auth.subagent import make_sub_agent_context
+from packages.auth.models import TenantContext
+from packages.auth.subagent import make_sub_agent_context
 from backend.core.capability.errors import (
     CapabilityGovernanceRequiredError,
     CapabilityUpstreamError,

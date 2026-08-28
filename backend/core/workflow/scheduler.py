@@ -194,7 +194,7 @@ def _advance_next(session: Session, sched: Any, *, now: datetime) -> None:
 
 
 def scan_due_schedules(*, now: datetime | None = None, limit: int = 50) -> dict[str, int]:
-    from backend.core.auth.models import TenantContext
+    from packages.auth.models import TenantContext
     from backend.core.workflow import runner as run_svc
     from backend.database.pgvector_session import (
         ScheduledRun,

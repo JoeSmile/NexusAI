@@ -7,7 +7,7 @@ import uuid
 import pytest
 from fastapi import HTTPException
 
-from backend.core.auth.models import TenantContext
+from packages.auth.models import TenantContext
 from backend.core.capability.models import (
     CapabilityKind,
     CapabilityProvider,

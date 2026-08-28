@@ -153,7 +153,7 @@ def try_bridge_start_run(state: PipelineState) -> PipelineState:
         if wf is None:
             return state
 
-        from backend.core.auth.models import TenantContext
+        from packages.auth.models import TenantContext
         from backend.core.org.scope import resolve_org_scope
         from backend.core.workflow import runner as run_svc
 

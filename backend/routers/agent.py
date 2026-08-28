@@ -12,9 +12,9 @@ Agent Router - Agent路由
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 
-from backend.core.auth.models import TenantContext
-from backend.core.auth.permissions import require_permission
-from backend.core.auth.scope import assert_user_access, resolve_acting_user_id
+from packages.auth.models import TenantContext
+from packages.auth.permissions import require_permission
+from packages.auth.scope import assert_user_access, resolve_acting_user_id
 from backend.core.errors import raise_internal_error
 from backend.services.agent_service import AgentService, get_agent_service
 

@@ -11,7 +11,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-from backend.core.auth.models import TenantContext
+from packages.auth.models import TenantContext
 from backend.core.capability.contract import derive_idempotency_key
 from backend.core.capability.errors import (
     CapabilityQuotaExceededError,
@@ -68,7 +68,7 @@ def run_governance_chain(
         )
 
     # 1) policy — sub-agent critical tool block (Task 62)
-    from backend.core.auth.subagent import is_sub_agent
+    from packages.auth.subagent import is_sub_agent
     from backend.core.capability.risk import (
         capability_risk_level,
         is_sub_agent_blocked_capability,

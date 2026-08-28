@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 from fastapi import HTTPException
 
-from backend.core.auth.models import TenantContext
-from backend.core.auth.scope import (
+from packages.auth.models import TenantContext
+from packages.auth.scope import (
     assert_user_access,
     can_access_user,
     require_tenant_admin,

@@ -111,7 +111,7 @@ def test_snapshot_refresh_bumps_generation_without_deleting_active() -> None:
 
 @pytest.mark.asyncio
 async def test_invoke_mcp_mock_has_no_subprocess_pid(monkeypatch: pytest.MonkeyPatch) -> None:
-    from backend.core.auth.models import TenantContext
+    from packages.auth.models import TenantContext
     from backend.core.capability.connectors.mcp_server import invoke_mcp
     from backend.core.capability.models import CapabilityKind, CapabilityProvider, CapabilitySpec
 

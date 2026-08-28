@@ -9,8 +9,8 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 
 from backend.core.audit import write_audit_sync
-from backend.core.auth.dual_auth import verify_human_or_legacy_key
-from backend.core.auth.models import TenantContext
+from packages.auth.dual_auth import verify_human_or_legacy_key
+from packages.auth.models import TenantContext
 from backend.core.content_ops.dig_persist import persist_dig_result
 from backend.core.content_ops.hotspot import HotspotCrawlError, dig_hotspots
 from backend.core.content_ops.offerings import get_offering, list_offerings

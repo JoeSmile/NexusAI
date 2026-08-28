@@ -18,8 +18,8 @@ from fastapi import (
 
 from backend.core.audit import log_audit
 from backend.core.audit_context import bind_audit_lineage
-from backend.core.auth.dual_auth import verify_human_or_legacy_key
-from backend.core.auth.models import TenantContext
+from packages.auth.dual_auth import verify_human_or_legacy_key
+from packages.auth.models import TenantContext
 from backend.core.billing.context import bind_billing_context
 from backend.core.errors import ErrorCode, NexusAIException
 from backend.core.file_sanitizer import sanitize_filename, validate_file

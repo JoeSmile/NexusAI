@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from backend.core.auth.models import TenantContext
-from backend.core.auth.subagent import is_sub_agent, make_sub_agent_context
+from packages.auth.models import TenantContext
+from packages.auth.subagent import is_sub_agent, make_sub_agent_context
 from backend.core.capability.governance_chain import run_governance_chain
 from backend.core.capability.models import (
     CapabilityKind,

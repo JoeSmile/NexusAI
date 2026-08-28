@@ -8,7 +8,7 @@ from datetime import datetime
 import pytest
 from fastapi import HTTPException
 
-from backend.core.auth.models import TenantContext
+from packages.auth.models import TenantContext
 from backend.core.org.scope import OrgScope
 from backend.core.workflow.runner import execute_run, start_run
 from backend.database.pgvector_session import Workflow, WorkflowRun, get_pg_session

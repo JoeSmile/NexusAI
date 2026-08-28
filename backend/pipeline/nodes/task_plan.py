@@ -10,7 +10,7 @@ from typing import Any
 
 from backend.core.audit import write_audit_sync
 from backend.core.audit_context import get_audit_lineage
-from backend.core.auth.models import TenantContext
+from packages.auth.models import TenantContext
 from backend.core.capability.invoke import capability_visible_to
 from backend.core.capability.registry import get_capability_registry
 from backend.core.guardrails.output_guard import check_output

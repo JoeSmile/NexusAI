@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 from fastapi import HTTPException
 
-from backend.core.auth.models import TenantContext
-from backend.core.auth.scope import assert_user_access, can_access_user
+from packages.auth.models import TenantContext
+from packages.auth.scope import assert_user_access, can_access_user
 
 
 def test_user_cannot_access_other_user_memory():

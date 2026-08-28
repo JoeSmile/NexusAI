@@ -1,6 +1,6 @@
 """认证模块测试"""
 
-from backend.core.auth.models import ROLES, TenantContext
+from packages.auth.models import ROLES, TenantContext
 
 
 def test_super_admin_permissions():

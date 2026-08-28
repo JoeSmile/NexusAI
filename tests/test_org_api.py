@@ -10,8 +10,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from backend.core.auth.dual_auth import verify_human_or_legacy_key
-from backend.core.auth.models import TenantContext
+from packages.auth.dual_auth import verify_human_or_legacy_key
+from packages.auth.models import TenantContext
 from backend.core.org.models import normalize_business_roles
 from backend.core.org.service import compute_child_path, rewrite_subtree_paths
 from backend.routers import org as org_mod

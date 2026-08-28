@@ -1,7 +1,7 @@
 """探针: workflow run 完成后 node output 结构(runHotspotDigInPlace 的 countFromNodes 能否解析)。"""
 import asyncio
 
-from backend.core.auth.models import TenantContext
+from packages.auth.models import TenantContext
 from backend.core.org.scope import resolve_org_scope
 from backend.core.workflow import runner as run_svc
 from backend.database.pgvector_session import Workflow, get_pg_session

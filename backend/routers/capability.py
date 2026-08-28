@@ -22,8 +22,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from backend.core.audit import log_audit
-from backend.core.auth.dual_auth import verify_human_or_legacy_key
-from backend.core.auth.models import TenantContext
+from packages.auth.dual_auth import verify_human_or_legacy_key
+from packages.auth.models import TenantContext
 from backend.core.capability.invoke import invoke
 from backend.core.capability.models import CapabilitySpec
 from backend.core.capability.registry import get_capability_registry

@@ -11,9 +11,9 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from backend.core.auth.models import TenantContext
-from backend.core.auth.permissions import require_permission
-from backend.core.auth.scope import require_tenant_admin
+from packages.auth.models import TenantContext
+from packages.auth.permissions import require_permission
+from packages.auth.scope import require_tenant_admin
 from backend.logging_config import get_logger
 from backend.services.performance_optimizer import (
     cache_manager,

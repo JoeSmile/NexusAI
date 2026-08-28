@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from backend.core.auth.dual_auth import verify_human_or_legacy_key
+from packages.auth.dual_auth import verify_human_or_legacy_key
 from backend.core.guardrails.image_guard import check_image_input, image_content_hash
 from backend.core.harness.base import HarnessResult
 from backend.core.model_registry import get_model, list_vision_models, reload_registry
@@ -53,7 +53,7 @@ def test_build_vision_messages() -> None:
 
 
 def test_multimodal_chat_mock_harness(monkeypatch: pytest.MonkeyPatch) -> None:
-    from backend.core.auth.models import TenantContext
+    from packages.auth.models import TenantContext
     from backend.routers import multimodal as mm_mod
 
     reload_registry()
@@ -105,7 +105,7 @@ def test_multimodal_chat_mock_harness(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_multimodal_denied_without_permission() -> None:
-    from backend.core.auth.models import TenantContext
+    from packages.auth.models import TenantContext
 
     user = TenantContext("acme", "u1", "user", [], False)
     app = FastAPI()

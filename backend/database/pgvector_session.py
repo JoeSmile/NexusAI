@@ -835,7 +835,7 @@ class PGVectorSession:
 
     def _seed_roles(self) -> None:
         """幂等写入默认角色"""
-        from backend.core.auth.models import ROLES
+        from packages.auth.models import ROLES
 
         with self.Session() as session:
             for name, meta in ROLES.items():
