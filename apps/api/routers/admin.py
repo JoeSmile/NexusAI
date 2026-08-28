@@ -789,7 +789,7 @@ async def verify_llm_key(
     tenant: TenantContext = Depends(require_permission("admin:llm_key")),
 ):
     """验证 Key 有效性"""
-    from backend.core.key_health import verify_key_by_id
+    from packages.key_health import verify_key_by_id
 
     return await verify_key_by_id(key_id)
 

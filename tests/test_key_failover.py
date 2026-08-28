@@ -165,7 +165,7 @@ async def test_get_key_chain_excludes_cooling_keys(monkeypatch, decrypt_ok):
 @pytest.mark.asyncio
 async def test_health_restore_skips_admin_deactivate(monkeypatch):
     """人工停用(failures=0)不应被 verify 成功重新激活。"""
-    import backend.core.key_health as kh
+    import packages.key_health as kh
 
     row = SimpleNamespace(
         id=9, encrypted_key="enc", base_url="https://x", is_active=False
@@ -398,7 +398,7 @@ async def test_llm_generate_passes_key_provider(monkeypatch):
 @pytest.mark.asyncio
 async def test_verify_key_failed_marks_and_may_deactivate(monkeypatch):
     """27.03: verify 失败走 mark_key_failed;达阈值后审计摘除。"""
-    import backend.core.key_health as kh
+    import packages.key_health as kh
 
     row = SimpleNamespace(
         id=42,
