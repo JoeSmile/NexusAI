@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from backend.core.plan.coref import (
+from packages.plan.coref import (
     apply_coref_to_plan,
     apply_coref_to_text,
     infer_coref_table,
@@ -16,7 +16,7 @@ from backend.core.plan.coref import (
     save_session_coref,
     warm_coref_key,
 )
-from backend.core.plan.models import CorefEntry, CorefTable
+from packages.plan.models import CorefEntry, CorefTable
 from packages.pipeline.state import make_initial_state
 
 
@@ -137,7 +137,7 @@ async def test_invalidate_coref_on_drift(monkeypatch):
         cleared.append("yes")
         return None
 
-    monkeypatch.setattr("backend.core.plan.coref.clear_session_coref", _clear)
+    monkeypatch.setattr("packages.plan.coref.clear_session_coref", _clear)
     state = make_initial_state("t1", "u1", "s1", "不是那个，算了")
     assert await invalidate_coref_if_drift(state) is True
     assert cleared == ["yes"]

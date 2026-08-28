@@ -7,7 +7,7 @@ import re
 from typing import Any
 
 from backend.core.guardrails.pii_patterns import PII_PATTERNS
-from backend.core.workflow.ir import _FORBIDDEN_PARAM_KEYS
+from packages.workflow.ir import _FORBIDDEN_PARAM_KEYS
 
 # 密钥 / 凭据启发式
 _SECRET_PATTERNS = [

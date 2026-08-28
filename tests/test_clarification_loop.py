@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.core.plan.clarification import (
+from packages.plan.clarification import (
     CLARIFY_CONFIDENCE_MAX,
     ClarificationPayload,
     evaluate_clarification_triggers,
@@ -79,7 +79,7 @@ def test_missing_entities_triggers_clarification():
 async def test_resolve_pending_merges_answer(monkeypatch):
     audits: list[dict] = []
     monkeypatch.setattr(
-        "backend.core.plan.clarification.write_audit_sync",
+        "packages.plan.clarification.write_audit_sync",
         lambda rec: audits.append(dict(rec)) or True,
     )
     state = make_initial_state("t1", "u1", "s1", "汇丰银行")
@@ -104,7 +104,7 @@ async def test_resolve_pending_merges_answer(monkeypatch):
 async def test_clarification_gate_holds_pipeline(monkeypatch):
     audits: list[dict] = []
     monkeypatch.setattr(
-        "backend.core.plan.clarification.write_audit_sync",
+        "packages.plan.clarification.write_audit_sync",
         lambda rec: audits.append(dict(rec)) or True,
     )
     state = make_initial_state("t1", "u1", "s1", "帮我看看")
@@ -124,7 +124,7 @@ async def test_clarification_gate_holds_pipeline(monkeypatch):
 @pytest.mark.asyncio
 async def test_clarification_gate_resume_continues(monkeypatch):
     monkeypatch.setattr(
-        "backend.core.plan.clarification.write_audit_sync",
+        "packages.plan.clarification.write_audit_sync",
         lambda rec: True,
     )
     state = make_initial_state("t1", "u1", "s1", "查汇丰理财产品")
@@ -147,7 +147,7 @@ async def test_clarification_gate_resume_continues(monkeypatch):
 async def test_pending_timeout_audit(monkeypatch):
     audits: list[dict] = []
     monkeypatch.setattr(
-        "backend.core.plan.clarification.write_audit_sync",
+        "packages.plan.clarification.write_audit_sync",
         lambda rec: audits.append(dict(rec)) or True,
     )
     state = make_initial_state("t1", "u1", "s1", "hi")

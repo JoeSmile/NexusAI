@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 
 from packages.auth.models import TenantContext
-from backend.core.plan.models import PlanIR, PlanStep
-from backend.core.plan.validator import validate_plan_ir
+from packages.plan.models import PlanIR, PlanStep
+from packages.plan.validator import validate_plan_ir
 from packages.pipeline.nodes.orchestrator import _run_step_once
 from packages.pipeline.state import make_initial_state
 

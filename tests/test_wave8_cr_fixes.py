@@ -7,7 +7,7 @@ from datetime import datetime
 
 from packages.auth.models import TenantContext
 from backend.core.org.scope import OrgScope
-from backend.core.workflow.runner import cancel_run, recover_waiting_child_parents, wake_parent
+from packages.workflow.runner import cancel_run, recover_waiting_child_parents, wake_parent
 from backend.database.pgvector_session import (
     Workflow,
     WorkflowRun,
@@ -122,7 +122,7 @@ def test_cancel_child_wakes_parent() -> None:
 def test_recover_waiting_child_when_child_already_terminal(monkeypatch) -> None:
     """2A: startup recover wakes parent if child finished without wake."""
     monkeypatch.setattr(
-        "backend.core.workflow.run_lifecycle.schedule_resume_or_continue",
+        "packages.workflow.run_lifecycle.schedule_resume_or_continue",
         lambda *_a, **_k: None,
     )
     tid = f"c2a-{uuid.uuid4().hex[:8]}"

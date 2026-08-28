@@ -1,35 +1,11 @@
-"""PlanIR + 验证器 + 工具检索（Task 56 切片 2）。"""
+"""Deprecated shim — use `packages.plan` (Task 75.4)."""
+from __future__ import annotations
 
-from backend.core.plan.models import (
-    CorefEntry,
-    CorefTable,
-    OnFailMode,
-    PlanIR,
-    PlanStep,
-    PlanStepMode,
-    QueryRewrite,
-    normalize_plan_dict,
-    plan_to_state_dict,
-)
-from backend.core.plan.tool_index import search_capabilities
-from backend.core.plan.validator import (
-    PlanValidationError,
-    topological_sort_steps,
-    validate_plan_ir,
-)
+import warnings
 
-__all__ = [
-    "CorefEntry",
-    "CorefTable",
-    "OnFailMode",
-    "PlanIR",
-    "PlanStep",
-    "PlanStepMode",
-    "PlanValidationError",
-    "QueryRewrite",
-    "normalize_plan_dict",
-    "plan_to_state_dict",
-    "search_capabilities",
-    "topological_sort_steps",
-    "validate_plan_ir",
-]
+warnings.warn(
+    "backend.core.plan is deprecated; import from packages.plan",
+    DeprecationWarning,
+    stacklevel=2,
+)
+from packages.plan import *  # noqa: F401,F403

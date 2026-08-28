@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
 from backend.core.org.scope import OrgScope
-from backend.core.workflow.runner import start_run
+from packages.workflow.runner import start_run
 from backend.database.pgvector_session import Workflow, WorkflowRun, get_pg_session
 from backend.routers.workflow_runs import router
 
@@ -63,7 +63,7 @@ def test_list_and_get_run_api(monkeypatch):
         lambda *a, **k: scope,
     )
     monkeypatch.setattr(
-        "backend.core.workflow.runner.schedule_execute",
+        "packages.workflow.runner.schedule_execute",
         lambda *_a, **_k: None,
     )
 

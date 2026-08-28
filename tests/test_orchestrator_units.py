@@ -6,16 +6,16 @@ from unittest.mock import patch
 
 import pytest
 
-from backend.core.plan.blackboard import Blackboard, BlackboardEntry, entry_from_step_result
-from backend.core.plan.loop_guard import LoopGuard, LoopGuardError
-from backend.core.plan.models import normalize_plan_dict
-from backend.core.plan.validator import PlanValidationError, validate_plan_ir
+from packages.plan.blackboard import Blackboard, BlackboardEntry, entry_from_step_result
+from packages.plan.loop_guard import LoopGuard, LoopGuardError
+from packages.plan.models import normalize_plan_dict
+from packages.plan.validator import PlanValidationError, validate_plan_ir
 
 
 @pytest.fixture(autouse=True)
 def _noop_audit(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "backend.core.plan.blackboard.write_audit_sync",
+        "packages.plan.blackboard.write_audit_sync",
         lambda *a, **k: True,
     )
 
@@ -72,7 +72,7 @@ def test_loop_guard_blocks_repeat(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LOOP_GUARD_SESSION_CAP", "50")
     guard = LoopGuard()
     payload = {"q": "same"}
-    with patch("backend.core.plan.loop_guard.write_audit_sync", return_value=True):
+    with patch("packages.plan.loop_guard.write_audit_sync", return_value=True):
         guard.check("cap.a", payload, tenant_id="t1", user_id="u1", trace_id="tr1")
         guard.check("cap.a", payload, tenant_id="t1", user_id="u1", trace_id="tr1")
         with pytest.raises(LoopGuardError):

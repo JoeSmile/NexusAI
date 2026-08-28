@@ -14,9 +14,9 @@ from backend.core.audit import write_audit_sync
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
 from backend.core.org.scope import OrgScope, assert_org_access, resolve_org_scope
-from backend.core.workflow import runner as run_svc
-from backend.core.workflow.grants import can_review_request, issue_approval_grant
-from backend.core.workflow.notify import maybe_escalate_timeout
+from packages.workflow import runner as run_svc
+from packages.workflow.grants import can_review_request, issue_approval_grant
+from packages.workflow.notify import maybe_escalate_timeout
 from backend.database.pgvector_session import (
     PermissionRequest,
     Workflow,

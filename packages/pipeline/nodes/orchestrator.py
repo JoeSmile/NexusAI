@@ -10,7 +10,7 @@ from typing import Any
 from backend.core.audit_context import bind_audit_lineage
 from packages.capability.invoke import invoke
 from backend.core.harness import LLMHarness
-from backend.core.plan.agent_spawn import (
+from packages.plan.agent_spawn import (
     SpawnBlockedError,
     complete_agent_instance_for_step,
     fail_agent_instance_for_step,
@@ -18,26 +18,26 @@ from backend.core.plan.agent_spawn import (
     resolve_step_tenant,
     spawn_sub_agent_instance,
 )
-from backend.core.plan.blackboard import Blackboard, entry_from_step_result
-from backend.core.plan.clarification import (
+from packages.plan.blackboard import Blackboard, entry_from_step_result
+from packages.plan.clarification import (
     hold_for_clarification,
 )
-from backend.core.plan.event_bus import PlanEventBus, bus_for_state
-from backend.core.plan.execution import group_independent_batches
-from backend.core.plan.intent_drift import (
+from packages.plan.event_bus import PlanEventBus, bus_for_state
+from packages.plan.execution import group_independent_batches
+from packages.plan.intent_drift import (
     DriftAssessment,
     audit_intent_drift,
     detect_intent_drift,
 )
-from backend.core.plan.llm_output_guard import prevalidate_llm_plan
-from backend.core.plan.loop_guard import LoopGuard, LoopGuardError
-from backend.core.plan.models import OnFailMode, PlanIR, PlanStep
-from backend.core.plan.params_resolve import resolve_step_params
-from backend.core.plan.run_cancel import RunCancelledError, check_cancelled
-from backend.core.plan.slot_gate import evaluate_required_slots
-from backend.core.plan.spawn_budget import SpawnBudget, resolve_spawn_budget
-from backend.core.plan.tool_output_guard import sanitize_tool_output
-from backend.core.plan.validator import topological_sort_steps, validate_plan_ir
+from packages.plan.llm_output_guard import prevalidate_llm_plan
+from packages.plan.loop_guard import LoopGuard, LoopGuardError
+from packages.plan.models import OnFailMode, PlanIR, PlanStep
+from packages.plan.params_resolve import resolve_step_params
+from packages.plan.run_cancel import RunCancelledError, check_cancelled
+from packages.plan.slot_gate import evaluate_required_slots
+from packages.plan.spawn_budget import SpawnBudget, resolve_spawn_budget
+from packages.plan.tool_output_guard import sanitize_tool_output
+from packages.plan.validator import topological_sort_steps, validate_plan_ir
 from backend.core.render.directive import extract_render_directive, render_directive_to_dict
 from backend.observability.decorators import enrich_span, observe
 from packages.auth.models import TenantContext
@@ -497,7 +497,7 @@ async def execute_plan_ir(
                             assessment=drift,
                         )
                         if drift.signal == "user_correction":
-                            from backend.core.plan.coref import clear_session_coref
+                            from packages.plan.coref import clear_session_coref
 
                             await clear_session_coref(state)
                         new_plan = await _replan_remaining(

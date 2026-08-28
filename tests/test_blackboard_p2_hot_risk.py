@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import pytest
 
-from backend.core.plan.blackboard import Blackboard, is_high_risk
+from packages.plan.blackboard import Blackboard, is_high_risk
 
 
 @pytest.fixture(autouse=True)
 def _noop_audit(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "backend.core.plan.blackboard.write_audit_sync",
+        "packages.plan.blackboard.write_audit_sync",
         lambda *a, **k: True,
     )
 

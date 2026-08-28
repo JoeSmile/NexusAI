@@ -7,11 +7,11 @@ from datetime import datetime, timedelta
 
 from packages.auth.models import TenantContext
 from backend.core.org.scope import OrgScope
-from backend.core.workflow.grants import (
+from packages.workflow.grants import (
     cap_entry,
     expire_stale_approvals_for_node,
 )
-from backend.core.workflow.runner import cancel_run
+from packages.workflow.runner import cancel_run
 from backend.database.pgvector_session import (
     PermissionRequest,
     Workflow,

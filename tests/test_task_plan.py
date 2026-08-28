@@ -12,7 +12,7 @@ from packages.pipeline.intent_path import (
     should_task_plan,
     skill_to_state,
 )
-from backend.core.plan.validator import PlanValidationError
+from packages.plan.validator import PlanValidationError
 from packages.pipeline.nodes.task_plan import (
     audit_task_plan_on_success,
     plan_for_audit,
@@ -381,7 +381,7 @@ async def test_async_plan_skipped_when_flag_off(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_async_plan_ok_emits_done(monkeypatch):
-    from backend.core.plan.event_bus import get_run_bus
+    from packages.plan.event_bus import get_run_bus
     from packages.pipeline.nodes.task_plan import run_async_task_plan_for_stream
 
     monkeypatch.setenv("ASYNC_TASK_PLAN_ON_STREAM", "1")
@@ -437,7 +437,7 @@ async def test_async_plan_ok_emits_done(monkeypatch):
 async def test_async_plan_timeout_degrades(monkeypatch):
     import asyncio
 
-    from backend.core.plan.event_bus import get_run_bus
+    from packages.plan.event_bus import get_run_bus
     from packages.pipeline.nodes.task_plan import run_async_task_plan_for_stream
 
     monkeypatch.setenv("ASYNC_TASK_PLAN_ON_STREAM", "1")

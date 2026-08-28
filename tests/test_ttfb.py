@@ -38,7 +38,7 @@ def test_short_path_never_async_plans(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.mark.asyncio
 async def test_mock_first_frame_pending_under_budget(monkeypatch: pytest.MonkeyPatch) -> None:
     """复杂路径：pending 事件本身应瞬间可发（不计入规划 LLM）。"""
-    from backend.core.plan.event_bus import get_run_bus
+    from packages.plan.event_bus import get_run_bus
 
     monkeypatch.setenv("ASYNC_TASK_PLAN_ON_STREAM", "1")
     bus = get_run_bus("tr-ttfb")

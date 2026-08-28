@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from backend.core.workflow.dataflow import (
+from packages.workflow.dataflow import (
     DataflowError,
     detect_edge_cycles,
     get_dotted,
@@ -14,7 +14,7 @@ from backend.core.workflow.dataflow import (
     resolve_params,
     validate_edges_static,
 )
-from backend.core.workflow.ir import WorkflowEdge, WorkflowIR, WorkflowNode
+from packages.workflow.ir import WorkflowEdge, WorkflowIR, WorkflowNode
 
 
 def test_edge_four_field_model() -> None:

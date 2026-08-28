@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from backend.core.plan.models import OnFailMode, PlanIR, PlanStep, PlanStepRetry
-from backend.core.plan.blackboard import Blackboard
-from backend.core.plan.spawn_budget import SpawnBudget
+from packages.plan.models import OnFailMode, PlanIR, PlanStep, PlanStepRetry
+from packages.plan.blackboard import Blackboard
+from packages.plan.spawn_budget import SpawnBudget
 from packages.pipeline.nodes.orchestrator import (
     OrchestratorError,
     execute_plan_ir,

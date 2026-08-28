@@ -4,15 +4,15 @@ from __future__ import annotations
 
 import pytest
 
-from backend.core.plan.blackboard import Blackboard
-from backend.core.plan.blackboard_preprocess import preprocess_blackboard_write
-from backend.core.plan.topic_registry import TopicRegistryError, topic_allowed, validate_topic
+from packages.plan.blackboard import Blackboard
+from packages.plan.blackboard_preprocess import preprocess_blackboard_write
+from packages.plan.topic_registry import TopicRegistryError, topic_allowed, validate_topic
 
 
 @pytest.fixture(autouse=True)
 def _noop_audit(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "backend.core.plan.blackboard.write_audit_sync",
+        "packages.plan.blackboard.write_audit_sync",
         lambda *a, **k: True,
     )
 
@@ -82,7 +82,7 @@ def test_preprocess_semantic_conflict() -> None:
 
 
 def test_preprocess_homogeneous_merge() -> None:
-    from backend.core.plan.blackboard import BlackboardEntry
+    from packages.plan.blackboard import BlackboardEntry
 
     prev = BlackboardEntry(
         source_agent_id="a",

@@ -81,7 +81,7 @@ async def create_api_key(
         ).fetchone()
         if existing_user_key is None:
             try:
-                from backend.core.workflow.subscription import (
+                from packages.workflow.subscription import (
                     SeatLimitExceeded,
                     assert_seat_available,
                 )

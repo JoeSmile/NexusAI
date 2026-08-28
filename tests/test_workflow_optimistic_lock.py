@@ -15,7 +15,7 @@ from packages.capability.models import (
 )
 from packages.capability.registry import CapabilityRegistry
 from backend.core.org.scope import OrgScope
-from backend.core.workflow import service as wf_svc
+from packages.workflow import service as wf_svc
 from backend.database.pgvector_session import Workflow, get_pg_session
 
 
@@ -53,7 +53,7 @@ def ctx():
 def test_double_publish_second_409(ctx, monkeypatch):
     tenant, scope, reg, _tid = ctx
     monkeypatch.setattr(
-        "backend.core.workflow.service.get_capability_registry", lambda: reg
+        "packages.workflow.service.get_capability_registry", lambda: reg
     )
     sf = get_pg_session()
     with sf.Session() as session:
@@ -84,7 +84,7 @@ def test_double_publish_second_409(ctx, monkeypatch):
 def test_publish_revision_mismatch(ctx, monkeypatch):
     tenant, scope, reg, _tid = ctx
     monkeypatch.setattr(
-        "backend.core.workflow.service.get_capability_registry", lambda: reg
+        "packages.workflow.service.get_capability_registry", lambda: reg
     )
     sf = get_pg_session()
     with sf.Session() as session:

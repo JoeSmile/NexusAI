@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.core.plan.agent_type import (
+from packages.plan.agent_type import (
     agent_type_for_intent,
     get_agent_type,
     list_agent_types,

@@ -14,11 +14,11 @@ from packages.capability.invoke import capability_visible_to
 from packages.capability.registry import get_capability_registry
 from backend.core.guardrails.output_guard import check_output
 from backend.core.harness import LLMHarness
-from backend.core.plan.event_bus import bus_for_state
-from backend.core.plan.llm_output_guard import prevalidate_llm_plan
-from backend.core.plan.models import plan_to_state_dict
-from backend.core.plan.tool_index import search_capabilities
-from backend.core.plan.validator import validate_plan_ir
+from packages.plan.event_bus import bus_for_state
+from packages.plan.llm_output_guard import prevalidate_llm_plan
+from packages.plan.models import plan_to_state_dict
+from packages.plan.tool_index import search_capabilities
+from packages.plan.validator import validate_plan_ir
 from backend.observability.decorators import enrich_span, observe
 from packages.auth.models import TenantContext
 from packages.pipeline.intent_path import (
@@ -204,7 +204,7 @@ def _build_messages(
         f"message={message[:2000]}\n"
     )
     if agent_type_id:
-        from backend.core.plan.agent_type import get_agent_type
+        from packages.plan.agent_type import get_agent_type
 
         at = get_agent_type(agent_type_id)
         if at is not None:
@@ -375,7 +375,7 @@ async def _produce_plan_ir(state: PipelineState) -> dict[str, Any] | None:
     intent = state.get("intent", "default") or "default"
     confidence = float(state.get("intent_confidence", 0.0) or 0.0)
 
-    from backend.core.plan.coref import (
+    from packages.plan.coref import (
         apply_coref_to_plan,
         infer_coref_table,
         invalidate_coref_if_drift,
@@ -390,7 +390,7 @@ async def _produce_plan_ir(state: PipelineState) -> dict[str, Any] | None:
     session_coref_dict = session_coref.model_dump(mode="json")
 
     ranked_caps = search_capabilities(caps, message, top_k=12)
-    from backend.core.plan.agent_spawn import boost_capabilities_for_agent_type
+    from packages.plan.agent_spawn import boost_capabilities_for_agent_type
 
     ranked_caps = boost_capabilities_for_agent_type(
         ranked_caps,

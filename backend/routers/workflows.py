@@ -10,8 +10,8 @@ from pydantic import BaseModel, Field
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
 from backend.core.org.scope import resolve_org_scope
-from backend.core.workflow import service as wf_svc
-from backend.core.workflow.models import WorkflowCreateBody, WorkflowPatchBody
+from packages.workflow import service as wf_svc
+from packages.workflow.models import WorkflowCreateBody, WorkflowPatchBody
 from backend.database.pgvector_session import get_pg_session
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])

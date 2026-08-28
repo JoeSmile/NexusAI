@@ -1,6 +1,6 @@
 """Wave D2 — IR snapshot freeze + idempotency key."""
 
-from backend.core.workflow.runner import freeze_ir_snapshot, idempotency_key
+from packages.workflow.runner import freeze_ir_snapshot, idempotency_key
 
 
 def test_freeze_ir_snapshot_deepcopy():

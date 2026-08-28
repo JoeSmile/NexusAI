@@ -154,7 +154,7 @@ def try_bridge_start_run(state: PipelineState) -> PipelineState:
             return state
 
         from backend.core.org.scope import resolve_org_scope
-        from backend.core.workflow import runner as run_svc
+        from packages.workflow import runner as run_svc
         from packages.auth.models import TenantContext
 
         uc = state.get("user_context") or {}

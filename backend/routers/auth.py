@@ -198,7 +198,7 @@ async def register(req: RegisterRequest, background_tasks: BackgroundTasks):
 
             # G1/G8：席位硬限（拍板 3B 上线闸；I-2 专用异常）
             try:
-                from backend.core.workflow.subscription import (
+                from packages.workflow.subscription import (
                     SeatLimitExceeded,
                     assert_seat_available,
                 )

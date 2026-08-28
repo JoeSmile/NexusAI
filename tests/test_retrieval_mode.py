@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.core.plan.retrieval_mode import choose_retrieval_mode
+from packages.plan.retrieval_mode import choose_retrieval_mode
 
 
 def test_mode_a_for_small_catalog() -> None:

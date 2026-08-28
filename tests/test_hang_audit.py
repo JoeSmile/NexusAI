@@ -16,8 +16,8 @@ from packages.capability.models import (
 )
 from packages.capability.registry import CapabilityRegistry
 from backend.core.org.scope import OrgScope
-from backend.core.workflow.notify import mark_escalated
-from backend.core.workflow.runner import execute_run, start_run
+from packages.workflow.notify import mark_escalated
+from packages.workflow.runner import execute_run, start_run
 from backend.database.pgvector_session import (
     PermissionRequest,
     Workflow,
@@ -50,7 +50,7 @@ async def test_suspend_and_escalate_audit_fields(monkeypatch):
         )
     )
     monkeypatch.setattr(
-        "backend.core.workflow.node_exec.get_capability_registry", lambda: reg
+        "packages.workflow.node_exec.get_capability_registry", lambda: reg
     )
     tenant = TenantContext(tid, uid, "user", [], False, credential_kind="human_session")
     scope = OrgScope(
@@ -94,12 +94,12 @@ async def test_suspend_and_escalate_audit_fields(monkeypatch):
 
     with (
         patch(
-            "backend.core.workflow.run_lifecycle.rebuild_tenant_context",
+            "packages.workflow.run_lifecycle.rebuild_tenant_context",
             return_value=(tenant, scope),
         ),
-        patch("backend.core.workflow.runner_shared.write_audit_sync", _cap),
-        patch("backend.core.workflow.notify.write_audit_sync", _cap),
-        patch("backend.core.workflow.notify.get_unit", return_value=None),
+        patch("packages.workflow.runner_shared.write_audit_sync", _cap),
+        patch("packages.workflow.notify.write_audit_sync", _cap),
+        patch("packages.workflow.notify.get_unit", return_value=None),
     ):
         await execute_run(run_id)
 
@@ -130,7 +130,7 @@ async def test_suspend_and_escalate_audit_fields(monkeypatch):
 def test_timeout_escalate_audit(monkeypatch):
     records: list[dict] = []
     monkeypatch.setattr(
-        "backend.core.workflow.notify.write_audit_sync",
+        "packages.workflow.notify.write_audit_sync",
         lambda rec: records.append(dict(rec)),
     )
     tid = f"e5-t-{uuid.uuid4().hex[:8]}"

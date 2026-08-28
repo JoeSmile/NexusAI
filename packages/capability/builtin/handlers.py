@@ -321,7 +321,7 @@ async def _plan_status(payload: dict[str, Any], tenant: TenantContext) -> dict[s
 async def _blackboard_search(
     payload: dict[str, Any], tenant: TenantContext
 ) -> dict[str, Any]:
-    from backend.core.plan.blackboard import Blackboard
+    from packages.plan.blackboard import Blackboard
 
     raw = payload.get("blackboard")
     if not isinstance(raw, list):

@@ -5,8 +5,8 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta
 
-from backend.core.workflow.grants import normalize_request_policy, renew_grant
-from backend.core.workflow.scheduler import parse_cron_next
+from packages.workflow.grants import normalize_request_policy, renew_grant
+from packages.workflow.scheduler import parse_cron_next
 from backend.database.pgvector_session import (
     PermissionRequest,
     Workflow,

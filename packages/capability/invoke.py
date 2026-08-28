@@ -87,7 +87,7 @@ def _check_permission(spec: CapabilitySpec, tenant: TenantContext) -> None:
     needed = (spec.permission or "").strip() or "chat:write"
     if not tenant.has_permission(needed):
         # Wave E: workflow_grant 命中（caps 不并进 extra_permissions）
-        from backend.core.workflow.grants import current_grant_covers_capability
+        from packages.workflow.grants import current_grant_covers_capability
 
         if not current_grant_covers_capability():
             raise NexusAIException(

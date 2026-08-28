@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta
 
-from backend.core.workflow.notify import (
+from packages.workflow.notify import (
     hang_escalate_after_seconds,
     maybe_escalate_timeout,
     scan_hang_timeouts,

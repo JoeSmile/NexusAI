@@ -254,7 +254,7 @@ async def invoke_agent(
 
     # Wave 8 拍板 8A: Hub agent stack counts toward composition budget
     try:
-        from backend.core.workflow.composition import (
+        from packages.workflow.composition import (
             CompositionDepthExceeded,
             check_composition_budget,
         )

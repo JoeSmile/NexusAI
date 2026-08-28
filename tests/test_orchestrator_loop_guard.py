@@ -6,9 +6,9 @@ from unittest.mock import patch
 
 import pytest
 
-from backend.core.plan.loop_guard import LoopGuardError
-from backend.core.plan.models import PlanIR, PlanStep
-from backend.core.plan.spawn_budget import SpawnBudget
+from packages.plan.loop_guard import LoopGuardError
+from packages.plan.models import PlanIR, PlanStep
+from packages.plan.spawn_budget import SpawnBudget
 from packages.pipeline.nodes.orchestrator import OrchestratorError, execute_plan_ir
 from packages.pipeline.state import make_initial_state
 
@@ -62,7 +62,7 @@ async def test_execute_plan_loop_guard_stops_on_dup(monkeypatch: pytest.MonkeyPa
 
     audits: list[dict] = []
     with patch(
-        "backend.core.plan.loop_guard.write_audit_sync",
+        "packages.plan.loop_guard.write_audit_sync",
         side_effect=lambda r: audits.append(r) or True,
     ):
         with pytest.raises(OrchestratorError, match="重复执行"):

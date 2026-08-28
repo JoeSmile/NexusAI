@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from backend.core.plan.intent_drift import detect_intent_drift
-from backend.core.plan.models import PlanStep
+from packages.plan.intent_drift import detect_intent_drift
+from packages.plan.models import PlanStep
 
 
 def _step() -> PlanStep:

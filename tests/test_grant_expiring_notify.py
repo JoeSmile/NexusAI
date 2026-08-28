@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from unittest.mock import patch
 
-from backend.core.workflow.subscription import get_subscription, set_subscription
+from packages.workflow.subscription import get_subscription, set_subscription
 from backend.modules.notification.service import refs_only
 
 
@@ -52,14 +52,14 @@ def test_grant_scanner_renew_before_notify_order():
         return {}
 
     with patch(
-        "backend.core.workflow.grants.scan_grants_for_auto_renew", side_effect=_renew
+        "packages.workflow.grants.scan_grants_for_auto_renew", side_effect=_renew
     ), patch(
-        "backend.core.workflow.grant_notify.scan_expiring_grants", side_effect=_notify
+        "packages.workflow.grant_notify.scan_expiring_grants", side_effect=_notify
     ), patch(
-        "backend.core.workflow.subscription.scan_subscription_expiring",
+        "packages.workflow.subscription.scan_subscription_expiring",
         side_effect=_sub,
     ):
-        from backend.core.workflow.grant_scanner import scan_once
+        from packages.workflow.grant_scanner import scan_once
 
         scan_once()
     assert calls[:2] == ["renew", "notify"]

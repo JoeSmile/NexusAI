@@ -10,7 +10,7 @@ import pytest
 
 from packages.auth.models import TenantContext
 from backend.core.org.scope import OrgScope
-from backend.core.workflow.runner import _execute_node
+from packages.workflow.runner import _execute_node
 from backend.database.pgvector_session import WorkflowRun, WorkflowRunNode, get_pg_session
 
 
@@ -60,7 +60,7 @@ async def test_succeeded_node_skips_invoke():
             business_roles=frozenset(),
         )
         with patch(
-            "backend.core.workflow.node_exec.invoke", new_callable=AsyncMock
+            "packages.workflow.node_exec.invoke", new_callable=AsyncMock
         ) as inv:
             await _execute_node(
                 session,

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.core.workflow.run_lifecycle import execute_run, run_advisory_lock_key
+from packages.workflow.run_lifecycle import execute_run, run_advisory_lock_key
 
 
 def test_run_advisory_lock_key_stable_and_positive() -> None:
@@ -46,11 +46,11 @@ class _LockBusyFactory:
 async def test_busy_advisory_lock_skips_without_cas(monkeypatch: pytest.MonkeyPatch) -> None:
     """拿不到锁 → 不执行 CAS（另一 worker 正在跑）。"""
     monkeypatch.setattr(
-        "backend.core.workflow.run_lifecycle.get_pg_session",
+        "packages.workflow.run_lifecycle.get_pg_session",
         lambda: _LockBusyFactory(),
     )
     monkeypatch.setattr(
-        "backend.core.workflow.run_lifecycle._try_execute_lock",
+        "packages.workflow.run_lifecycle._try_execute_lock",
         lambda session, run_id: False,
     )
     await execute_run("run-held-elsewhere")

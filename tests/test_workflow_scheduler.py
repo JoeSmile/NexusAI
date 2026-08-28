@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.core.workflow.scheduler import (
+from packages.workflow.scheduler import (
     _user_still_valid,
     parse_cron_next,
     scan_due_schedules,
@@ -61,16 +61,16 @@ def test_scan_auth_check_fail_does_not_start_run():
     with patch(
         "backend.database.pgvector_session.get_pg_session", return_value=sf
     ), patch(
-        "backend.core.workflow.scheduler._user_still_valid", return_value=True
+        "packages.workflow.scheduler._user_still_valid", return_value=True
     ), patch(
-        "backend.core.workflow.scheduler.validate_grants_before_execute",
+        "packages.workflow.scheduler.validate_grants_before_execute",
         side_effect=RuntimeError("boom"),
     ), patch(
-        "backend.core.workflow.scheduler._audit_schedule"
+        "packages.workflow.scheduler._audit_schedule"
     ) as audit, patch(
-        "backend.core.workflow.runner.start_run"
+        "packages.workflow.runner.start_run"
     ) as start_run, patch(
-        "backend.core.workflow.runner.schedule_execute"
+        "packages.workflow.runner.schedule_execute"
     ):
         out = scan_due_schedules(now=datetime(2026, 8, 15, 8, 0, 0), limit=5)
 

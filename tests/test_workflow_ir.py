@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from backend.core.workflow.ir import (
+from packages.workflow.ir import (
     WorkflowIR,
     WorkflowNode,
     validate_ir_capabilities,

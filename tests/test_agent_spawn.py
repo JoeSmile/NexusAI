@@ -6,20 +6,20 @@ import pytest
 
 from packages.auth.models import TenantContext
 from packages.auth.subagent import is_sub_agent
-from backend.core.plan.agent_spawn import (
+from packages.plan.agent_spawn import (
     SpawnBlockedError,
     boost_capabilities_for_agent_type,
     prepare_orchestrator_spawn,
     resolve_step_tenant,
 )
-from backend.core.plan.blackboard import Blackboard
+from packages.plan.blackboard import Blackboard
 from packages.pipeline.state import make_initial_state
 
 
 @pytest.fixture(autouse=True)
 def _noop_audit(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "backend.core.plan.blackboard.write_audit_sync",
+        "packages.plan.blackboard.write_audit_sync",
         lambda *a, **k: True,
     )
 
@@ -86,16 +86,16 @@ def test_prepare_orchestrator_spawn_writes_slots_filled() -> None:
 
 @pytest.mark.asyncio
 async def test_orchestrator_spawn_blocked_holds_clarification(monkeypatch):
-    from backend.core.plan.agent_spawn import SpawnBlockedError
-    from backend.core.plan.clarification import get_pending
-    from backend.core.plan.slot_gate import evaluate_required_slots
+    from packages.plan.agent_spawn import SpawnBlockedError
+    from packages.plan.clarification import get_pending
+    from packages.plan.slot_gate import evaluate_required_slots
     from packages.pipeline.nodes.orchestrator import (
         orchestrator,
         route_after_orchestrator,
     )
 
     monkeypatch.setattr(
-        "backend.core.plan.clarification.write_audit_sync",
+        "packages.plan.clarification.write_audit_sync",
         lambda *a, **k: True,
     )
     async def _write(self, tier, *, user_id, **payload):

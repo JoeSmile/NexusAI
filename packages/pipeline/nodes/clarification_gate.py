@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.core.plan.clarification import (
+from packages.plan.clarification import (
     evaluate_clarification_triggers,
     get_pending,
     hold_for_clarification,

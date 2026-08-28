@@ -6,9 +6,9 @@ import json
 
 import pytest
 
-from backend.core.plan.agent_type import TOPIC_SLOTS_MISSING, get_agent_type
-from backend.core.plan.blackboard import Blackboard
-from backend.core.plan.slot_gate import (
+from packages.plan.agent_type import TOPIC_SLOTS_MISSING, get_agent_type
+from packages.plan.blackboard import Blackboard
+from packages.plan.slot_gate import (
     evaluate_required_slots,
     missing_required_slots,
     write_slots_missing_entry,
@@ -18,7 +18,7 @@ from backend.core.plan.slot_gate import (
 @pytest.fixture(autouse=True)
 def _noop_audit(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "backend.core.plan.blackboard.write_audit_sync",
+        "packages.plan.blackboard.write_audit_sync",
         lambda *a, **k: True,
     )
 

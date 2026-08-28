@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from backend.core.plan.retrieval_mode import estimate_prompt_tokens
+from packages.plan.retrieval_mode import estimate_prompt_tokens
 from packages.pipeline.state import PipelineState
 
 HOT_HISTORY_TURNS = 10

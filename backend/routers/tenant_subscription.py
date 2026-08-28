@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field, model_validator
 from backend.core.audit import write_audit_sync
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
-from backend.core.workflow.subscription import (
+from packages.workflow.subscription import (
     effective_seat_cap,
     get_subscription,
     set_subscription,

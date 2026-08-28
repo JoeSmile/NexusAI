@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from backend.core.workflow.runner import _audit
+from packages.workflow.runner import _audit
 
 
 def test_audit_includes_run_and_node_ids():
@@ -13,7 +13,7 @@ def test_audit_includes_run_and_node_ids():
     def _capture(record):
         captured.update(record)
 
-    with patch("backend.core.workflow.runner_shared.write_audit_sync", _capture):
+    with patch("packages.workflow.runner_shared.write_audit_sync", _capture):
         _audit(
             tenant_id="t1",
             user_id="u1",

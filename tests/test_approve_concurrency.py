@@ -11,7 +11,7 @@ from sqlalchemy import text
 
 from packages.auth.models import TenantContext
 from backend.core.org.scope import OrgScope
-from backend.core.workflow.grants import can_review_request
+from packages.workflow.grants import can_review_request
 from backend.database.pgvector_session import PermissionRequest, get_pg_session
 from backend.routers import workflow_approvals as apr
 

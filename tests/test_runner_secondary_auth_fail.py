@@ -16,7 +16,7 @@ from packages.capability.models import (
 )
 from packages.capability.registry import CapabilityRegistry
 from backend.core.org.scope import OrgScope
-from backend.core.workflow.runner import execute_run, start_run
+from packages.workflow.runner import execute_run, start_run
 from backend.database.pgvector_session import Workflow, WorkflowRun, WorkflowRunNode, get_pg_session
 
 
@@ -38,7 +38,7 @@ async def test_secondary_auth_fail_marks_run_failed(monkeypatch):
         )
     )
     monkeypatch.setattr(
-        "backend.core.workflow.node_exec.get_capability_registry", lambda: reg
+        "packages.workflow.node_exec.get_capability_registry", lambda: reg
     )
 
     # user without admin:*
@@ -85,7 +85,7 @@ async def test_secondary_auth_fail_marks_run_failed(monkeypatch):
         run_id = started["id"]
 
     with patch(
-        "backend.core.workflow.run_lifecycle.rebuild_tenant_context",
+        "packages.workflow.run_lifecycle.rebuild_tenant_context",
         return_value=(tenant, scope),
     ):
         await execute_run(run_id)

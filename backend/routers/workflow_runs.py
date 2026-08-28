@@ -11,7 +11,7 @@ from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
 from backend.core.errors import ErrorCode
 from backend.core.org.scope import assert_org_access, resolve_org_scope, visible_org_filter
-from backend.core.workflow import runner as run_svc
+from packages.workflow import runner as run_svc
 from backend.database.pgvector_session import Workflow, WorkflowRun, WorkflowRunNode, get_pg_session
 
 router = APIRouter(tags=["workflow-runs"])
@@ -262,7 +262,7 @@ async def get_run(
             parent_status=parent_status,
         )
         if run.status == "suspended":
-            from backend.core.workflow.notify import hang_visibility
+            from packages.workflow.notify import hang_visibility
 
             out.update(hang_visibility(session, run_id=run.id))
         return out
@@ -275,7 +275,7 @@ async def create_workflow_schedule(
     tenant: TenantContext = Depends(verify_human_or_legacy_key),
 ) -> dict[str, Any]:
     """I6：创建 cron；created_by 从 auth 钉死，忽略/拒 body.created_by。"""
-    from backend.core.workflow.scheduler import create_scheduled_run
+    from packages.workflow.scheduler import create_scheduled_run
 
     payload = body or {}
     body_cb = payload.get("created_by")

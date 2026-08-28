@@ -18,7 +18,7 @@ from packages.capability.models import (
 )
 from packages.capability.registry import CapabilityRegistry
 from backend.core.org.scope import OrgScope
-from backend.core.workflow import service as wf_svc
+from packages.workflow import service as wf_svc
 from backend.database.pgvector_session import Workflow, get_pg_session
 from backend.routers.workflows import router
 
@@ -89,7 +89,7 @@ def cap_reg(monkeypatch) -> CapabilityRegistry:
         )
     )
     monkeypatch.setattr(
-        "backend.core.workflow.service.get_capability_registry", lambda: reg
+        "packages.workflow.service.get_capability_registry", lambda: reg
     )
     return reg
 

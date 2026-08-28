@@ -10,7 +10,7 @@ from packages.capability.models import (
     CapabilityStatus,
 )
 from packages.capability.invoke import capability_visible_to
-from backend.core.workflow.service import capability_catalog_visible
+from packages.workflow.service import capability_catalog_visible
 
 
 def test_catalog_visible_ignores_permission() -> None:

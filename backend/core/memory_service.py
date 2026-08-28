@@ -1080,7 +1080,7 @@ class UnifiedMemoryService:
             format_summary_line,
             parse_structured_summary,
         )
-        from backend.core.plan.retrieval_mode import normalize_retrieval_mode
+        from packages.plan.retrieval_mode import normalize_retrieval_mode
 
         window = context_window_tokens or int(
             os.getenv("MEMORY_CONTEXT_TOKENS") or _DEFAULT_CONTEXT_TOKENS

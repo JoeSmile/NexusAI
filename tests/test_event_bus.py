@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.core.plan.event_bus import PlanEventBus, get_run_bus, release_run_bus
+from packages.plan.event_bus import PlanEventBus, get_run_bus, release_run_bus
 
 
 def test_emit_order_and_snapshot() -> None:

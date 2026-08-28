@@ -64,7 +64,7 @@ async def _analyze_intent(message: str) -> dict:
 
         result = get_intent_service().intent_classifier.detect_intent(message)
         intent = result.intent.value if hasattr(result.intent, "value") else str(result.intent)
-        from backend.core.plan.agent_type import agent_type_for_intent
+        from packages.plan.agent_type import agent_type_for_intent
 
         at = agent_type_for_intent(intent)
         agent_type_id = at.type_id if at else None

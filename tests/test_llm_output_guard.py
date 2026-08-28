@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import pytest
 
-from backend.core.plan.llm_output_guard import (
+from packages.plan.llm_output_guard import (
     LlmOutputValidationError,
     detect_fake_tool_call_text,
     prevalidate_llm_plan,
     scan_plan_for_fake_tool_calls,
 )
-from backend.core.plan.tool_output_guard import sanitize_tool_output
-from backend.core.plan.validator import PlanValidationError
+from packages.plan.tool_output_guard import sanitize_tool_output
+from packages.plan.validator import PlanValidationError
 
 
 def test_detect_fake_tool_call_markers() -> None:

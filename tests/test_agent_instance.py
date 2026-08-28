@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.core.plan.agent_instance import (
+from packages.plan.agent_instance import (
     AgentInstanceStatus,
     complete_agent_instance,
     fail_agent_instance,
@@ -12,7 +12,7 @@ from backend.core.plan.agent_instance import (
     spawn_agent_instance,
     spawn_trace_id,
 )
-from backend.core.plan.agent_spawn import (
+from packages.plan.agent_spawn import (
     complete_agent_instance_for_step,
     fail_agent_instance_for_step,
     spawn_sub_agent_instance,
@@ -65,7 +65,7 @@ def test_lifecycle_complete_and_fail() -> None:
 @pytest.fixture(autouse=True)
 def _noop_audit(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "backend.core.plan.agent_instance.write_audit_sync",
+        "packages.plan.agent_instance.write_audit_sync",
         lambda *a, **k: True,
     )
 

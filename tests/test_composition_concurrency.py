@@ -10,12 +10,12 @@ from fastapi import HTTPException
 
 from packages.auth.models import TenantContext
 from backend.core.org.scope import OrgScope
-from backend.core.workflow.composition import (
+from packages.workflow.composition import (
     MAX_COMPOSITION_DEPTH,
     CompositionDepthExceeded,
     check_composition_budget,
 )
-from backend.core.workflow.runner import MAX_RUNNING_ROOT_RUNS, start_run
+from packages.workflow.runner import MAX_RUNNING_ROOT_RUNS, start_run
 from backend.database.pgvector_session import Workflow, WorkflowRun, get_pg_session
 
 
@@ -126,7 +126,7 @@ def test_two_roots_full_third_root_429_child_ok() -> None:
 
 
 def test_serial_ready_not_parallel_documented() -> None:
-    from backend.core.workflow.dataflow import pick_next_ready, ready_node_ids
+    from packages.workflow.dataflow import pick_next_ready, ready_node_ids
 
     assert callable(ready_node_ids)
     assert callable(pick_next_ready)

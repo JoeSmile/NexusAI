@@ -9,8 +9,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from backend.core.audit import write_audit_sync
 from packages.auth.models import TenantContext
 from packages.auth.permissions import require_permission
-from backend.core.plan.event_bus import event_to_dict, get_run_bus_optional
-from backend.core.plan.run_cancel import request_cancel
+from packages.plan.event_bus import event_to_dict, get_run_bus_optional
+from packages.plan.run_cancel import request_cancel
 
 router = APIRouter(prefix="/api/chat", tags=["chat-execution"])
 

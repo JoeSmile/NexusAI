@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from backend.core.plan.execution import group_independent_batches
-from backend.core.plan.params_resolve import resolve_step_params
-from backend.core.plan.spawn_budget import SpawnBudget
+from packages.plan.execution import group_independent_batches
+from packages.plan.params_resolve import resolve_step_params
+from packages.plan.spawn_budget import SpawnBudget
 
 
 def test_spawn_budget_can_spawn_within_limits() -> None:

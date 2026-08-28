@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from backend.core.plan.tool_index import search_capabilities
-from backend.core.plan.validator import PlanValidationError, validate_plan_ir
+from packages.plan.tool_index import search_capabilities
+from packages.plan.validator import PlanValidationError, validate_plan_ir
 from packages.pipeline.nodes.query_rewrite import attach_query_rewrite_to_plan
 
 

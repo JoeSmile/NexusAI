@@ -10,7 +10,7 @@ from packages.pipeline.cache.fingerprint_cache import make_fingerprint
 from packages.pipeline.nodes.analyze_parallel import analyze_parallel
 from packages.pipeline.nodes.orchestrator import execute_plan_ir
 from packages.pipeline.state import make_initial_state
-from backend.core.plan.models import PlanIR, PlanStep
+from packages.plan.models import PlanIR, PlanStep
 
 
 @pytest.mark.asyncio

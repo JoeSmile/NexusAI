@@ -1,6 +1,6 @@
 """Evidence mapping — real sources only."""
 
-from backend.core.workflow.evidence import evidence_from_rag_sources
+from packages.workflow.evidence import evidence_from_rag_sources
 
 
 def test_empty_sources_yield_empty_evidence():

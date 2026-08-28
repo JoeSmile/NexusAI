@@ -6,14 +6,14 @@ import re
 
 import pytest
 
-from backend.core.plan.agent_type import get_agent_type
-from backend.core.plan.slot_gate import evaluate_required_slots
+from packages.plan.agent_type import get_agent_type
+from packages.plan.slot_gate import evaluate_required_slots
 
 
 @pytest.fixture(autouse=True)
 def _noop_audit(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "backend.core.plan.blackboard.write_audit_sync",
+        "packages.plan.blackboard.write_audit_sync",
         lambda *a, **k: True,
     )
 

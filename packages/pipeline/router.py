@@ -17,12 +17,12 @@ from backend.core.audit_context import bind_audit_lineage
 from backend.core.billing.context import bind_billing_context
 from backend.core.errors import ErrorCode, NexusAIException
 from backend.core.guardrails.output_guard import DRIFT_PATTERNS, VIOLATION_PATTERNS
-from backend.core.plan.event_bus import (
+from packages.plan.event_bus import (
     event_to_sse_payload,
     get_run_bus,
     get_run_bus_optional,
 )
-from backend.core.plan.run_cancel import (
+from packages.plan.run_cancel import (
     clear_cancel,
     is_cancelled,
     register_run,

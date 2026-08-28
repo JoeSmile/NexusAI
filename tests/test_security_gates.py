@@ -11,7 +11,7 @@ from packages.capability.models import (
     CapabilitySpec,
 )
 from backend.core.org.scope import OrgScope
-from backend.core.workflow.security_gates import (
+from packages.workflow.security_gates import (
     HangGateError,
     assert_hang_wait_allowed,
     assert_no_browser_delegation,

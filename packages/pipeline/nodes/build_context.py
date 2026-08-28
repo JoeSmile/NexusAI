@@ -12,7 +12,7 @@ from backend.core.memory_service import (
     MemoryBundle,
     get_unified_memory_service,
 )
-from backend.core.plan.retrieval_mode import (
+from packages.plan.retrieval_mode import (
     choose_retrieval_mode,
     token_budget_warning,
 )

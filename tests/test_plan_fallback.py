@@ -6,7 +6,7 @@ import asyncio
 
 import pytest
 
-from backend.core.plan.event_bus import get_run_bus
+from packages.plan.event_bus import get_run_bus
 from packages.pipeline.nodes.task_plan import run_async_task_plan_for_stream
 from packages.pipeline.state import make_initial_state
 

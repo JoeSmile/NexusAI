@@ -200,7 +200,7 @@ files = [
   "backend/modules/llm",
   "backend/modules/notification",
   "backend/modules/channel",
-  "backend/core/workflow",
+  "packages/workflow",
   "backend/core/skill_assets",
   "backend/routers/workflow_runs.py",
   "backend/routers/workflows.py",

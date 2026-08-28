@@ -10,7 +10,7 @@ from fastapi import HTTPException
 
 from packages.auth.models import TenantContext
 from backend.core.org.scope import OrgScope
-from backend.core.workflow.runner import execute_run, start_run
+from packages.workflow.runner import execute_run, start_run
 from backend.database.pgvector_session import Workflow, WorkflowRun, get_pg_session
 
 

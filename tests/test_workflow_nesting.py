@@ -5,10 +5,10 @@ from __future__ import annotations
 import pytest
 from fastapi import HTTPException
 
-from backend.core.workflow import runner as run_svc
-from backend.core.workflow.composition import MAX_COMPOSITION_DEPTH
-from backend.core.workflow.ir import WorkflowIR, WorkflowNode
-from backend.core.workflow.run_state import can_node_transition
+from packages.workflow import runner as run_svc
+from packages.workflow.composition import MAX_COMPOSITION_DEPTH
+from packages.workflow.ir import WorkflowIR, WorkflowNode
+from packages.workflow.run_state import can_node_transition
 
 
 def test_waiting_child_transitions() -> None:

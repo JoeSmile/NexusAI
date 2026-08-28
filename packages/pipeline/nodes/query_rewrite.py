@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from backend.core.plan.models import CorefTable, QueryRewrite
+from packages.plan.models import CorefTable, QueryRewrite
 
 _SECRET_RE = re.compile(
     r"(?i)(api[_-]?key|secret|password|token|bearer\s+\S+|sk-[a-z0-9]{8,})"

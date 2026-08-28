@@ -1,6 +1,6 @@
 """Wave D1 — run state machine."""
 
-from backend.core.workflow.run_state import can_transition
+from packages.workflow.run_state import can_transition
 
 
 def test_legal_transitions():

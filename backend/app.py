@@ -49,7 +49,7 @@ async def lifespan(app: FastAPI):
         logger.warning("数据库初始化失败: %s", e)
 
     try:
-        from backend.core.workflow.runner import (
+        from packages.workflow.runner import (
             mark_zombie_runs_failed,
             recover_waiting_child_parents,
         )
@@ -64,7 +64,7 @@ async def lifespan(app: FastAPI):
         logger.debug("zombie/waiting_child sweep skipped: %s", e)
 
     try:
-        from backend.core.workflow.notify import start_hang_scanner
+        from packages.workflow.notify import start_hang_scanner
 
         start_hang_scanner()
         logger.info("✓ hang escalate scanner 已启动")
@@ -72,7 +72,7 @@ async def lifespan(app: FastAPI):
         logger.debug("hang scanner skipped: %s", e)
 
     try:
-        from backend.core.workflow.grant_scanner import start_grant_scanner
+        from packages.workflow.grant_scanner import start_grant_scanner
 
         start_grant_scanner()
         logger.info("✓ grant auto_renew scanner 已启动")
@@ -88,7 +88,7 @@ async def lifespan(app: FastAPI):
         logger.debug("memory metrics skipped: %s", e)
 
     try:
-        from backend.core.workflow.scheduler import start_schedule_scanner
+        from packages.workflow.scheduler import start_schedule_scanner
 
         start_schedule_scanner()
         logger.info("✓ workflow schedule scanner 已启动")
@@ -150,19 +150,19 @@ async def lifespan(app: FastAPI):
 
     logger.info("NexusAI 关闭中...")
     try:
-        from backend.core.workflow.notify import stop_hang_scanner
+        from packages.workflow.notify import stop_hang_scanner
 
         stop_hang_scanner()
     except Exception:
         pass
     try:
-        from backend.core.workflow.grant_scanner import stop_grant_scanner
+        from packages.workflow.grant_scanner import stop_grant_scanner
 
         stop_grant_scanner()
     except Exception:
         pass
     try:
-        from backend.core.workflow.scheduler import stop_schedule_scanner
+        from packages.workflow.scheduler import stop_schedule_scanner
 
         stop_schedule_scanner()
     except Exception:

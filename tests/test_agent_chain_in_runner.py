@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from backend.core.workflow.composition import (
+from packages.workflow.composition import (
     MAX_COMPOSITION_DEPTH,
     CompositionDepthExceeded,
     check_composition_budget,
 )
-from backend.core.workflow.ir import WorkflowIR, WorkflowNode
+from packages.workflow.ir import WorkflowIR, WorkflowNode
 
 
 def test_agent_kind_in_ir() -> None:

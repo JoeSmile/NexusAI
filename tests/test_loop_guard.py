@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from backend.core.plan.loop_guard import LoopGuard, LoopGuardError, invoke_fingerprint
+from packages.plan.loop_guard import LoopGuard, LoopGuardError, invoke_fingerprint
 
 
 def test_fingerprint_stable() -> None:
@@ -24,7 +24,7 @@ def test_duplicate_streak_blocks_on_third(monkeypatch: pytest.MonkeyPatch) -> No
     audits: list[dict] = []
 
     with patch(
-        "backend.core.plan.loop_guard.write_audit_sync",
+        "packages.plan.loop_guard.write_audit_sync",
         side_effect=lambda r: audits.append(r) or True,
     ):
         guard.check("cap.a", payload, tenant_id="t1", user_id="u1", trace_id="tr1")

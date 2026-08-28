@@ -16,7 +16,7 @@ from packages.capability.models import (
 )
 from packages.capability.registry import CapabilityRegistry
 from backend.core.org.scope import OrgScope
-from backend.core.workflow.runner import execute_run, start_run
+from packages.workflow.runner import execute_run, start_run
 from backend.database.pgvector_session import (
     PermissionRequest,
     Workflow,
@@ -66,7 +66,7 @@ async def test_requestable_false_still_fails(monkeypatch):
     sf = get_pg_session()
     reg = _reg_member_cap()
     monkeypatch.setattr(
-        "backend.core.workflow.node_exec.get_capability_registry", lambda: reg
+        "packages.workflow.node_exec.get_capability_registry", lambda: reg
     )
     tenant = TenantContext(tid, uid, "user", [], False)
     scope = _scope(tid, uid)
@@ -101,7 +101,7 @@ async def test_requestable_false_still_fails(monkeypatch):
         run_id = started["id"]
 
     with patch(
-        "backend.core.workflow.run_lifecycle.rebuild_tenant_context",
+        "packages.workflow.run_lifecycle.rebuild_tenant_context",
         return_value=(tenant, scope),
     ):
         await execute_run(run_id)
@@ -128,7 +128,7 @@ async def test_requestable_true_suspends(monkeypatch):
     sf = get_pg_session()
     reg = _reg_member_cap()
     monkeypatch.setattr(
-        "backend.core.workflow.node_exec.get_capability_registry", lambda: reg
+        "packages.workflow.node_exec.get_capability_registry", lambda: reg
     )
     tenant = TenantContext(tid, uid, "user", [], False)
     scope = _scope(tid, uid)
@@ -164,7 +164,7 @@ async def test_requestable_true_suspends(monkeypatch):
         run_id = started["id"]
 
     with patch(
-        "backend.core.workflow.run_lifecycle.rebuild_tenant_context",
+        "packages.workflow.run_lifecycle.rebuild_tenant_context",
         return_value=(tenant, scope),
     ):
         await execute_run(run_id)
@@ -201,7 +201,7 @@ async def test_auto_grant_when_dept_manager(monkeypatch):
     sf = get_pg_session()
     reg = _reg_member_cap()
     monkeypatch.setattr(
-        "backend.core.workflow.node_exec.get_capability_registry", lambda: reg
+        "packages.workflow.node_exec.get_capability_registry", lambda: reg
     )
     tenant = TenantContext(tid, uid, "user", [], False, business_roles=["dept_manager"])
     scope = _scope(tid, uid, roles=frozenset({"dept_manager"}))
@@ -238,11 +238,11 @@ async def test_auto_grant_when_dept_manager(monkeypatch):
 
     with (
         patch(
-            "backend.core.workflow.run_lifecycle.rebuild_tenant_context",
+            "packages.workflow.run_lifecycle.rebuild_tenant_context",
             return_value=(tenant, scope),
         ),
         patch(
-            "backend.core.workflow.node_exec.invoke",
+            "packages.workflow.node_exec.invoke",
             _fake_invoke,
         ),
     ):

@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from backend.core.workflow.notify import (
+from packages.workflow.notify import (
     ancestor_unit_ids,
     notify_hang_pending,
     resolve_hang_route,
@@ -48,9 +48,9 @@ def test_route_prefers_ancestor_manager_over_none(monkeypatch):
             return [FakeMem(mgr, ["dept_manager"])]
         return [FakeMem("member1", ["member"])]
 
-    monkeypatch.setattr("backend.core.workflow.notify.get_unit", fake_get_unit)
+    monkeypatch.setattr("packages.workflow.notify.get_unit", fake_get_unit)
     monkeypatch.setattr(
-        "backend.core.workflow.notify.list_memberships_for_unit", fake_list_mem
+        "packages.workflow.notify.list_memberships_for_unit", fake_list_mem
     )
 
     sf = get_pg_session()
@@ -70,11 +70,11 @@ def test_route_escalates_when_no_manager(monkeypatch):
         path = f"/{ou}/"
 
     monkeypatch.setattr(
-        "backend.core.workflow.notify.get_unit",
+        "packages.workflow.notify.get_unit",
         lambda session, **kw: FakeUnit(),
     )
     monkeypatch.setattr(
-        "backend.core.workflow.notify.list_memberships_for_unit",
+        "packages.workflow.notify.list_memberships_for_unit",
         lambda session, **kw: [],
     )
     sf = get_pg_session()
@@ -95,11 +95,11 @@ def test_notify_marks_escalated_when_no_manager(monkeypatch):
         path = "/ou-x/"
 
     monkeypatch.setattr(
-        "backend.core.workflow.notify.get_unit",
+        "packages.workflow.notify.get_unit",
         lambda session, **kw: FakeUnit(),
     )
     monkeypatch.setattr(
-        "backend.core.workflow.notify.list_memberships_for_unit",
+        "packages.workflow.notify.list_memberships_for_unit",
         lambda session, **kw: [],
     )
 

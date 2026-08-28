@@ -12,7 +12,7 @@ from backend.core.memory_service import (
     UnifiedMemoryService,
     redact_student_names_in_text,
 )
-from backend.core.workflow.subscription import (
+from packages.workflow.subscription import (
     PLAN_SEAT_LIMITS,
     SeatLimitExceeded,
     assert_seat_available,

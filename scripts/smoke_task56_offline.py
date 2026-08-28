@@ -14,8 +14,8 @@ from types import SimpleNamespace
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.core.audit import audit_row_to_ndjson_events, write_governance_audit
-from backend.core.plan.event_bus import get_run_bus, release_run_bus
-from backend.core.plan.models import PlanIR, PlanStep
+from packages.plan.event_bus import get_run_bus, release_run_bus
+from packages.plan.models import PlanIR, PlanStep
 from packages.pipeline.nodes.orchestrator import execute_plan_ir
 from packages.pipeline.state import make_initial_state
 
