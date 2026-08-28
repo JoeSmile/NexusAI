@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.core.uvicorn_workers import resolve_uvicorn_workers
+from packages.uvicorn_workers import resolve_uvicorn_workers
 from backend.database.pg_pool import pg_engine_kwargs, pg_pool_budget_note
 
 

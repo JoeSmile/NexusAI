@@ -6,7 +6,7 @@ import os
 
 import uvicorn
 
-from backend.core.uvicorn_workers import resolve_uvicorn_workers
+from packages.uvicorn_workers import resolve_uvicorn_workers
 
 
 def main() -> None:
