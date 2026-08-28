@@ -1,7 +1,7 @@
 [project]
 name = "nexus-ai"
 version = "1.0.0"
-description = "The Governance Hub for Enterprise AI �?企业 AI 中台"
+description = "The Governance Hub for Enterprise AI — 企业 AI 中台"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "Commercial License"}
@@ -35,7 +35,7 @@ dependencies = [
     "langgraph>=0.2.0,<0.3.0",
     "langfuse>=4.7.0,<5",
     "pandas>=2.0.0",
-    # 数据�?(PostgreSQL + pgvector)
+    # 数据库 (PostgreSQL + pgvector)
     "psycopg2-binary>=2.9.0",
     "pgvector>=0.3.0,<0.4.0",
     "sqlalchemy>=1.4.0,<2.0.0",
@@ -69,14 +69,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# 可选依赖（保留用于兼容性，推荐使用 dependency-groups�?dev = [
+# 可选依赖（保留用于兼容性，推荐使用 dependency-groups）
+dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
     "black>=23.0.0",
     "ruff>=0.1.0",
     "mypy>=1.0.0",
 ]
-# 多模态提取（Task 21.02）�?未安装时 /api/rag/upload 返回 RAG_001
+# 多模态提取（Task 21.02）— 未安装时 /api/rag/upload 返回 RAG_001
 # 安装: uv sync --extra multimodal
 multimodal = [
     "faster-whisper>=1.0.0",
@@ -85,12 +86,12 @@ multimodal = [
     "paddlepaddle>=2.5.0",
     "soundfile>=0.12.0",
 ]
-# 工具混合检索本地向量（Task 60）�?未安装时�?hash 兜底
+# 工具混合检索本地向量（Task 60）— 未安装时用 hash 兜底
 # 安装: uv sync --extra tool-search
 tool-search = [
     "sentence-transformers>=2.2.0",
 ]
-# 意图 BERT v8（Task 65 slice 9）�?未安装或未部署模型时回退规则引擎
+# 意图 BERT v8（Task 65 slice 9）— 未安装或未部署模型时回退规则引擎
 # 安装: uv sync --extra intent-model
 intent-model = [
     "transformers>=4.46.0,<5",
@@ -115,10 +116,12 @@ package = false
 packages = ["backend", "packages", "apps"]
 
 [tool.uv.sources]
-# 可以在这里指定自定义源，例如阿里云镜�?# 注意：uv 默认使用官方 PyPI，如需使用镜像源，可以在命令行使用 --index-url
+# 可以在这里指定自定义源，例如阿里云镜像
+# 注意：uv 默认使用官方 PyPI，如需使用镜像源，可以在命令行使用 --index-url
 
 [dependency-groups]
-# 开发依赖组（替代已弃用�?tool.uv.dev-dependencies�?dev = [
+# 开发依赖组（替代已弃用的 tool.uv.dev-dependencies）
+dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
     "black>=23.0.0",
@@ -135,7 +138,8 @@ line-length = 100
 target-version = "py311"
 
 [tool.ruff.lint]
-# Ruff 0.16+ 默认规则过宽（含 BLE/DTZ/RUF 中文标点等）；显式收敛为可维护门�?select = [
+# Ruff 0.16+ 默认规则过宽（含 BLE/DTZ/RUF 中文标点等）；显式收敛为可维护门禁
+select = [
   "E4", "E7", "E9", # pycodestyle (selected)
   "F",              # Pyflakes
   "I",              # isort
@@ -143,16 +147,17 @@ target-version = "py311"
   "B",              # flake8-bugbear
 ]
 ignore = [
-  "E501", # line length �?formatter / 中文注释
-  "B008", # FastAPI Depends() in defaults �?idiomatic
-  "B904", # raise without from �?legacy noise
-  "E402", # import not at top �?dotenv / sys.path bootstrap
+  "E501", # line length — formatter / 中文注释
+  "B008", # FastAPI Depends() in defaults — idiomatic
+  "B904", # raise without from — legacy noise
+  "E402", # import not at top — dotenv / sys.path bootstrap
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "scripts/**" = ["E402", "B", "F401", "UP035"]
 "backend/tests/**" = ["F401", "F811", "UP035"]
-# Message/Conversation ORM 已移除，遗留 agent hub 待后续退�?"backend/agent/memory_hub.py" = ["F821"]
+# Message/Conversation ORM 已移除，遗留 agent hub 待后续退役
+"backend/agent/memory_hub.py" = ["F821"]
 
 [tool.mypy]
 python_version = "3.11"
@@ -160,7 +165,8 @@ ignore_missing_imports = true
 warn_return_any = false
 warn_unused_configs = false
 follow_imports = "silent"
-# 存量类型债务巨大(�?plugins 后暴�?~760)。门禁严�?NexusAI 主路径�?files = [
+# 存量类型债务巨大(删 plugins 后暴露 ~760)。门禁严查 NexusAI 主路径。
+files = [
   "packages/pipeline",
   "packages/skills",
   "backend/observability",
@@ -203,7 +209,7 @@ follow_imports = "silent"
   "apps/api/routers/channel_webhooks.py",
 ]
 
-# 遗留模块类型债巨�?�?纳入 files 扫描范围，但对这些包忽略错误，避免放宽全局策略
+# 遗留模块类型债巨大 — 纳入 files 扫描范围，但对这些包忽略错误，避免放宽全局策略
 [[tool.mypy.overrides]]
 module = [
   "backend.modules.rag.*",
