@@ -78,7 +78,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: ["python", "-m", "backend.workers.memory_worker"]
+    command: ["python", "-m", "apps.memory_worker"]
     healthcheck:
       test: ["CMD", "python", "scripts/worker_liveness.py", "memory"]
       interval: 30s
@@ -107,7 +107,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: ["python", "-m", "backend.workers.social_worker"]
+    command: ["python", "-m", "apps.social_worker"]
     healthcheck:
       test: ["CMD", "python", "scripts/worker_liveness.py", "social"]
       interval: 30s

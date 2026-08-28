@@ -312,7 +312,7 @@ uv run python scripts/seed_pgvector.py    # 向量 fixtures
 ### 5) 启动服务
 
 ```bash
-uv run uvicorn backend.app:app --reload --port 8000
+uv run uvicorn apps.api.app:app --reload --port 8000
 ```
 
 API 文档: http://127.0.0.1:8000/docs · 指标: http://127.0.0.1:8000/metrics

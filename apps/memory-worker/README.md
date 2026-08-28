@@ -5,7 +5,7 @@
 ```bash
 python -m apps.memory_worker
 # 兼容 shim：
-python -m backend.workers.memory_worker
+python -m apps.memory_worker
 ```
 
 代码：`apps/memory_worker/worker.py` · `heartbeat.py`

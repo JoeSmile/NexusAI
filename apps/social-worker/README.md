@@ -5,7 +5,7 @@
 ```bash
 python -m apps.social_worker
 # 兼容 shim：
-python -m backend.workers.social_worker
+python -m apps.social_worker
 ```
 
 代码：`apps/social_worker/worker.py`
