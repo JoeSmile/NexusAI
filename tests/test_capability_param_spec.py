@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from backend.core.capability.models import (
+from packages.capability.models import (
     CapabilityKind,
     CapabilityProvider,
     CapabilitySpec,
     CapabilityStatus,
 )
-from backend.core.capability.registry import CapabilityRegistry
+from packages.capability.registry import CapabilityRegistry
 from backend.routers.capability import _spec_public
 
 

@@ -8,7 +8,7 @@ import os
 from typing import Any
 
 from backend.core.audit_context import bind_audit_lineage
-from backend.core.capability.invoke import invoke
+from packages.capability.invoke import invoke
 from backend.core.harness import LLMHarness
 from backend.core.plan.agent_spawn import (
     SpawnBlockedError,
@@ -138,7 +138,7 @@ async def _run_step_once(
     escalated_model: str | None = None
     if attempt > 1:
         payload["_orchestrator_retry_attempt"] = attempt
-        from backend.core.capability.registry import get_capability_registry
+        from packages.capability.registry import get_capability_registry
         from backend.core.model_registry import resolve_model_for_retry
 
         try:

@@ -9,9 +9,9 @@ from unittest.mock import patch
 import pytest
 
 from packages.auth.models import TenantContext
-from backend.core.capability.errors import CapabilityDisabledError
-from backend.core.capability.models import CapabilityStatus
-from backend.core.capability.registry import CapabilityRegistry
+from packages.capability.errors import CapabilityDisabledError
+from packages.capability.models import CapabilityStatus
+from packages.capability.registry import CapabilityRegistry
 from backend.core.guardrails.config_store import reset_store_for_tests
 from backend.core.guardrails.dry_run import dry_run
 from tests.test_admin_console import _client, _tool_spec
@@ -19,7 +19,7 @@ from tests.test_admin_console import _client, _tool_spec
 
 @pytest.fixture(autouse=True)
 def _no_db_persist() -> None:
-    with patch("backend.core.capability.admin_store._upsert_db_row"):
+    with patch("packages.capability.admin_store._upsert_db_row"):
         yield
 
 

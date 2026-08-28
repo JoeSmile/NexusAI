@@ -6,19 +6,19 @@ import json
 
 import pytest
 
-from backend.core.capability.exec_policy import global_default_exec_policy, resolve_exec_policy
-from backend.core.capability.mcp_registry import (
+from packages.capability.exec_policy import global_default_exec_policy, resolve_exec_policy
+from packages.capability.mcp_registry import (
     McpServerConfig,
     normalize_mcp_tool,
     register_mcp_tools,
 )
-from backend.core.capability.mcp_semaphore import reset_mcp_semaphores_for_tests, stdio_spawn_limit
-from backend.core.capability.mcp_snapshots import (
+from packages.capability.mcp_semaphore import reset_mcp_semaphores_for_tests, stdio_spawn_limit
+from packages.capability.mcp_snapshots import (
     get_mcp_snapshot_registry,
     reset_mcp_snapshot_registry_for_tests,
 )
-from backend.core.capability.models import CapabilityStatus
-from backend.core.capability.registry import CapabilityRegistry
+from packages.capability.models import CapabilityStatus
+from packages.capability.registry import CapabilityRegistry
 
 
 def _valid_tool(name: str) -> dict:
@@ -112,8 +112,8 @@ def test_snapshot_refresh_bumps_generation_without_deleting_active() -> None:
 @pytest.mark.asyncio
 async def test_invoke_mcp_mock_has_no_subprocess_pid(monkeypatch: pytest.MonkeyPatch) -> None:
     from packages.auth.models import TenantContext
-    from backend.core.capability.connectors.mcp_server import invoke_mcp
-    from backend.core.capability.models import CapabilityKind, CapabilityProvider, CapabilitySpec
+    from packages.capability.connectors.mcp_server import invoke_mcp
+    from packages.capability.models import CapabilityKind, CapabilityProvider, CapabilitySpec
 
     monkeypatch.setenv("CAPABILITY_UPSTREAM_MOCK", "true")
     monkeypatch.setenv(

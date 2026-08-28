@@ -8,21 +8,21 @@ from unittest.mock import patch
 import pytest
 
 from packages.auth.models import TenantContext
-from backend.core.capability.contract import (
+from packages.capability.contract import (
     FailureSemantic,
     ToolContract,
     assert_contract_valid,
     derive_idempotency_key,
 )
-from backend.core.capability.errors import CapabilityContractError
-from backend.core.capability.governance_chain import run_governance_chain
-from backend.core.capability.invoke import _check_permission, invoke
-from backend.core.capability.models import (
+from packages.capability.errors import CapabilityContractError
+from packages.capability.governance_chain import run_governance_chain
+from packages.capability.invoke import _check_permission, invoke
+from packages.capability.models import (
     CapabilityKind,
     CapabilityProvider,
     CapabilitySpec,
 )
-from backend.core.capability.registry import CapabilityRegistry
+from packages.capability.registry import CapabilityRegistry
 from backend.core.errors import ErrorCode, NexusAIException
 
 
@@ -128,7 +128,7 @@ def test_register_tool_with_contract_ok() -> None:
 
 
 def test_assert_contract_name_mismatch() -> None:
-    from backend.core.capability.contract import ToolContractError
+    from packages.capability.contract import ToolContractError
 
     c = ToolContract(
         name="other",
@@ -184,7 +184,7 @@ def test_load_from_env_skips_bad_contract() -> None:
     n = reg.load_from_env(payload)
     assert n == 1
     assert reg.get("good-tool").id == "good-tool"
-    from backend.core.capability.errors import CapabilityNotFoundError
+    from packages.capability.errors import CapabilityNotFoundError
 
     with pytest.raises(CapabilityNotFoundError):
         reg.get("bad-tool")
@@ -204,11 +204,11 @@ def test_governance_chain_approval_stub(tenant_user: TenantContext) -> None:
         },
     )
     # bypass register — contract already on object for chain test
-    from backend.core.capability.contract import parse_tool_contract
+    from packages.capability.contract import parse_tool_contract
 
     spec.contract = parse_tool_contract(spec.spec["tool_contract"])
     with (
-        patch("backend.core.capability.governance._redis", return_value=None),
+        patch("packages.capability.governance._redis", return_value=None),
         pytest.raises(NexusAIException) as ei,
     ):
         run_governance_chain(
@@ -238,10 +238,10 @@ async def test_invoke_runs_governance_without_sse_pollution(
     )
     with (
         patch(
-            "backend.core.capability.invoke.get_capability_registry",
+            "packages.capability.invoke.get_capability_registry",
             return_value=reg,
         ),
-        patch("backend.core.capability.governance._redis", return_value=None),
+        patch("packages.capability.governance._redis", return_value=None),
     ):
         frames: list[dict] = []
         async for f in invoke(

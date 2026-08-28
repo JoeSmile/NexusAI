@@ -16,9 +16,9 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from packages.auth.models import TenantContext
-from backend.core.capability.errors import CapabilityNotFoundError
-from backend.core.capability.invoke import invoke
-from backend.core.capability.registry import get_capability_registry
+from packages.capability.errors import CapabilityNotFoundError
+from packages.capability.invoke import invoke
+from packages.capability.registry import get_capability_registry
 from backend.core.errors import ErrorCode, NexusAIException
 from backend.core.guardrails.input_guard import detect_injection_in_params
 from backend.core.org.scope import OrgScope, resolve_org_scope

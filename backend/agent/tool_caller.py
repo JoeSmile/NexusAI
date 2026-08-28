@@ -3,7 +3,7 @@ Tool Caller - 工具调用模块（legacy Agent 路径）
 
 负责 legacy ``/agent`` 路由下的本地 ToolRegistry。
 **新工具** 应注册到 ``CapabilityRegistry``（kind=tool）并经
-``backend.core.capability.invoke`` 治理链执行（Task 66）。
+``packages.capability.invoke`` 治理链执行（Task 66）。
 
 本模块内 ``MCPProtocol`` 指内部消息格式，**不是** Anthropic MCP 标准。
 """

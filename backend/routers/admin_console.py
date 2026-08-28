@@ -12,11 +12,11 @@ from pydantic import BaseModel, Field
 
 from backend.core.audit import write_audit_sync
 from packages.auth.models import TenantContext
-from backend.core.capability.admin_store import (
+from packages.capability.admin_store import (
     update_capability_spec_body,
     update_capability_status,
 )
-from backend.core.capability.console_access import (
+from packages.capability.console_access import (
     can_mutate_exec_policy,
     can_mutate_tenant_allowlist,
     can_mutate_tool_status,
@@ -24,16 +24,16 @@ from backend.core.capability.console_access import (
     require_console_reader,
     require_console_super_admin,
 )
-from backend.core.capability.errors import CapabilityNotFoundError
-from backend.core.capability.exec_policy import resolve_exec_policy
-from backend.core.capability.invoke import capability_visible_to
-from backend.core.capability.models import (
+from packages.capability.errors import CapabilityNotFoundError
+from packages.capability.exec_policy import resolve_exec_policy
+from packages.capability.invoke import capability_visible_to
+from packages.capability.models import (
     CapabilityKind,
     CapabilityProvider,
     CapabilitySpec,
     CapabilityStatus,
 )
-from backend.core.capability.registry import get_capability_registry
+from packages.capability.registry import get_capability_registry
 
 logger = logging.getLogger(__name__)
 

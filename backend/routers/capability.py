@@ -24,9 +24,9 @@ from pydantic import BaseModel, Field
 from backend.core.audit import log_audit
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
-from backend.core.capability.invoke import invoke
-from backend.core.capability.models import CapabilitySpec
-from backend.core.capability.registry import get_capability_registry
+from packages.capability.invoke import invoke
+from packages.capability.models import CapabilitySpec
+from packages.capability.registry import get_capability_registry
 from backend.core.errors import NexusAIException
 from backend.observability.decorators import observe
 
@@ -70,7 +70,7 @@ def _spec_public(spec: CapabilitySpec) -> dict[str, Any]:
 
 
 def _visible_to(tenant: TenantContext, spec: CapabilitySpec) -> bool:
-    from backend.core.capability.invoke import capability_visible_to
+    from packages.capability.invoke import capability_visible_to
 
     return capability_visible_to(spec, tenant)
 
@@ -189,11 +189,11 @@ def _schedule_langfuse_flush(
 
 def _preflight(cap_id: str, tenant: TenantContext) -> CapabilitySpec:
     """在返回 StreamingResponse 前暴露 CAP_/AUTH_（JSON 错误，非 SSE）。"""
-    from backend.core.capability.governance import (
+    from packages.capability.governance import (
         check_cap_quota,
         check_cap_rate_limit,
     )
-    from backend.core.capability.invoke import _check_permission
+    from packages.capability.invoke import _check_permission
 
     spec = get_capability_registry().get(cap_id)
     _check_permission(spec, tenant)
@@ -233,7 +233,7 @@ async def reload_capabilities(
     """tenant_admin：从 DB 重载 registry（smoke / 运维；不改权限模型）。"""
     from fastapi import HTTPException
 
-    from backend.core.capability.registry import reload_capability_registry
+    from packages.capability.registry import reload_capability_registry
 
     if tenant.role not in ("tenant_admin", "super_admin") and not tenant.has_permission(
         "admin:*"

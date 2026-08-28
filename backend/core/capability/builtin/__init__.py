@@ -1,5 +1,2 @@
-"""Builtin capability package (Task 66 slice 1)."""
-
-from backend.core.capability.builtin.register import register_builtin_tools
-
-__all__ = ["register_builtin_tools"]
+"""Shim — prefer packages.capability.builtin"""
+from packages.capability.builtin import *  # noqa: F401,F403

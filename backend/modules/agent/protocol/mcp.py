@@ -4,7 +4,7 @@
 .. deprecated::
     本模块**不是** Anthropic Model Context Protocol (MCP) 标准实现。
     它是 Wave 早期「模块间结构化消息」封装，仅被 ``backend.agent`` 遗留路径引用。
-    **新代码禁止依赖**；工具调用统一走 ``backend.core.capability.invoke`` +
+    **新代码禁止依赖**；工具调用统一走 ``packages.capability.invoke`` +
     ``CapabilityRegistry``（Task 66）。真 MCP client 见 ``connectors/mcp_server.py``（切片 3）。
 
 历史模块名 ``mcp`` 保留以免破坏 import；类名/函数名暂不 rename。

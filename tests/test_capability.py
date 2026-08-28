@@ -8,21 +8,21 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from packages.auth.models import TenantContext
-from backend.core.capability.errors import (
+from packages.capability.errors import (
     CapabilityDisabledError,
     CapabilityGovernanceRequiredError,
     CapabilityNotFoundError,
     CapabilityQuotaExceededError,
 )
-from backend.core.capability.governance import check_cap_quota, validate_governance_declaration
-from backend.core.capability.invoke import invoke
-from backend.core.capability.models import (
+from packages.capability.governance import check_cap_quota, validate_governance_declaration
+from packages.capability.invoke import invoke
+from packages.capability.models import (
     CapabilityKind,
     CapabilityProvider,
     CapabilitySpec,
     CapabilityStatus,
 )
-from backend.core.capability.registry import CapabilityRegistry
+from packages.capability.registry import CapabilityRegistry
 from backend.core.errors import NexusAIException, ErrorCode
 
 
@@ -101,8 +101,8 @@ def test_quota_exceeded_cap_005(monkeypatch: pytest.MonkeyPatch) -> None:
         pass
 
     with (
-        patch("backend.core.capability.governance._redis", return_value=FakeR()),
-        patch("backend.core.capability.governance._day_bucket", return_value="20260101"),
+        patch("packages.capability.governance._redis", return_value=FakeR()),
+        patch("packages.capability.governance._day_bucket", return_value="20260101"),
     ):
         with pytest.raises(CapabilityQuotaExceededError) as ei:
             check_cap_quota("t1")
@@ -128,10 +128,10 @@ async def test_invoke_model_stream_and_auth(
     # Redis 不可用 = fail-open（拍板 A）；测分发/鉴权不依赖 Redis
     with (
         patch(
-            "backend.core.capability.invoke.get_capability_registry",
+            "packages.capability.invoke.get_capability_registry",
             return_value=reg,
         ),
-        patch("backend.core.capability.governance._redis", return_value=None),
+        patch("packages.capability.governance._redis", return_value=None),
     ):
         auditor = TenantContext("t1", "a1", "auditor", [], True)
         with pytest.raises(NexusAIException) as ei:
@@ -161,7 +161,7 @@ async def test_invoke_rejects_foreign_tenant_cap(
     tenant_user: TenantContext, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """跨租户 private capability：list 不可见，invoke 亦应 CAP_001。"""
-    from backend.core.capability.errors import CapabilityNotFoundError
+    from packages.capability.errors import CapabilityNotFoundError
 
     monkeypatch.setenv("LLM_PROVIDER", "mock")
     reg = CapabilityRegistry()
@@ -178,10 +178,10 @@ async def test_invoke_rejects_foreign_tenant_cap(
     )
     with (
         patch(
-            "backend.core.capability.invoke.get_capability_registry",
+            "packages.capability.invoke.get_capability_registry",
             return_value=reg,
         ),
-        patch("backend.core.capability.governance._redis", return_value=None),
+        patch("packages.capability.governance._redis", return_value=None),
     ):
         with pytest.raises(CapabilityNotFoundError) as ei:
             async for _ in invoke(
@@ -192,7 +192,7 @@ async def test_invoke_rejects_foreign_tenant_cap(
 
 
 def test_build_dify_request_shape(tenant_user: TenantContext) -> None:
-    from backend.core.capability.connectors.external_app import build_dify_request
+    from packages.capability.connectors.external_app import build_dify_request
 
     spec = CapabilitySpec(
         id="dify-contract-review",
@@ -219,7 +219,7 @@ def test_build_dify_request_shape(tenant_user: TenantContext) -> None:
 
 
 def test_parse_dify_sse_to_unified_frames() -> None:
-    from backend.core.capability.connectors.external_app import parse_upstream_sse_line
+    from packages.capability.connectors.external_app import parse_upstream_sse_line
 
     frames = parse_upstream_sse_line(
         'data: {"event":"text_chunk","data":{"text":"hi"}}',
@@ -240,8 +240,8 @@ def test_audit_prefix_includes_upstream() -> None:
 async def test_invoke_external_mock_and_circuit(
     tenant_user: TenantContext, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from backend.core.capability.connectors import external_app as ext
-    from backend.core.capability.errors import CapabilityUpstreamError
+    from packages.capability.connectors import external_app as ext
+    from packages.capability.errors import CapabilityUpstreamError
     from backend.core.circuit_breaker import CircuitState
 
     monkeypatch.setenv("CAPABILITY_UPSTREAM_MOCK", "true")
@@ -328,10 +328,10 @@ async def test_unsupported_kind_raises_cap_001(tenant_user: TenantContext) -> No
     )
     with (
         patch(
-            "backend.core.capability.invoke.get_capability_registry",
+            "packages.capability.invoke.get_capability_registry",
             return_value=reg,
         ),
-        patch("backend.core.capability.governance._redis", return_value=None),
+        patch("packages.capability.governance._redis", return_value=None),
     ):
         with pytest.raises(CapabilityNotFoundError) as ei:
             async for _ in invoke("tool-x", {"message": "hi"}, tenant_user):
@@ -360,10 +360,10 @@ async def test_tool_executor_model_streams(
     )
     with (
         patch(
-            "backend.core.capability.invoke.get_capability_registry",
+            "packages.capability.invoke.get_capability_registry",
             return_value=reg,
         ),
-        patch("backend.core.capability.governance._redis", return_value=None),
+        patch("packages.capability.governance._redis", return_value=None),
     ):
         frames: list[dict] = []
         async for f in invoke(
@@ -405,10 +405,10 @@ async def test_tool_executor_rag_uses_rag_service(
 
     with (
         patch(
-            "backend.core.capability.invoke.get_capability_registry",
+            "packages.capability.invoke.get_capability_registry",
             return_value=reg,
         ),
-        patch("backend.core.capability.governance._redis", return_value=None),
+        patch("packages.capability.governance._redis", return_value=None),
         patch(
             "backend.modules.rag.routers.rag_router.get_rag_service",
             return_value=_FakeRag(),
@@ -429,7 +429,7 @@ async def test_leaf_stub_mode_still_stubs(
     tenant_user: TenantContext, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """LEAF_STUB_MODE=true + leaf → 演示 stub（agents 子路径）。"""
-    from backend.core.capability.agents import invoke_agent
+    from packages.capability.agents import invoke_agent
 
     monkeypatch.setenv("LEAF_STUB_MODE", "true")
     reg = CapabilityRegistry()
@@ -454,7 +454,7 @@ async def test_leaf_stub_mode_still_stubs(
 
     with (
         patch(
-            "backend.core.capability.registry.get_capability_registry",
+            "packages.capability.registry.get_capability_registry",
             return_value=reg,
         ),
         patch("backend.core.audit.write_audit_sync"),
@@ -501,10 +501,10 @@ async def test_model_invoke_skips_invoke_layer_record_consumption(
     )
     with (
         patch(
-            "backend.core.capability.invoke.get_capability_registry",
+            "packages.capability.invoke.get_capability_registry",
             return_value=reg,
         ),
-        patch("backend.core.capability.governance._redis", return_value=None),
+        patch("packages.capability.governance._redis", return_value=None),
         patch("backend.core.cost_manager.record_consumption") as rec,
     ):
         async for _ in invoke(

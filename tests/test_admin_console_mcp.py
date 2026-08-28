@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
-from backend.core.capability.mcp_store import reset_mcp_store_for_tests
+from packages.capability.mcp_store import reset_mcp_store_for_tests
 from backend.core.errors import NexusAIException, nexusai_exception_handler
 from backend.routers.admin_console import router
 
@@ -105,7 +105,7 @@ def test_mcp_rejects_duplicate(super_admin: TenantContext) -> None:
 
 
 def test_load_all_mcp_servers_db_overrides_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    from backend.core.capability.mcp_store import (
+    from packages.capability.mcp_store import (
         delete_mcp_server_record,
         load_all_mcp_servers,
         upsert_mcp_server_record,

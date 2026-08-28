@@ -56,11 +56,11 @@ def _autofill_tool_contracts(
         yield
         return
 
-    from backend.core.capability.contract import (
+    from packages.capability.contract import (
         contract_required_for,
         stub_contract_dict,
     )
-    from backend.core.capability.registry import CapabilityRegistry
+    from packages.capability.registry import CapabilityRegistry
 
     original = CapabilityRegistry.register
 

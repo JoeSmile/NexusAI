@@ -9,9 +9,9 @@ from fastapi import APIRouter, Depends
 
 from packages.auth.api_key_auth import verify_api_key
 from packages.auth.models import TenantContext
-from backend.core.capability.agents import agent_spec_from_capability
-from backend.core.capability.models import CapabilityKind
-from backend.core.capability.registry import get_capability_registry
+from packages.capability.agents import agent_spec_from_capability
+from packages.capability.models import CapabilityKind
+from packages.capability.registry import get_capability_registry
 from backend.routers.capability import _visible_to
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])

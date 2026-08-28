@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 from backend.core import audit as audit_mod
 from backend.core.audit_context import bind_audit_lineage, clear_audit_lineage, get_audit_lineage
-from backend.core.capability.governance_chain import DecisionExplain
+from packages.capability.governance_chain import DecisionExplain
 
 
 def test_lineage_context_bind() -> None:

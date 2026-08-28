@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 
 from backend.core.audit import write_audit_sync
 from packages.auth.models import TenantContext
-from backend.core.capability.console_access import (
+from packages.capability.console_access import (
     require_console_reader,
     require_console_super_admin,
 )

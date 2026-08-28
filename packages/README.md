@@ -5,7 +5,7 @@
 | **intent** | ✅ 已落地 `packages/intent/` | 原 `backend/modules/intent` |
 | **auth** | ✅ 已落地 `packages/auth/`（75.1） | 原 `backend/core/auth` |
 | **pipeline** | ✅ 已落地 `packages/pipeline/`（75.2） | 原 `backend/pipeline` |
-| capability | 未搬 | `backend/core/capability` |
+| **capability** | ✅ 已落地 `packages/capability/`（75.3） | 原 `backend/core/capability` |
 | plan | 未搬 | `backend/core/plan` |
 | workflow | 未搬 | `backend/core/workflow` |
 | memory / guardrails / harness / skills | 未搬 | `backend/core/*` · `backend/skills` |

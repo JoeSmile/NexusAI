@@ -8,24 +8,24 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from packages.auth.models import TenantContext
-from backend.core.capability.connectors.mcp_server import (
+from packages.capability.connectors.mcp_server import (
     list_server_tools,
     mcp_server_runtime_status,
 )
-from backend.core.capability.console_access import require_console_super_admin
-from backend.core.capability.mcp_errors import McpError
-from backend.core.capability.mcp_registry import (
+from packages.capability.console_access import require_console_super_admin
+from packages.capability.mcp_errors import McpError
+from packages.capability.mcp_registry import (
     capability_id_for_mcp_tool,
     normalize_mcp_tool,
 )
-from backend.core.capability.mcp_store import (
+from packages.capability.mcp_store import (
     delete_mcp_server_record,
     get_mcp_server_record,
     list_mcp_server_records,
     save_mcp_server_probe,
     upsert_mcp_server_record,
 )
-from backend.core.capability.registry import get_capability_registry
+from packages.capability.registry import get_capability_registry
 from backend.core.security.url_guard import UrlValidationError
 
 router = APIRouter()

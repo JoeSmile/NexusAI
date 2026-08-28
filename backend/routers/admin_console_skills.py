@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from packages.auth.models import TenantContext
-from backend.core.capability.console_access import (
+from packages.capability.console_access import (
     is_console_super_admin,
     require_console_reader,
 )

@@ -47,14 +47,14 @@ def _live_env() -> None:
 
 async def _run_smoke(*, with_governance: bool = True) -> dict[str, Any]:
     from packages.auth.models import TenantContext
-    from backend.core.capability.connectors.mcp_server import list_server_tools
-    from backend.core.capability.invoke import invoke
-    from backend.core.capability.mcp_registry import (
+    from packages.capability.connectors.mcp_server import list_server_tools
+    from packages.capability.invoke import invoke
+    from packages.capability.mcp_registry import (
         capability_id_for_mcp_tool,
         get_mcp_server_config,
         refresh_mcp_servers_from_env,
     )
-    from backend.core.capability.registry import CapabilityRegistry
+    from packages.capability.registry import CapabilityRegistry
     from backend.core.tool_search import get_tool_search_index
 
     report: dict[str, Any] = {
@@ -105,8 +105,8 @@ async def _run_smoke(*, with_governance: bool = True) -> dict[str, Any]:
             return True
 
         with (
-            patch("backend.core.capability.invoke.get_capability_registry", return_value=reg),
-            patch("backend.core.capability.governance._redis", return_value=None),
+            patch("packages.capability.invoke.get_capability_registry", return_value=reg),
+            patch("packages.capability.governance._redis", return_value=None),
             patch(
                 "backend.core.audit.write_governance_audit",
                 side_effect=_capture_audit,
@@ -127,7 +127,7 @@ async def _run_smoke(*, with_governance: bool = True) -> dict[str, Any]:
         )
         report["ok"] = any(f.get("event") == "done" for f in frames) and len(audits) >= 1
     else:
-        from backend.core.capability.connectors.mcp_server import invoke_mcp
+        from packages.capability.connectors.mcp_server import invoke_mcp
 
         frames = []
         async for frame in invoke_mcp(spec, payload, tenant):

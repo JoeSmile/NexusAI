@@ -10,8 +10,8 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from packages.auth.models import TenantContext
-from backend.core.capability.models import CapabilitySpec, CapabilityStatus
-from backend.core.capability.registry import get_capability_registry
+from packages.capability.models import CapabilitySpec, CapabilityStatus
+from packages.capability.registry import get_capability_registry
 from backend.core.org.scope import OrgScope, assert_org_access, visible_org_filter
 from backend.core.workflow.ir import WorkflowIR, validate_ir_capabilities
 from backend.core.workflow.models import workflow_to_dict

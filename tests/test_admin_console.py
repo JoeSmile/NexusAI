@@ -11,13 +11,13 @@ from fastapi.testclient import TestClient
 
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
-from backend.core.capability.models import (
+from packages.capability.models import (
     CapabilityKind,
     CapabilityProvider,
     CapabilitySpec,
     CapabilityStatus,
 )
-from backend.core.capability.registry import CapabilityRegistry
+from packages.capability.registry import CapabilityRegistry
 from backend.core.errors import NexusAIException, nexusai_exception_handler
 from backend.routers.admin_console import router
 
@@ -86,7 +86,7 @@ def _client(tenant: TenantContext, reg: CapabilityRegistry):
 
     app.dependency_overrides[verify_human_or_legacy_key] = _auth
     with patch("backend.routers.admin_console.get_capability_registry", return_value=reg), patch(
-        "backend.core.capability.admin_store.get_capability_registry", return_value=reg
+        "packages.capability.admin_store.get_capability_registry", return_value=reg
     ):
         yield TestClient(app)
 
@@ -135,7 +135,7 @@ def test_user_forbidden(user: TenantContext, tool_reg: CapabilityRegistry) -> No
 def test_super_admin_can_disable_tool(super_admin: TenantContext, tool_reg: CapabilityRegistry) -> None:
     with (
         patch("backend.routers.admin_console.write_audit_sync"),
-        patch("backend.core.capability.admin_store._upsert_db_row"),
+        patch("packages.capability.admin_store._upsert_db_row"),
         _client(super_admin, tool_reg) as client,
     ):
         r = client.patch(
@@ -171,7 +171,7 @@ def test_tenant_admin_can_update_own_allowlist(
 
 
 def test_tenant_allowlist_hides_tool_from_other_tenant(tool_reg: CapabilityRegistry) -> None:
-    from backend.core.capability.invoke import capability_visible_to
+    from packages.capability.invoke import capability_visible_to
 
     spec = tool_reg.get("tool:tenant:only", require_enabled=False)
     allowed = TenantContext("t-allowed", "u1", "user", ["chat:write"], False)

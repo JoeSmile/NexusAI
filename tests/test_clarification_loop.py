@@ -176,7 +176,7 @@ def test_high_risk_incomplete_tool_trigger(monkeypatch):
     reg = MagicMock()
     reg.get.return_value = FakeSpec()
     monkeypatch.setattr(
-        "backend.core.capability.registry.get_capability_registry",
+        "packages.capability.registry.get_capability_registry",
         lambda: reg,
     )
     state = make_initial_state("t1", "u1", "s1", "执行操作")

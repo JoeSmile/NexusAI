@@ -10,12 +10,12 @@ from fastapi.testclient import TestClient
 
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
-from backend.core.capability.models import (
+from packages.capability.models import (
     CapabilityKind,
     CapabilityProvider,
     CapabilitySpec,
 )
-from backend.core.capability.registry import CapabilityRegistry
+from packages.capability.registry import CapabilityRegistry
 from backend.core.errors import NexusAIException, nexusai_exception_handler
 from backend.routers.capability import router
 
@@ -105,10 +105,10 @@ def test_invoke_short_json(
             return_value=cap_reg,
         ),
         patch(
-            "backend.core.capability.invoke.get_capability_registry",
+            "packages.capability.invoke.get_capability_registry",
             return_value=cap_reg,
         ),
-        patch("backend.core.capability.governance._redis", return_value=None),
+        patch("packages.capability.governance._redis", return_value=None),
         patch("backend.routers.capability.log_audit"),
     ):
         client = _client(user_tenant, cap_reg)
@@ -131,7 +131,7 @@ def test_invoke_forbidden_for_auditor(
             "backend.routers.capability.get_capability_registry",
             return_value=cap_reg,
         ),
-        patch("backend.core.capability.governance._redis", return_value=None),
+        patch("packages.capability.governance._redis", return_value=None),
     ):
         client = _client(auditor_tenant, cap_reg)
         r = client.post(

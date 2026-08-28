@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from packages.auth.models import TenantContext
-from backend.core.capability.models import (
+from packages.capability.models import (
     CapabilityKind,
     CapabilityProvider,
     CapabilitySpec,
     CapabilityStatus,
 )
-from backend.core.capability.invoke import capability_visible_to
+from packages.capability.invoke import capability_visible_to
 from backend.core.workflow.service import capability_catalog_visible
 
 

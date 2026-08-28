@@ -6,8 +6,8 @@ import pytest
 
 from packages.auth.models import TenantContext
 from packages.auth.subagent import is_sub_agent, make_sub_agent_context
-from backend.core.capability.governance_chain import run_governance_chain
-from backend.core.capability.models import (
+from packages.capability.governance_chain import run_governance_chain
+from packages.capability.models import (
     CapabilityKind,
     CapabilityProvider,
     CapabilitySpec,

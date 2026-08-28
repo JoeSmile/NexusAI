@@ -35,8 +35,8 @@ def _gold_line_demo() -> None:
 
 
 async def _counts() -> dict[str, int]:
-    from backend.core.capability.builtin.register import register_builtin_tools
-    from backend.core.capability.builtin.specs import BUILTIN_TOOL_SPECS
+    from packages.capability.builtin.register import register_builtin_tools
+    from packages.capability.builtin.specs import BUILTIN_TOOL_SPECS
     from backend.core.skill_assets.bootstrap import validate_builtin_catalog
     from backend.core.skill_assets.builtin_catalog import (
         BUILTIN_SKILL_ASSET_CATALOG,
@@ -48,7 +48,7 @@ async def _counts() -> dict[str, int]:
     reg_skill.discover()
     validate_builtin_catalog()
 
-    from backend.core.capability.registry import CapabilityRegistry
+    from packages.capability.registry import CapabilityRegistry
 
     reg = CapabilityRegistry()
     register_builtin_tools(reg)

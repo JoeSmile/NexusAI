@@ -348,7 +348,7 @@ def main() -> None:
         status = upsert_capability(row)
         print(f"  [{status:7s}] {row['kind']:12s} {row['id']}")
     try:
-        from backend.core.capability.registry import reload_capability_registry
+        from packages.capability.registry import reload_capability_registry
 
         reg = reload_capability_registry()
         agents = [s.id for s in reg.list(kind="agent")]

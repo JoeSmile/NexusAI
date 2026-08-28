@@ -7,15 +7,15 @@ import json
 import pytest
 
 from packages.auth.models import TenantContext
-from backend.core.capability.connectors.mcp_server import _sanitize_tool_arguments
-from backend.core.capability.governance_chain import run_governance_chain
-from backend.core.capability.mcp_registry import (
+from packages.capability.connectors.mcp_server import _sanitize_tool_arguments
+from packages.capability.governance_chain import run_governance_chain
+from packages.capability.mcp_registry import (
     McpServerConfig,
     infer_mcp_risk_level,
     normalize_mcp_tool,
     register_mcp_tools,
 )
-from backend.core.capability.registry import CapabilityRegistry
+from packages.capability.registry import CapabilityRegistry
 from backend.core.errors import ErrorCode, NexusAIException
 
 
@@ -73,7 +73,7 @@ def test_sanitize_strips_user_context_by_default(tenant_user: TenantContext) -> 
 
 
 def test_governance_blocks_high_risk_mcp_without_approval(tenant_user: TenantContext) -> None:
-    from backend.core.capability.invoke import _check_permission
+    from packages.capability.invoke import _check_permission
 
     reg = CapabilityRegistry()
     server = McpServerConfig(id="srv", transport="stdio", command="uvx")
@@ -98,7 +98,7 @@ def test_governance_blocks_high_risk_mcp_without_approval(tenant_user: TenantCon
 
 
 def test_ssrf_url_rejected_on_server_load() -> None:
-    from backend.core.capability.mcp_registry import load_mcp_servers_from_env
+    from packages.capability.mcp_registry import load_mcp_servers_from_env
 
     servers = load_mcp_servers_from_env(
         json.dumps(

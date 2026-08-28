@@ -125,7 +125,7 @@ def test_blackboard_search_by_topic_and_keyword() -> None:
 @pytest.mark.asyncio
 async def test_blackboard_search_builtin_handler() -> None:
     from packages.auth.models import TenantContext
-    from backend.core.capability.builtin.handlers import invoke_builtin_handler
+    from packages.capability.builtin.handlers import invoke_builtin_handler
 
     tenant = TenantContext("t1", "u1", "user", ["chat:read"], False)
     payload = {

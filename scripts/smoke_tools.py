@@ -12,10 +12,10 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from packages.auth.models import TenantContext
-from backend.core.capability.builtin.handlers import invoke_builtin_handler
-from backend.core.capability.builtin.register import register_builtin_tools
-from backend.core.capability.builtin.specs import BUILTIN_TOOL_SPECS
-from backend.core.capability.registry import CapabilityRegistry
+from packages.capability.builtin.handlers import invoke_builtin_handler
+from packages.capability.builtin.register import register_builtin_tools
+from packages.capability.builtin.specs import BUILTIN_TOOL_SPECS
+from packages.capability.registry import CapabilityRegistry
 
 
 def _tenant() -> TenantContext:

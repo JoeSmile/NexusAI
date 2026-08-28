@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from packages.auth.models import TenantContext
-from backend.core.capability.models import (
+from packages.capability.models import (
     CapabilityKind,
     CapabilityProvider,
     CapabilitySpec,

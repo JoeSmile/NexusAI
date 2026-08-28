@@ -7,7 +7,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from packages.auth.models import TenantContext
-from backend.core.capability.models import CapabilitySpec
+from packages.capability.models import CapabilitySpec
 from backend.core.content_ops.hotspot import HotspotCrawlError, dig_hotspots
 from backend.core.content_ops.script_gen import generate_script
 from backend.core.content_ops.style import (

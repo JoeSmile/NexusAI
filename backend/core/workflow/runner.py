@@ -24,8 +24,8 @@ Patching ``runner_shared.rebuild_tenant_context`` alone does **not** affect
 from __future__ import annotations
 
 from backend.core.audit import write_audit_sync
-from backend.core.capability.invoke import invoke
-from backend.core.capability.registry import get_capability_registry
+from packages.capability.invoke import invoke
+from packages.capability.registry import get_capability_registry
 from backend.core.workflow.node_exec import (
     _child_terminal_outputs,
     _execute_agent_node,

@@ -7,17 +7,17 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from packages.auth.models import TenantContext
-from backend.core.capability.agents import MAX_AGENT_DEPTH, invoke_agent
-from backend.core.capability.errors import (
+from packages.capability.agents import MAX_AGENT_DEPTH, invoke_agent
+from packages.capability.errors import (
     CapabilityGovernanceRequiredError,
     CapabilityUpstreamError,
 )
-from backend.core.capability.models import (
+from packages.capability.models import (
     CapabilityKind,
     CapabilityProvider,
     CapabilitySpec,
 )
-from backend.core.capability.registry import CapabilityRegistry
+from packages.capability.registry import CapabilityRegistry
 from backend.core.errors import ErrorCode
 
 
@@ -80,7 +80,7 @@ async def test_vendor_risk_call_chain_and_audits(
 
     with (
         patch(
-            "backend.core.capability.registry.get_capability_registry",
+            "packages.capability.registry.get_capability_registry",
             return_value=reg,
         ),
         patch("backend.core.audit.write_audit_sync", side_effect=fake_audit),
@@ -132,14 +132,14 @@ async def test_non_leaf_child_uses_real_invoke(tenant: TenantContext) -> None:
 
     with (
         patch(
-            "backend.core.capability.registry.get_capability_registry",
+            "packages.capability.registry.get_capability_registry",
             return_value=reg,
         ),
         patch(
-            "backend.core.capability.invoke.get_capability_registry",
+            "packages.capability.invoke.get_capability_registry",
             return_value=reg,
         ),
-        patch("backend.core.capability.governance._redis", return_value=None),
+        patch("packages.capability.governance._redis", return_value=None),
         patch("backend.core.audit.write_audit_sync"),
         patch(
             "backend.services.agent_service.get_agent_service",
@@ -184,7 +184,7 @@ async def test_agent_depth_limit(
 
     with (
         patch(
-            "backend.core.capability.registry.get_capability_registry",
+            "packages.capability.registry.get_capability_registry",
             return_value=reg,
         ),
         patch("backend.core.audit.write_audit_sync"),

@@ -8,12 +8,12 @@ import pytest
 from fastapi import HTTPException
 
 from packages.auth.models import TenantContext
-from backend.core.capability.models import (
+from packages.capability.models import (
     CapabilityKind,
     CapabilityProvider,
     CapabilitySpec,
 )
-from backend.core.capability.registry import CapabilityRegistry
+from packages.capability.registry import CapabilityRegistry
 from backend.core.org.scope import OrgScope
 from backend.core.workflow import service as wf_svc
 from backend.database.pgvector_session import Workflow, get_pg_session

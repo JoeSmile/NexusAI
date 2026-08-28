@@ -158,7 +158,7 @@ def _query_rewrite(state: dict[str, Any]) -> dict[str, Any]:
 
 
 def _high_risk_incomplete_steps(plan: dict[str, Any]) -> list[str]:
-    from backend.core.capability.registry import get_capability_registry
+    from packages.capability.registry import get_capability_registry
 
     reg = get_capability_registry()
     missing: list[str] = []

@@ -6,8 +6,8 @@ import json
 
 import pytest
 
-from backend.core.capability.mcp_errors import McpErrorCode, map_jsonrpc_error
-from backend.core.capability.mcp_registry import (
+from packages.capability.mcp_errors import McpErrorCode, map_jsonrpc_error
+from packages.capability.mcp_registry import (
     McpServerConfig,
     capability_id_for_mcp_tool,
     infer_mcp_risk_level,
@@ -15,8 +15,8 @@ from backend.core.capability.mcp_registry import (
     normalize_mcp_tool,
     register_mcp_tools,
 )
-from backend.core.capability.models import CapabilityKind, CapabilityProvider
-from backend.core.capability.registry import CapabilityRegistry
+from packages.capability.models import CapabilityKind, CapabilityProvider
+from packages.capability.registry import CapabilityRegistry
 
 
 def test_capability_id_for_mcp_tool() -> None:
@@ -118,8 +118,8 @@ def test_map_jsonrpc_error_codes() -> None:
 @pytest.mark.asyncio
 async def test_invoke_mcp_mock_echo(monkeypatch: pytest.MonkeyPatch) -> None:
     from packages.auth.models import TenantContext
-    from backend.core.capability.connectors.mcp_server import invoke_mcp
-    from backend.core.capability.models import CapabilitySpec, CapabilityStatus
+    from packages.capability.connectors.mcp_server import invoke_mcp
+    from packages.capability.models import CapabilitySpec, CapabilityStatus
 
     monkeypatch.setenv("CAPABILITY_UPSTREAM_MOCK", "true")
     monkeypatch.setenv(

@@ -5,13 +5,13 @@ from __future__ import annotations
 import pytest
 
 from packages.auth.models import TenantContext
-from backend.core.capability.builtin.register import register_builtin_tools
-from backend.core.capability.builtin.specs import BUILTIN_TOOL_SPECS
-from backend.core.capability.contract import validate_capability_contract
-from backend.core.capability.exec_policy import global_default_exec_policy, resolve_exec_policy
-from backend.core.capability.governance_chain import run_governance_chain
-from backend.core.capability.models import CapabilityKind, CapabilitySpec
-from backend.core.capability.registry import CapabilityRegistry
+from packages.capability.builtin.register import register_builtin_tools
+from packages.capability.builtin.specs import BUILTIN_TOOL_SPECS
+from packages.capability.contract import validate_capability_contract
+from packages.capability.exec_policy import global_default_exec_policy, resolve_exec_policy
+from packages.capability.governance_chain import run_governance_chain
+from packages.capability.models import CapabilityKind, CapabilitySpec
+from packages.capability.registry import CapabilityRegistry
 from backend.core.errors import ErrorCode, NexusAIException
 
 
@@ -69,7 +69,7 @@ def test_exec_policy_defaults_and_override() -> None:
 
 @pytest.mark.asyncio
 async def test_invoke_calendar_query_handler(tenant_user: TenantContext) -> None:
-    from backend.core.capability.builtin.handlers import invoke_builtin_handler
+    from packages.capability.builtin.handlers import invoke_builtin_handler
 
     result = await invoke_builtin_handler(
         "calendar.query",
@@ -82,7 +82,7 @@ async def test_invoke_calendar_query_handler(tenant_user: TenantContext) -> None
 
 @pytest.mark.asyncio
 async def test_sql_query_rejects_mutating(tenant_user: TenantContext) -> None:
-    from backend.core.capability.builtin.handlers import invoke_builtin_handler
+    from packages.capability.builtin.handlers import invoke_builtin_handler
 
     result = await invoke_builtin_handler(
         "sql.query",
@@ -93,7 +93,7 @@ async def test_sql_query_rejects_mutating(tenant_user: TenantContext) -> None:
 
 
 def test_governance_denies_mail_send_without_approval(tenant_user: TenantContext) -> None:
-    from backend.core.capability.invoke import _check_permission
+    from packages.capability.invoke import _check_permission
 
     reg = CapabilityRegistry()
     register_builtin_tools(reg)
@@ -104,7 +104,7 @@ def test_governance_denies_mail_send_without_approval(tenant_user: TenantContext
 
 
 def test_governance_allows_calendar_query(tenant_user: TenantContext) -> None:
-    from backend.core.capability.invoke import _check_permission
+    from packages.capability.invoke import _check_permission
 
     reg = CapabilityRegistry()
     register_builtin_tools(reg)
@@ -115,7 +115,7 @@ def test_governance_allows_calendar_query(tenant_user: TenantContext) -> None:
 
 @pytest.mark.asyncio
 async def test_web_search_ssrf_blocks_localhost(tenant_user: TenantContext) -> None:
-    from backend.core.capability.builtin.handlers import invoke_builtin_handler
+    from packages.capability.builtin.handlers import invoke_builtin_handler
 
     result = await invoke_builtin_handler(
         "web.search",

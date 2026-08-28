@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from backend.core.capability.local_tool_bridge import legacy_tool_to_capability_spec
-from backend.core.capability.models import CapabilityKind, CapabilityProvider
-from backend.core.capability.registry import _provider_from_str
+from packages.capability.local_tool_bridge import legacy_tool_to_capability_spec
+from packages.capability.models import CapabilityKind, CapabilityProvider
+from packages.capability.registry import _provider_from_str
 
 
 def test_mcp_provider_enum() -> None:

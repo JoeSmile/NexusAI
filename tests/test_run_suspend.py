@@ -9,12 +9,12 @@ from unittest.mock import patch
 import pytest
 
 from packages.auth.models import TenantContext
-from backend.core.capability.models import (
+from packages.capability.models import (
     CapabilityKind,
     CapabilityProvider,
     CapabilitySpec,
 )
-from backend.core.capability.registry import CapabilityRegistry
+from packages.capability.registry import CapabilityRegistry
 from backend.core.org.scope import OrgScope
 from backend.core.workflow.run_state import can_node_transition, can_transition
 from backend.core.workflow.runner import execute_run, start_run
