@@ -32,7 +32,7 @@ async def generate_text(prompt: str, model: str = "", api_key: str = "", base_ur
         engine = ChatEngine()
         # ChatEngine.chat is sync request-shaped; fall back to requests via engine internals
         if hasattr(engine, "chat"):
-            from backend.models import ChatRequest
+            from packages.models import ChatRequest
 
             resp = engine.chat(ChatRequest(message=prompt, session_id="pipeline", user_id="pipeline"))
             content = getattr(resp, "response", None) or getattr(resp, "message", None) or str(resp)

@@ -29,7 +29,7 @@ from packages.multimodal.vision import (
     resolve_vision_credentials,
 )
 from packages.terms.service import enforce_terms_for_chat
-from backend.models import MultimodalResponse
+from packages.models import MultimodalResponse
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
 

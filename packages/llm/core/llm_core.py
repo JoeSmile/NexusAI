@@ -17,7 +17,7 @@ except ImportError:
 
 # 数据库和模型
 from backend.database import DatabaseManager, create_tables
-from backend.models import ChatResponse
+from packages.models import ChatResponse
 
 # 导入NexusAIPrompt配置
 from packages.system_prompt import (
