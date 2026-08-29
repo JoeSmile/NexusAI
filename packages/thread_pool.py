@@ -12,7 +12,7 @@ _executor: ThreadPoolExecutor | None = None
 
 
 def thread_pool_max_workers() -> int:
-    from backend.config.performance_config import PerformanceConfig
+    from packages.performance_config import PerformanceConfig
 
     return max(1, int(PerformanceConfig.THREAD_POOL_MAX_WORKERS))
 
