@@ -10,6 +10,6 @@
 | rag / llm / notification / channel / agent | 原 `backend/modules/*`（agent=MCP protocol） |
 | **agent_runtime** | 原 `backend/agent` 会话运行时（AgentCore / MemoryHub） |
 
-进程入口见 `apps/`。`backend/` 仅余 `config/`（环境 env 文件）、`core/__init__.py` re-export、`tests/` 遗留套件。异常真源：`packages.errors`（跟进 [`docs/backlog/E1-legacy-exception-cleanup.md`](../docs/backlog/E1-legacy-exception-cleanup.md)）。已迁对照见 [`docs/REPO_LAYOUT.md`](../docs/REPO_LAYOUT.md)。
+进程入口见 `apps/`。`backend/` 仅余 `core/__init__.py` re-export。配置真源：根 `config.py`；异常真源：`packages.errors`（跟进 [`docs/backlog/E1-legacy-exception-cleanup.md`](../docs/backlog/E1-legacy-exception-cleanup.md)）。已迁对照见 [`docs/REPO_LAYOUT.md`](../docs/REPO_LAYOUT.md)。
 
 地图：[`docs/REPO_LAYOUT.md`](../docs/REPO_LAYOUT.md)
