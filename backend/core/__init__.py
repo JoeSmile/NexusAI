@@ -1,16 +1,16 @@
 """
 遗留 re-export：原 backend.core 包入口。
 
-真源已迁至 packages.*；保留此模块以免旧 ``from backend.core import …`` 立刻炸。
-异常统一用 ``packages.errors``（``ErrorCode`` / ``NexusAIException``）。
+配置真源：根目录 ``config.py``（``get_settings`` / ``Config`` 代理）。
+异常真源：``packages.errors``。
 """
 
-from packages.config import Config, get_config
+from config import Config, get_settings
 from packages.errors import ErrorCode, NexusAIException
 
 __all__ = [
     "Config",
     "ErrorCode",
     "NexusAIException",
-    "get_config",
+    "get_settings",
 ]

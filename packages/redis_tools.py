@@ -40,7 +40,7 @@ def resolve_redis_url(default: str = "redis://localhost:6379") -> str:
     Priority:
     1. ``REDIS_URL`` env (explicit full URL)
     2. ``REDIS_HOST`` + ``REDIS_PORT`` (+ optional password/db) — docker-compose path
-    3. ``Config.REDIS_URL`` / ``Config.redis.url`` when available
+    3. root ``config.Config.REDIS_URL`` (pydantic Settings proxy)
     4. ``default`` (localhost)
     """
     env_url = (os.getenv("REDIS_URL") or "").strip()
@@ -60,16 +60,6 @@ def resolve_redis_url(default: str = "redis://localhost:6379") -> str:
         cfg_url = getattr(Config, "REDIS_URL", None)
         if cfg_url and str(cfg_url).strip():
             return str(cfg_url).strip()
-    except Exception:
-        pass
-
-    try:
-        from packages.config import get_config
-
-        redis_cfg = getattr(get_config(), "redis", None)
-        url_prop = getattr(redis_cfg, "url", None) if redis_cfg is not None else None
-        if url_prop and str(url_prop).strip():
-            return str(url_prop).strip()
     except Exception:
         pass
 
