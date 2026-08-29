@@ -1,0 +1,22 @@
+"""
+Policy — 声明式策略引擎
+
+策略 = "何时触发什么动作" (workflow 规则)
+权限 = "谁能做什么" (访问控制)
+
+两者正交：权限系统决定 ALLOW/DENY/ASK，策略引擎决定附加动作。
+"""
+
+from packages.runtime.policy.policy_engine import (
+    ActionType,
+    PolicyAction,
+    PolicyEngine,
+    PolicyRule,
+)
+
+__all__ = [
+    "ActionType",
+    "PolicyAction",
+    "PolicyEngine",
+    "PolicyRule",
+]
