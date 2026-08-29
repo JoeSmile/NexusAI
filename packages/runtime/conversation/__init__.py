@@ -4,7 +4,7 @@ runtime.conversation — ConversationRuntime package
 基于 Skill 的对话运行时，替代原 AgentCore 的 7 阶段线性 Workflow。
 
 外部导入路径保持不变：
-    from runtime.conversation import ConversationRuntime
+    from packages.runtime.conversation import ConversationRuntime
 """
 
 from packages.runtime.conversation._helpers import TurnResult

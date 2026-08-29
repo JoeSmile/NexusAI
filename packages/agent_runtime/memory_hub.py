@@ -40,11 +40,8 @@ from packages.agent_runtime.memory_store import (
     PersistentScopedStore,
 )
 
-# 惰性导入：MemoryManager / Database 允许在缺依赖时降级
-try:
-    from backend.memory_manager import MemoryManager
-except ImportError:
-    MemoryManager = None  # type: ignore
+# 旧 backend.memory_manager 已移除；记忆真源 packages.memory
+MemoryManager = None  # type: ignore
 
 try:
     from packages.database import ChatMessage, ChatSession, User, get_db

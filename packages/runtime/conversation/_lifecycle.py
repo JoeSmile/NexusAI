@@ -107,10 +107,10 @@ class LifecycleMixin:
             return
 
         # 注册默认 Skills（EmotionSkill 已随 Batch 3.1 移除）
-        from runtime.skills.memory_skill import MemorySkill
-        from runtime.skills.planning_skill import PlanningSkill
-        from runtime.skills.reflect_skill import ReflectSkill
-        from runtime.skills.tool_skill import ToolSkill
+        from packages.runtime.skills.memory_skill import MemorySkill
+        from packages.runtime.skills.planning_skill import PlanningSkill
+        from packages.runtime.skills.reflect_skill import ReflectSkill
+        from packages.runtime.skills.tool_skill import ToolSkill
 
         self._skill_registry.register(MemorySkill(memory_hub=memory_hub), order=1)
         self._skill_registry.register(PlanningSkill(llm_client=llm_client), order=2)

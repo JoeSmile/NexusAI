@@ -30,11 +30,9 @@ from packages.agent.protocol.mcp import (
     get_mcp_logger,
 )
 
-try:
-    from backend.hermes.intent import workspace_automation_intent
-except ImportError:  # Batch 3.1: hermes 已删除
-    def workspace_automation_intent(_text: str) -> bool:
-        return False
+def workspace_automation_intent(_text: str) -> bool:
+    """hermes 已删除；stub 恒为 False。"""
+    return False
 
 
 class GoalType(Enum):

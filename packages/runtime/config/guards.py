@@ -7,13 +7,13 @@ Module Guards — 统一的开关检查入口
 
 Usage::
 
-    from runtime.config.guards import is_module_enabled
+    from packages.runtime.config.guards import is_module_enabled
 
     if is_module_enabled("memory_skill"):
         result = await memory_skill.execute(context)
     ...
 
-    from runtime.config.guards import require_module
+    from packages.runtime.config.guards import require_module
 
     async def dangerous_operation(self, ...):
         require_module("crisis_intervention")  # raises if disabled

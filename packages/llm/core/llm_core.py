@@ -27,13 +27,8 @@ from packages.system_prompt import (
 )
 from packages.llm.harness import resolve_llm_settings, try_create_chat_openai
 
-# 尝试导入向量数据库（可选）
-try:
-    from backend.vector_store import VectorStore
-    VECTOR_STORE_AVAILABLE = True
-except ImportError as e:
-    VECTOR_STORE_AVAILABLE = False
-    print(f"提示: 向量数据库模块未安装 ({e}), 将仅使用MySQL短期记忆")
+# 旧 backend.vector_store 已移除；长期记忆走 packages.memory / pgvector
+VECTOR_STORE_AVAILABLE = False
 
 
 class ChatEngine:
@@ -51,17 +46,8 @@ class ChatEngine:
         # 创建数据库表
         create_tables()
         
-        # 初始化向量数据库（长期记忆）
-        if VECTOR_STORE_AVAILABLE:
-            try:
-                self.vector_store = VectorStore()
-                print("✓ 向量数据库 (pgvector) 初始化成功")
-            except Exception as e:
-                print(f"警告: 向量数据库初始化失败: {e}，将仅使用MySQL")
-                self.vector_store = None
-        else:
-            self.vector_store = None
-            print("⚠ 向量数据库未安装，仅使用MySQL短期记忆")
+        self.vector_store = None
+        print("⚠ 向量数据库未经 ChatEngine 挂载，仅使用短期记忆路径")
         
         # 初始化 LangChain 组件（LCEL 表达式）- 如果可用
         if self.api_key and LANGCHAIN_AVAILABLE:

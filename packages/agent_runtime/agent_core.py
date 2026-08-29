@@ -53,7 +53,7 @@ class _LLMClientAdapter:
         max_tokens: int = 4096,
     ):
         """流式输出 — 返回 async generator"""
-        from runtime.protocols.llm_client import AssistantEvent
+        from packages.runtime.protocols.llm_client import AssistantEvent
 
         if self._llm and hasattr(self._llm, "astream"):
             async for chunk in self._llm.astream(messages, system=system_prompt):
@@ -76,7 +76,7 @@ class _LLMClientAdapter:
         max_tokens: int = 4096,
     ):
         """完整生成 — 返回 TurnSummary"""
-        from runtime.protocols.llm_client import TurnSummary
+        from packages.runtime.protocols.llm_client import TurnSummary
 
         text = ""
 
@@ -146,7 +146,7 @@ class _PermissionPrompterAdapter:
 
     async def confirm(self, request) -> Any:
         """自动批准"""
-        from runtime.protocols.permission_prompter import PermissionDecision
+        from packages.runtime.protocols.permission_prompter import PermissionDecision
         return PermissionDecision(approved=True, reason="auto_approved")
 
 
@@ -236,12 +236,8 @@ class AgentCore:
         except ImportError:
             self.reflector = None
 
-        # 旧系统组件
-        try:
-            from backend.context_assembler import ContextAssembler
-            self.context_assembler = ContextAssembler()
-        except ImportError:
-            self.context_assembler = None
+        # 旧 backend.context_assembler 已移除
+        self.context_assembler = None
 
     def _build_runtime(self, user_id: str, session_id: str | None = None):
         """
@@ -249,7 +245,7 @@ class AgentCore:
 
         每个用户/会话创建独立的 Runtime 实例。
         """
-        from runtime.conversation import ConversationRuntime
+        from packages.runtime.conversation import ConversationRuntime
 
         # 创建 Protocol 适配器
         llm_adapter = _LLMClientAdapter(

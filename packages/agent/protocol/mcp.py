@@ -23,13 +23,8 @@ try:
     from packages.services.context_service import ContextService
     CONTEXT_SERVICE_AVAILABLE = True
 except ImportError:
-    try:
-        from backend.context_assembler import ContextAssembler
-        CONTEXT_SERVICE_AVAILABLE = True
-    except ImportError:
-        CONTEXT_SERVICE_AVAILABLE = False
-        ContextService = None
-        ContextAssembler = None
+    CONTEXT_SERVICE_AVAILABLE = False
+    ContextService = None
 
 
 class MCPMessageType(StrEnum):

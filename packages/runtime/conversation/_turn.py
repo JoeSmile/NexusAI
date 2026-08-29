@@ -277,7 +277,7 @@ class TurnMixin:
         skill_results: dict[str, SkillResult],
     ) -> str:
         """使用 SystemPromptBuilder 构建系统提示"""
-        from runtime.prompt_builder import SystemPromptBuilder
+        from packages.runtime.prompt_builder import SystemPromptBuilder
 
         builder = SystemPromptBuilder(
             base_identity="你是'NexusAI'，企业级 LLM 信息平台的智能助手，职责是提供专业、准确、安全的信息服务。",
@@ -297,7 +297,7 @@ class TurnMixin:
 
     def _should_skip_skill(self, actions: list) -> bool:
         """根据策略动作判断是否跳过 Skill"""
-        from runtime.policy.policy_engine import ActionType
+        from packages.runtime.policy.policy_engine import ActionType
 
         for action in actions:
             if action.type in (ActionType.DENY, ActionType.ESCALATE_TO_HUMAN):
