@@ -7,7 +7,7 @@ from typing import Any
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from backend.database.pgvector_session import (
+from packages.database.pgvector_session import (
     SocialAccount,
     SocialContent,
     SocialFollow,

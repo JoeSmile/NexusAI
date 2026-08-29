@@ -105,8 +105,8 @@ def test_l2_same_text_one_api_call(fake_redis, monkeypatch):
 
     monkeypatch.setattr("openai.OpenAI", _Client)
 
-    from backend.database import embeddings as emb_mod
-    from backend.database.embeddings import embed_text, reset_embed_mode_for_tests
+    from packages.database import embeddings as emb_mod
+    from packages.database.embeddings import embed_text, reset_embed_mode_for_tests
 
     reset_embed_mode_for_tests()
     spec = SimpleNamespace(

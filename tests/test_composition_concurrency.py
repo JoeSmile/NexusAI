@@ -16,7 +16,7 @@ from packages.workflow.composition import (
     check_composition_budget,
 )
 from packages.workflow.runner import MAX_RUNNING_ROOT_RUNS, start_run
-from backend.database.pgvector_session import Workflow, WorkflowRun, get_pg_session
+from packages.database.pgvector_session import Workflow, WorkflowRun, get_pg_session
 
 
 def _mk_run(

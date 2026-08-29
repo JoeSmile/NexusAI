@@ -56,11 +56,11 @@ def test_semantic_paraphrase_hits_when_search_returns_key() -> None:
     items = _world_keys(25, _decision_warm())
     with (
         patch(
-            "backend.database.embeddings.embedding_uses_hash_fallback",
+            "packages.database.embeddings.embedding_uses_hash_fallback",
             return_value=False,
         ),
         patch(
-            "backend.database.vector_ops.search_user_memories",
+            "packages.database.vector_ops.search_user_memories",
             return_value=[
                 {
                     "key": "decision:分布式锁防",
@@ -83,7 +83,7 @@ def test_semantic_paraphrase_hits_when_search_returns_key() -> None:
 def test_semantic_hash_fallback_uses_keyword() -> None:
     items = _world_keys(25, _decision_warm())
     with patch(
-        "backend.database.embeddings.embedding_uses_hash_fallback",
+        "packages.database.embeddings.embedding_uses_hash_fallback",
         return_value=True,
     ):
         keys = select_world_items(
@@ -136,11 +136,11 @@ def test_assemble_paraphrase_via_semantic_mock() -> None:
     warm = _world_keys(25, _decision_warm())
     with (
         patch(
-            "backend.database.embeddings.embedding_uses_hash_fallback",
+            "packages.database.embeddings.embedding_uses_hash_fallback",
             return_value=False,
         ),
         patch(
-            "backend.database.vector_ops.search_user_memories",
+            "packages.database.vector_ops.search_user_memories",
             return_value=[
                 {
                     "key": "decision:分布式锁防",
@@ -174,11 +174,11 @@ def test_small_world_semantic_skips_embed(monkeypatch) -> None:
         raise AssertionError("search_user_memories must not run for small world")
 
     monkeypatch.setattr(
-        "backend.database.embeddings.embedding_uses_hash_fallback", lambda: False
+        "packages.database.embeddings.embedding_uses_hash_fallback", lambda: False
     )
-    monkeypatch.setattr("backend.database.embeddings.embed_text", _boom_embed)
+    monkeypatch.setattr("packages.database.embeddings.embed_text", _boom_embed)
     monkeypatch.setattr(
-        "backend.database.vector_ops.search_user_memories", _boom_search
+        "packages.database.vector_ops.search_user_memories", _boom_search
     )
     keys = select_world_items(
         "任意查询需要走语义",
@@ -201,7 +201,7 @@ def test_small_world_semantic_skips_embed(monkeypatch) -> None:
 def test_large_world_semantic_still_searches(monkeypatch) -> None:
     items = _world_keys(50)
     monkeypatch.setattr(
-        "backend.database.embeddings.embedding_uses_hash_fallback", lambda: False
+        "packages.database.embeddings.embedding_uses_hash_fallback", lambda: False
     )
     hits = [
         {
@@ -211,7 +211,7 @@ def test_large_world_semantic_still_searches(monkeypatch) -> None:
         }
     ]
     with patch(
-        "backend.database.vector_ops.search_user_memories",
+        "packages.database.vector_ops.search_user_memories",
         return_value=hits,
     ) as search:
         keys = select_world_items(
@@ -229,14 +229,14 @@ def test_small_world_threshold_env_override(monkeypatch) -> None:
     monkeypatch.setenv("MEMORY_SMALL_WORLD_THRESHOLD", "50")
     items = _world_keys(40)
     monkeypatch.setattr(
-        "backend.database.embeddings.embedding_uses_hash_fallback", lambda: False
+        "packages.database.embeddings.embedding_uses_hash_fallback", lambda: False
     )
 
     def _boom_search(*_a, **_k):
         raise AssertionError("threshold 50 should skip search for n=40")
 
     monkeypatch.setattr(
-        "backend.database.vector_ops.search_user_memories", _boom_search
+        "packages.database.vector_ops.search_user_memories", _boom_search
     )
     keys = select_world_items(
         "查询",

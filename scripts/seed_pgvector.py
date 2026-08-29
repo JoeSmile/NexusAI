@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import numpy as np
 
-from backend.database.pgvector_session import (
+from packages.database.pgvector_session import (
     ChatMessage,
     ChatSession,
     UserMemory,
@@ -171,7 +171,7 @@ def seed_llm_keys() -> None:
 
     from sqlalchemy import text
 
-    from backend.database.pgvector_session import get_pg_session
+    from packages.database.pgvector_session import get_pg_session
 
     # 真实密钥只活在环境变量（config.env），不进 DB（DB 迁移/备份/泄露会带走 key）。
     # 运行时 key 解析顺序：租户 key → 全局 key → env（registry.py 已支持回落 env）。

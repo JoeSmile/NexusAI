@@ -13,7 +13,7 @@ from packages.key_repository import (
     LLMKeyRepository,
     _max_consecutive_failures,
 )
-from backend.database.pgvector_session import get_pg_session
+from packages.database.pgvector_session import get_pg_session
 
 logger = logging.getLogger(__name__)
 

@@ -9,7 +9,7 @@ from typing import Any, Protocol, runtime_checkable
 
 from sqlalchemy.orm import Session
 
-from backend.database.pgvector_session import Notification
+from packages.database.pgvector_session import Notification
 
 logger = logging.getLogger(__name__)
 

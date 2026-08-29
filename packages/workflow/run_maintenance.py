@@ -7,7 +7,7 @@ from datetime import datetime
 from sqlalchemy import text
 
 from packages.errors import ErrorCode
-from backend.database.pgvector_session import WorkflowRun, WorkflowRunNode, get_pg_session
+from packages.database.pgvector_session import WorkflowRun, WorkflowRunNode, get_pg_session
 from packages.workflow.runner_shared import _audit
 
 

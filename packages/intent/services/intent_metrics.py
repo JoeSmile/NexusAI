@@ -7,7 +7,7 @@ from typing import Any
 
 from sqlalchemy import text
 
-from backend.database.pgvector_session import get_pg_session
+from packages.database.pgvector_session import get_pg_session
 
 LOW_CONFIDENCE_THRESHOLD = 0.7
 

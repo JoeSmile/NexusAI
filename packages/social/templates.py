@@ -13,7 +13,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from backend.database.pgvector_session import SocialResult, SocialTemplate
+from packages.database.pgvector_session import SocialResult, SocialTemplate
 
 _SLOT_RE = re.compile(r"[\u4e00-\u9fffA-Za-z0-9]{2,}")
 

@@ -17,7 +17,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from packages.org.scope import OrgScope, assert_org_access
-from backend.database.pgvector_session import PermissionRequest, WorkflowGrant
+from packages.database.pgvector_session import PermissionRequest, WorkflowGrant
 from packages.auth.models import TenantContext
 from packages.workflow.security_gates import RequestableMode
 
@@ -128,7 +128,7 @@ def current_grant_covers_capability() -> bool:
     ctx = _grant_lookup.get()
     if ctx is None:
         return False
-    from backend.database.pgvector_session import get_pg_session
+    from packages.database.pgvector_session import get_pg_session
 
     sf = get_pg_session()
     with sf.Session() as session:
@@ -390,7 +390,7 @@ def scan_grants_for_auto_renew(
     """
     from sqlalchemy import text
 
-    from backend.database.pgvector_session import Workflow, get_pg_session
+    from packages.database.pgvector_session import Workflow, get_pg_session
 
     now = now or datetime.utcnow()
     horizon = now + timedelta(days=within_days)

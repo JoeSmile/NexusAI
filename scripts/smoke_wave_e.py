@@ -61,7 +61,7 @@ def seed_hang_capability(cap_id: str) -> None:
     """Insert kb:read tool into DB so member can see but not invoke."""
     from datetime import datetime
 
-    from backend.database.pgvector_session import Capability, get_pg_session
+    from packages.database.pgvector_session import Capability, get_pg_session
 
     sf = get_pg_session()
     with sf.Session() as session:

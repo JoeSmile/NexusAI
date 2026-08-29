@@ -7,7 +7,7 @@ from sqlalchemy import text
 from packages.errors import ErrorCode, NexusAIException
 from packages.key_manager import KeyManager
 from packages.key_repository import LLMKey
-from backend.database.pgvector_session import get_pg_session
+from packages.database.pgvector_session import get_pg_session
 
 _LLM_KEY_MISSING = ErrorCode.LLM_KEY_MISSING.value
 _LLM_MODEL_NOT_ALLOWED = ErrorCode.LLM_MODEL_NOT_ALLOWED.value

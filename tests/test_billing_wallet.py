@@ -113,7 +113,7 @@ def test_wallet_recharge_deduct_and_insufficient(monkeypatch: pytest.MonkeyPatch
     )
     assert get_balance_sync(tid) == 10.0
 
-    from backend.database.pgvector_session import get_pg_session
+    from packages.database.pgvector_session import get_pg_session
 
     sf = get_pg_session()
     with sf.Session() as session:
@@ -147,7 +147,7 @@ def test_concurrent_deduct_cannot_overdraw(monkeypatch: pytest.MonkeyPatch) -> N
         operator="tester",
     )
 
-    from backend.database.pgvector_session import get_pg_session
+    from packages.database.pgvector_session import get_pg_session
 
     sf = get_pg_session()
     failures: list[str] = []

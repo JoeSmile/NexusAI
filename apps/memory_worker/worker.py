@@ -23,7 +23,7 @@ def process_one(xid: str, data: dict, *, deliveries: int = 1) -> float:
         is_tombstoned,
     )
     from packages.memory.memory_service import get_unified_memory_service
-    from backend.database.vector_ops import list_user_memories_by_prefix
+    from packages.database.vector_ops import list_user_memories_by_prefix
 
     tenant_id = str(data.get("tenant_id") or "")
     user_id = str(data.get("user_id") or "")

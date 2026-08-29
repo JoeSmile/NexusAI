@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 
 from packages.errors import ErrorCode
 from packages.org.scope import OrgScope, assert_org_access
-from backend.database.pgvector_session import Workflow, WorkflowRun, WorkflowRunNode, get_pg_session
+from packages.database.pgvector_session import Workflow, WorkflowRun, WorkflowRunNode, get_pg_session
 from packages.auth.models import TenantContext
 from packages.workflow.composition import CompositionDepthExceeded, check_composition_budget
 from packages.workflow.ir import WorkflowIR
@@ -523,7 +523,7 @@ def cancel_run(
     run_id: str,
 ) -> dict[str, Any]:
     """pending/running/suspended → cancelled；挂起 request 同步 cancelled。"""
-    from backend.database.pgvector_session import PermissionRequest
+    from packages.database.pgvector_session import PermissionRequest
 
     run = (
         session.query(WorkflowRun)

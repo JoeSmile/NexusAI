@@ -10,7 +10,7 @@ from packages.content_ops.offerings import (
     ensure_default_offerings,
     list_offerings,
 )
-from backend.database.pgvector_session import Base, Offering
+from packages.database.pgvector_session import Base, Offering
 
 
 def test_ensure_and_list_offerings():

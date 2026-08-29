@@ -89,7 +89,7 @@ def init_database(url: str | None = None) -> None:
 
     resolved = url or _resolve_database_url()
     _database_url = resolved
-    from backend.database.pg_pool import pg_engine_kwargs
+    from packages.database.pg_pool import pg_engine_kwargs
 
     kwargs = pg_engine_kwargs(resolved)
     if resolved.startswith("sqlite"):
@@ -109,7 +109,7 @@ def get_session():
 
 
 def __getattr__(name: str):
-    """兼容 `from backend.database.models import engine/SessionLocal/DATABASE_URL`。"""
+    """兼容 `from packages.database.models import engine/SessionLocal/DATABASE_URL`。"""
     if name == "engine":
         init_database()
         return _engine
@@ -437,7 +437,7 @@ def get_db():
 
 
 # 数据库操作类
-# DEPRECATED: 请使用 backend.database.pgvector_session.PGVectorSession
+# DEPRECATED: 请使用 packages.database.pgvector_session.PGVectorSession
 class DatabaseManager:
     def __init__(self):
         self.db = get_session()
@@ -450,7 +450,7 @@ class DatabaseManager:
 
     def save_message(self, session_id, user_id, role, content):
         """保存聊天消息"""
-        from backend.database.pgvector_session import ChatMessage
+        from packages.database.pgvector_session import ChatMessage
 
         message = ChatMessage(
             session_id=session_id,
@@ -465,7 +465,7 @@ class DatabaseManager:
     
     def get_session_messages(self, session_id, limit=50):
         """获取会话消息"""
-        from backend.database.pgvector_session import ChatMessage
+        from packages.database.pgvector_session import ChatMessage
 
         return self.db.query(ChatMessage)\
             .filter(ChatMessage.session_id == session_id)\
@@ -510,7 +510,7 @@ class DatabaseManager:
     
     def get_user_sessions(self, user_id, limit=50):
         """获取用户的所有会话"""
-        from backend.database.pgvector_session import ChatSession
+        from packages.database.pgvector_session import ChatSession
 
         return self.db.query(ChatSession)\
             .filter(ChatSession.user_id == user_id)\
@@ -520,7 +520,7 @@ class DatabaseManager:
     
     def create_session(self, session_id, user_id):
         """创建新会话"""
-        from backend.database.pgvector_session import ChatSession
+        from packages.database.pgvector_session import ChatSession
 
         session = ChatSession(
             session_id=session_id,
@@ -533,7 +533,7 @@ class DatabaseManager:
     
     def delete_session(self, session_id):
         """删除会话及其相关数据"""
-        from backend.database.pgvector_session import ChatMessage, ChatSession
+        from packages.database.pgvector_session import ChatMessage, ChatSession
 
         try:
             # 删除会话相关的所有消息

@@ -68,7 +68,7 @@ async def _fetch_pending_from_db(state: dict[str, Any]) -> dict[str, Any] | None
         return None
     key = warm_pending_key(str(state.get("session_id") or "default"))
     try:
-        from backend.database.vector_ops import list_user_memories_by_prefix
+        from packages.database.vector_ops import list_user_memories_by_prefix
 
         rows = list_user_memories_by_prefix(tenant_id, user_id, key, limit=1)
     except Exception:
@@ -140,7 +140,7 @@ async def clear_pending(state: dict[str, Any]) -> None:
     session_id = str(state.get("session_id") or "default")
     key = warm_pending_key(session_id)
 
-    from backend.database.vector_ops import delete_user_memory
+    from packages.database.vector_ops import delete_user_memory
 
     try:
         delete_user_memory(tenant_id, user_id, key)

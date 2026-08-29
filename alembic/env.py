@@ -19,8 +19,8 @@ from alembic import context
 sys.path.insert(0, str(Path(__file__).parent.parent))
 # 导入配置和数据库模型
 from config import Config
-from backend.database.models import Base as ModelsBase
-from backend.database.pgvector_session import Base as VectorBase
+from packages.database.models import Base as ModelsBase
+from packages.database.pgvector_session import Base as VectorBase
 
 # 这是Alembic配置对象，提供了alembic.ini文件的访问
 config = context.config

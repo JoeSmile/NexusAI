@@ -15,7 +15,7 @@ def scan_expiring_grants(
     limit: int = 100,
 ) -> dict[str, int]:
     """到期前 7 天提醒；已 auto_renew 成功的不推（先续期后通知由 grant_scanner 顺序保证）。"""
-    from backend.database.pgvector_session import (
+    from packages.database.pgvector_session import (
         PermissionRequest,
         Workflow,
         WorkflowGrant,

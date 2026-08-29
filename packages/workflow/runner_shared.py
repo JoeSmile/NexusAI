@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 from packages.audit import write_audit_sync
 from packages.errors import ErrorCode
 from packages.org.scope import OrgScope, resolve_org_scope
-from backend.database.pgvector_session import WorkflowRun, WorkflowRunNode, get_pg_session
+from packages.database.pgvector_session import WorkflowRun, WorkflowRunNode, get_pg_session
 from packages.auth.models import TenantContext
 from packages.workflow.composition import CompositionDepthExceeded
 from packages.workflow.ir import WorkflowIR

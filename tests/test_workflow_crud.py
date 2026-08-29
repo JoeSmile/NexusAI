@@ -19,7 +19,7 @@ from packages.capability.models import (
 from packages.capability.registry import CapabilityRegistry
 from packages.org.scope import OrgScope
 from packages.workflow import service as wf_svc
-from backend.database.pgvector_session import Workflow, get_pg_session
+from packages.database.pgvector_session import Workflow, get_pg_session
 from apps.api.routers.workflows import router
 
 

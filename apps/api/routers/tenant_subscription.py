@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, model_validator
 
 from packages.audit import write_audit_sync
-from backend.database.pgvector_session import TenantConfig, get_pg_session
+from packages.database.pgvector_session import TenantConfig, get_pg_session
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
 from packages.workflow.subscription import (

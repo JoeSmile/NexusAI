@@ -133,15 +133,15 @@ async def test_write_warm_delegates_store() -> None:
     svc = UnifiedMemoryService(tenant_id="t1")
     with (
         patch(
-            "backend.database.pgvector_session.get_pg_session",
+            "packages.database.pgvector_session.get_pg_session",
             return_value=_FakeFactory(sess),
         ),
         patch(
-            "backend.database.embeddings.embed_text",
+            "packages.database.embeddings.embed_text",
             return_value=[0.0] * 8,
         ),
         patch(
-            "backend.database.vector_ops.list_user_memories_by_prefix",
+            "packages.database.vector_ops.list_user_memories_by_prefix",
             return_value=[],
         ),
     ):

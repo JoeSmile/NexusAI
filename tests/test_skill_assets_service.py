@@ -8,7 +8,7 @@ import pytest
 from fastapi import HTTPException
 
 from packages.skill_assets import service as svc
-from backend.database.pgvector_session import SkillAsset, get_pg_session
+from packages.database.pgvector_session import SkillAsset, get_pg_session
 
 
 @pytest.fixture()
@@ -16,7 +16,7 @@ def ensure_table(monkeypatch: pytest.MonkeyPatch):
     """Deterministic embeddings: no live HTTP; 'invoice' vs unrelated stay separable."""
 
     def _fake_embed(text: str, tenant_id: str | None = None) -> list[float]:
-        from backend.database.embeddings import EMBED_DIM
+        from packages.database.embeddings import EMBED_DIM
 
         vec = [0.0] * EMBED_DIM
         blob = (text or "").lower()

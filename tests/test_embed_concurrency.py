@@ -71,7 +71,7 @@ def test_embed_buckets_by_base_url() -> None:
 
 def test_embed_hash_and_cache_skip_slot(monkeypatch: pytest.MonkeyPatch) -> None:
     import packages.model_registry as mr
-    import backend.database.embeddings as emb
+    import packages.database.embeddings as emb
 
     monkeypatch.setenv("RAG_CACHE_ENABLED", "false")
     for key in (
@@ -95,7 +95,7 @@ def test_embed_http_uses_slot(monkeypatch: pytest.MonkeyPatch) -> None:
     from types import SimpleNamespace
 
     import packages.model_registry as mr
-    import backend.database.embeddings as emb
+    import packages.database.embeddings as emb
     from packages.rag import cache as rag_cache
 
     monkeypatch.setenv("RAG_CACHE_ENABLED", "false")
@@ -129,14 +129,14 @@ def test_embed_http_uses_slot(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_embed_cache_hit_skips_slot(monkeypatch: pytest.MonkeyPatch) -> None:
-    import backend.database.embeddings as emb
+    import packages.database.embeddings as emb
 
     monkeypatch.setattr(
         "packages.rag.cache.l2_get",
         lambda model, text: [0.3] * 768,
     )
     monkeypatch.setattr(
-        "backend.database.embeddings._resolve_embedding_endpoint",
+        "packages.database.embeddings._resolve_embedding_endpoint",
         lambda tenant_id=None: type(
             "E",
             (),

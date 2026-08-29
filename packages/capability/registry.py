@@ -209,7 +209,7 @@ class CapabilityRegistry:
     def load_from_db(self) -> int:
         """DB 优先：同 id 覆盖 env/model。表不存在时静默跳过。"""
         try:
-            from backend.database.pgvector_session import Capability, get_pg_session
+            from packages.database.pgvector_session import Capability, get_pg_session
         except Exception as exc:  # pragma: no cover
             logger.debug("capability DB import skipped: %s", exc)
             return 0
@@ -319,7 +319,7 @@ def resolve_credential(
         from sqlalchemy import text
 
         from packages.key_manager import KeyManager
-        from backend.database.pgvector_session import get_pg_session
+        from packages.database.pgvector_session import get_pg_session
 
         km = KeyManager()
         pg = get_pg_session()

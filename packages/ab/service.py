@@ -9,7 +9,7 @@ from typing import Any
 
 from sqlalchemy import text
 
-from backend.database.pgvector_session import get_pg_session
+from packages.database.pgvector_session import get_pg_session
 
 
 def _parse_json(raw: str | None, default: Any) -> Any:

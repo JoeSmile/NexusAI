@@ -29,7 +29,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-from backend.database.pg_pool import pg_engine_kwargs
+from packages.database.pg_pool import pg_engine_kwargs
 
 Base = declarative_base()
 
@@ -822,7 +822,7 @@ class PGVectorSession:
 
     def __init__(self, db_url: str | None = None):
         if db_url is None:
-            from backend.database.models import _resolve_database_url
+            from packages.database.models import _resolve_database_url
 
             db_url = _resolve_database_url()
         self.engine = create_engine(db_url, **pg_engine_kwargs(db_url))

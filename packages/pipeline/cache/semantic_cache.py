@@ -138,7 +138,7 @@ def lookup(state: PipelineState) -> str | None:
         return None
 
     try:
-        from backend.database.embeddings import embed_text
+        from packages.database.embeddings import embed_text
 
         qvec = embed_text(query, tenant_id=tenant_id)
     except Exception:
@@ -218,7 +218,7 @@ def upsert(state: PipelineState, response: str) -> None:
         return
 
     try:
-        from backend.database.embeddings import embed_text
+        from packages.database.embeddings import embed_text
 
         vec = embed_text(query, tenant_id=tenant_id)
         ttl = ttl_seconds()

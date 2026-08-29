@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Literal
 
-from backend.database.pgvector_session import (
+from packages.database.pgvector_session import (
     ChatMessage,
     ChatSession,
     ColdMemory,
@@ -343,7 +343,7 @@ class UnifiedMemoryService:
             # P0-7：forget 后禁止再写（除清除标记本身）
             if key != "__forgotten__":
                 try:
-                    from backend.database.vector_ops import list_user_memories_by_prefix
+                    from packages.database.vector_ops import list_user_memories_by_prefix
 
                     markers = list_user_memories_by_prefix(
                         self.tenant_id, user_id, "__forgotten__"
@@ -378,8 +378,8 @@ class UnifiedMemoryService:
             superseded: list[str] = []
             from datetime import datetime as _dt
 
-            from backend.database.embeddings import embed_text
-            from backend.database.pgvector_session import UserMemory, get_pg_session
+            from packages.database.embeddings import embed_text
+            from packages.database.pgvector_session import UserMemory, get_pg_session
             from packages.memory.structured_summary import build_structured_summary
             from packages.memory.supersede import supersede_user_domain
 
@@ -1325,7 +1325,7 @@ class UnifiedMemoryService:
         limit: int = 5,
         memory_type: str | None = None,
     ) -> list[dict[str, Any]]:
-        from backend.database.vector_ops import search_user_memories
+        from packages.database.vector_ops import search_user_memories
 
         results = search_user_memories(
             tenant_id=self.tenant_id,

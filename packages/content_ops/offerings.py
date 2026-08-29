@@ -7,7 +7,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from backend.database.pgvector_session import Offering
+from packages.database.pgvector_session import Offering
 
 DEFAULT_OFFERINGS: list[dict[str, Any]] = [
     {

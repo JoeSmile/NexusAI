@@ -10,7 +10,7 @@ from packages.workflow.notify import (
     notify_hang_pending,
     resolve_hang_route,
 )
-from backend.database.pgvector_session import PermissionRequest, get_pg_session
+from packages.database.pgvector_session import PermissionRequest, get_pg_session
 
 
 def test_ancestor_unit_ids_nearest_first():

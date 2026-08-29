@@ -8,7 +8,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from backend.database.pgvector_session import Workflow
+from packages.database.pgvector_session import Workflow
 
 BUILTIN_HOTSPOT_NAME = "内置·抓取相关热点"
 HOTSPOT_INTENT_TAGS = ["hotspot", "抓热点", "热点", "hotspot.dig", "挖热点"]

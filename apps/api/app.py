@@ -41,7 +41,7 @@ async def lifespan(app: FastAPI):
     logger.info("═" * 40)
 
     try:
-        from backend.database import init_database
+        from packages.database import init_database
 
         init_database()
         logger.info("✓ 数据库连接池就绪")

@@ -27,7 +27,7 @@ def _parse_permissions(raw) -> list[str]:
 
 
 def _load_extra_permissions(*, user_id: str, tenant_id: str) -> list[str]:
-    from backend.database.pgvector_session import get_pg_session
+    from packages.database.pgvector_session import get_pg_session
 
     session_factory = get_pg_session()
     with session_factory.Session() as session:

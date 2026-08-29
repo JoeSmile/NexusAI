@@ -4,7 +4,7 @@ import asyncio
 from packages.auth.models import TenantContext
 from packages.org.scope import resolve_org_scope
 from packages.workflow import runner as run_svc
-from backend.database.pgvector_session import Workflow, get_pg_session
+from packages.database.pgvector_session import Workflow, get_pg_session
 
 
 async def main() -> None:
@@ -42,7 +42,7 @@ async def main() -> None:
     for _ in range(60):
         await asyncio.sleep(1)
         with sf.Session() as session:
-            from backend.database.pgvector_session import WorkflowRun
+            from packages.database.pgvector_session import WorkflowRun
 
             row = session.query(WorkflowRun).filter(WorkflowRun.id == rid).first()
             if row and row.status in ("succeeded", "failed", "cancelled", "suspended"):
@@ -53,7 +53,7 @@ async def main() -> None:
     else:
         print("run 超时未终态")
 
-    from backend.database.pgvector_session import WorkflowRun, WorkflowRunNode
+    from packages.database.pgvector_session import WorkflowRun, WorkflowRunNode
 
     with sf.Session() as session:
         nodes = (

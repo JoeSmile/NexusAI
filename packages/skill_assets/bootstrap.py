@@ -6,7 +6,7 @@ import logging
 
 from sqlalchemy.orm import Session
 
-from backend.database.pgvector_session import SkillAsset, get_pg_session
+from packages.database.pgvector_session import SkillAsset, get_pg_session
 from packages.skill_assets.builtin_catalog import BUILTIN_SKILL_ASSET_CATALOG
 from packages.skill_assets.gates import GateReject, run_publish_gates
 from packages.skill_assets.service import create_draft, publish

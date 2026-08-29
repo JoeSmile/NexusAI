@@ -226,7 +226,7 @@ class PersistentScopedStore(InMemoryStore):
         if not self._persist:
             return
         try:
-            from backend.database.vector_ops import store_user_memory
+            from packages.database.vector_ops import store_user_memory
 
             # 软删：写空串占位，hydrate 时跳过
             store_user_memory(

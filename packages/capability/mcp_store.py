@@ -128,7 +128,7 @@ def _validate_record_payload(
 def list_mcp_server_records() -> list[McpServerRecord]:
     records: list[McpServerRecord] = []
     try:
-        from backend.database.pgvector_session import McpServer, get_pg_session
+        from packages.database.pgvector_session import McpServer, get_pg_session
 
         pg = get_pg_session()
         with pg.get_session() as session:
@@ -143,7 +143,7 @@ def list_mcp_server_records() -> list[McpServerRecord]:
 
 def get_mcp_server_record(server_id: str) -> McpServerRecord | None:
     try:
-        from backend.database.pgvector_session import McpServer, get_pg_session
+        from packages.database.pgvector_session import McpServer, get_pg_session
 
         pg = get_pg_session()
         with pg.get_session() as session:
@@ -209,7 +209,7 @@ def upsert_mcp_server_record(
     )
     enc = _encrypt_headers(record.headers)
     try:
-        from backend.database.pgvector_session import McpServer, get_pg_session
+        from packages.database.pgvector_session import McpServer, get_pg_session
 
         pg = get_pg_session()
         with pg.get_session() as session:
@@ -251,7 +251,7 @@ def upsert_mcp_server_record(
 def delete_mcp_server_record(server_id: str) -> bool:
     deleted = False
     try:
-        from backend.database.pgvector_session import McpServer, get_pg_session
+        from packages.database.pgvector_session import McpServer, get_pg_session
 
         pg = get_pg_session()
         with pg.get_session() as session:
@@ -271,7 +271,7 @@ def delete_mcp_server_record(server_id: str) -> bool:
 def save_mcp_server_probe(server_id: str, probe: dict[str, Any]) -> None:
     probe = {**probe, "tested_at": datetime.utcnow().isoformat()}
     try:
-        from backend.database.pgvector_session import McpServer, get_pg_session
+        from packages.database.pgvector_session import McpServer, get_pg_session
 
         pg = get_pg_session()
         with pg.get_session() as session:

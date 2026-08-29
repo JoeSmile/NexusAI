@@ -167,14 +167,14 @@ async def test_warm_write_skips_stale_enqueued_at():
     sf.Session.return_value.__exit__.return_value = False
 
     with patch(
-        "backend.database.pgvector_session.get_pg_session", return_value=sf
+        "packages.database.pgvector_session.get_pg_session", return_value=sf
     ), patch(
-        "backend.database.vector_ops.list_user_memories_by_prefix",
+        "packages.database.vector_ops.list_user_memories_by_prefix",
         return_value=[],
     ), patch(
         "packages.memory.supersede.supersede_user_domain", return_value=[]
     ), patch(
-        "backend.database.embeddings.embed_text", return_value=None
+        "packages.database.embeddings.embed_text", return_value=None
     ):
         stale_ts = (datetime.utcnow() - timedelta(hours=1)).timestamp()
         out = await svc.write(

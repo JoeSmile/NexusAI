@@ -10,7 +10,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from packages.errors import ErrorCode
-from backend.database.pgvector_session import get_pg_session
+from packages.database.pgvector_session import get_pg_session
 
 _INSUFFICIENT = ErrorCode.INSUFFICIENT_BALANCE.value
 

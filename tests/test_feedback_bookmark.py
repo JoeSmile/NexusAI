@@ -206,7 +206,7 @@ def test_list_passes_tenant(admin: TenantContext) -> None:
 
 def test_u1_reaction_switch_single_row() -> None:
     """SQLite-compatible upsert path: helpful → irrelevant stays one row."""
-    from backend.database.models import DatabaseManager, UserFeedback
+    from packages.database.models import DatabaseManager, UserFeedback
 
     class _S:
         def __init__(self) -> None:

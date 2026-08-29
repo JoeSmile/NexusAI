@@ -10,7 +10,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from backend.database import UserPersonalization
+from packages.database import UserPersonalization
 from packages.services.prompt_composer import PromptComposer
 
 logger = logging.getLogger(__name__)

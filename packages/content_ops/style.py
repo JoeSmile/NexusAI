@@ -8,7 +8,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from backend.database.pgvector_session import TenantConfig
+from packages.database.pgvector_session import TenantConfig
 
 DEFAULT_CREATOR_ID = "default"
 

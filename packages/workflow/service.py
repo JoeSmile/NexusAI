@@ -10,7 +10,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from packages.org.scope import OrgScope, assert_org_access, visible_org_filter
-from backend.database.pgvector_session import Workflow
+from packages.database.pgvector_session import Workflow
 from packages.auth.models import TenantContext
 from packages.capability.models import CapabilitySpec, CapabilityStatus
 from packages.capability.registry import get_capability_registry

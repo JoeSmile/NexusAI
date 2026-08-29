@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
 from packages.org import service as org_svc
-from backend.database.pgvector_session import get_pg_session
+from packages.database.pgvector_session import get_pg_session
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
 

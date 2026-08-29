@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def _upsert_db_row(spec: CapabilitySpec) -> None:
-    from backend.database.pgvector_session import Capability, get_pg_session
+    from packages.database.pgvector_session import Capability, get_pg_session
 
     pg = get_pg_session()
     with pg.get_session() as session:

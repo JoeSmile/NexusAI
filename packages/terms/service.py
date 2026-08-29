@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from sqlalchemy import text
 
 from packages.errors import ErrorCode, NexusAIException
-from backend.database.pgvector_session import get_pg_session
+from packages.database.pgvector_session import get_pg_session
 
 _TERMS_NOT_ACCEPTED = ErrorCode.TERMS_NOT_ACCEPTED.value
 

@@ -7,7 +7,7 @@ import logging
 from typing import Any
 
 from packages.audit import write_audit_sync
-from backend.database.vector_ops import delete_user_memory, list_user_memories_by_prefix
+from packages.database.vector_ops import delete_user_memory, list_user_memories_by_prefix
 from packages.memory.flywheel import record_correction_phrase, record_item_outcome
 from packages.memory.item_rules import (
     extract_structured_items,

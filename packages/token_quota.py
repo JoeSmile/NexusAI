@@ -69,7 +69,7 @@ def _tenant_limits_from_db(tenant_id: str) -> TokenQuotaLimits | None:
     try:
         from sqlalchemy import text
 
-        from backend.database.pgvector_session import get_pg_session
+        from packages.database.pgvector_session import get_pg_session
 
         session_factory = get_pg_session()
         with session_factory.Session() as session:

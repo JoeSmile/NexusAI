@@ -12,7 +12,7 @@ from fastapi import BackgroundTasks
 from sqlalchemy import text
 
 from packages.audit_context import AuditLineage, get_audit_lineage
-from backend.database.pgvector_session import get_pg_session
+from packages.database.pgvector_session import get_pg_session
 
 logger = logging.getLogger(__name__)
 

@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from packages.audit import write_audit_sync
 from packages.org.scope import OrgScope, assert_org_access, resolve_org_scope
-from backend.database.pgvector_session import (
+from packages.database.pgvector_session import (
     PermissionRequest,
     Workflow,
     WorkflowRun,

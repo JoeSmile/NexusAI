@@ -89,7 +89,7 @@ def main() -> None:
         try:
             from sqlalchemy import text
 
-            from backend.database.pgvector_session import get_pg_session
+            from packages.database.pgvector_session import get_pg_session
 
             sf = get_pg_session()
             with sf.Session() as session:
@@ -173,7 +173,7 @@ def main() -> None:
         try:
             from sqlalchemy import text
 
-            from backend.database.pgvector_session import get_pg_session
+            from packages.database.pgvector_session import get_pg_session
 
             sf = get_pg_session()
             with sf.Session() as session:

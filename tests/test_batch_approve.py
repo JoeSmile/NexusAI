@@ -10,7 +10,7 @@ import pytest
 
 from packages.auth.models import TenantContext
 from packages.org.scope import OrgScope
-from backend.database.pgvector_session import (
+from packages.database.pgvector_session import (
     PermissionRequest,
     Workflow,
     WorkflowRun,

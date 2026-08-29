@@ -8,7 +8,7 @@ from datetime import datetime
 from packages.auth.models import TenantContext
 from packages.org.scope import OrgScope
 from packages.workflow.runner import cancel_run, recover_waiting_child_parents, wake_parent
-from backend.database.pgvector_session import (
+from packages.database.pgvector_session import (
     Workflow,
     WorkflowRun,
     WorkflowRunNode,

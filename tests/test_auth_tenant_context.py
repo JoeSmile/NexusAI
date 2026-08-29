@@ -28,7 +28,7 @@ async def test_verify_api_key_fills_scaffold_fields(monkeypatch) -> None:
     factory = MagicMock()
     factory.Session.return_value = session
     monkeypatch.setattr(
-        "backend.database.pgvector_session.get_pg_session",
+        "packages.database.pgvector_session.get_pg_session",
         lambda: factory,
     )
 

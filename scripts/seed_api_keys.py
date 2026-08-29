@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sqlalchemy import text
 
 from packages.auth.password import hash_password
-from backend.database.pgvector_session import get_pg_session
+from packages.database.pgvector_session import get_pg_session
 
 # 测试账号统一密码(本地方便);生产 seed 必须设强 TEST_PASSWORD
 # 拍板 2026-08-21 A：本地默认 123456；不强制首次改密；交接后人工改密

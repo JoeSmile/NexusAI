@@ -16,7 +16,7 @@ except ImportError:
     print("提示: LangChain 模块未安装，将使用传统 HTTP 请求方式")
 
 # 数据库和模型
-from backend.database import DatabaseManager, create_tables
+from packages.database import DatabaseManager, create_tables
 from packages.models import ChatResponse
 
 # 导入NexusAIPrompt配置

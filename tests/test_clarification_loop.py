@@ -42,7 +42,7 @@ def _mock_warm_write(monkeypatch):
         _write,
     )
     monkeypatch.setattr(
-        "backend.database.vector_ops.delete_user_memory",
+        "packages.database.vector_ops.delete_user_memory",
         lambda *a, **k: True,
     )
     yield writes
@@ -225,7 +225,7 @@ async def test_fetch_pending_from_db_when_warm_empty(monkeypatch):
         original_query="x",
     )
     monkeypatch.setattr(
-        "backend.database.vector_ops.list_user_memories_by_prefix",
+        "packages.database.vector_ops.list_user_memories_by_prefix",
         lambda *a, **k: [{"value": json.dumps(row.to_dict(), ensure_ascii=False)}],
     )
     state = make_initial_state("t1", "u1", "s1", "answer")

@@ -10,7 +10,7 @@ from fastapi import APIRouter
 from sqlalchemy import text
 from starlette.responses import JSONResponse
 
-from backend.database.pgvector_session import get_pg_session
+from packages.database.pgvector_session import get_pg_session
 
 router = APIRouter(tags=["system"])
 
@@ -92,7 +92,7 @@ async def health_check():
 
     # 4. 缓存表
     try:
-        from backend.database.pgvector_session import CacheEntry
+        from packages.database.pgvector_session import CacheEntry
 
         session_factory = get_pg_session()
         with session_factory.Session() as session:

@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 from packages.skill_assets import miner
-from backend.database.pgvector_session import SkillAsset, get_pg_session
+from packages.database.pgvector_session import SkillAsset, get_pg_session
 
 
 @pytest.fixture()

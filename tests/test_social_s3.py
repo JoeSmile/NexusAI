@@ -28,7 +28,7 @@ from packages.social.service import (
     retry_task,
     stub_replica,
 )
-from backend.database.pgvector_session import (
+from packages.database.pgvector_session import (
     Base,
     SocialAccount,
     SocialContent,

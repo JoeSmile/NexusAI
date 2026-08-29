@@ -7,7 +7,7 @@ import re
 from sqlalchemy import text
 
 from packages.metrics import cost_total, tokens_total
-from backend.database.pgvector_session import get_pg_session
+from packages.database.pgvector_session import get_pg_session
 
 COST_TABLE: dict[str, float] = {
     "deepseek-v4-flash": 0.00014,

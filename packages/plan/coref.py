@@ -47,7 +47,7 @@ def load_session_coref(state: dict[str, Any]) -> CorefTable:
     user_id = str(state.get("user_id") or "")
     if tenant_id and user_id:
         try:
-            from backend.database.vector_ops import list_user_memories_by_prefix
+            from packages.database.vector_ops import list_user_memories_by_prefix
 
             rows = list_user_memories_by_prefix(tenant_id, user_id, key, limit=1)
             if rows:
@@ -92,7 +92,7 @@ async def clear_session_coref(state: dict[str, Any]) -> None:
     session_id = str(state.get("session_id") or "default")
     key = warm_coref_key(session_id)
     try:
-        from backend.database.vector_ops import delete_user_memory
+        from packages.database.vector_ops import delete_user_memory
 
         delete_user_memory(tenant_id, user_id, key)
     except Exception:

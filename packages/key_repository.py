@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from sqlalchemy import text
 
 from packages.key_manager import KeyManager
-from backend.database.pgvector_session import get_pg_session
+from packages.database.pgvector_session import get_pg_session
 
 
 @dataclass

@@ -7,7 +7,7 @@ from datetime import datetime
 
 import pytest
 
-from backend.database.pgvector_session import Notification, get_pg_session
+from packages.database.pgvector_session import Notification, get_pg_session
 from packages.notification import channels as ch
 from packages.notification.service import (
     list_inbox,
@@ -142,7 +142,7 @@ def test_notify_failure_does_not_raise(ensure_table, monkeypatch):
 def test_hang_pending_wires_inbox(ensure_table, monkeypatch):
     """notify_hang_pending → hang.pending inbox（有经理时）。"""
     from packages.workflow.notify import HangRoute, notify_hang_pending
-    from backend.database.pgvector_session import PermissionRequest
+    from packages.database.pgvector_session import PermissionRequest
 
     tid = f"n44h-{uuid.uuid4().hex[:8]}"
     run_id = str(uuid.uuid4())

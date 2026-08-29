@@ -32,7 +32,7 @@ print("▶ 1/7 残留符号扫描...", flush=True)
 # 情绪/情感功能已整体移除(2026-08),相关符号不再检查;若未来 reintroduce 另行添加
 DELETED_SYMBOLS = [
     "agent_core_v2",
-    "database.legacy", "backend.database.legacy", "run_backend.py",
+    "database.legacy", "packages.database.legacy", "run_backend.py",
     "quick_start", "db_manager.py", "setup_macbook", "install_python310",
     "install_system_deps", "run_backend.ps1", "requirements.txt",
 ]

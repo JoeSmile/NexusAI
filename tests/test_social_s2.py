@@ -11,7 +11,7 @@ from sqlalchemy.orm import sessionmaker
 
 from packages.social.rate_limit import BUCKET_KEY, acquire_tikhub_token
 from packages.social.types import Content
-from backend.database.pgvector_session import (
+from packages.database.pgvector_session import (
     Base,
     SocialAccount,
     SocialContent,

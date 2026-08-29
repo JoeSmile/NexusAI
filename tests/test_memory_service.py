@@ -53,7 +53,7 @@ def test_assemble_world_miss_without_query_hit():
             {"name": f"p{i}", "text": f"p{i}", "type": "entity"}
         )
     with patch(
-        "backend.database.embeddings.embedding_uses_hash_fallback",
+        "packages.database.embeddings.embedding_uses_hash_fallback",
         return_value=True,
     ):
         block = svc.assemble_prompt_block(

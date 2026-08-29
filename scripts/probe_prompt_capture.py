@@ -44,7 +44,7 @@ async def main() -> None:
     from packages.content_ops.hotspot import dig_hotspots
     from packages.content_ops.script_gen import generate_script
     from packages.content_ops.style import resolve_style_for_generate
-    from backend.database.pgvector_session import get_pg_session
+    from packages.database.pgvector_session import get_pg_session
 
     sf = get_pg_session()
     with sf.Session() as session:

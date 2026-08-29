@@ -11,7 +11,7 @@ import pytest
 from packages.auth.models import TenantContext
 from packages.org.scope import OrgScope
 from packages.workflow.runner import _execute_node
-from backend.database.pgvector_session import WorkflowRun, WorkflowRunNode, get_pg_session
+from packages.database.pgvector_session import WorkflowRun, WorkflowRunNode, get_pg_session
 
 
 @pytest.mark.asyncio

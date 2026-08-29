@@ -11,7 +11,7 @@ from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
 from packages.org.scope import OrgScope
 from packages.workflow.runner import start_run
-from backend.database.pgvector_session import Workflow, WorkflowRun, get_pg_session
+from packages.database.pgvector_session import Workflow, WorkflowRun, get_pg_session
 from apps.api.routers.workflow_runs import router
 
 

@@ -28,7 +28,7 @@ os.environ.setdefault(
 def main() -> int:
     from packages.memory import memory_queue as mq
     from packages.memory.memory_service import get_unified_memory_service
-    from backend.database.vector_ops import list_user_memories_by_prefix
+    from packages.database.vector_ops import list_user_memories_by_prefix
     from apps.memory_worker.worker import process_one
 
     tenant_id = "shipgate"

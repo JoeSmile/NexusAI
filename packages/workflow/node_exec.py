@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from packages.errors import ErrorCode, NexusAIException
 from packages.guardrails.input_guard import detect_injection_in_params
 from packages.org.scope import OrgScope, resolve_org_scope
-from backend.database.pgvector_session import Workflow, WorkflowRun, WorkflowRunNode
+from packages.database.pgvector_session import Workflow, WorkflowRun, WorkflowRunNode
 from packages.auth.models import TenantContext
 from packages.capability.errors import CapabilityNotFoundError
 from packages.capability.invoke import invoke

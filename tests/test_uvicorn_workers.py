@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from packages.uvicorn_workers import resolve_uvicorn_workers
-from backend.database.pg_pool import pg_engine_kwargs, pg_pool_budget_note
+from packages.database.pg_pool import pg_engine_kwargs, pg_pool_budget_note
 
 
 def test_reload_forces_one_worker(monkeypatch: pytest.MonkeyPatch) -> None:

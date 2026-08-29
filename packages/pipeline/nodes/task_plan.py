@@ -310,7 +310,7 @@ def _tenant_has_bridge_targets(tenant_id: str) -> bool:
     if not tenant_id:
         return False
     try:
-        from backend.database.pgvector_session import Workflow, get_pg_session
+        from packages.database.pgvector_session import Workflow, get_pg_session
 
         sf = get_pg_session()
         with sf.Session() as session:

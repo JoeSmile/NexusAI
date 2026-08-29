@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from packages.billing.wallet import get_wallet_summary, recharge_wallet
-from backend.database.pgvector_session import get_pg_session
+from packages.database.pgvector_session import get_pg_session
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
 

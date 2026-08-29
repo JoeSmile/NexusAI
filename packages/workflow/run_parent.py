@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
-from backend.database.pgvector_session import WorkflowRun, WorkflowRunNode, get_pg_session
+from packages.database.pgvector_session import WorkflowRun, WorkflowRunNode, get_pg_session
 from packages.workflow.node_exec import _child_terminal_outputs
 from packages.workflow.runner_shared import _set_node_status
 

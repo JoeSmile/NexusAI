@@ -15,7 +15,7 @@ from packages.skill_assets.service import (
     publish,
     reject_draft,
 )
-from backend.database.pgvector_session import SkillAsset
+from packages.database.pgvector_session import SkillAsset
 from packages.auth.models import TenantContext
 from packages.capability.console_access import (
     is_console_super_admin,

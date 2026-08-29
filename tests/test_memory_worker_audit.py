@@ -16,7 +16,7 @@ def test_process_one_audits_accepted_write():
     ), patch(
         "packages.memory.memory_queue.ack"
     ) as ack, patch(
-        "backend.database.vector_ops.list_user_memories_by_prefix", return_value=[]
+        "packages.database.vector_ops.list_user_memories_by_prefix", return_value=[]
     ), patch(
         "packages.memory.memory_service.get_unified_memory_service"
     ) as get_mem, patch(
@@ -59,7 +59,7 @@ def test_process_one_refuses_ack_when_audit_fails():
     ), patch(
         "packages.memory.memory_queue.ack"
     ) as ack, patch(
-        "backend.database.vector_ops.list_user_memories_by_prefix", return_value=[]
+        "packages.database.vector_ops.list_user_memories_by_prefix", return_value=[]
     ), patch(
         "packages.memory.memory_service.get_unified_memory_service"
     ) as get_mem, patch(

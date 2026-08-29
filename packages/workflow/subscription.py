@@ -114,7 +114,7 @@ def assert_seat_available(
 ) -> None:
     """超限 → 抛 SeatLimitExceeded 供路由转 403（I-2：专用异常，禁字符串匹配）。"""
     if config is None:
-        from backend.database.pgvector_session import TenantConfig
+        from packages.database.pgvector_session import TenantConfig
 
         row = (
             session.query(TenantConfig)
@@ -184,7 +184,7 @@ def scan_subscription_expiring(
     within_days: int = 30,
     now: datetime | None = None,
 ) -> dict[str, int]:
-    from backend.database.pgvector_session import TenantConfig, get_pg_session
+    from packages.database.pgvector_session import TenantConfig, get_pg_session
     from packages.notification.service import list_tenant_admin_user_ids, notify
 
     now = now or datetime.utcnow()

@@ -140,7 +140,7 @@ def backfill_encrypted_rows(batch_size: int = 200) -> int:
 
     from sqlalchemy import text
 
-    from backend.database.pgvector_session import get_pg_session
+    from packages.database.pgvector_session import get_pg_session
 
     updated = 0
     session_factory = get_pg_session()

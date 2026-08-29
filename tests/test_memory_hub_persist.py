@@ -29,7 +29,7 @@ async def test_persistent_store_write_calls_store_user_memory() -> None:
         persist=True,
     )
     with patch(
-        "backend.database.vector_ops.store_user_memory", return_value=7
+        "packages.database.vector_ops.store_user_memory", return_value=7
     ) as m:
         entry = await store.write("preferences/tone", "formal")
     assert entry.content == "formal"
@@ -77,7 +77,7 @@ async def test_memory_hub_survives_reinit_via_hydrate() -> None:
         return 1
 
     with patch(
-        "backend.database.vector_ops.store_user_memory", side_effect=fake_store
+        "packages.database.vector_ops.store_user_memory", side_effect=fake_store
     ):
         hub1 = MemoryHub(
             user_id="u1", session_id="s1", tenant_id="t1", agent_type="cg"

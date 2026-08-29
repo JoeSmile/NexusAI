@@ -10,7 +10,7 @@ from packages.workflow.notify import (
     maybe_escalate_timeout,
     scan_hang_timeouts,
 )
-from backend.database.pgvector_session import PermissionRequest, get_pg_session
+from packages.database.pgvector_session import PermissionRequest, get_pg_session
 
 
 def test_hang_escalate_after_env(monkeypatch):

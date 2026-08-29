@@ -11,8 +11,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from sqlalchemy import MetaData, create_engine, inspect
 from sqlalchemy.dialects import postgresql
 
-from backend.database.models import Base as ModelsBase
-from backend.database.pgvector_session import Base as VectorBase
+from packages.database.models import Base as ModelsBase
+from packages.database.pgvector_session import Base as VectorBase
 
 # 合并两套 metadata(与 alembic/env.py 逻辑一致)
 merged = MetaData()

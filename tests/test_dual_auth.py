@@ -49,7 +49,7 @@ def _patch_key_row(monkeypatch, *, role: str = "user"):
     factory = MagicMock()
     factory.Session.return_value = session
     monkeypatch.setattr(
-        "backend.database.pgvector_session.get_pg_session",
+        "packages.database.pgvector_session.get_pg_session",
         lambda: factory,
     )
     return session
@@ -65,7 +65,7 @@ def _patch_session_perms(monkeypatch, perms=None):
     factory = MagicMock()
     factory.Session.return_value = session
     monkeypatch.setattr(
-        "backend.database.pgvector_session.get_pg_session",
+        "packages.database.pgvector_session.get_pg_session",
         lambda: factory,
     )
 

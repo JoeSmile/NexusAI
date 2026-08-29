@@ -15,7 +15,7 @@ _POLL_SEC = float(os.environ.get("SOCIAL_WORKER_POLL_SEC", "2.0"))
 
 
 def _session_factory() -> Any:
-    from backend.database.pgvector_session import PGVectorSession
+    from packages.database.pgvector_session import PGVectorSession
 
     return PGVectorSession().Session
 
@@ -24,7 +24,7 @@ def process_once(session_factory: Callable[[], Any] | None = None) -> bool:
     """Claim and process one task. Returns True if work was done."""
     from packages.social.pipeline import process_task
     from packages.social.queue import claim_next_task, reclaim_stale_running
-    from backend.database.pgvector_session import SocialTask
+    from packages.database.pgvector_session import SocialTask
 
     Session = session_factory or _session_factory()
     with Session() as session:

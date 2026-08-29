@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from backend.database.pgvector_session import Workflow, get_pg_session
+from packages.database.pgvector_session import Workflow, get_pg_session
 from packages.pipeline.state import PipelineState
 
 logger = logging.getLogger(__name__)

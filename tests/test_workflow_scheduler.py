@@ -59,7 +59,7 @@ def test_scan_auth_check_fail_does_not_start_run():
     sf.Session.return_value.__exit__.return_value = False
 
     with patch(
-        "backend.database.pgvector_session.get_pg_session", return_value=sf
+        "packages.database.pgvector_session.get_pg_session", return_value=sf
     ), patch(
         "packages.workflow.scheduler._user_still_valid", return_value=True
     ), patch(

@@ -6,7 +6,7 @@ import logging
 
 from sqlalchemy import text
 
-from backend.database.pgvector_session import get_pg_session
+from packages.database.pgvector_session import get_pg_session
 
 logger = logging.getLogger(__name__)
 

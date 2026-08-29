@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from packages.errors import ErrorCode, NexusAIException
-from backend.database import vector_ops
+from packages.database import vector_ops
 from packages.logging_config import get_logger
 
 from .chunking_selector import ChunkingStrategySelector
@@ -46,7 +46,7 @@ class KnowledgeBaseManager:
             chunk_overlap: 块重叠（字符数）
         """
         self.persist_directory = persist_directory
-        # Embedding 统一走 backend.database.embeddings.embed_text(registry + DashScope);
+        # Embedding 统一走 packages.database.embeddings.embed_text(registry + DashScope);
         # 不再初始化未使用的 LangChain OpenAIEmbeddings(Task 28)
 
         # Chroma 已移除；检索走 pgvector knowledge_chunks
@@ -369,7 +369,7 @@ class KnowledgeBaseManager:
     def delete_collection(self) -> None:
         """删除当前租户知识块"""
         try:
-            from backend.database.pgvector_session import KnowledgeChunk, get_pg_session
+            from packages.database.pgvector_session import KnowledgeChunk, get_pg_session
 
             sf = get_pg_session()
             with sf.Session() as session:
@@ -384,7 +384,7 @@ class KnowledgeBaseManager:
     def get_stats(self) -> dict[str, Any]:
         """获取知识库统计信息"""
         try:
-            from backend.database.pgvector_session import KnowledgeChunk, get_pg_session
+            from packages.database.pgvector_session import KnowledgeChunk, get_pg_session
 
             sf = get_pg_session()
             with sf.Session() as session:
@@ -393,7 +393,7 @@ class KnowledgeBaseManager:
                     .filter_by(tenant_id=self.tenant_id)
                     .count()
                 )
-            from backend.database.embeddings import embedding_model_label
+            from packages.database.embeddings import embedding_model_label
             from packages.rag.cache import cache_stats_snapshot
 
             return {

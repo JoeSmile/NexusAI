@@ -41,7 +41,7 @@ async def verify_api_key(
 
     key_hash = hashlib.sha256(api_key.encode()).hexdigest()
 
-    from backend.database.pgvector_session import get_pg_session
+    from packages.database.pgvector_session import get_pg_session
 
     session_factory = get_pg_session()
     with session_factory.Session() as session:

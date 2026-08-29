@@ -7,7 +7,7 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from backend.database.pgvector_session import SocialUsage
+from packages.database.pgvector_session import SocialUsage
 
 # Panel-ish unit costs (USD) — annotate when TikHub panel changes
 COST_PROBE = Decimal("0.005")

@@ -11,7 +11,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import text
 
 from packages.audit_org_scope import audit_user_filter
-from backend.database.pgvector_session import get_pg_session
+from packages.database.pgvector_session import get_pg_session
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
 

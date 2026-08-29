@@ -14,7 +14,7 @@ from packages.file_sanitizer import (
     sanitize_filename,
     validate_file,
 )
-from backend.database.pgvector_session import get_pg_session
+from packages.database.pgvector_session import get_pg_session
 from packages.auth.models import TenantContext
 from packages.auth.permissions import require_permission
 

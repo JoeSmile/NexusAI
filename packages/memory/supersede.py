@@ -89,7 +89,7 @@ def supersede_user_domain(
     """
     if not new_key.startswith(_USER_DOMAIN_PREFIXES):
         return []
-    from backend.database.pgvector_session import UserMemory, get_pg_session
+    from packages.database.pgvector_session import UserMemory, get_pg_session
 
     own_session = session is None
     if own_session:

@@ -75,7 +75,7 @@ def test_weekly_report_demo_chain_parallel_steps() -> None:
 def test_bootstrap_skill_assets_idempotent(ensure_skill_table):
     import uuid
 
-    from backend.database.pgvector_session import SkillAsset
+    from packages.database.pgvector_session import SkillAsset
 
     tid = f"bsk-{uuid.uuid4().hex[:8]}"
     sf = ensure_skill_table
@@ -98,7 +98,7 @@ def test_bootstrap_skill_assets_idempotent(ensure_skill_table):
 def ensure_skill_table():
     from sqlalchemy import text
 
-    from backend.database.pgvector_session import SkillAsset, get_pg_session
+    from packages.database.pgvector_session import SkillAsset, get_pg_session
 
     sf = get_pg_session()
     try:

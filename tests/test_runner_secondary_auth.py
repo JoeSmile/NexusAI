@@ -17,7 +17,7 @@ from packages.capability.models import (
 from packages.capability.registry import CapabilityRegistry
 from packages.org.scope import OrgScope
 from packages.workflow.runner import execute_run, start_run
-from backend.database.pgvector_session import (
+from packages.database.pgvector_session import (
     PermissionRequest,
     Workflow,
     WorkflowGrant,

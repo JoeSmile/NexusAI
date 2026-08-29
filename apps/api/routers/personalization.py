@@ -10,7 +10,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from backend.database import UserPersonalization, get_db
+from packages.database import UserPersonalization, get_db
 from packages.models import (
     PersonalizationUpdateRequest,
     RoleTemplate,

@@ -12,7 +12,7 @@ from packages.workflow.grants import (
     expire_stale_approvals_for_node,
 )
 from packages.workflow.runner import cancel_run
-from backend.database.pgvector_session import (
+from packages.database.pgvector_session import (
     PermissionRequest,
     Workflow,
     WorkflowGrant,

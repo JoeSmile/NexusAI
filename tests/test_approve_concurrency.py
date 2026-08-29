@@ -12,7 +12,7 @@ from sqlalchemy import text
 from packages.auth.models import TenantContext
 from packages.org.scope import OrgScope
 from packages.workflow.grants import can_review_request
-from backend.database.pgvector_session import PermissionRequest, get_pg_session
+from packages.database.pgvector_session import PermissionRequest, get_pg_session
 from apps.api.routers import workflow_approvals as apr
 
 
@@ -181,7 +181,7 @@ async def test_approve_endpoint_409_when_already_done(monkeypatch):
 async def test_reject_fails_run(monkeypatch):
     tid = f"e4-rj-{uuid.uuid4().hex[:8]}"
     sf = get_pg_session()
-    from backend.database.pgvector_session import Workflow, WorkflowRun
+    from packages.database.pgvector_session import Workflow, WorkflowRun
 
     with sf.Session() as session:
         wf = Workflow(

@@ -47,7 +47,7 @@ except ImportError:
     MemoryManager = None  # type: ignore
 
 try:
-    from backend.database import ChatMessage, ChatSession, User, get_db
+    from packages.database import ChatMessage, ChatSession, User, get_db
 except ImportError:
     get_db = None  # type: ignore
     User = None  # type: ignore

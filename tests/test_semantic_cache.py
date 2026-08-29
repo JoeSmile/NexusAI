@@ -72,7 +72,7 @@ def test_paraphrase_hit(
 ) -> None:
     monkeypatch.setenv("SEMANTIC_CACHE_ENABLED", "1")
     monkeypatch.setattr(
-        "backend.database.embeddings.embed_text",
+        "packages.database.embeddings.embed_text",
         lambda text, tenant_id=None: _embed_bucket(text),
     )
 
@@ -94,7 +94,7 @@ def test_different_model_miss(
 ) -> None:
     monkeypatch.setenv("SEMANTIC_CACHE_ENABLED", "1")
     monkeypatch.setattr(
-        "backend.database.embeddings.embed_text",
+        "packages.database.embeddings.embed_text",
         lambda text, tenant_id=None: _embed_bucket(text),
     )
 
@@ -115,7 +115,7 @@ def test_context_hash_isolation(
 ) -> None:
     monkeypatch.setenv("SEMANTIC_CACHE_ENABLED", "1")
     monkeypatch.setattr(
-        "backend.database.embeddings.embed_text",
+        "packages.database.embeddings.embed_text",
         lambda text, tenant_id=None: _embed_bucket(text),
     )
 
@@ -138,7 +138,7 @@ def test_try_apply_sets_finish_reason(
 ) -> None:
     monkeypatch.setenv("SEMANTIC_CACHE_ENABLED", "1")
     monkeypatch.setattr(
-        "backend.database.embeddings.embed_text",
+        "packages.database.embeddings.embed_text",
         lambda text, tenant_id=None: _embed_bucket(text),
     )
 
@@ -161,7 +161,7 @@ def test_expired_entry_miss(
 ) -> None:
     monkeypatch.setenv("SEMANTIC_CACHE_ENABLED", "1")
     monkeypatch.setattr(
-        "backend.database.embeddings.embed_text",
+        "packages.database.embeddings.embed_text",
         lambda text, tenant_id=None: _embed_bucket(text),
     )
 

@@ -6,7 +6,7 @@ import json
 from collections.abc import AsyncIterator
 from typing import Any
 
-from backend.database.pgvector_session import get_pg_session
+from packages.database.pgvector_session import get_pg_session
 from packages.auth.models import TenantContext
 from packages.capability.models import CapabilitySpec
 from packages.content_ops.hotspot import HotspotCrawlError, dig_hotspots

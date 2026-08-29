@@ -113,7 +113,7 @@ def select_world_items(
         return list(world.keys())
 
     try:
-        from backend.database.embeddings import embedding_uses_hash_fallback
+        from packages.database.embeddings import embedding_uses_hash_fallback
     except Exception:
         embedding_uses_hash_fallback = lambda: True  # noqa: E731
 
@@ -126,7 +126,7 @@ def select_world_items(
         return keyword_select(query, world)
 
     try:
-        from backend.database.vector_ops import search_user_memories
+        from packages.database.vector_ops import search_user_memories
 
         hits = search_user_memories(
             tenant_id,

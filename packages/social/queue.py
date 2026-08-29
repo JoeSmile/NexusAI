@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from backend.database.pgvector_session import SocialTask
+from packages.database.pgvector_session import SocialTask
 
 logger = logging.getLogger(__name__)
 

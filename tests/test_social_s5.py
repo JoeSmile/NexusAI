@@ -11,7 +11,7 @@ from packages.social.templates import (
     template_key_from_structure,
     upsert_template,
 )
-from backend.database.pgvector_session import Base, SocialTemplate
+from packages.database.pgvector_session import Base, SocialTemplate
 
 
 @pytest.fixture()

@@ -18,7 +18,7 @@ from packages.capability.registry import CapabilityRegistry
 from packages.org.scope import OrgScope
 from packages.workflow.notify import mark_escalated
 from packages.workflow.runner import execute_run, start_run
-from backend.database.pgvector_session import (
+from packages.database.pgvector_session import (
     PermissionRequest,
     Workflow,
     WorkflowRun,
@@ -173,7 +173,7 @@ async def test_approve_audit_credential_kind_delegation(monkeypatch):
     tid = f"e5-a-{uuid.uuid4().hex[:8]}"
     sf = get_pg_session()
     with sf.Session() as session:
-        from backend.database.pgvector_session import Workflow, WorkflowRun
+        from packages.database.pgvector_session import Workflow, WorkflowRun
 
         wf = Workflow(
             id=str(uuid.uuid4()),
@@ -248,7 +248,7 @@ async def test_approve_audit_credential_kind_delegation(monkeypatch):
     assert ap[0]["user_id"] == "admin"
 
     with sf.Session() as session:
-        from backend.database.pgvector_session import WorkflowGrant
+        from packages.database.pgvector_session import WorkflowGrant
 
         session.query(WorkflowGrant).filter(WorkflowGrant.tenant_id == tid).delete()
         session.query(PermissionRequest).filter(PermissionRequest.tenant_id == tid).delete()

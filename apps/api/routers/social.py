@@ -20,7 +20,7 @@ from packages.social.exceptions import (
     TikHubUpstreamError,
 )
 from packages.social.export_xlsx import build_analysis_xlsx
-from backend.database.pgvector_session import (
+from packages.database.pgvector_session import (
     PGVectorSession,
     SocialContent,
     SocialResult,

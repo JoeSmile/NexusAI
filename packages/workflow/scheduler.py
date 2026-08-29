@@ -52,7 +52,7 @@ def validate_grants_before_execute(
     now: datetime | None = None,
 ) -> dict[str, Any]:
     """E3.5 — run 执行前校验：过期且 auto_renew → 续；否则标 expired。"""
-    from backend.database.pgvector_session import Workflow, WorkflowGrant
+    from packages.database.pgvector_session import Workflow, WorkflowGrant
     from packages.workflow.grants import (
         normalize_request_policy,
         renew_grant,
@@ -86,7 +86,7 @@ def validate_grants_before_execute(
             if ng is not None:
                 renewed += 1
         else:
-            from backend.database.pgvector_session import PermissionRequest
+            from packages.database.pgvector_session import PermissionRequest
 
             req = (
                 session.query(PermissionRequest)
@@ -134,7 +134,7 @@ def _resolve_schedule_scope(session, sched):
 
 def _user_still_valid(session: Session, *, tenant_id: str, user_id: str) -> bool:
     """I6：created_by 对应用户须仍有 active api_key。"""
-    from backend.database.pgvector_session import ApiKey
+    from packages.database.pgvector_session import ApiKey
 
     if not user_id:
         return False
@@ -194,7 +194,7 @@ def _advance_next(session: Session, sched: Any, *, now: datetime) -> None:
 
 
 def scan_due_schedules(*, now: datetime | None = None, limit: int = 50) -> dict[str, int]:
-    from backend.database.pgvector_session import (
+    from packages.database.pgvector_session import (
         ScheduledRun,
         WorkflowRun,
         get_pg_session,
@@ -359,7 +359,7 @@ def create_scheduled_run(
     run_inputs: dict[str, Any] | None = None,
     enabled: bool = True,
 ) -> Any:
-    from backend.database.pgvector_session import ScheduledRun, Workflow
+    from packages.database.pgvector_session import ScheduledRun, Workflow
 
     now = datetime.utcnow()
     next_at = parse_cron_next(cron, after=now)

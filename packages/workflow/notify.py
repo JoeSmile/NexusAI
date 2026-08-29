@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from packages.audit import write_audit_sync
 from packages.org.service import get_unit, list_memberships_for_unit
-from backend.database.pgvector_session import PermissionRequest, get_pg_session
+from packages.database.pgvector_session import PermissionRequest, get_pg_session
 
 logger = logging.getLogger(__name__)
 

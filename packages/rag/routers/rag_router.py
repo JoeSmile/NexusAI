@@ -86,7 +86,7 @@ def _rag_errors(fn):
 
 def _bind_ingest_org(tenant: TenantContext) -> str:
     """Resolve primary org for RAG write; raises 400 if missing/archived."""
-    from backend.database.pgvector_session import get_pg_session
+    from packages.database.pgvector_session import get_pg_session
     from packages.rag.org_tag import require_primary_org_for_ingest
 
     sf = get_pg_session()
@@ -98,7 +98,7 @@ def _bind_ingest_org(tenant: TenantContext) -> str:
 def _attach_org_scope_to_kb(
     kb_manager: KnowledgeBaseManager, tenant: TenantContext
 ) -> None:
-    from backend.database.pgvector_session import get_pg_session
+    from packages.database.pgvector_session import get_pg_session
     from packages.org.scope import resolve_org_scope
 
     sf = get_pg_session()
@@ -338,7 +338,7 @@ async def upload_multimodal(
     音频/图片需 `uv sync --extra multimodal`。租户取自认证上下文。
     """
     from packages.file_sanitizer import file_kind, sanitize_filename, validate_file
-    from backend.database.vector_ops import add_knowledge
+    from packages.database.vector_ops import add_knowledge
     from packages.rag.extractors.audio import MultimodalDependencyError
 
     tenant_id = tenant.tenant_id
@@ -557,7 +557,7 @@ async def list_documents(
     """按 source 聚合列出本租户已入库文档（chunk 计数）。"""
     from sqlalchemy import func
 
-    from backend.database.pgvector_session import KnowledgeChunk, get_pg_session
+    from packages.database.pgvector_session import KnowledgeChunk, get_pg_session
 
     tid = tenant.tenant_id
     kb_manager = get_kb_manager()
@@ -598,7 +598,7 @@ async def delete_document(
     tenant: TenantContext = Depends(_rag_guard),
 ):
     """按 source 删除本租户下该文档的全部 chunk。"""
-    from backend.database.pgvector_session import KnowledgeChunk, get_pg_session
+    from packages.database.pgvector_session import KnowledgeChunk, get_pg_session
 
     tid = tenant.tenant_id
     sf = get_pg_session()

@@ -7,8 +7,8 @@ from typing import Any
 
 from sqlalchemy import text
 
-from backend.database.embeddings import embed_text
-from backend.database.pgvector_session import (
+from packages.database.embeddings import embed_text
+from packages.database.pgvector_session import (
     CacheEntry,
     ChatMessage,
     KnowledgeChunk,

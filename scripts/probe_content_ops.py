@@ -27,7 +27,7 @@ async def main() -> None:
 
     print("=== 路 2: 口播生成(默认风格 + 热点) ===")
     try:
-        from backend.database.pgvector_session import get_pg_session
+        from packages.database.pgvector_session import get_pg_session
 
         sf = get_pg_session()
         with sf.Session() as session:

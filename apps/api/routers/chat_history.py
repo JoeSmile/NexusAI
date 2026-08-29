@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
-from backend.database.pgvector_session import ChatMessage, get_pg_session
+from packages.database.pgvector_session import ChatMessage, get_pg_session
 from packages.logging_config import get_logger
 from packages.auth.models import TenantContext
 from packages.auth.permissions import require_permission
@@ -208,7 +208,7 @@ async def search_chat_history(
         seen: set[int] = {int(r.id) for r in matched}
 
         try:
-            from backend.database.embeddings import embed_text
+            from packages.database.embeddings import embed_text
 
             vec = embed_text(needle, tenant_id=tenant.tenant_id)
             vec_str = "[" + ",".join(str(v) for v in vec) + "]"

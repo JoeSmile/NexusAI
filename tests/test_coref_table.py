@@ -156,7 +156,7 @@ async def test_save_session_coref_writes_warm(monkeypatch):
         _write,
     )
     monkeypatch.setattr(
-        "backend.database.vector_ops.delete_user_memory",
+        "packages.database.vector_ops.delete_user_memory",
         lambda *a, **k: True,
     )
     state = make_initial_state("t1", "u1", "s1", "q")

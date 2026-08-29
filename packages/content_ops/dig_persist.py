@@ -8,7 +8,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from backend.database.pgvector_session import ContentArtifact
+from packages.database.pgvector_session import ContentArtifact
 from packages.content_ops.hotspot import (
     annotate_similar_to_previous,
     day_collection_hash,

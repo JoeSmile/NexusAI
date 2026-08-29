@@ -30,7 +30,7 @@ def _load_module_from_file(module_name: str, file_path: str):
     return module
 
 def _get_db_session():
-    from backend.database import SessionLocal
+    from packages.database import SessionLocal
     return SessionLocal()
 
 def _get_scheduler():
