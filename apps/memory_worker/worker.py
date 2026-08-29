@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import time
 
-from backend.observability.decorators import langfuse_context, observe
+from packages.observability.decorators import langfuse_context, observe
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("memory_worker")

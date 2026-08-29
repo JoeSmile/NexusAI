@@ -123,7 +123,7 @@ async def lifespan(app: FastAPI):
         logger.warning("Skill discovery failed: %s", e)
 
     try:
-        from backend.observability.langfuse_client import get_langfuse, langfuse_enabled
+        from packages.observability.langfuse_client import get_langfuse, langfuse_enabled
 
         if not langfuse_enabled():
             logger.info("LangFuse disabled")

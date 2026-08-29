@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-import backend.observability.sampling as sampling
+import packages.observability.sampling as sampling
 
 
 def _settings(short: float, long: float = 1.0):

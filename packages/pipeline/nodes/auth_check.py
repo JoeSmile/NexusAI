@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.observability.decorators import observe
+from packages.observability.decorators import observe
 from packages.pipeline.state import PipelineState
 
 

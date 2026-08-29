@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from packages import health as health_mod
-from backend.observability import langfuse_client as lf
+from packages.observability import langfuse_client as lf
 
 
 @pytest.fixture(autouse=True)

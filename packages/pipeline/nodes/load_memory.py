@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from packages.memory.memory_service import get_unified_memory_service
-from backend.observability.decorators import observe
+from packages.observability.decorators import observe
 from packages.pipeline.state import PipelineState
 
 

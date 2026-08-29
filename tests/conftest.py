@@ -33,7 +33,7 @@ def _quiet_langfuse_unless_requested():
     os.environ.pop("LANGFUSE_SECRET_KEY", None)
     # Reset singleton if already warmed by import
     try:
-        import backend.observability.langfuse_client as lf
+        import packages.observability.langfuse_client as lf
 
         lf._lf = None
         lf._init_attempted = False

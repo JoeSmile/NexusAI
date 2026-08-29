@@ -56,7 +56,7 @@ def _lf_node(name: str, fn: Any) -> Any:
             else state
         )
         if tid and oid:
-            from backend.observability.sampling import tracing_enabled
+            from packages.observability.sampling import tracing_enabled
 
             if tracing_enabled():
                 # SDK v4: langfuse_trace_id + langfuse_parent_observation_id

@@ -9,7 +9,7 @@ from packages.guardrails.deny_list import deny_list_hit
 from packages.metrics import guardrails_blocked
 from packages.rate_limiter import check_rate_limit
 from packages.text_normalize import make_normalized_query_hash, normalize_text
-from backend.observability.decorators import observe
+from packages.observability.decorators import observe
 from packages.pipeline.state import PipelineState
 
 logger = logging.getLogger(__name__)

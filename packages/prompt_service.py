@@ -24,7 +24,7 @@ import threading
 import time
 from dataclasses import dataclass
 
-from backend.observability.langfuse_client import get_langfuse
+from packages.observability.langfuse_client import get_langfuse
 
 logger = logging.getLogger(__name__)
 

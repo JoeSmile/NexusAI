@@ -16,7 +16,7 @@ from packages.plan.retrieval_mode import (
     choose_retrieval_mode,
     token_budget_warning,
 )
-from backend.observability.decorators import enrich_span, observe
+from packages.observability.decorators import enrich_span, observe
 from packages.pipeline.context_messages import resolved_query
 from packages.pipeline.state import PipelineState
 

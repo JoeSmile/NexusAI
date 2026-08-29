@@ -8,7 +8,7 @@ from packages.plan.clarification import (
     hold_for_clarification,
     try_resolve_pending,
 )
-from backend.observability.decorators import enrich_span, observe
+from packages.observability.decorators import enrich_span, observe
 from packages.pipeline.state import PipelineState
 
 

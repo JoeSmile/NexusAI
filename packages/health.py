@@ -17,7 +17,7 @@ router = APIRouter(tags=["system"])
 
 def langfuse_local_status() -> dict:
     """进程内开关/SDK 状态，无出站 HTTP。供 GET /health 使用。"""
-    from backend.observability.langfuse_client import (  # type: ignore
+    from packages.observability.langfuse_client import (  # type: ignore
         _base_url,
         get_langfuse,
         langfuse_enabled,

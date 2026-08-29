@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 
 from packages.guardrails.output_guard import check_output
-from backend.observability.decorators import observe
+from packages.observability.decorators import observe
 from packages.pipeline.state import PipelineState
 
 logger = logging.getLogger(__name__)

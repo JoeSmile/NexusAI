@@ -19,7 +19,7 @@ from packages.plan.llm_output_guard import prevalidate_llm_plan
 from packages.plan.models import plan_to_state_dict
 from packages.plan.tool_index import search_capabilities
 from packages.plan.validator import validate_plan_ir
-from backend.observability.decorators import enrich_span, observe
+from packages.observability.decorators import enrich_span, observe
 from packages.auth.models import TenantContext
 from packages.pipeline.intent_path import (
     resolve_short_path_skill,

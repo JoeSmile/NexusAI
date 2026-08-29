@@ -94,7 +94,7 @@ def flush_langfuse() -> None:
 def current_langfuse_trace_ids() -> dict[str, str | None]:
     """当前 LangFuse trace/observation id — 供 audit 血缘互查。"""
     try:
-        from backend.observability.decorators import langfuse_context
+        from packages.observability.decorators import langfuse_context
 
         return {
             "langfuse_trace_id": langfuse_context.get_current_trace_id(),

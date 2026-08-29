@@ -37,7 +37,7 @@ class _LangfuseContextShim:
 
     def _client(self) -> Any | None:
         try:
-            from backend.observability.langfuse_client import get_langfuse
+            from packages.observability.langfuse_client import get_langfuse
 
             return get_langfuse()
         except Exception:
@@ -145,7 +145,7 @@ def observe(*args: Any, **kwargs: Any):
 
             @functools.wraps(fn)
             async def _async_wrapper(*a: Any, **kw: Any) -> Any:
-                from backend.observability.sampling import tracing_enabled
+                from packages.observability.sampling import tracing_enabled
 
                 if not tracing_enabled():
                     return await fn(*a, **kw)
@@ -157,7 +157,7 @@ def observe(*args: Any, **kwargs: Any):
 
             @functools.wraps(fn)
             def _agen_wrapper(*a: Any, **kw: Any) -> Any:
-                from backend.observability.sampling import tracing_enabled
+                from packages.observability.sampling import tracing_enabled
 
                 if not tracing_enabled():
                     return fn(*a, **kw)
@@ -167,7 +167,7 @@ def observe(*args: Any, **kwargs: Any):
 
         @functools.wraps(fn)
         def _sync_wrapper(*a: Any, **kw: Any) -> Any:
-            from backend.observability.sampling import tracing_enabled
+            from packages.observability.sampling import tracing_enabled
 
             if not tracing_enabled():
                 return fn(*a, **kw)
@@ -188,7 +188,7 @@ def enrich_span(
     level: str | None = None,
 ) -> None:
     """加深当前 observation 的 IO / 元数据（采样关闭时 no-op）。"""
-    from backend.observability.sampling import tracing_enabled
+    from packages.observability.sampling import tracing_enabled
 
     if not tracing_enabled():
         return

@@ -24,7 +24,7 @@ async def test_harness_success():
 async def test_harness_complete_reports_usage_to_langfuse(monkeypatch):
     """GAP-08 回归: usage 走 update_current_observation(update_current_generation 不存在于 SDK,曾静默失败)。"""
     from packages.harness.llm import LLMHarness
-    import backend.observability.decorators as obs_decorators
+    import packages.observability.decorators as obs_decorators
 
     calls: dict = {}
 

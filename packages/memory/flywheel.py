@@ -78,7 +78,7 @@ def flywheel_snapshot() -> dict[str, Any]:
 
 def _emit_langfuse_scores() -> None:
     try:
-        from backend.observability.decorators import langfuse_context
+        from packages.observability.decorators import langfuse_context
 
         langfuse_context.update_current_observation(
             metadata={

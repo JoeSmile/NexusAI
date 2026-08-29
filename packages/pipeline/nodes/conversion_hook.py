@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from packages.ab.service import record_event
-from backend.observability.decorators import observe
+from packages.observability.decorators import observe
 from packages.pipeline.state import PipelineState
 
 

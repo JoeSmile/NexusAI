@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from backend.observability.decorators import observe
+from packages.observability.decorators import observe
 from packages.pipeline.state import PipelineState
 
 

@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field
 
 from packages.audit import log_audit
 from packages.errors import NexusAIException
-from backend.observability.decorators import observe
+from packages.observability.decorators import observe
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
 from packages.capability.invoke import invoke
@@ -173,11 +173,11 @@ def _schedule_audit(
 def _schedule_langfuse_flush(
     background_tasks: BackgroundTasks, *, short_path: bool
 ) -> None:
-    from backend.observability.langfuse_client import (
+    from packages.observability.langfuse_client import (
         discard_langfuse_buffer,
         flush_langfuse,
     )
-    from backend.observability.sampling import should_sample, tracing_enabled
+    from packages.observability.sampling import should_sample, tracing_enabled
 
     finish = "skill_executed" if short_path else "llm_generated"
     keep = should_sample(finish) and tracing_enabled()

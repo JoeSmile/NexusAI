@@ -376,7 +376,7 @@ async def invoke(
     )
     from packages.audit import write_governance_audit
     from packages.audit_context import bind_audit_lineage, get_audit_lineage
-    from backend.observability.langfuse_client import current_langfuse_trace_ids
+    from packages.observability.langfuse_client import current_langfuse_trace_ids
 
     lineage = get_audit_lineage()
     tool_use_id = lineage.tool_use_id or (

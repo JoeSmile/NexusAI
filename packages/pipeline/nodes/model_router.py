@@ -6,8 +6,8 @@ from packages.cost_manager import estimate_cost
 from packages.errors import NexusAIException
 from packages.llm_credentials import resolve_tenant_credential
 from packages.model_registry import get_model, select_model_for_intent
-from backend.observability.decorators import enrich_span, observe
-from backend.observability.sampling import set_tracing_enabled, should_sample
+from packages.observability.decorators import enrich_span, observe
+from packages.observability.sampling import set_tracing_enabled, should_sample
 from packages.skills.registry import registry
 from packages.pipeline.intent_path import resolve_short_path_skill, skill_to_state
 from packages.pipeline.state import PipelineState

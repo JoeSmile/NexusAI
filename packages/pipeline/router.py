@@ -28,7 +28,7 @@ from packages.plan.run_cancel import (
     register_run,
     unregister_run,
 )
-from backend.observability.decorators import observe
+from packages.observability.decorators import observe
 from packages.auth.models import TenantContext
 from packages.auth.permissions import require_permission
 from packages.pipeline.graph import compiled_graph
@@ -159,12 +159,12 @@ async def _run_chat_pipeline(
     background_tasks: BackgroundTasks,
     tenant: TenantContext,
 ):
-    from backend.observability.decorators import enrich_span, langfuse_context
-    from backend.observability.langfuse_client import (
+    from packages.observability.decorators import enrich_span, langfuse_context
+    from packages.observability.langfuse_client import (
         discard_langfuse_buffer,
         flush_langfuse,
     )
-    from backend.observability.sampling import (
+    from packages.observability.sampling import (
         is_short_path,
         reset_sampling_state,
         should_sample,
@@ -297,7 +297,7 @@ async def _run_chat_pipeline(
 def _inject_langfuse_parent(initial: Any) -> None:
     """把当前 Langfuse 根 span id 注入 state,让 LangGraph 节点挂成其子 span(GAP-08)。"""
     try:
-        from backend.observability.decorators import langfuse_context
+        from packages.observability.decorators import langfuse_context
 
         tid = langfuse_context.get_current_trace_id()
         oid = langfuse_context.get_current_observation_id()

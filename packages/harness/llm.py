@@ -153,7 +153,7 @@ def _record_fallback_metadata(*, original_model: str, final_model: str) -> None:
     if original_model == final_model:
         return
     try:
-        from backend.observability.decorators import langfuse_context
+        from packages.observability.decorators import langfuse_context
 
         langfuse_context.update_current_observation(
             metadata={
@@ -275,7 +275,7 @@ class LLMHarness(Harness):
         except Exception:
             pass
         try:
-            from backend.observability.decorators import langfuse_context
+            from packages.observability.decorators import langfuse_context
 
             langfuse_context.update_current_observation(
                 model=model,
@@ -407,7 +407,7 @@ class LLMHarness(Harness):
         except Exception:
             pass
         try:
-            from backend.observability.decorators import langfuse_context
+            from packages.observability.decorators import langfuse_context
 
             langfuse_context.update_current_observation(
                 model=model,

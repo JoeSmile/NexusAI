@@ -10,7 +10,7 @@ from sqlalchemy import text
 
 from packages.memory.memory_service import get_unified_memory_service
 from backend.database.pgvector_session import CacheEntry, get_pg_session
-from backend.observability.decorators import observe
+from packages.observability.decorators import observe
 from packages.pipeline.state import PipelineState
 
 logger = logging.getLogger(__name__)
