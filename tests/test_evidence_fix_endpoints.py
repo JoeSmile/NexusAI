@@ -12,7 +12,7 @@ from packages.errors import ErrorCode
 from apps.api.routers import performance as perf_mod
 from apps.api.routers.agent import router as agent_router
 from apps.api.routers.performance import router as perf_router
-from backend.services.agent_service import get_agent_service
+from packages.services.agent_service import get_agent_service
 
 
 @pytest.fixture

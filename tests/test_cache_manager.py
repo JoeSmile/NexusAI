@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from backend.services.performance_optimizer import CacheManager, PerformanceOptimizer
+from packages.services.performance_optimizer import CacheManager, PerformanceOptimizer
 
 
 class _FakeAsyncRedis:

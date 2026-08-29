@@ -12,7 +12,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 
 from packages.logging_config import get_logger
-from backend.services.performance_optimizer import (
+from packages.services.performance_optimizer import (
     cache_manager,
     performance_optimizer,
     stream_handler,

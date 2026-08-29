@@ -340,7 +340,7 @@ async def invoke_agent(
     reply = ""
     if _depth == 0:
         try:
-            from backend.services.agent_service import get_agent_service
+            from packages.services.agent_service import get_agent_service
 
             svc = get_agent_service()
             result = await svc.process_message(

@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 
 # 延迟导入上下文服务，避免循环导入
 try:
-    from backend.services.context_service import ContextService
+    from packages.services.context_service import ContextService
     CONTEXT_SERVICE_AVAILABLE = True
 except ImportError:
     try:
@@ -187,7 +187,7 @@ class MCPProtocol:
         self.context_service = context_service
         if context_service is None and CONTEXT_SERVICE_AVAILABLE:
             try:
-                from backend.services.context_service import ContextService
+                from packages.services.context_service import ContextService
                 self.context_service = ContextService()
             except Exception:
                 # 如果无法创建ContextService，则使用None

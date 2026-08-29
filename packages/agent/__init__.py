@@ -1,6 +1,6 @@
 """Agent 包：仅保留 protocol（MCP）。
 
-Agent 运行时实现见 ``packages.agent_runtime``（经 ``backend.services.agent_service`` /
+Agent 运行时实现见 ``packages.agent_runtime``（经 ``packages.services.agent_service`` /
 ``apps.api.routers.agent`` 挂载为 ``/agent/*``）。本包不再导出 AgentCore /
 AgentService / 路由副本（Task 31 已删除孤儿树）。
 """

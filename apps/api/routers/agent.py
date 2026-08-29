@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from packages.errors import raise_internal_error
-from backend.services.agent_service import AgentService, get_agent_service
+from packages.services.agent_service import AgentService, get_agent_service
 from packages.auth.models import TenantContext
 from packages.auth.permissions import require_permission
 from packages.auth.scope import assert_user_access, resolve_acting_user_id

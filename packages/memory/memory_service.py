@@ -473,7 +473,7 @@ class UnifiedMemoryService:
                 session.commit()
             if superseded:
                 try:
-                    from backend.services.performance_optimizer import cache_manager
+                    from packages.services.performance_optimizer import cache_manager
 
                     await cache_manager.bump_epoch(self.tenant_id)
                 except Exception:
@@ -1033,7 +1033,7 @@ class UnifiedMemoryService:
             msg_n,
         )
         try:
-            from backend.services.performance_optimizer import cache_manager
+            from packages.services.performance_optimizer import cache_manager
 
             await cache_manager.bump_epoch(self.tenant_id)
         except Exception:

@@ -15,7 +15,7 @@ from packages.models import (
     PersonalizationUpdateRequest,
     RoleTemplate,
 )
-from backend.services.prompt_composer import (
+from packages.services.prompt_composer import (
     PromptComposer,
     get_all_role_templates,
     get_role_template,

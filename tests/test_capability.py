@@ -459,7 +459,7 @@ async def test_leaf_stub_mode_still_stubs(
         ),
         patch("packages.audit.write_audit_sync"),
         patch(
-            "backend.services.agent_service.get_agent_service",
+            "packages.services.agent_service.get_agent_service",
             return_value=type(
                 "S",
                 (),

@@ -428,7 +428,7 @@ async def test_build_context_strips_memory_on_role_drift() -> None:
 
 def test_prompt_composer_clamps_relaxed_style() -> None:
     from packages.memory.memory_service import MEMORY_ISOLATION_HEADER
-    from backend.services.prompt_composer import PromptComposer
+    from packages.services.prompt_composer import PromptComposer
 
     text = PromptComposer(
         {

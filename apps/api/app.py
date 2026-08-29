@@ -104,7 +104,7 @@ async def lifespan(app: FastAPI):
         logger.warning("KeyManager 未就绪: %s", e)
 
     try:
-        from backend.services.performance_optimizer import performance_optimizer
+        from packages.services.performance_optimizer import performance_optimizer
 
         r = await performance_optimizer._ensure_redis()
         if r is not None and await performance_optimizer.ping():
@@ -168,7 +168,7 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
     try:
-        from backend.services.performance_optimizer import performance_optimizer
+        from packages.services.performance_optimizer import performance_optimizer
 
         await performance_optimizer.close()
     except Exception:
