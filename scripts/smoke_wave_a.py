@@ -18,7 +18,7 @@ import time
 import uuid
 from datetime import UTC, datetime, timedelta, timezone
 
-# Allow `uv run python scripts/smoke_wave_a.py` to import backend.*
+# Project root on sys.path for `uv run python scripts/smoke_wave_a.py`
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import httpx
