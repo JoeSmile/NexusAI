@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -23,7 +23,7 @@ from packages.capability.models import (
     CapabilityStatus,
 )
 from packages.capability.registry import CapabilityRegistry
-from packages.errors import NexusAIException, ErrorCode
+from packages.errors import ErrorCode, NexusAIException
 
 
 @pytest.fixture
@@ -237,16 +237,9 @@ def test_audit_prefix_includes_upstream() -> None:
 
 
 @pytest.mark.asyncio
-async def test_invoke_external_mock_and_circuit(
-    tenant_user: TenantContext, monkeypatch: pytest.MonkeyPatch
-) -> None:
+async def test_external_app_invoke_is_sealed(tenant_user: TenantContext) -> None:
     from packages.capability.connectors import external_app as ext
-    from packages.capability.errors import CapabilityUpstreamError
-    from packages.circuit_breaker import CircuitState
-
-    monkeypatch.setenv("CAPABILITY_UPSTREAM_MOCK", "true")
-    monkeypatch.setenv("LLM_PROVIDER", "mock")
-    ext._BREAKERS.clear()
+    from packages.capability.errors import CapabilityDisabledError
 
     spec = CapabilitySpec(
         id="dify-mock",
@@ -254,33 +247,37 @@ async def test_invoke_external_mock_and_circuit(
         kind=CapabilityKind.EXTERNAL_APP,
         provider=CapabilityProvider.DIFY,
         permission="chat:write",
-        cost_model={"cost_per_1k": 1.0},
-        spec={
-            "governance": True,
-            "base_url": "https://api.dify.ai/v1",
-            "api_key": "k",
-        },
+        spec={"governance": True, "base_url": "https://api.dify.ai/v1", "api_key": "k"},
     )
-    frames: list[dict] = []
-    async for f in ext.invoke_external(spec, {"message": "x"}, tenant_user):
-        frames.append(f)
-    assert any(f.get("event") == "token" for f in frames)
-    usage = next(f for f in frames if f.get("event") == "usage")
-    assert usage["data"]["upstream"] == "dify"
-    assert usage.get("cost_source") == "invoke"
-    done = frames[-1]
-    assert done["event"] == "done"
-    assert done["data"]["upstream"] == "dify"
-
-    # 断路器打开 → CAP_003，不 hang
-    b = ext._breaker(f"cap:dify:{spec.id}")
-    b._state = CircuitState.OPEN
-    b._last_failure_time = 1e12  # 远未来，保持 open
-    with pytest.raises(CapabilityUpstreamError) as ei:
+    with pytest.raises(CapabilityDisabledError) as ei:
         async for _ in ext.invoke_external(spec, {"message": "x"}, tenant_user):
             pass
-    assert ei.value.code == ErrorCode.CAP_UPSTREAM_ERROR.value
-    assert "circuit_open" in ei.value.message
+    assert ei.value.code == ErrorCode.CAP_DISABLED.value
+    assert ei.value.message == "external_agent_sealed"
+
+
+@pytest.mark.asyncio
+async def test_hub_invoke_rejects_coze(tenant_user: TenantContext) -> None:
+    from packages.capability.errors import CapabilityDisabledError
+
+    spec = CapabilitySpec(
+        id="coze-bot",
+        name="coze-bot",
+        kind=CapabilityKind.EXTERNAL_APP,
+        provider=CapabilityProvider.COZE,
+        permission="chat:write",
+        spec={"governance": True},
+    )
+    reg = CapabilityRegistry()
+    reg.register(spec)
+    with patch(
+        "packages.capability.invoke.get_capability_registry",
+        return_value=reg,
+    ):
+        with pytest.raises(CapabilityDisabledError) as ei:
+            async for _ in invoke(spec.id, {"message": "hi"}, tenant_user):
+                pass
+    assert ei.value.message == "external_agent_sealed"
 
 def test_env_load_and_db_override_same_id() -> None:
     """DB 后加载覆盖同 id 的 env 条目。"""
@@ -458,18 +455,6 @@ async def test_leaf_stub_mode_still_stubs(
             return_value=reg,
         ),
         patch("packages.audit.write_audit_sync"),
-        patch(
-            "packages.services.agent_service.get_agent_service",
-            return_value=type(
-                "S",
-                (),
-                {
-                    "process_message": AsyncMock(
-                        return_value={"success": True, "data": {"response": "wrap"}}
-                    )
-                },
-            )(),
-        ),
     ):
         frames: list[dict] = []
         async for f in invoke_agent(

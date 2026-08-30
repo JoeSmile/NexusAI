@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -75,9 +75,6 @@ async def test_vendor_risk_call_chain_and_audits(
     def fake_audit(record: dict) -> None:
         audits.append(str(record.get("model")))
 
-    async def fake_process(*_a, **_k):
-        return {"success": True, "data": {"response": "risk-ok"}}
-
     with (
         patch(
             "packages.capability.registry.get_capability_registry",
@@ -86,12 +83,7 @@ async def test_vendor_risk_call_chain_and_audits(
         patch("packages.audit.write_audit_sync", side_effect=fake_audit),
         patch(
             "packages.services.agent_service.get_agent_service",
-            return_value=type(
-                "S",
-                (),
-                {"process_message": AsyncMock(side_effect=fake_process)},
-            )(),
-        ),
+        ) as agent_svc,
     ):
         frames = []
         async for f in invoke_agent(
@@ -100,6 +92,7 @@ async def test_vendor_risk_call_chain_and_audits(
             tenant,
         ):
             frames.append(f)
+        agent_svc.assert_not_called()
 
     assert any(f.get("event") == "token" for f in frames)
     done = next(f for f in frames if f.get("event") == "done")
@@ -141,18 +134,6 @@ async def test_non_leaf_child_uses_real_invoke(tenant: TenantContext) -> None:
         ),
         patch("packages.capability.governance._redis", return_value=None),
         patch("packages.audit.write_audit_sync"),
-        patch(
-            "packages.services.agent_service.get_agent_service",
-            return_value=type(
-                "S",
-                (),
-                {
-                    "process_message": AsyncMock(
-                        return_value={"success": True, "data": {"response": "wrap"}}
-                    )
-                },
-            )(),
-        ),
     ):
         import os
 
@@ -188,18 +169,6 @@ async def test_agent_depth_limit(
             return_value=reg,
         ),
         patch("packages.audit.write_audit_sync"),
-        patch(
-            "packages.services.agent_service.get_agent_service",
-            return_value=type(
-                "S",
-                (),
-                {
-                    "process_message": AsyncMock(
-                        return_value={"success": True, "data": {"response": "x"}}
-                    )
-                },
-            )(),
-        ),
     ):
         with pytest.raises(CapabilityUpstreamError) as ei:
             async for _ in invoke_agent(

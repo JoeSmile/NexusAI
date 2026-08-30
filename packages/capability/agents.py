@@ -1,17 +1,11 @@
-"""Agent 门面 — 包装 AgentService，支持嵌套能力链（Task 30.24）。
+"""Hub ``kind=agent`` — 只编排子工具/MCP，不跑第二套聊天脑。
 
-真实 Runtime 在 ``backend/agent/``（经 ``routers/agent.py`` 挂载）。
-``packages.agent`` 仅保留 ``protocol``（MCP）；Task 31 已删除孤儿实现树。
-
-深度 0 双路径（拍板 C，保留）:
-- **嵌套链**: 按 ``capabilities`` 顺序展开子能力（审计/流式 call_chain）。
-- **回复正文**: 以 ``AgentService.process_message`` 为准；仅当其失败/空时
-  回退到嵌套链 token 拼接。嵌套链成本/审计仍记账，不代表最终回复源。
+对话真源是 ``POST /chat/streaming``；多 agent 只走黑板 spawn subagent。
+本模块按 ``spec.capabilities`` 展开 tool/model/rag，把子能力输出原样上抛。
 """
 
 from __future__ import annotations
 
-import logging
 import os
 import time
 import uuid
@@ -27,8 +21,6 @@ from packages.capability.errors import (
     CapabilityUpstreamError,
 )
 from packages.capability.models import CapabilityKind, CapabilitySpec
-
-logger = logging.getLogger(__name__)
 
 MAX_AGENT_DEPTH = 3
 
@@ -213,7 +205,7 @@ async def _invoke_child_capability(
             yield frame
         return
 
-    # 真实分发（model / external_app 等）；避免再包一层 agent 审计双计
+    # 真实分发（model / tool / MCP）；external_app 会在 invoke 被封死
     from packages.capability.invoke import invoke
 
     if _should_chain_audit(child):
@@ -236,11 +228,7 @@ async def invoke_agent(
     _chain: list[str] | None = None,
     _trace_id: str | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
-    """门面入口：嵌套能力链 + AgentService.process_message + 分片流式。
-
-    深度 0: AgentService 拥有最终 reply；嵌套链负责可见 call_chain / 审计，
-    仅在 AgentService 无有效回复时回退嵌套文本（见模块 docstring）。
-    """
+    """展开子能力链。禁止调用 AgentService / 禁止再造一份聊天回复。"""
     if spec.kind != CapabilityKind.AGENT:
         raise CapabilityUpstreamError(
             message="not_an_agent",
@@ -297,14 +285,12 @@ async def invoke_agent(
     from packages.capability.registry import get_capability_registry
 
     registry = get_capability_registry()
-    nested_text_parts: list[str] = []
     child_tenant = (
         make_sub_agent_context(tenant, agent_id=spec.id, parent_trace_id=trace_id)
         if _depth == 0
         else tenant
     )
 
-    # 主链：按 capabilities 顺序展开；agent 递归，叶子走 _invoke_leaf
     for cap_id in agent.capabilities:
         child = registry.get(cap_id)
         if child.kind == CapabilityKind.AGENT:
@@ -316,8 +302,6 @@ async def invoke_agent(
                 _chain=chain,
                 _trace_id=trace_id,
             ):
-                if frame.get("event") == "token":
-                    nested_text_parts.append(str(frame.get("data") or ""))
                 if frame.get("event") == "done":
                     continue
                 yield frame
@@ -331,60 +315,10 @@ async def invoke_agent(
                 trace_id=trace_id,
                 parent_agent_id=spec.id if _depth == 0 else None,
             ):
-                if frame.get("event") == "token":
-                    nested_text_parts.append(str(frame.get("data") or ""))
                 if frame.get("event") != "done":
                     yield frame
 
-    # 顶层：AgentService 拥有 reply；嵌套链已跑完（审计/call_chain）
-    reply = ""
-    if _depth == 0:
-        try:
-            from packages.services.agent_service import get_agent_service
-
-            svc = get_agent_service()
-            result = await svc.process_message(
-                user_id=tenant.user_id,
-                message=message,
-                conversation_id=str(payload.get("conversation_id") or "") or None,
-                capabilities=list(agent.capabilities),
-                tenant_id=tenant.tenant_id,
-            )
-            if result.get("success"):
-                data = result.get("data") or {}
-                reply = str(
-                    data.get("response")
-                    or data.get("output")
-                    or data.get("message")
-                    or ""
-                )
-            else:
-                reply = str(result.get("error") or "")
-        except Exception as exc:
-            logger.info("AgentService fallback for %s: %s", spec.id, exc)
-            reply = ""
-
-    if not reply:
-        nested = "".join(nested_text_parts).strip()
-        reply = nested or f"[{spec.id}] ok"
-
-    if _depth == 0:
-        async for part in _stream_chunks(reply):
-            if part:
-                yield {"event": "token", "data": part, "cost_source": "invoke"}
-
     latency = (time.perf_counter() - t0) * 1000
-    cost = 0.01 * (1 + _depth)
-    if _depth == 0:
-        yield {
-            "event": "usage",
-            "data": {
-                "cost": cost,
-                "tokens": max(1, len(reply) // 4),
-                "upstream": spec.id,
-            },
-            "cost_source": "invoke",
-        }
     yield {
         "event": "done",
         "data": {

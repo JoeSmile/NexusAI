@@ -1,24 +1,55 @@
-"""文件上传接口 — 安全加固版"""
+"""文件上传 — 仅登录用户；下载仅本人。ACL TTL 默认 7 天（对齐会话附件）。"""
 
 from __future__ import annotations
 
 import os
+import re
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import text
 
+from packages.auth.models import TenantContext
+from packages.auth.permissions import require_permission
+from packages.database.pgvector_session import get_pg_session
 from packages.file_sanitizer import (
     MAX_FILE_SIZE,
     UPLOAD_DIR,
     sanitize_filename,
     validate_file,
 )
-from packages.database.pgvector_session import get_pg_session
-from packages.auth.models import TenantContext
-from packages.auth.permissions import require_permission
 
 router = APIRouter(prefix="/api/files", tags=["files"])
+
+_FILE_ID_RE = re.compile(r"^[a-f0-9]{32}(\.[A-Za-z0-9]{1,8})?$")
+# 与 Task 76 会话附件同一默认窗口；env ``FILE_ACL_TTL_SECONDS`` 可配
+FILE_ACL_TTL_DEFAULT = 7 * 24 * 3600
+
+
+def file_acl_ttl_seconds() -> int:
+    raw = (os.getenv("FILE_ACL_TTL_SECONDS") or "").strip()
+    if not raw:
+        return FILE_ACL_TTL_DEFAULT
+    try:
+        n = int(raw)
+    except ValueError:
+        return FILE_ACL_TTL_DEFAULT
+    return n if n > 0 else FILE_ACL_TTL_DEFAULT
+
+
+def _safe_part(value: str) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", (value or "").strip())[:80]
+    return cleaned or "_"
+
+
+def _file_cache_key(tenant_id: str, user_id: str, file_id: str) -> str:
+    return f"file:{tenant_id}:{user_id}:{file_id}"
+
+
+def _owned_path(tenant_id: str, user_id: str, file_id: str) -> Path:
+    return UPLOAD_DIR / _safe_part(tenant_id) / _safe_part(user_id) / file_id
 
 
 @router.post("/upload")
@@ -26,7 +57,7 @@ async def upload_file(
     file: UploadFile = File(...),
     tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
-    """上传文件（安全加固）"""
+    """上传文件（登录用户；落点按租户+用户隔离）。"""
     content = await file.read()
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(
@@ -40,13 +71,13 @@ async def upload_file(
         code = error_msg.split(":")[0]
         raise HTTPException(status_code=400, detail={"code": code, "message": error_msg})
 
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    safe_name, _ext = sanitize_filename(file.filename or "upload")
-    file_path = UPLOAD_DIR / safe_name
+    file_id, _ext = sanitize_filename(file.filename or "upload")
+    file_path = _owned_path(tenant.tenant_id, tenant.user_id, file_id)
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    file_path.write_bytes(content)
 
-    with open(file_path, "wb") as f:
-        f.write(content)
-
+    ttl = file_acl_ttl_seconds()
+    expires = datetime.now(UTC) + timedelta(seconds=ttl)
     session_factory = get_pg_session()
     with session_factory.Session() as session:
         session.execute(
@@ -55,19 +86,21 @@ async def upload_file(
                 INSERT INTO cache_entries
                     (cache_key, cache_type, tenant_id, value, ttl_seconds, expires_at)
                 VALUES
-                    (:key, 'file', :tid, :path, 86400, now() + interval '24 hours')
+                    (:key, 'file', :tid, :path, :ttl, :expires)
                 """
             ),
             {
-                "key": f"file:{safe_name}",
+                "key": _file_cache_key(tenant.tenant_id, tenant.user_id, file_id),
                 "tid": tenant.tenant_id,
                 "path": str(file_path),
+                "ttl": ttl,
+                "expires": expires,
             },
         )
         session.commit()
 
     return {
-        "file_id": safe_name,
+        "file_id": file_id,
         "original_name": file.filename,
         "size": len(content),
         "content_type": content_type,
@@ -75,10 +108,39 @@ async def upload_file(
 
 
 @router.get("/{file_id}")
-async def get_file(file_id: str):
-    """获取上传文件"""
+async def get_file(
+    file_id: str,
+    tenant: TenantContext = Depends(require_permission("chat:write")),
+):
+    """仅上传者可下载；过期 ACL（默认 7 天）与未登录 / 他人 / 跨租户一律 401 或 404。"""
     safe_name = os.path.basename(file_id)
-    file_path = UPLOAD_DIR / safe_name
-    if not file_path.exists():
+    if not _FILE_ID_RE.match(safe_name):
         raise HTTPException(status_code=404, detail="file_not_found")
-    return FileResponse(str(file_path))
+
+    key = _file_cache_key(tenant.tenant_id, tenant.user_id, safe_name)
+    session_factory = get_pg_session()
+    with session_factory.Session() as session:
+        row = session.execute(
+            text(
+                """
+                SELECT value FROM cache_entries
+                WHERE cache_key = :key AND tenant_id = :tid
+                  AND expires_at > now()
+                """
+            ),
+            {"key": key, "tid": tenant.tenant_id},
+        ).first()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="file_not_found")
+
+    mapping = getattr(row, "_mapping", row)
+    stored = Path(str(mapping["value"]))
+    expected = _owned_path(tenant.tenant_id, tenant.user_id, safe_name).resolve()
+    try:
+        stored_resolved = stored.resolve()
+    except OSError:
+        raise HTTPException(status_code=404, detail="file_not_found") from None
+    if stored_resolved != expected or not stored_resolved.is_file():
+        raise HTTPException(status_code=404, detail="file_not_found")
+    return FileResponse(str(stored_resolved))

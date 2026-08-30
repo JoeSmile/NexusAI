@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from '@/api/http'
+import { apiGet } from '@/api/http'
 
 export type AgentEnvelope<T> = {
   code: number
@@ -38,14 +38,6 @@ export async function agentStatus() {
 
 export async function agentTools() {
   return apiGet<AgentEnvelope<AgentTool[] | Record<string, unknown>>>('/agent/tools')
-}
-
-export async function agentChat(body: {
-  user_id: string
-  message: string
-  conversation_id?: string
-}) {
-  return apiPost<AgentEnvelope<Record<string, unknown>>>('/agent/chat', body)
 }
 
 export async function agentHistory(userId: string, limit = 10) {

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
 import {
-  agentChat,
   agentHistory,
   agentStatus,
   agentTools,
@@ -57,7 +56,6 @@ export default function AgentPanel() {
   const [tools, setTools] = useState<AgentTool[]>([])
   const [streamText, setStreamText] = useState('')
   const [callChain, setCallChain] = useState<string[]>([])
-  const [chatResult, setChatResult] = useState<unknown>(null)
   const [history, setHistory] = useState<unknown>(null)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
@@ -95,7 +93,6 @@ export default function AgentPanel() {
       skip.current = false
       return
     }
-    setChatResult(null)
     setHistory(null)
     setStreamText('')
     setCallChain([])
@@ -147,22 +144,6 @@ export default function AgentPanel() {
       },
     )
     setBusy(false)
-  }
-
-  const onChat = async () => {
-    setBusy(true)
-    setErr('')
-    try {
-      const r = await agentChat({
-        user_id: userId.trim() || 'fe-agent',
-        message: message.trim(),
-      })
-      setChatResult(r.data)
-    } catch (e) {
-      setErr(formatApiError(e, 'chat:write'))
-    } finally {
-      setBusy(false)
-    }
   }
 
   const onHistory = async () => {
@@ -297,27 +278,17 @@ export default function AgentPanel() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm font-semibold">Legacy /agent/chat</CardTitle>
+          <CardTitle className="text-sm font-semibold">History</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" disabled={busy} onClick={() => void onChat()}>
-              发送 /agent/chat
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={busy}
-              onClick={() => void onHistory()}
-            >
-              History
-            </Button>
-          </div>
-          {chatResult ? (
-            <pre className="overflow-auto rounded-lg border border-border p-2 text-xs">
-              {JSON.stringify(chatResult, null, 2)}
-            </pre>
-          ) : null}
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy}
+            onClick={() => void onHistory()}
+          >
+            读取 /agent/history
+          </Button>
           {history ? (
             <pre className="overflow-auto rounded-lg border border-border p-2 text-xs">
               {JSON.stringify(history, null, 2)}

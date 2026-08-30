@@ -17,14 +17,12 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
 
-import httpx
-
-from packages.circuit_breaker import CircuitBreaker, CircuitState
-from packages.security.url_guard import UrlValidationError, validate_base_url
 from packages.auth.models import TenantContext
-from packages.capability.errors import CapabilityUpstreamError
+from packages.capability.errors import CapabilityDisabledError, CapabilityUpstreamError
 from packages.capability.models import CapabilityProvider, CapabilitySpec
 from packages.capability.registry import resolve_credential
+from packages.circuit_breaker import CircuitBreaker
+from packages.security.url_guard import UrlValidationError, validate_base_url
 
 logger = logging.getLogger(__name__)
 
@@ -318,22 +316,13 @@ async def _mock_line_iter(provider: str) -> AsyncIterator[str]:
 
 
 async def _http_line_iter(req: UpstreamRequest) -> AsyncIterator[str]:
-    timeout = httpx.Timeout(req.timeout, connect=min(10.0, req.timeout))
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        async with client.stream(
-            req.method,
-            req.url,
-            headers=req.headers,
-            json=req.json_body,
-        ) as resp:
-            if resp.status_code >= 400:
-                body = (await resp.aread())[:500]
-                raise CapabilityUpstreamError(
-                    message="upstream_http_error",
-                    detail=f"{resp.status_code}:{body!r}",
-                )
-            async for line in resp.aiter_lines():
-                yield line
+    del req
+    raise CapabilityDisabledError(
+        message="external_agent_sealed",
+        detail="http_line_iter",
+    )
+    if False:  # pragma: no cover
+        yield ""
 
 
 async def invoke_external(
@@ -341,76 +330,12 @@ async def invoke_external(
     payload: dict[str, Any],
     tenant: TenantContext,
 ) -> AsyncIterator[dict[str, Any]]:
-    """连接器入口 — 供 ``capability.invoke`` 调用。"""
-    req = build_upstream_request(spec, payload, tenant)
-    breaker = _breaker(f"cap:{req.provider}:{spec.id}")
-    if breaker.state == CircuitState.OPEN:
-        raise CapabilityUpstreamError(
-            message="circuit_open",
-            detail=breaker.name,
-        )
+    """已封：Dify/Coze 不再出站。"""
+    from packages.capability.seal import reject_sealed_external_agent
 
-    collected: list[str] = []
-    saw_error = False
-    try:
-        if _mock_enabled():
-            line_iter = _mock_line_iter(req.provider)
-        else:
-            line_iter = _http_line_iter(req)
-
-        async for frame in _iter_sse_bytes(line_iter, req.provider):
-            if frame.get("event") == "token":
-                collected.append(str(frame.get("data") or ""))
-            if frame.get("event") == "error":
-                saw_error = True
-            yield {**frame, "cost_source": "invoke"}
-
-        if saw_error:
-            breaker._on_failure()
-        else:
-            breaker._on_success()
-    except CapabilityUpstreamError:
-        breaker._on_failure()
-        raise
-    except httpx.TimeoutException as e:
-        breaker._on_failure()
-        raise CapabilityUpstreamError(
-            message="upstream_timeout",
-            detail=str(e),
-        ) from e
-    except httpx.HTTPError as e:
-        breaker._on_failure()
-        raise CapabilityUpstreamError(
-            message="upstream_http_error",
-            detail=str(e),
-        ) from e
-    except Exception as e:
-        breaker._on_failure()
-        raise CapabilityUpstreamError(
-            message="upstream_error",
-            detail=str(e),
-        ) from e
-
-    text = "".join(collected)
-    cost, tokens = _estimate_cost(spec, text)
-    yield {
-        "event": "usage",
-        "data": {
-            "cost": cost,
-            "tokens": tokens,
-            "upstream": req.provider,
-        },
-        "cost_source": "invoke",
-    }
-    yield {
-        "event": "done",
-        "data": {
-            "capability_id": spec.id,
-            "kind": spec.kind.value,
-            "upstream": req.provider,
-        },
-        "cost_source": "invoke",
-    }
+    reject_sealed_external_agent(spec)
+    if False:  # pragma: no cover
+        yield {}
 
 
 __all__ = [

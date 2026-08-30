@@ -4,7 +4,7 @@
 SSE 组帧 / LangFuse 根注入在 routers 层（30.06）。
 
 成本幂等: kind=model 由 harness 内部 ``record_consumption``;
-external_app / agent 由本层记账并带 ``cost_source: invoke``。
+external_app 已封（Dify/Coze 不出站）；agent 由本层记账并带 ``cost_source: invoke``。
 kind=tool 经 ``spec.executor`` 映射到 model / rag（Task 30b）。
 """
 
@@ -17,7 +17,6 @@ from collections.abc import AsyncIterator
 from dataclasses import replace
 from typing import Any
 
-from packages.errors import ErrorCode, NexusAIException
 from packages.auth.models import TenantContext
 from packages.capability.errors import (
     CapabilityNotFoundError,
@@ -28,6 +27,7 @@ from packages.capability.registry import (
     get_capability_registry,
     resolve_credential,
 )
+from packages.errors import ErrorCode, NexusAIException
 
 logger = logging.getLogger(__name__)
 
@@ -161,31 +161,11 @@ async def _invoke_external_app(
     payload: dict[str, Any],
     tenant: TenantContext,
 ) -> AsyncIterator[dict[str, Any]]:
-    """占位：完整转发在 30.07 连接器实现。"""
-    try:
-        from packages.capability import connectors  # type: ignore[attr-defined]
-    except ImportError:
-        connectors = None
+    from packages.capability.seal import reject_sealed_external_agent
 
-    if connectors is None or not hasattr(connectors, "invoke_external"):
-        raise CapabilityUpstreamError(
-            message="connector_not_ready",
-            detail=f"{spec.provider.value}:await_30.07",
-        )
-
-    cost = 0.0
-    tokens = 0
-    async for frame in connectors.invoke_external(spec, payload, tenant):
-        if frame.get("event") == "usage":
-            cost = float((frame.get("data") or {}).get("cost") or 0)
-            tokens = int((frame.get("data") or {}).get("tokens") or 0)
-        yield {**frame, "cost_source": "invoke"}
-
-    if cost or tokens:
-        from packages.cost_manager import record_consumption
-
-        # 审计带 cost_source 由 30.06 router 写入 BackgroundTasks
-        record_consumption(tenant.tenant_id, cost, tokens, model=spec.id)
+    reject_sealed_external_agent(spec)
+    if False:  # pragma: no cover — 保持 async generator 签名
+        yield {}
 
 
 async def _invoke_agent(
@@ -193,7 +173,7 @@ async def _invoke_agent(
     payload: dict[str, Any],
     tenant: TenantContext,
 ) -> AsyncIterator[dict[str, Any]]:
-    """Agent 门面分发（``packages.capability.agents``）。"""
+    """Agent 门面：只展开子工具链，不调用 AgentService。"""
     from packages.capability import agents as agent_runtime
 
     cost = 0.0
@@ -366,6 +346,9 @@ async def invoke(
 
     registry = get_capability_registry()
     spec = registry.get(cap_id)  # CAP_001 / CAP_002
+    from packages.capability.seal import reject_sealed_external_agent
+
+    reject_sealed_external_agent(spec)
 
     # Task 56: 叙事治理链（policy→budget→approval→IAM→audit explain）
     explain = run_governance_chain(

@@ -11,15 +11,15 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from packages.auth.models import TenantContext
+from packages.auth.permissions import require_permission
+from packages.auth.scope import require_tenant_admin
 from packages.logging_config import get_logger
 from packages.services.performance_optimizer import (
     cache_manager,
     performance_optimizer,
     stream_handler,
 )
-from packages.auth.models import TenantContext
-from packages.auth.permissions import require_permission
-from packages.auth.scope import require_tenant_admin
 
 logger = get_logger(__name__)
 
@@ -131,18 +131,17 @@ async def get_cache_stats():
 
 @router.post("/cache/clear")
 async def clear_cache(
-    pattern: str | None = None,
+    pattern: str | None = None,  # noqa: ARG001 — 旧客户端仍可带；已忽略，防止 Redis glob 跨租户
     tenant: TenantContext = Depends(require_permission("chat:write")),
 ):
-    """清除缓存（仅 tenant_admin / super_admin）。"""
+    """清除**本租户** chat + RAG epoch。pattern 忽略（禁止 Redis glob 跨租户）。"""
     require_tenant_admin(tenant)
     try:
-        if pattern:
-            await cache_manager.invalidate_pattern(pattern)
-            message = f"已清除匹配模式 '{pattern}' 的缓存"
-        else:
-            await cache_manager.invalidate_pattern("*")
-            message = "已清除所有缓存"
+        await cache_manager.invalidate_tenant(tenant.tenant_id)
+        from packages.rag.cache import bump_epoch as bump_rag_epoch
+
+        bump_rag_epoch(tenant.tenant_id)
+        message = f"已清除租户 {tenant.tenant_id} 的缓存"
 
         return {
             "status": "success",

@@ -8,10 +8,10 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from packages.errors import ErrorCode
 from apps.api.routers import performance as perf_mod
 from apps.api.routers.agent import router as agent_router
 from apps.api.routers.performance import router as perf_router
+from packages.errors import ErrorCode
 from packages.services.agent_service import get_agent_service
 
 
@@ -49,13 +49,43 @@ def test_cache_stats_redis_down_returns_503_cache_001(perf_client):
 def test_cache_clear_redis_down_returns_503_cache_001(perf_client):
     client, monkeypatch = perf_client
 
-    async def _boom(_pattern=None):
+    async def _boom(_tenant_id=None):
         raise ConnectionRefusedError("Connection refused")
 
-    monkeypatch.setattr(perf_mod.cache_manager, "invalidate_pattern", _boom)
+    monkeypatch.setattr(perf_mod.cache_manager, "invalidate_tenant", _boom)
     r = client.post("/performance/cache/clear")
     assert r.status_code == 503
     assert r.json()["detail"]["code"] == "CACHE_001"
+
+
+def test_cache_clear_only_bumps_caller_tenant_never_all(perf_client):
+    """POST /performance/cache/clear 只 bump 本租户；不存在全站 bump API。"""
+    import asyncio
+    from unittest.mock import AsyncMock
+
+    from packages.services.performance_optimizer import CacheManager, PerformanceOptimizer
+    from tests.test_cache_manager import _FakeAsyncRedis
+
+    client, monkeypatch = perf_client
+    assert not hasattr(CacheManager, "bump_all_tenant_epochs")
+    opt = PerformanceOptimizer()
+    fake = _FakeAsyncRedis()
+    opt._ensure_redis = AsyncMock(return_value=fake)  # type: ignore[method-assign]
+    cm = CacheManager(opt)
+    monkeypatch.setattr(perf_mod, "cache_manager", cm)
+    monkeypatch.setattr("packages.rag.cache.bump_epoch", lambda *_a, **_k: None)
+
+    async def compute():
+        return {"a": 1}
+
+    asyncio.run(cm.get_or_set("k", compute, tenant_id="t1"))
+    asyncio.run(cm.get_or_set("k", compute, tenant_id="t2"))
+
+    r = client.post("/performance/cache/clear", params={"pattern": "*"})
+    assert r.status_code == 200, r.text
+    assert r.json()["tenant_id"] == "t1"
+    assert asyncio.run(cm.get_epoch("t1")) >= 1
+    assert asyncio.run(cm.get_epoch("t2")) == 0
 
 
 def test_agent_memory_awaits_summary():

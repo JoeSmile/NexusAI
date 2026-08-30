@@ -1,26 +1,23 @@
 """
 Agent Router - Agent路由
 
-提供Agent相关的API端点。
-
 .. deprecated::
-    Task 30.24 起能力化调用请走 ``POST /api/capabilities/{id}/invoke``
-    与 ``GET /api/agents``。本路由保留兼容；实现仍为 ``backend/agent`` V2 Runtime。
-    MCP 协议在 ``packages.agent.protocol``（Task 31 已删孤儿实现树）。
+    对话真源是 ``POST /chat/streaming``。Hub ``kind=agent`` 只编排子工具，
+    不再走 AgentService 聊天。本路由仅保留 status/tools/history/memory/followup 兼容。
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 
-from packages.errors import raise_internal_error
-from packages.services.agent_service import AgentService, get_agent_service
 from packages.auth.models import TenantContext
 from packages.auth.permissions import require_permission
 from packages.auth.scope import assert_user_access, resolve_acting_user_id
+from packages.errors import raise_internal_error
+from packages.services.agent_service import AgentService, get_agent_service
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 
-_SUCCESSOR = "/api/capabilities/{id}/invoke"
+_SUCCESSOR = "/chat/streaming"
 _DEP_TRUE = "true"
 
 
@@ -38,50 +35,12 @@ def _stamp(response: Response) -> None:
 
 # ==================== 请求模型 ====================
 
-class MessageRequest(BaseModel):
-    """消息请求"""
-    user_id: str = ""
-    message: str
-    conversation_id: str | None = None
-
-
 class FollowupRequest(BaseModel):
     """回访请求"""
     user_id: str = ""
 
 
 # ==================== API端点 ====================
-
-@router.post("/chat", deprecated=True)
-async def agent_chat(
-    request: MessageRequest,
-    http_request: Request,
-    response: Response,
-    agent_service: AgentService = Depends(get_agent_service),
-    tenant: TenantContext = Depends(require_permission("chat:write")),
-):
-    """Agent聊天（deprecated → ``POST /api/capabilities/{id}/invoke``）。"""
-    _stamp(response)
-    try:
-        uid = resolve_acting_user_id(tenant, request.user_id)
-        result = await agent_service.process_message(
-            user_id=uid,
-            message=request.message,
-            conversation_id=request.conversation_id,
-            tenant_id=tenant.tenant_id,
-        )
-
-        return {
-            "code": 200 if result["success"] else 500,
-            "message": "success" if result["success"] else "error",
-            "data": result
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise_internal_error(http_request, e)
-
 
 @router.get("/status", deprecated=True)
 async def get_agent_status(

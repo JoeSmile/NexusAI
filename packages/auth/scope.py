@@ -36,7 +36,7 @@ def assert_user_access(tenant: TenantContext, target_user_id: str) -> str:
 
 
 def require_tenant_admin(tenant: TenantContext) -> TenantContext:
-    """破坏性运维（遗忘权 / 清全站缓存等）。"""
+    """破坏性运维（遗忘权 / 清**本租户**缓存等）。"""
     if tenant.role not in ("tenant_admin", "super_admin"):
         raise HTTPException(
             status_code=403,

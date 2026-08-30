@@ -13,8 +13,8 @@ from collections.abc import AsyncGenerator, Callable
 from functools import wraps
 from typing import Any
 
-from packages.thread_pool import get_thread_pool
 from packages.logging_config import get_logger
+from packages.thread_pool import get_thread_pool
 
 logger = get_logger(__name__)
 
@@ -282,36 +282,9 @@ class CacheManager:
             logger.warning("chat epoch bump 失败(降级): %s", e)
             return 0
 
-    async def bump_all_tenant_epochs(self) -> int:
-        """运维清全站 chat 缓存：发现所有相关租户并 INCR 各自 epoch。"""
-        tids: set[str] = {"default"}
-        r = await self._opt._ensure_redis()
-        if r is not None:
-            try:
-                for match in ("chat:epoch:*", "chat:v:*"):
-                    cursor = 0
-                    while True:
-                        cursor, keys = await r.scan(
-                            cursor=cursor, match=match, count=200
-                        )
-                        for raw in keys or []:
-                            key = raw.decode() if isinstance(raw, bytes) else str(raw)
-                            if key.startswith("chat:epoch:"):
-                                tid = key[len("chat:epoch:") :]
-                                if tid:
-                                    tids.add(tid)
-                            elif key.startswith("chat:v:"):
-                                # chat:v:<epoch>:<tenant>:<logical...>
-                                parts = key.split(":")
-                                if len(parts) >= 5 and parts[3]:
-                                    tids.add(parts[3])
-                        if cursor == 0:
-                            break
-            except Exception as e:
-                logger.warning("scan chat epochs 失败(仍 bump default): %s", e)
-        for tid in sorted(tids):
-            await self.bump_epoch(tid)
-        return len(tids)
+    async def invalidate_tenant(self, tenant_id: str) -> int:
+        """只失效该租户 chat epoch。不存在全站 bump。"""
+        return await self.bump_epoch(tenant_id or "default")
 
     async def get_or_set(
         self,
@@ -372,24 +345,12 @@ class CacheManager:
                 pass
         return value
 
-    async def invalidate_pattern(self, pattern: str) -> None:
-        """SCAN 匹配删除；``*`` / chat 通配 → bump **全部**已知租户 epoch（1A）。"""
-        if not pattern or pattern in ("*", "chat:*", "chat:v:*"):
-            await self.bump_all_tenant_epochs()
-            return
-        r = await self._opt._ensure_redis()
-        if r is None:
-            return
-        try:
-            cursor = 0
-            while True:
-                cursor, keys = await r.scan(cursor=cursor, match=pattern, count=200)
-                if keys:
-                    await r.delete(*keys)
-                if cursor == 0:
-                    break
-        except Exception as e:
-            logger.warning("invalidate_pattern 失败: %s", e)
+    async def invalidate_pattern(self, pattern: str, *, tenant_id: str) -> None:
+        """兼容旧调用：pattern 忽略，只 bump 该租户。禁止 Redis glob / 全站 SCAN。"""
+        del pattern
+        if not tenant_id:
+            raise ValueError("invalidate_pattern requires tenant_id")
+        await self.invalidate_tenant(tenant_id)
 
     async def get_cache_stats(self) -> dict[str, Any]:
         r = await self._opt._ensure_redis()
