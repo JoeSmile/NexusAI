@@ -9,10 +9,15 @@ from pathlib import Path
 
 # 获取项目根目录
 project_root = os.getenv('PROJECT_ROOT', str(Path(__file__).parent.parent))
-log_dir = Path(project_root) / "log"
+# 与 Dockerfile / prod compose 的 ./logs:/app/logs 对齐（勿用 /app/log）
+log_dir = Path(project_root) / "logs"
 
-# 确保log目录存在
-log_dir.mkdir(exist_ok=True)
+try:
+    log_dir.mkdir(parents=True, exist_ok=True)
+except OSError:
+    # bind-mount 权限未 chown 时仍允许进程起来；仅丢文件 handler
+    pass
+
 
 def setup_logging():
     """设置日志配置"""

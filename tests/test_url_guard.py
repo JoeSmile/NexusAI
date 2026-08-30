@@ -26,6 +26,10 @@ def _clear_ssrf_dev_flag(monkeypatch: pytest.MonkeyPatch) -> None:
         "ftp://api.example.com/v1",
         "not-a-url",
         "",
+        "https://api.example.com/v1?x=1",
+        "https://api.example.com/v1#frag",
+        "https://api.example.com/../v1",
+        "https://api.example.com/%2e%2e/v1",
     ],
 )
 def test_validate_base_url_rejects_ssrf(url: str) -> None:
@@ -36,9 +40,16 @@ def test_validate_base_url_rejects_ssrf(url: str) -> None:
 @pytest.mark.parametrize(
     "url,expected",
     [
-        ("https://api.openai.com/v1", "https://api.openai.com"),
+        ("https://api.openai.com/v1", "https://api.openai.com/v1"),
         ("http://api.example.com", "http://api.example.com"),
-        ("https://dashscope.aliyuncs.com/compatible-mode/v1/", "https://dashscope.aliyuncs.com"),
+        (
+            "https://dashscope.aliyuncs.com/compatible-mode/v1/",
+            "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        ),
+        (
+            "http://host.docker.internal:11434/v1",
+            "http://host.docker.internal:11434/v1",
+        ),
     ],
 )
 def test_validate_base_url_allows_public(url: str, expected: str) -> None:

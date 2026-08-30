@@ -3,6 +3,7 @@ FROM python:3.11-slim AS builder
 
 # uv 二进制：docker hub 无官方 astral-sh/uv 镜像（仅 ghcr.io，大陆直连不可达）；
 # 用 pip 从清华 PyPI 安装，同时把 uv 的默认索引指向清华避免 pypi.org 慢
+# torch 走 pyproject [tool.uv.sources] → pytorch-cpu（无 nvidia-*）；切 GPU 见 pyproject 注释
 RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple uv
 ENV UV_DEFAULT_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple
 

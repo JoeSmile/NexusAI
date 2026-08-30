@@ -18,6 +18,32 @@ logger = logging.getLogger(__name__)
 MAX_SEQ_LEN = 48
 
 
+def _resolve_torch_device():
+    """INTENT_DEVICE=cpu|cuda|auto（默认 cpu；无 GPU 构建不装 CUDA 轮子）。"""
+    import os
+
+    import torch
+
+    pref = (os.getenv("INTENT_DEVICE") or "").strip().lower()
+    if not pref:
+        try:
+            from config import get_settings
+
+            pref = (get_settings().intent_device or "cpu").strip().lower()
+        except Exception:
+            pref = "cpu"
+
+    if pref == "cpu":
+        return torch.device("cpu")
+    if pref == "cuda":
+        if not torch.cuda.is_available():
+            logger.warning("INTENT_DEVICE=cuda but CUDA unavailable; using cpu")
+            return torch.device("cpu")
+        return torch.device("cuda")
+    # auto
+    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
 def resolve_intent_model_path(model_path: str | None = None) -> Path:
     """Resolve INTENT_MODEL_PATH (absolute or relative to project_root)."""
     try:
@@ -85,7 +111,7 @@ class MLIntentClassifier:
                 str(self.model_path)
             )
             self.model.eval()
-            self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            self._device = _resolve_torch_device()
             self.model.to(self._device)
             logger.info("Intent v8 BERT loaded from %s on %s", self.model_path, self._device)
         except Exception as exc:

@@ -14,6 +14,8 @@ _BLOCKED_HOSTNAMES = frozenset(
     }
 )
 _METADATA_IPV4 = ipaddress.IPv4Address("169.254.169.254")
+# OpenAI-compatible roots: /v1, /compatible-mode/v1, custom gateway prefixes.
+_SAFE_PATH_RE = re.compile(r"^(?:/[A-Za-z0-9._-]+)+$")
 
 
 def _dev_allow_local() -> bool:
@@ -45,8 +47,29 @@ def _ip_is_ssrf_blocked(ip: ipaddress.IPv4Address | ipaddress.IPv6Address, *, al
     return True
 
 
+def _normalize_safe_path(path: str) -> str:
+    """Keep OpenAI-compatible path (/v1, /compatible-mode/v1); reject tricks."""
+    raw = (path or "").strip()
+    if not raw or raw == "/":
+        return ""
+    cleaned = raw.rstrip("/")
+    if (
+        "\\" in cleaned
+        or ".." in cleaned
+        or "//" in cleaned
+        or "%" in cleaned
+        or not _SAFE_PATH_RE.fullmatch(cleaned)
+    ):
+        _reject("invalid_path", "invalid_path")
+    return cleaned
+
+
 def validate_base_url(url: str) -> str:
-    """Validate and normalize a base URL. Raises UrlValidationError on SSRF risk."""
+    """Validate and normalize a base URL. Raises UrlValidationError on SSRF risk.
+
+    Preserves a safe path (e.g. ``/v1``, ``/compatible-mode/v1``) required by
+    OpenAI-compatible providers (Ollama, DashScope). Query/fragment are rejected.
+    """
     allow_local = _dev_allow_local()
     raw = (url or "").strip()
     if not raw:
@@ -60,6 +83,9 @@ def validate_base_url(url: str) -> str:
     scheme = (parsed.scheme or "").lower()
     if scheme not in ("http", "https"):
         _reject("invalid_scheme", "invalid_scheme")
+
+    if parsed.query or parsed.fragment:
+        _reject("invalid_path", "invalid_path")
 
     host = parsed.hostname
     if not host:
@@ -84,5 +110,5 @@ def validate_base_url(url: str) -> str:
     if re.fullmatch(r"\d+", host_lower) or re.fullmatch(r"0x[0-9a-f]+", host_lower):
         _reject("ssrf_blocked", "ssrf_blocked")
 
-    normalized = f"{scheme}://{parsed.netloc}".rstrip("/")
-    return normalized
+    path = _normalize_safe_path(parsed.path or "")
+    return f"{scheme}://{parsed.netloc}{path}"

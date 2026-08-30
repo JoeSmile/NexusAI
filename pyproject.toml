@@ -93,6 +93,7 @@ tool-search = [
 ]
 # 意图 BERT v8（Task 65 slice 9）— 未安装或未部署模型时回退规则引擎
 # 安装: uv sync --extra intent-model
+# 默认 CPU 轮子（无 nvidia-*）；有 GPU 后再改 [tool.uv.sources] → pytorch-cu* 并重建镜像
 intent-model = [
     "transformers>=4.46.0,<5",
     "torch>=2.0.0",
@@ -115,9 +116,24 @@ package = false
 [tool.hatch.build.targets.wheel]
 packages = ["backend", "packages", "apps"]
 
+# PyTorch 索引：默认 CPU（档位 A/无 GPU 服务器）。切 GPU 时：
+#   1) 把下面 torch 的 index 改成 pytorch-cu128（或当期 CUDA 版）
+#   2) uv lock --extra intent-model && 重建 Docker 镜像
+#   3) config.env 设 INTENT_DEVICE=cuda（或 auto）
+# 文档: https://docs.astral.sh/uv/guides/integration/pytorch/
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+# 预留：用户量上来、机器有 NVIDIA 时启用（取消注释并改 sources）
+# [[tool.uv.index]]
+# name = "pytorch-cu128"
+# url = "https://download.pytorch.org/whl/cu128"
+# explicit = true
+
 [tool.uv.sources]
-# 可以在这里指定自定义源，例如阿里云镜像
-# 注意：uv 默认使用官方 PyPI，如需使用镜像源，可以在命令行使用 --index-url
+torch = [{ index = "pytorch-cpu" }]
 
 [dependency-groups]
 # 开发依赖组（替代已弃用的 tool.uv.dev-dependencies）

@@ -94,6 +94,8 @@ class Settings(BaseSettings):
 
     # Intent v8 BERT (Task 65 slice 9) — relative to project_root unless absolute
     intent_model_path: str = "data/models/intent_v8"
+    # cpu | cuda | auto — 无 GPU 服务器用 cpu；有卡后可改 cuda 或 auto
+    intent_device: str = "cpu"
 
     # Capability Hub (Task 30.03)
     capability_registry_json: str = "[]"

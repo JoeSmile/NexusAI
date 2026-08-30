@@ -30,23 +30,23 @@ def test_default_blocks_ssrf_targets(url: str) -> None:
 
 
 def test_default_allows_public_hostname() -> None:
-    assert validate_base_url("https://api.openai.com/v1") == "https://api.openai.com"
+    assert validate_base_url("https://api.openai.com/v1") == "https://api.openai.com/v1"
 
 
 @pytest.mark.parametrize(
-    "url",
+    "url,expected",
     [
-        "http://127.0.0.1:11434/v1",
-        "http://localhost:11434/v1",
-        "http://10.0.0.1/v1",
-        "http://192.168.1.1/v1",
+        ("http://127.0.0.1:11434/v1", "http://127.0.0.1:11434/v1"),
+        ("http://localhost:11434/v1", "http://localhost:11434/v1"),
+        ("http://10.0.0.1/v1", "http://10.0.0.1/v1"),
+        ("http://192.168.1.1/v1", "http://192.168.1.1/v1"),
     ],
 )
 def test_allow_local_dev_permits_loopback_and_private(
-    monkeypatch: pytest.MonkeyPatch, url: str
+    monkeypatch: pytest.MonkeyPatch, url: str, expected: str
 ) -> None:
     monkeypatch.setenv("SSRF_ALLOW_LOCAL_DEV", "1")
-    assert validate_base_url(url).startswith("http://")
+    assert validate_base_url(url) == expected
 
 
 def test_allow_local_dev_still_blocks_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
