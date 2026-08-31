@@ -8,8 +8,8 @@ from datetime import datetime, timedelta
 
 from sqlalchemy import text
 
-from packages.memory.memory_service import get_unified_memory_service
 from packages.database.pgvector_session import CacheEntry, get_pg_session
+from packages.memory.memory_service import get_unified_memory_service
 from packages.observability.decorators import observe
 from packages.pipeline.state import PipelineState
 
@@ -27,7 +27,7 @@ async def write_memory(state: PipelineState) -> PipelineState:
     trace_id = state["trace_id"]
 
     mem = get_unified_memory_service(tenant_id=tenant_id)
-    await mem.write_turn(
+    wrote = await mem.write_turn(
         user_id=user_id,
         session_id=session_id,
         user_message=message or "",
@@ -36,6 +36,18 @@ async def write_memory(state: PipelineState) -> PipelineState:
         user_client_message_id=state.get("user_client_message_id"),
         assistant_client_message_id=state.get("assistant_client_message_id"),
     )
+    try:
+        from packages.memory.context_summarize import maybe_enqueue_l1_summarize
+
+        maybe_enqueue_l1_summarize(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            session_id=session_id,
+            archived_ids=wrote.get("archived_ids") or [],
+            trace_id=trace_id or "",
+        )
+    except Exception:
+        logger.debug("l1 summarize enqueue skipped", exc_info=True)
     cold = await mem.maybe_cold_summarize(user_id=user_id, session_id=session_id)
     if cold:
         # 供观测；load_memory 下一轮才会读到 cold 表

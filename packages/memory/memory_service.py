@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Literal
@@ -545,7 +546,7 @@ class UnifiedMemoryService:
                     )
                 )
             session.flush()
-            self._archive_overflow_in_session(
+            archived_ids = self._archive_overflow_in_session(
                 session, user_id=user_id, session_id=session_id
             )
             session.commit()
@@ -556,11 +557,12 @@ class UnifiedMemoryService:
             "user_id": user_id,
             "wrote_user": bool(user_message),
             "wrote_assistant": bool(assistant_message),
+            "archived_ids": archived_ids,
         }
 
     def _archive_overflow_in_session(
         self, session, *, user_id: str, session_id: str
-    ) -> None:
+    ) -> list[int]:
         from packages.memory.turn_archive import (
             archive_window_limits,
             select_turn_ids_to_archive,
@@ -584,12 +586,57 @@ class UnifiedMemoryService:
             budget_tokens=budget,
         )
         if not ids:
-            return
+            return []
         now = datetime.utcnow()
         session.query(ChatMessage).filter(ChatMessage.id.in_(ids)).update(
             {ChatMessage.archived_at: now},
             synchronize_session=False,
         )
+        return [int(i) for i in ids]
+
+    def read_archived_turns(
+        self,
+        *,
+        user_id: str,
+        session_id: str,
+        ids: Sequence[int],
+    ) -> list[dict[str, str]]:
+        want = [int(i) for i in ids if i]
+        if not want:
+            return []
+        session_factory = get_pg_session()
+        with session_factory.Session() as session:
+            rows = (
+                session.query(ChatMessage)
+                .filter(
+                    ChatMessage.tenant_id == self.tenant_id,
+                    ChatMessage.user_id == user_id,
+                    ChatMessage.session_id == session_id,
+                    ChatMessage.id.in_(want),
+                )
+                .order_by(ChatMessage.created_at.asc(), ChatMessage.id.asc())
+                .all()
+            )
+        return [{"role": str(r.role), "content": str(r.content or "")} for r in rows]
+
+    def read_l1_summary(self, *, user_id: str, session_id: str) -> str:
+        from packages.memory.context_summarize import l1_warm_key
+
+        key = l1_warm_key(session_id)
+        session_factory = get_pg_session()
+        with session_factory.Session() as session:
+            row = (
+                session.query(UserMemory)
+                .filter_by(
+                    tenant_id=self.tenant_id,
+                    user_id=user_id,
+                    key=key,
+                )
+                .first()
+            )
+        if row is None or not row.value:
+            return ""
+        return str(row.value)
 
     def count_session_messages(
         self, *, user_id: str, session_id: str, role: str | None = None
@@ -1159,6 +1206,7 @@ class UnifiedMemoryService:
                 )
             )
 
+        l1_lines: list[str] = []
         user_lines: list[str] = []
         todo_lines: list[str] = []
         decision_lines: list[str] = []
@@ -1167,6 +1215,15 @@ class UnifiedMemoryService:
 
         for key, raw in (bundle.warm or {}).items():
             if key.startswith("pending:") or key.startswith("bookmark:"):
+                continue
+            if key.startswith("l1_narrative:"):
+                val = _parse_val(str(raw))
+                if isinstance(val, dict):
+                    text = str(val.get("summary") or "").strip()
+                else:
+                    text = str(val).strip()
+                if text:
+                    l1_lines.append(f"- {text}")
                 continue
             val = _parse_val(str(raw))
             if key.startswith(
@@ -1235,6 +1292,8 @@ class UnifiedMemoryService:
             return lines[:n]
 
         parts: list[str] = [MEMORY_ISOLATION_HEADER]
+        if l1_lines:
+            parts.append("[滚动摘要]\n" + "\n".join(l1_lines[:3]))
         todo_keep = _clip(todo_lines, 10)
         if todo_keep:
             parts.append("[活跃待办]\n" + "\n".join(todo_keep))

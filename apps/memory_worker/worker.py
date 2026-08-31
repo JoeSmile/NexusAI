@@ -16,6 +16,7 @@ def process_one(xid: str, data: dict, *, deliveries: int = 1) -> float:
     """处理单条；返回 score（1.0 成功落库 / 0.0 跳过或失败门控）。"""
     import hashlib
 
+    from packages.database.vector_ops import list_user_memories_by_prefix
     from packages.memory.memory_queue import (
         MAX_DELIVERIES,
         ack,
@@ -23,13 +24,13 @@ def process_one(xid: str, data: dict, *, deliveries: int = 1) -> float:
         is_tombstoned,
     )
     from packages.memory.memory_service import get_unified_memory_service
-    from packages.database.vector_ops import list_user_memories_by_prefix
 
     tenant_id = str(data.get("tenant_id") or "")
     user_id = str(data.get("user_id") or "")
     key = str(data.get("key") or "")
     value = str(data.get("value") or "")
     trace_id = str(data.get("request_trace_id") or "")
+    kind = str(data.get("kind") or "")
     score = 0.0
 
     try:
@@ -51,7 +52,10 @@ def process_one(xid: str, data: dict, *, deliveries: int = 1) -> float:
         drop_poison(xid, data, deliveries=deliveries)
         return 0.0
 
-    if not tenant_id or not user_id or not key:
+    if not tenant_id or not user_id:
+        ack(xid)
+        return 0.0
+    if kind != "l1_summarize" and not key:
         ack(xid)
         return 0.0
 
@@ -74,6 +78,17 @@ def process_one(xid: str, data: dict, *, deliveries: int = 1) -> float:
     except Exception:
         logger.exception("forgotten marker check failed; refuse write xid=%s", xid)
         return 0.0
+
+    if kind == "l1_summarize":
+        import asyncio
+
+        from packages.memory.context_summarize import run_l1_summarize
+
+        code = asyncio.run(run_l1_summarize(data))
+        if code == "skipped_lock":
+            return 0.0
+        ack(xid)
+        return 1.0 if code == "wrote" else 0.0
 
     mem = get_unified_memory_service(tenant_id=tenant_id)
     import asyncio
