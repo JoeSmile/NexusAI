@@ -61,6 +61,8 @@ class ChatMessage(Base):
     client_message_id = Column(String(64), nullable=True, index=True)
     embedding = Column(Vector(768), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    # Task 78.1 — NULL = live L0; set when rolled out of the model window
+    archived_at = Column(DateTime, nullable=True)
 
     __table_args__ = (
         Index("idx_messages_tenant_session", "tenant_id", "session_id"),

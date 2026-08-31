@@ -35,9 +35,10 @@ class _FakeSession:
                 return q
 
             q.filter_by.side_effect = _filter_by
-            q.order_by.return_value.limit.return_value.all.return_value = list(
-                reversed(self._chat)
-            )
+            q.filter.return_value = q
+            ordered = q.order_by.return_value
+            ordered.limit.return_value.all.return_value = list(reversed(self._chat))
+            ordered.all.return_value = []
             return q
         if name == "UserMemory":
             q.filter_by.return_value.all.return_value = self._warm

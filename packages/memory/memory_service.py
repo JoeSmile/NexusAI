@@ -4,7 +4,7 @@ Pipeline / agent / ``/memory`` 管理 API 的唯一入口：``write()`` / ``read
 ``assemble_prompt_block()`` 以及 warm 管理方法。
 
 分层职责（不合并）:
-- hot  → ``chat_messages``（全量对话，不可删）
+- hot  → ``chat_messages`` 未归档行（``archived_at IS NULL``；超窗打标，不删）
 - warm → ``user_memories``（画像 / 偏好 kv）
 - cold → ``cold_memories``（会话摘要）
 """
@@ -544,6 +544,10 @@ class UnifiedMemoryService:
                         client_message_id=(assistant_client_message_id or None),
                     )
                 )
+            session.flush()
+            self._archive_overflow_in_session(
+                session, user_id=user_id, session_id=session_id
+            )
             session.commit()
         self._invalidate_mem_bundle(user_id)
         return {
@@ -553,6 +557,39 @@ class UnifiedMemoryService:
             "wrote_user": bool(user_message),
             "wrote_assistant": bool(assistant_message),
         }
+
+    def _archive_overflow_in_session(
+        self, session, *, user_id: str, session_id: str
+    ) -> None:
+        from packages.memory.turn_archive import (
+            archive_window_limits,
+            select_turn_ids_to_archive,
+        )
+
+        max_turns, budget = archive_window_limits()
+        live = (
+            session.query(ChatMessage)
+            .filter_by(
+                tenant_id=self.tenant_id,
+                user_id=user_id,
+                session_id=session_id,
+            )
+            .filter(ChatMessage.archived_at.is_(None))
+            .order_by(ChatMessage.created_at.asc(), ChatMessage.id.asc())
+            .all()
+        )
+        ids = select_turn_ids_to_archive(
+            [(int(r.id), str(r.content or "")) for r in live],
+            max_turns=max_turns,
+            budget_tokens=budget,
+        )
+        if not ids:
+            return
+        now = datetime.utcnow()
+        session.query(ChatMessage).filter(ChatMessage.id.in_(ids)).update(
+            {ChatMessage.archived_at: now},
+            synchronize_session=False,
+        )
 
     def count_session_messages(
         self, *, user_id: str, session_id: str, role: str | None = None
@@ -791,8 +828,11 @@ class UnifiedMemoryService:
             )
             if session_id:
                 q = q.filter_by(session_id=session_id)
+            q = q.filter(ChatMessage.archived_at.is_(None))
             recent = (
-                q.order_by(ChatMessage.created_at.desc()).limit(hot_limit).all()
+                q.order_by(ChatMessage.created_at.desc(), ChatMessage.id.desc())
+                .limit(hot_limit)
+                .all()
             )
             hot = [
                 {"role": r.role, "content": r.content}
