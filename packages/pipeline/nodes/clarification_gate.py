@@ -19,6 +19,8 @@ from packages.plan.clarification import (
 
 @observe(name="pipeline.clarification_gate")
 async def clarification_gate(state: PipelineState) -> PipelineState:
+    # Task 80.3: funnel L2 already skipped when session_has_pending_clarification.
+    # 「好的 / 是的」 must resolve here, not be treated as greeting / new topic.
     state.setdefault("pending_clarification", False)  # type: ignore[typeddict-item]
     state.setdefault("clarification", None)  # type: ignore[typeddict-item]
     state.setdefault("clarification_resolved", False)  # type: ignore[typeddict-item]

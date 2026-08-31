@@ -53,6 +53,12 @@ def should_run_l2(
     belief: dict[str, Any] | None,
     hint_new_topic: bool,
 ) -> bool:
+    """L2 only when there is no live clarification pending (Task 80.3 / 77).
+
+    ``should_run_l2`` must be false when ``session_has_pending_clarification``.
+    Follow-ups like 「好的 / 是的」 then reach ``clarification_gate`` resolve,
+    not greeting / new-topic.
+    """
     if session_has_pending_clarification(state):
         return False
     if belief and str(belief.get("status") or "").upper() == "ACTIVE":

@@ -15,9 +15,11 @@ from packages.pipeline.nodes.clarification_gate import (
 from packages.pipeline.state import make_initial_state
 from packages.plan.clarification import (
     CLARIFY_CONFIDENCE_MAX,
+    PENDING_TTL_S,
     ClarificationPayload,
     evaluate_clarification_triggers,
     get_pending,
+    session_has_pending_clarification,
     store_pending,
     try_resolve_pending,
     warm_pending_key,
@@ -269,3 +271,38 @@ async def test_abandon_after_two_required_slots_reholds(monkeypatch):
         or a.get("action") == "clarification_abandoned"
         for a in audits
     )
+
+
+def test_session_has_pending_clarification_true_when_warm_unexpired():
+    state = make_initial_state("t1", "u1", "s1", "好的")
+    _seed_warm(
+        state,
+        ClarificationPayload(
+            source="missing_entities",
+            question="哪家银行？",
+            options=["汇丰"],
+            created_at=time.time(),
+            original_query="查流水",
+        ),
+    )
+    assert session_has_pending_clarification(state) is True
+
+
+def test_session_has_pending_clarification_false_when_expired():
+    state = make_initial_state("t1", "u1", "s1", "好的")
+    _seed_warm(
+        state,
+        ClarificationPayload(
+            source="missing_entities",
+            question="哪家银行？",
+            options=["汇丰"],
+            created_at=time.time() - PENDING_TTL_S - 1,
+            original_query="查流水",
+        ),
+    )
+    assert session_has_pending_clarification(state) is False
+
+
+def test_session_has_pending_clarification_false_when_empty():
+    state = make_initial_state("t1", "u1", "s1", "好的")
+    assert session_has_pending_clarification(state) is False
