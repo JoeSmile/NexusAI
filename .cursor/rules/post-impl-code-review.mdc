@@ -1,26 +1,28 @@
 ---
-description: After implementation, run code review; Important needs user OK, rest auto-fix
+description: After every slice, code review; auto-fix Critical and Minor; Important waits
 alwaysApply: true
 ---
 
 # Post-implementation code review workflow
 
-After finishing a batch, feature, or non-trivial change set — **before** asking the user “下一步” or starting the next batch — run a code review on the diff.
+After **every task slice** (not only Wave Done) — **before** telling the user “下一步” or starting the next slice — run a code review on that slice’s diff.
 
 ## Sequence
 
-1. **Implement** against the batch/task plan.
-2. **Verify** with the plan’s verification commands (imports, unit checks, smoke).
-3. **Code review** the commit/diff (Standards + Spec when a plan exists; otherwise quality + security).
-4. **Triage findings** by severity:
-   - **Critical** — fix immediately (security, data loss, broken auth, wrong tenant isolation).
-   - **Important** — **do not auto-fix**. Present a short审核 list (what / why / options) and wait for the user’s decision.
-   - **Minor / nits / smells** — fix directly in the same session; no need to ask.
-5. After user decides on Important items, apply the chosen fixes, re-verify, then proceed (commit only if the user asked or the batch plan’s commit step is in progress).
+1. **Implement** against the slice/task plan.
+2. **Verify** with the plan’s verification commands.
+3. **Code review** the slice diff (Standards + Spec when a plan exists; otherwise quality + security). Do not skip because the slice is small.
+4. **Triage and act:**
+   - **Critical** — fix immediately (security, data loss, broken auth, wrong tenant isolation), then re-verify.
+   - **Minor / nits / smells** — fix in the same session; do not ask.
+   - **Important** — **do not auto-fix**. Present the 审核 list and wait.
+5. After Important decisions, apply, re-verify. Commit only if the user asked or the slice plan’s commit step is in progress.
+
+Present a short 审核 conclusion even when Important is empty (Critical/Minor already applied).
 
 ## Important 审核 format
 
-For each Important item, report:
+For each Important item:
 
 - **Finding** — one line
 - **Why it matters**
@@ -30,6 +32,6 @@ Do not bury Important items inside a long review dump.
 
 ## Do not
 
-- Skip review because “it’s a small batch”
+- Skip review because “it’s a small slice”
 - Auto-apply Important policy choices (role model, cross-tenant scope, signature gates, etc.)
-- Start the next batch while Important items are still unanswered
+- Start the next slice while Important items are still unanswered

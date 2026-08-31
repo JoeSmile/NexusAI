@@ -19,7 +19,7 @@ alwaysApply: true
 ## Loop 循环
 
 ```
-读任务切片 → 写代码 → 跑验证命令 → 绿? → 下一个切片
+读任务切片 → 写代码 → 跑验证命令 → 绿? → code review → 改 Critical/Minor → 有 Important? 停
                           └─ 红 → 修复(最多 3 轮) → 再跑
                                      └─ 3 轮还红 → 停下汇报
 ```
@@ -42,7 +42,7 @@ alwaysApply: true
 - 已拍板（「规则（写死）」/「非目标」）→ 严格执行，不重开讨论。
 - Done 标准**全部勾选**才算完成；缺一条 = 未完成，不许提前交付。
 - Commit：验证绿可前进；**实际 commit 仅 Wave Done 或用户明示**；Conventional + `Signed-off-by: Joe`。
-- Code review：auth/安全 Important 立即停；风格类 Important 可攒到 Wave Done。
+- Code review：**每个切片**验证绿后立刻做；Critical / Minor 当场改；Important 停下来问。禁止跳过。
 
 ## NexusAI 特化红线
 
