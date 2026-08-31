@@ -120,6 +120,18 @@ class MemoryAttachmentStore:
             return
         row["status"] = "parsing"
 
+    def list_expired(self, *, now: datetime) -> list[dict[str, Any]]:
+        from packages.attachments.notice import row_is_live
+
+        return [
+            dict(row)
+            for row in self.items.values()
+            if not row_is_live(row, now=now)
+        ]
+
+    def delete(self, *, attachment_id: str) -> dict[str, Any] | None:
+        return self.items.pop(attachment_id, None)
+
 
 class PgAttachmentStore:
     def save(
@@ -293,6 +305,27 @@ class PgAttachmentStore:
             else:
                 row.status = "parsing"
             session.commit()
+
+    def list_expired(self, *, now: datetime) -> list[dict[str, Any]]:
+        from packages.database.pgvector_session import Attachment, get_pg_session
+
+        sf = get_pg_session()
+        with sf.Session() as session:
+            rows = session.query(Attachment).filter(Attachment.expired_at <= now).all()
+            return [_attachment_row(r) for r in rows]
+
+    def delete(self, *, attachment_id: str) -> dict[str, Any] | None:
+        from packages.database.pgvector_session import Attachment, get_pg_session
+
+        sf = get_pg_session()
+        with sf.Session() as session:
+            row = session.query(Attachment).filter(Attachment.id == attachment_id).first()
+            if row is None:
+                return None
+            payload = _attachment_row(row)
+            session.delete(row)
+            session.commit()
+            return payload
 
 
 def _attachment_row(row: Any) -> dict[str, Any]:

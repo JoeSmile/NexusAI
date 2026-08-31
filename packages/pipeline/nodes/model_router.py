@@ -8,9 +8,9 @@ from packages.llm_credentials import resolve_tenant_credential
 from packages.model_registry import get_model, select_model_for_intent
 from packages.observability.decorators import enrich_span, observe
 from packages.observability.sampling import set_tracing_enabled, should_sample
-from packages.skills.registry import registry
 from packages.pipeline.intent_path import resolve_short_path_skill, skill_to_state
 from packages.pipeline.state import PipelineState
+from packages.skills.registry import registry
 
 
 def _maybe_disable_short_path_trace(finish_reason: str) -> None:
@@ -33,7 +33,7 @@ async def model_router(state: PipelineState) -> PipelineState:
     skill = resolve_short_path_skill(state)
     state["short_path_skill"] = skill_to_state(skill)
 
-    if confidence >= 0.85 and skill is not None:
+    if confidence >= 0.85 and skill is not None and not state.get("file_blocks"):
         try:
             result = await registry.execute_skill(
                 skill_id=skill.id,

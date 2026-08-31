@@ -12,13 +12,13 @@ from packages.memory.memory_service import (
     MemoryBundle,
     get_unified_memory_service,
 )
+from packages.observability.decorators import enrich_span, observe
+from packages.pipeline.context_messages import resolved_query
+from packages.pipeline.state import PipelineState
 from packages.plan.retrieval_mode import (
     choose_retrieval_mode,
     token_budget_warning,
 )
-from packages.observability.decorators import enrich_span, observe
-from packages.pipeline.context_messages import resolved_query
-from packages.pipeline.state import PipelineState
 
 
 @observe(name="pipeline.build_context")
@@ -100,4 +100,7 @@ async def build_context(state: PipelineState) -> PipelineState:
             "retrieval_mode": retrieval_mode,
         },
     )
+    from packages.attachments.inject import inject_session_attachments
+
+    inject_session_attachments(state)
     return state

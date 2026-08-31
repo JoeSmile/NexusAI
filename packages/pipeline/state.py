@@ -117,6 +117,9 @@ class PipelineState(TypedDict):
     slot_values: dict[str, Any]
     agent_instances: list[dict[str, Any]]
     seen_fact_ids: list[str]
+    # Task 76 — session attachment injection
+    attachment_ids: list[str]
+    file_blocks: list[dict]
 
 
 def make_initial_state(
@@ -216,4 +219,6 @@ def make_initial_state(
         "slot_values": {},
         "agent_instances": [],
         "seen_fact_ids": [],
+        "attachment_ids": [],
+        "file_blocks": [],
     }

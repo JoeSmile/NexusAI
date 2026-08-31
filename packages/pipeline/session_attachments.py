@@ -1,4 +1,4 @@
-"""Session attachment readiness — Task 76.0 stub; slice 1 replaces with a real SELECT."""
+"""Session attachment readiness — real attachments table (Task 76.3)."""
 
 from __future__ import annotations
 
@@ -8,9 +8,15 @@ def session_has_ready_attachments(
     user_id: str,
     session_id: str,
 ) -> bool:
-    """Unexpired status=ready attachments on this session.
+    """Unexpired status=ready attachments on this session."""
+    del user_id
+    from packages.attachments.notice import row_is_live
+    from packages.attachments.store import get_attachment_store
 
-    Slice 0 default: False. Tests monkeypatch. Slice 3 wires the attachments table.
-    """
-    del tenant_id, user_id, session_id
-    return False
+    try:
+        rows = get_attachment_store().list_session(
+            tenant_id=tenant_id, session_id=session_id
+        )
+    except Exception:
+        return False
+    return any(r.get("status") == "ready" and row_is_live(r) for r in rows)

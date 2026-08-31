@@ -96,6 +96,14 @@ async def lifespan(app: FastAPI):
         logger.debug("schedule scanner skipped: %s", e)
 
     try:
+        from packages.attachments.ttl import start_attachment_ttl_scanner
+
+        start_attachment_ttl_scanner()
+        logger.info("✓ attachment TTL scanner 已启动")
+    except Exception as e:
+        logger.debug("attachment TTL scanner skipped: %s", e)
+
+    try:
         from packages.key_manager import KeyManager
 
         KeyManager()
@@ -221,8 +229,8 @@ def _lazy_include(
 
 def create_app() -> FastAPI:
     """创建并配置 FastAPI 应用实例。"""
-    from packages.production_guard import assert_production_security
     from packages.auth.jwt_session import assert_jwt_secret_strength
+    from packages.production_guard import assert_production_security
 
     assert_jwt_secret_strength()
     from packages.security.audit_crypto import assert_audit_encryption_config
@@ -271,9 +279,9 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    from packages.auth.signature_auth import SignatureMiddleware
     from packages.metrics import MetricsMiddleware
     from packages.tenant import TenantMiddleware
-    from packages.auth.signature_auth import SignatureMiddleware
 
     app.add_middleware(SignatureMiddleware)
     app.add_middleware(MetricsMiddleware)

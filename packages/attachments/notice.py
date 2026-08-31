@@ -7,13 +7,20 @@ from datetime import UTC, datetime
 PARSING_USER_MESSAGE = "文件正在解析，请稍后再问。"
 
 
-def _alive(row: dict) -> bool:
+def row_is_live(row: dict, *, now: datetime | None = None) -> bool:
     exp = row.get("expired_at")
     if exp is None:
         return True
     if getattr(exp, "tzinfo", None) is None:
         exp = exp.replace(tzinfo=UTC)
-    return exp > datetime.now(UTC)
+    stamp = now or datetime.now(UTC)
+    if stamp.tzinfo is None:
+        stamp = stamp.replace(tzinfo=UTC)
+    return exp > stamp
+
+
+def _alive(row: dict) -> bool:
+    return row_is_live(row)
 
 
 def parsing_notice_for_session(*, tenant_id: str, session_id: str) -> str | None:
