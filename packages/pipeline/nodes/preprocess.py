@@ -7,10 +7,12 @@ import os
 
 from packages.guardrails.deny_list import deny_list_hit
 from packages.metrics import guardrails_blocked
+from packages.observability.decorators import observe
+from packages.pipeline.followup_lexicon import is_followup_utterance
+from packages.pipeline.session_attachments import session_has_ready_attachments
+from packages.pipeline.state import PipelineState
 from packages.rate_limiter import check_rate_limit
 from packages.text_normalize import make_normalized_query_hash, normalize_text
-from packages.observability.decorators import observe
-from packages.pipeline.state import PipelineState
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +91,16 @@ async def preprocess(state: PipelineState) -> PipelineState:
     normalized = normalize_text(raw)
     query_hash = make_normalized_query_hash(raw)
     state["query_hash"] = query_hash
-    state["cache_bypass"] = should_cache_bypass(normalized)
+    # 内容工厂启发式 OR 跟句词表 OR 本 session 未过期 ready 附件（76.0）
+    state["cache_bypass"] = (
+        should_cache_bypass(normalized)
+        or is_followup_utterance(normalized)
+        or session_has_ready_attachments(
+            state["tenant_id"],
+            state["user_id"],
+            state["session_id"],
+        )
+    )
 
     enabled = _env_bool("PIPELINE_PREPROCESS_ENABLED", True)
     if not enabled:
