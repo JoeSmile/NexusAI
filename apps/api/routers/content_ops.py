@@ -9,6 +9,8 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 
 from packages.audit import write_audit_sync
+from packages.auth.dual_auth import verify_human_or_legacy_key
+from packages.auth.models import TenantContext
 from packages.content_ops.dig_persist import persist_dig_result
 from packages.content_ops.hotspot import HotspotCrawlError, dig_hotspots
 from packages.content_ops.offerings import get_offering, list_offerings
@@ -23,10 +25,8 @@ from packages.content_ops.style import (
     upsert_content_style,
 )
 from packages.content_ops.workflow_seed import ensure_builtin_hotspot_workflow
-from packages.rate_limiter import check_endpoint_rate_limit
 from packages.database.pgvector_session import ContentArtifact, get_pg_session
-from packages.auth.dual_auth import verify_human_or_legacy_key
-from packages.auth.models import TenantContext
+from packages.rate_limiter import check_endpoint_rate_limit
 
 router = APIRouter(tags=["content-ops"])
 
@@ -316,6 +316,7 @@ async def api_dig_hotspots(
                 region=body.region,
                 use_org_profile=body.use_org_profile,
                 user_note=body.user_note,
+                tenant_id=tenant.tenant_id,
             )
         except HotspotCrawlError as e:
             raise HTTPException(

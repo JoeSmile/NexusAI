@@ -6,7 +6,6 @@ import json
 from collections.abc import AsyncIterator
 from typing import Any
 
-from packages.database.pgvector_session import get_pg_session
 from packages.auth.models import TenantContext
 from packages.capability.models import CapabilitySpec
 from packages.content_ops.hotspot import HotspotCrawlError, dig_hotspots
@@ -15,6 +14,7 @@ from packages.content_ops.style import (
     get_org_content_profile,
     resolve_style_for_generate,
 )
+from packages.database.pgvector_session import get_pg_session
 
 
 def _payload_list(payload: dict[str, Any], key: str) -> list[Any]:
@@ -57,6 +57,7 @@ async def invoke_content_ops(
                     region=payload.get("region"),
                     use_org_profile=bool(payload.get("use_org_profile", True)),
                     user_note=payload.get("user_note"),
+                    tenant_id=tid,
                 )
             except HotspotCrawlError as e:
                 yield {

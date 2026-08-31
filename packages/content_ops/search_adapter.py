@@ -51,6 +51,13 @@ class SearchRequest:
     query: str
     recency: Recency = "one_week"
     count: int = 10
+    tenant_id: str = ""
+
+
+class SearchAdapterError(RuntimeError):
+    def __init__(self, message: str, *, status: int | None = None) -> None:
+        super().__init__(message)
+        self.status = status
 
 
 class SearchAdapter(Protocol):
@@ -207,12 +214,21 @@ class DoubaoSearchAdapter:
             "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
         }
-        resp = requests.post(
-            DOUBAO_SEARCH_URL, headers=headers, json=payload, timeout=20
-        )
-        resp.raise_for_status()
+        try:
+            resp = requests.post(
+                DOUBAO_SEARCH_URL, headers=headers, json=payload, timeout=20
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        except requests.Timeout as e:
+            raise SearchAdapterError("timeout", status=408) from e
+        except requests.HTTPError as e:
+            status = int(getattr(e.response, "status_code", 0) or 0)
+            raise SearchAdapterError(f"http_{status}", status=status) from e
+        except requests.RequestException as e:
+            raise SearchAdapterError("request_failed", status=None) from e
         rows: list[SearchResult] = []
-        for item in _doubao_result_rows(resp.json()):
+        for item in _doubao_result_rows(data):
             title = str(item.get("Title") or item.get("title") or "").strip()
             url = str(item.get("Url") or item.get("url") or "").strip()
             snippet = str(
@@ -233,9 +249,78 @@ class DoubaoSearchAdapter:
         return rows
 
 
+ZHIPU_SEARCH_URL = "https://open.bigmodel.cn/api/paas/v4/web_search"
+
+
+class ZhipuSearchAdapter:
+    """Zhipu Web Search HTTP — official ``search_recency_filter``, not ``time_range``."""
+
+    name = "zhipu"
+
+    def search(self, req: SearchRequest) -> list[SearchResult]:
+        key = (os.getenv("SEARCH_BACKUP_API_KEY") or "").strip()
+        if not key:
+            return []
+        query = (req.query or "").strip()[:70]
+        if not query:
+            return []
+        count = max(1, min(int(req.count or 10), 50))
+        payload: dict[str, Any] = {
+            "search_query": query,
+            "search_engine": "search_std",
+            "search_intent": False,
+            "count": count,
+            "search_recency_filter": recency_to_zhipu(req.recency),
+        }
+        headers = {
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+        }
+        try:
+            resp = requests.post(
+                ZHIPU_SEARCH_URL, headers=headers, json=payload, timeout=20
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        except requests.Timeout as e:
+            raise SearchAdapterError("timeout", status=408) from e
+        except requests.HTTPError as e:
+            status = int(getattr(e.response, "status_code", 0) or 0)
+            raise SearchAdapterError(f"http_{status}", status=status) from e
+        except requests.RequestException as e:
+            raise SearchAdapterError("request_failed", status=None) from e
+        raw = data.get("search_result") if isinstance(data, dict) else None
+        rows: list[SearchResult] = []
+        for item in raw or []:
+            if not isinstance(item, dict):
+                continue
+            title = str(item.get("title") or "").strip()
+            url = str(item.get("link") or item.get("url") or "").strip()
+            snippet = str(item.get("content") or item.get("snippet") or "").strip()
+            if not title and not url:
+                continue
+            pub = item.get("publish_date")
+            rows.append(
+                {
+                    "title": title or url,
+                    "url": url,
+                    "snippet": snippet,
+                    "publish_date": str(pub) if pub else None,
+                    "source": self.name,
+                }
+            )
+        return rows
+
+
 def get_search_adapters() -> tuple[SearchAdapter, SearchAdapter]:
     provider = (os.getenv("SEARCH_PROVIDER") or "mock").strip().lower()
-    backup: SearchAdapter = MockSearchAdapter("mock_zhipu")
+    backup: SearchAdapter = (
+        ZhipuSearchAdapter()
+        if (os.getenv("SEARCH_BACKUP_API_KEY") or "").strip()
+        else MockSearchAdapter("mock_zhipu")
+    )
     if provider == "doubao":
         return DoubaoSearchAdapter(), backup
+    if provider == "zhipu":
+        return ZhipuSearchAdapter(), MockSearchAdapter("mock_doubao")
     return MockSearchAdapter("mock_doubao"), backup

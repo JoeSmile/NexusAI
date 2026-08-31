@@ -395,6 +395,7 @@ def _topic_agent_items(
     exclude_keywords: str | None,
     region: str | None,
     user_note: str | None = None,
+    tenant_id: str = "",
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Crawl Tier-1/2 hubs (5×5) then dedupe. Empty crawl = fail (no seed fallback).
 
@@ -461,25 +462,34 @@ def _topic_agent_items(
                 get_search_adapters,
                 search_hits_to_hotspots,
             )
+            from packages.content_ops.search_failover import search_with_failover
 
-            primary, _backup = get_search_adapters()
-            hits = primary.search(
-                SearchRequest(query=keywords[:100], recency="one_week", count=10)
+            primary, backup = get_search_adapters()
+            outcome = search_with_failover(
+                primary,
+                backup,
+                SearchRequest(
+                    query=keywords[:100],
+                    recency="one_week",
+                    count=10,
+                    tenant_id=tenant_id or "",
+                ),
             )
-            extra = search_hits_to_hotspots(hits)
+            extra = search_hits_to_hotspots(outcome.hits)
             extra = _filter_items(
                 extra,
                 categories=None,
                 keywords=None,
                 exclude_keywords=exclude_keywords,
             )
+            crawl_meta = {
+                **crawl_meta,
+                "search_merged": len(extra),
+                "search_provider": outcome.provider,
+                "search_degrade": outcome.degrade_code,
+            }
             if extra:
                 filtered, _new, _skip = merge_hotspot_pool(filtered, extra)
-                crawl_meta = {
-                    **crawl_meta,
-                    "search_merged": len(extra),
-                    "search_provider": getattr(primary, "name", ""),
-                }
         except Exception:
             logger.debug("hotspot paid search merge skipped", exc_info=True)
     return _rank_items_by_note(filtered, user_note), crawl_meta
@@ -698,6 +708,7 @@ def dig_hotspots(
     region: str | None = None,
     use_org_profile: bool = True,
     user_note: str | None = None,
+    tenant_id: str = "",
 ) -> dict[str, Any]:
     """Return hotspot list + content_hash. Manual trigger only (no cron)."""
     org_profile = dict(org_profile or {}) if use_org_profile else {}
@@ -753,6 +764,7 @@ def dig_hotspots(
             exclude_keywords=exclude_keywords,
             region=region,
             user_note=note,
+            tenant_id=tenant_id,
         )
 
     # 5 源 × 5 条去重后通常 ≤25
@@ -798,6 +810,7 @@ def dig_hotspots(
         else {},
         "provenance_note": provenance,
         "crawl": crawl_meta,
+        "search_degrade": (crawl_meta or {}).get("search_degrade"),
     }
     return {
         "adapter": adapter_l,
@@ -805,6 +818,7 @@ def dig_hotspots(
         "content_hash": content_hash(items),
         "count": len(items),
         "dig_evidence": dig_evidence,
+        "search_degrade": (crawl_meta or {}).get("search_degrade"),
     }
 
 
