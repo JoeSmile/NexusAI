@@ -220,6 +220,15 @@ async def run_funnel(
 
     if decision is None:
         decision = rule_decide(message, belief)
+    if decision["is_new_topic"] and belief:
+        from packages.intent.belief_archive import archive_ended_belief
+
+        await archive_ended_belief(
+            tenant_id=state["tenant_id"],
+            user_id=state["user_id"],
+            session_id=state["session_id"],
+            belief=belief,
+        )
     _apply_decision(state, belief=belief, decision=decision, message=message)
     return state
 
