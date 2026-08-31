@@ -18,6 +18,8 @@ CLARIFY_CONFIDENCE_MAX = 0.4
 PENDING_TTL_S = 60
 _HIGH_RISK_LEVELS = frozenset({"high", "critical"})
 WARM_KEY_PREFIX = "clarify_pending:"
+WARM_ATTEMPTS_PREFIX = "clarify_attempts:"
+ABANDON_AFTER = 2
 
 
 @dataclass
@@ -42,6 +44,55 @@ class ClarificationPayload:
 
 def warm_pending_key(session_id: str) -> str:
     return f"{WARM_KEY_PREFIX}{session_id or 'default'}"
+
+
+def warm_attempts_key(session_id: str) -> str:
+    return f"{WARM_ATTEMPTS_PREFIX}{session_id or 'default'}"
+
+
+def get_clarification_attempts(state: dict[str, Any]) -> int:
+    raw = (state.get("warm_memory") or {}).get(
+        warm_attempts_key(str(state.get("session_id") or "default"))
+    )
+    try:
+        return max(0, int(raw or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def set_clarification_attempts(state: dict[str, Any], n: int) -> int:
+    n = max(0, int(n))
+    key = warm_attempts_key(str(state.get("session_id") or "default"))
+    warm = dict(state.get("warm_memory") or {})
+    if n <= 0:
+        warm.pop(key, None)
+    else:
+        warm[key] = str(n)
+    state["warm_memory"] = warm
+    state["clarification_attempts"] = n
+    return n
+
+
+async def persist_clarification_attempts(state: dict[str, Any]) -> None:
+    tenant_id = str(state.get("tenant_id") or "")
+    user_id = str(state.get("user_id") or "")
+    session_id = str(state.get("session_id") or "default")
+    key = warm_attempts_key(session_id)
+    n = get_clarification_attempts(state)
+    if n <= 0:
+        return
+    from packages.memory.memory_service import get_unified_memory_service
+
+    mem = get_unified_memory_service(tenant_id=tenant_id)
+    await mem.write(
+        "warm",
+        user_id=user_id,
+        key=key,
+        value=str(n),
+        confidence=1.0,
+        source="clarification",
+        embed=False,
+    )
 
 
 def _parse_pending_value(raw: str) -> dict[str, Any] | None:
@@ -148,7 +199,9 @@ async def store_pending(state: dict[str, Any], payload: ClarificationPayload) ->
     state["warm_memory"] = warm
 
 
-async def clear_pending(state: dict[str, Any]) -> None:
+async def clear_pending(
+    state: dict[str, Any], *, reset_attempts: bool = True
+) -> None:
     tenant_id = str(state.get("tenant_id") or "")
     user_id = str(state.get("user_id") or "")
     session_id = str(state.get("session_id") or "default")
@@ -161,8 +214,18 @@ async def clear_pending(state: dict[str, Any]) -> None:
     except Exception:
         logger.warning("clear clarification pending failed key=%s", key, exc_info=True)
 
+    if reset_attempts:
+        ak = warm_attempts_key(session_id)
+        try:
+            delete_user_memory(tenant_id, user_id, ak)
+        except Exception:
+            logger.debug("clear clarification attempts failed key=%s", ak, exc_info=True)
+
     warm = dict(state.get("warm_memory") or {})
     warm.pop(key, None)
+    if reset_attempts:
+        warm.pop(warm_attempts_key(session_id), None)
+        state["clarification_attempts"] = 0
     state["warm_memory"] = warm
 
 
@@ -310,6 +373,7 @@ async def try_resolve_pending(state: dict[str, Any]) -> bool:
 
     original = str(pending.get("original_query") or "").strip()
     merged = f"{original}（补充：{answer}）" if original else answer
+    state["clarification_latest_answer"] = answer
     state["message"] = merged
     state["raw_input"] = merged
     state["query_rewrite"] = {
@@ -323,7 +387,7 @@ async def try_resolve_pending(state: dict[str, Any]) -> bool:
     state["clarification"] = None
     state["task_plan"] = None
 
-    await clear_pending(state)
+    await clear_pending(state, reset_attempts=False)
     audit_clarification_event(
         tenant_id=str(state.get("tenant_id") or ""),
         user_id=str(state.get("user_id") or ""),
@@ -336,6 +400,37 @@ async def try_resolve_pending(state: dict[str, Any]) -> bool:
         },
     )
     return True
+
+
+async def abandon_clarification(
+    state: dict[str, Any], *, reason: str = "rehold"
+) -> dict[str, Any]:
+    """Drop pending after repeated re-holds; continue with the latest user text."""
+    latest = str(
+        state.get("clarification_latest_answer")
+        or state.get("raw_input")
+        or state.get("message")
+        or ""
+    ).strip()
+    if "（补充：" in latest:
+        # Prefer the un-merged answer stored before merge when present.
+        latest = str(state.get("clarification_latest_answer") or latest)
+    state["message"] = latest
+    state["raw_input"] = latest
+    state["pending_clarification"] = False
+    state["clarification"] = None
+    state["clarification_resolved"] = False
+    state["finish_reason"] = ""
+    state["task_plan"] = None
+    await clear_pending(state, reset_attempts=True)
+    audit_clarification_event(
+        tenant_id=str(state.get("tenant_id") or ""),
+        user_id=str(state.get("user_id") or ""),
+        trace_id=str(state.get("trace_id") or ""),
+        event="abandoned",
+        payload={"reason": reason},
+    )
+    return state
 
 
 def audit_clarification_event(

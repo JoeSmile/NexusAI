@@ -8,6 +8,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from packages.pipeline.nodes.clarification_gate import (
+    clarification_gate,
+    route_after_clarification,
+)
+from packages.pipeline.state import make_initial_state
 from packages.plan.clarification import (
     CLARIFY_CONFIDENCE_MAX,
     ClarificationPayload,
@@ -17,11 +22,6 @@ from packages.plan.clarification import (
     try_resolve_pending,
     warm_pending_key,
 )
-from packages.pipeline.nodes.clarification_gate import (
-    clarification_gate,
-    route_after_clarification,
-)
-from packages.pipeline.state import make_initial_state
 
 
 def _seed_warm(state: dict, payload: ClarificationPayload) -> None:
@@ -233,3 +233,39 @@ async def test_fetch_pending_from_db_when_warm_empty(monkeypatch):
     assert pending is not None
     assert pending["trace_id"] == "tr_db"
     assert warm_pending_key("s1") in state["warm_memory"]
+
+
+@pytest.mark.asyncio
+async def test_abandon_after_two_required_slots_reholds(monkeypatch):
+    audits: list[dict] = []
+    monkeypatch.setattr(
+        "packages.plan.clarification.write_audit_sync",
+        lambda rec: audits.append(dict(rec)) or True,
+    )
+    first = make_initial_state("t1", "u1", "s1", "介绍一下")
+    first["agent_type_id"] = "pre_sales_agent"
+    first["slot_values"] = {}
+    held = await clarification_gate(first)
+    assert held["finish_reason"] == "clarification_pending"
+
+    second = make_initial_state("t1", "u1", "s1", "随便说说")
+    second["agent_type_id"] = "pre_sales_agent"
+    second["slot_values"] = {}
+    second["warm_memory"] = dict(held.get("warm_memory") or {})
+    rehold = await clarification_gate(second)
+    assert rehold["finish_reason"] == "clarification_pending"
+
+    third = make_initial_state("t1", "u1", "s1", "今天天气")
+    third["agent_type_id"] = "pre_sales_agent"
+    third["slot_values"] = {}
+    third["warm_memory"] = dict(rehold.get("warm_memory") or {})
+    out = await clarification_gate(third)
+    assert out["finish_reason"] != "clarification_pending"
+    assert out["message"] == "今天天气"
+    assert out.get("pending_clarification") is False
+    assert route_after_clarification(out) == "continue"
+    assert any(
+        "abandoned" in (a.get("output_text") or "")
+        or a.get("action") == "clarification_abandoned"
+        for a in audits
+    )
