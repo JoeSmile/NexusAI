@@ -33,7 +33,12 @@ async def model_router(state: PipelineState) -> PipelineState:
     skill = resolve_short_path_skill(state)
     state["short_path_skill"] = skill_to_state(skill)
 
-    if confidence >= 0.85 and skill is not None and not state.get("file_blocks"):
+    if (
+        confidence >= 0.85
+        and skill is not None
+        and not state.get("file_blocks")
+        and not state.get("funnel_block_short_path")
+    ):
         try:
             result = await registry.execute_skill(
                 skill_id=skill.id,

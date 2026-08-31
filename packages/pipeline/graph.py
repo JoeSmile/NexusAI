@@ -21,6 +21,7 @@ from packages.pipeline.nodes.guardrails_input import (
     should_block_to_end,
 )
 from packages.pipeline.nodes.guardrails_output import guardrails_output
+from packages.pipeline.nodes.intent_funnel import intent_funnel
 from packages.pipeline.nodes.llm_generate import llm_generate
 from packages.pipeline.nodes.load_memory import load_memory
 from packages.pipeline.nodes.model_router import model_router, route_short_or_long
@@ -84,6 +85,7 @@ def build_pipeline():
     builder.add_node("cache_check", _lf_node("cache_check", cache_check))
     builder.add_node("guardrails_input", _lf_node("guardrails_input", guardrails_input))
     builder.add_node("load_memory", _lf_node("load_memory", load_memory))
+    builder.add_node("intent_funnel", _lf_node("intent_funnel", intent_funnel))
     builder.add_node("analyze_parallel", _lf_node("analyze_parallel", analyze_parallel))
     # Node name ≠ state key `task_plan` (official LangGraph forbids collision)
     builder.add_node("task_planning", _lf_node("task_planning", task_plan))
@@ -129,7 +131,8 @@ def build_pipeline():
             "continue": "load_memory",
         },
     )
-    builder.add_edge("load_memory", "analyze_parallel")
+    builder.add_edge("load_memory", "intent_funnel")
+    builder.add_edge("intent_funnel", "analyze_parallel")
     builder.add_edge("analyze_parallel", "task_planning")
     builder.add_edge("task_planning", "clarification_gate")
     builder.add_conditional_edges(

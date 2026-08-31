@@ -205,6 +205,8 @@ async def test_task_plan_edge_preserved():
     assert '"continue": "build_context"' in src
     assert 'add_edge("auth_check", "preprocess")' in src
     assert 'continue": "load_memory"' in src
+    assert 'add_edge("load_memory", "intent_funnel")' in src
+    assert 'add_edge("intent_funnel", "analyze_parallel")' in src
 
 
 @pytest.mark.asyncio

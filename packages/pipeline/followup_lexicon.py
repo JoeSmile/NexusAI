@@ -30,6 +30,8 @@ FOLLOWUP_UTTERANCES: frozenset[str] = frozenset(
     }
 )
 
+TOPIC_SWITCH_PREFIXES: tuple[str, ...] = ("换个话题", "另外问", "新问题")
+
 _EDGE_PUNCT = re.compile(
     r"^[\s。！？!?.,，、~～…·「」『』\"'“”]+|[\s。！？!?.,，、~～…·「」『』\"'“”]+$"
 )
@@ -50,3 +52,11 @@ def canonicalize_followup(text: str) -> str:
 def is_followup_utterance(text: str) -> bool:
     """True when the whole (normalized) message is a short follow-up / deixis."""
     return canonicalize_followup(text) in FOLLOWUP_UTTERANCES
+
+
+def is_topic_switch_utterance(text: str) -> bool:
+    """True when the utterance starts a new topic (L1 hint=1, not a follow-up)."""
+    s = canonicalize_followup(text)
+    if not s:
+        return False
+    return any(s == p or s.startswith(p) for p in TOPIC_SWITCH_PREFIXES)

@@ -112,6 +112,14 @@ class PipelineState(TypedDict):
     clarification: dict | None
     clarification_resolved: bool
 
+    # ── Task 77 — topic funnel ──
+    is_new_topic: bool
+    continue_prev_task: bool
+    funnel_block_short_path: bool
+    funnel_skipped: str | None
+    funnel_l1_hint: int
+    funnel_recall: list[dict]
+
     # ── Task 62 — AgentType / slots ──
     agent_type_id: str | None
     slot_values: dict[str, Any]
@@ -215,6 +223,12 @@ def make_initial_state(
         "pending_clarification": False,
         "clarification": None,
         "clarification_resolved": False,
+        "is_new_topic": False,
+        "continue_prev_task": False,
+        "funnel_block_short_path": False,
+        "funnel_skipped": None,
+        "funnel_l1_hint": 0,
+        "funnel_recall": [],
         "agent_type_id": None,
         "slot_values": {},
         "agent_instances": [],

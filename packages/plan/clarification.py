@@ -110,6 +110,20 @@ async def get_pending(
     return row
 
 
+def session_has_pending_clarification(state: dict[str, Any]) -> bool:
+    """True when this session has a not-yet-expired clarification pending.
+
+    Task 80.3 hook / Task 77 L2 skip. Reads warm already loaded by load_memory.
+    """
+    row = _pending_from_warm(state)
+    if not row:
+        return bool(state.get("pending_clarification"))
+    created = float(row.get("created_at") or 0)
+    if created and (time.time() - created) > PENDING_TTL_S:
+        return False
+    return True
+
+
 async def store_pending(state: dict[str, Any], payload: ClarificationPayload) -> None:
     tenant_id = str(state.get("tenant_id") or "")
     user_id = str(state.get("user_id") or "")
