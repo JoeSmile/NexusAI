@@ -297,6 +297,47 @@ class CacheEntry(Base):
     expires_at = Column(DateTime, nullable=False)
 
 
+class Attachment(Base):
+    """Chat session file (Task 76) — not a RAG / embedding source."""
+
+    __tablename__ = "attachments"
+    id = Column(String(32), primary_key=True)
+    tenant_id = Column(String(50), nullable=False, index=True)
+    session_id = Column(String(100), nullable=False, index=True)
+    uploaded_by = Column(String(100), nullable=False)
+    name = Column(Text, nullable=False)
+    media_type = Column(String(120), nullable=False, default="application/octet-stream")
+    size = Column(Integer, nullable=False, default=0)
+    status = Column(String(20), nullable=False, default="parsing")
+    storage_path = Column(Text, nullable=False, default="")
+    uploaded_at = Column(DateTime, default=datetime.utcnow)
+    expired_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index("idx_attachments_tenant_session", "tenant_id", "session_id"),
+    )
+
+
+class AttachmentBlock(Base):
+    __tablename__ = "attachment_blocks"
+    id = Column(_PK, primary_key=True, autoincrement=True)
+    attachment_id = Column(
+        String(32), ForeignKey("attachments.id", ondelete="CASCADE"), nullable=False
+    )
+    tenant_id = Column(String(50), nullable=False)
+    session_id = Column(String(100), nullable=False)
+    block_index = Column(Integer, nullable=False)
+    kind = Column(String(20), nullable=False)
+    page = Column(Integer, nullable=True)
+    sheet = Column(String(200), nullable=True)
+    rows = Column(Integer, nullable=True)
+    text = Column(Text, nullable=False, default="")
+    char_count = Column(Integer, nullable=False, default=0)
+    __table_args__ = (
+        Index("idx_attachment_blocks_attachment", "attachment_id", "block_index"),
+        Index("idx_attachment_blocks_session", "tenant_id", "session_id"),
+    )
+
+
 class TenantConfig(Base):
     __tablename__ = "tenant_config"
     id = Column(Integer, primary_key=True)

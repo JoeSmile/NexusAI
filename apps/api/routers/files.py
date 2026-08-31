@@ -4,13 +4,19 @@ from __future__ import annotations
 
 import os
 import re
+import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import text
 
+from packages.attachments.errors import ParseError
+from packages.attachments.service import ingest_bytes
+from packages.attachments.store import AttachmentForbidden, get_attachment_store
+from packages.attachments.validate import ATTACHMENT_MAX_BYTES
+from packages.audit import write_audit_sync
 from packages.auth.models import TenantContext
 from packages.auth.permissions import require_permission
 from packages.database.pgvector_session import get_pg_session
@@ -50,6 +56,94 @@ def _file_cache_key(tenant_id: str, user_id: str, file_id: str) -> str:
 
 def _owned_path(tenant_id: str, user_id: str, file_id: str) -> Path:
     return UPLOAD_DIR / _safe_part(tenant_id) / _safe_part(user_id) / file_id
+
+
+@router.post("")
+async def upload_session_attachment(
+    file: UploadFile = File(...),
+    session_id: str = Form(...),
+    tenant: TenantContext = Depends(require_permission("chat:write")),
+):
+    """Chat 会话附件：解析进 attachment_blocks，不进知识库。"""
+    sid = (session_id or "").strip()
+    if not sid:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "FILE_SESSION", "message": "session_id_required"},
+        )
+    content = await file.read()
+    filename = file.filename or "upload.bin"
+    if len(content) > ATTACHMENT_MAX_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "FILE_TOO_LARGE", "message": "file_exceeds_20mb"},
+        )
+    ttl = file_acl_ttl_seconds()
+    expires = datetime.now(UTC) + timedelta(seconds=ttl)
+    aid = uuid.uuid4().hex
+    dest = _owned_path(tenant.tenant_id, tenant.user_id, aid)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(content)
+    try:
+        result = ingest_bytes(
+            tenant_id=tenant.tenant_id,
+            user_id=tenant.user_id,
+            session_id=sid,
+            filename=filename,
+            data=content,
+            storage_path=str(dest),
+            expired_at=expires,
+            attachment_id=aid,
+        )
+    except ParseError as exc:
+        dest.unlink(missing_ok=True)
+        raise HTTPException(
+            status_code=400,
+            detail={"code": exc.code, "message": exc.message},
+        ) from exc
+    result["size"] = len(content)
+    return result
+
+
+@router.get("/{attachment_id}/blocks")
+async def get_attachment_blocks(
+    attachment_id: str,
+    session_id: str,
+    tenant: TenantContext = Depends(require_permission("chat:write")),
+):
+    """仅本 tenant + 本 session 可读块。"""
+    store = get_attachment_store()
+    try:
+        row = store.get(
+            tenant_id=tenant.tenant_id,
+            session_id=(session_id or "").strip(),
+            attachment_id=attachment_id,
+        )
+    except AttachmentForbidden as exc:
+        write_audit_sync(
+            {
+                "tenant_id": tenant.tenant_id,
+                "user_id": tenant.user_id,
+                "action": "attachment_denied",
+                "trace_id": attachment_id,
+                "error_code": "AUTH_004",
+                "model": "files",
+                "input_text": exc.reason,
+                "created_at": datetime.now(UTC),
+            }
+        )
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "AUTH_004", "message": "attachment_forbidden"},
+        ) from None
+    if not row:
+        raise HTTPException(status_code=404, detail="file_not_found")
+    return {
+        "attachment_id": row["id"],
+        "status": row["status"],
+        "name": row["name"],
+        "blocks": row["blocks"],
+    }
 
 
 @router.post("/upload")
