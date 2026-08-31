@@ -215,38 +215,81 @@ def merge_hotspot_pool(
     existing: list[dict[str, Any]],
     incoming: list[dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], int, int]:
-    """Dedupe by normalize token set; keep higher score. Returns pool, new, skipped."""
+    """URL canonical first, then title token set. Keep higher score."""
+    from packages.content_ops.search_adapter import canonical_url as _canon
+
     pool: list[dict[str, Any]] = []
-    index: dict[frozenset[str], int] = {}
+    url_index: dict[str, int] = {}
+    title_index: dict[frozenset[str], int] = {}
+
+    def _url(row: dict[str, Any]) -> str:
+        return _canon(str(row.get("canonical_url") or row.get("url") or ""))
+
+    def _title_key(row: dict[str, Any]) -> frozenset[str]:
+        return normalize_title_token_set(str(row.get("title") or ""))
+
+    def _place(row: dict[str, Any]) -> None:
+        idx = len(pool)
+        pool.append(row)
+        cu = _url(row)
+        key = _title_key(row)
+        if cu:
+            url_index[cu] = idx
+        if key:
+            title_index[key] = idx
+
+    def _replace(i: int, row: dict[str, Any]) -> None:
+        old = pool[i]
+        old_cu = _url(old)
+        old_key = _title_key(old)
+        if old_cu and url_index.get(old_cu) == i:
+            del url_index[old_cu]
+        if old_key and title_index.get(old_key) == i:
+            del title_index[old_key]
+        pool[i] = row
+        cu = _url(row)
+        key = _title_key(row)
+        if cu:
+            url_index[cu] = i
+        if key:
+            title_index[key] = i
+
     for it in existing:
         row = {k: v for k, v in dict(it).items() if k != "similar_to_previous"}
-        key = normalize_title_token_set(str(row.get("title") or ""))
-        if not key:
-            pool.append(row)
-            continue
-        if key in index:
-            i = index[key]
+        cu = _url(row)
+        key = _title_key(row)
+        if cu and cu in url_index:
+            i = url_index[cu]
             if item_hot_score(row) > item_hot_score(pool[i]):
-                pool[i] = row
-        else:
-            index[key] = len(pool)
-            pool.append(row)
+                _replace(i, row)
+            continue
+        if key and key in title_index:
+            i = title_index[key]
+            if item_hot_score(row) > item_hot_score(pool[i]):
+                _replace(i, row)
+            continue
+        _place(row)
 
     new_count = 0
     skipped = 0
     for it in incoming:
         row = {k: v for k, v in dict(it).items() if k != "similar_to_previous"}
-        key = normalize_title_token_set(str(row.get("title") or ""))
-        if key and key in index:
+        cu = _url(row)
+        key = _title_key(row)
+        if cu and cu in url_index:
             skipped += 1
-            i = index[key]
+            i = url_index[cu]
             if item_hot_score(row) > item_hot_score(pool[i]):
-                pool[i] = row
+                _replace(i, row)
+            continue
+        if key and key in title_index:
+            skipped += 1
+            i = title_index[key]
+            if item_hot_score(row) > item_hot_score(pool[i]):
+                _replace(i, row)
             continue
         new_count += 1
-        if key:
-            index[key] = len(pool)
-        pool.append(row)
+        _place(row)
 
     pool.sort(key=lambda x: -item_hot_score(x))
     return pool, new_count, skipped
@@ -412,6 +455,33 @@ def _topic_agent_items(
 
         if any(_kw_hits(it) for it in filtered):
             filtered.sort(key=lambda it: (-_kw_hits(it), -item_hot_score(it)))
+        try:
+            from packages.content_ops.search_adapter import (
+                SearchRequest,
+                get_search_adapters,
+                search_hits_to_hotspots,
+            )
+
+            primary, _backup = get_search_adapters()
+            hits = primary.search(
+                SearchRequest(query=keywords[:100], recency="one_week", count=10)
+            )
+            extra = search_hits_to_hotspots(hits)
+            extra = _filter_items(
+                extra,
+                categories=None,
+                keywords=None,
+                exclude_keywords=exclude_keywords,
+            )
+            if extra:
+                filtered, _new, _skip = merge_hotspot_pool(filtered, extra)
+                crawl_meta = {
+                    **crawl_meta,
+                    "search_merged": len(extra),
+                    "search_provider": getattr(primary, "name", ""),
+                }
+        except Exception:
+            logger.debug("hotspot paid search merge skipped", exc_info=True)
     return _rank_items_by_note(filtered, user_note), crawl_meta
 
 

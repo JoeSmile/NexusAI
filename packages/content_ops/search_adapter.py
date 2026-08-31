@@ -14,7 +14,10 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Literal, Protocol, TypedDict
+from typing import Any, Literal, Protocol, TypedDict
+from urllib.parse import urlsplit, urlunsplit
+
+import requests
 
 Recency = Literal["one_day", "one_week", "one_month", "one_year", "no_limit"]
 ProviderName = Literal["doubao", "zhipu", "mock"]
@@ -109,9 +112,130 @@ class MockSearchAdapter:
         return out
 
 
+DOUBAO_SEARCH_URL = "https://open.feedcoopapi.com/search_api/web_search"
+
+
+def canonical_url(url: str) -> str:
+    raw = (url or "").strip()
+    if not raw:
+        return ""
+    if "://" not in raw:
+        raw = "https://" + raw
+    parts = urlsplit(raw)
+    scheme = parts.scheme.lower() if parts.scheme else "https"
+    if scheme == "http":
+        scheme = "https"
+    host = (parts.hostname or "").lower()
+    if host.startswith("www."):
+        host = host[4:]
+    path = (parts.path or "").rstrip("/")
+    return urlunsplit((scheme, host, path, parts.query, ""))
+
+
+def search_hits_to_hotspots(hits: list[SearchResult] | list[dict[str, Any]]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for hit in hits:
+        title = str(hit.get("title") or "").strip()
+        url = str(hit.get("url") or "").strip()
+        snippet = str(hit.get("snippet") or "").strip()
+        if not title and not url:
+            continue
+        cu = canonical_url(url)
+        out.append(
+            {
+                "title": title or cu or "搜索结果",
+                "summary": snippet,
+                "summary_source": "snippet",
+                "url": url,
+                "canonical_url": cu,
+                "source": str(hit.get("source") or "search"),
+                "publish_date": hit.get("publish_date"),
+                "score": 75,
+                "category": "素质教育",
+            }
+        )
+    return out
+
+
+def _doubao_result_rows(data: Any) -> list[dict[str, Any]]:
+    if isinstance(data, list):
+        return [x for x in data if isinstance(x, dict)]
+    if not isinstance(data, dict):
+        return []
+    for path in (
+        ("Result", "ResultList"),
+        ("result", "ResultList"),
+        ("Data", "ResultList"),
+        ("data", "results"),
+        ("Results",),
+        ("results",),
+    ):
+        cur: Any = data
+        ok = True
+        for key in path:
+            if isinstance(cur, dict) and key in cur:
+                cur = cur[key]
+            else:
+                ok = False
+                break
+        if ok and isinstance(cur, list):
+            return [x for x in cur if isinstance(x, dict)]
+    return []
+
+
+class DoubaoSearchAdapter:
+    """Volcengine Doubao Search Custom HTTP (official MCP host + PascalCase fields)."""
+
+    name = "doubao"
+
+    def search(self, req: SearchRequest) -> list[SearchResult]:
+        key = (os.getenv("SEARCH_API_KEY") or "").strip()
+        if not key:
+            return []
+        query = (req.query or "").strip()[:100]
+        if not query:
+            return []
+        count = max(1, min(int(req.count or 10), 50))
+        payload: dict[str, Any] = {
+            "Query": query,
+            "SearchType": "web",
+            "Count": count,
+            "TimeRange": recency_to_doubao(req.recency),
+            "Filter": {"NeedUrl": True},
+        }
+        headers = {
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+        }
+        resp = requests.post(
+            DOUBAO_SEARCH_URL, headers=headers, json=payload, timeout=20
+        )
+        resp.raise_for_status()
+        rows: list[SearchResult] = []
+        for item in _doubao_result_rows(resp.json()):
+            title = str(item.get("Title") or item.get("title") or "").strip()
+            url = str(item.get("Url") or item.get("url") or "").strip()
+            snippet = str(
+                item.get("Snippet") or item.get("snippet") or item.get("Summary") or ""
+            ).strip()
+            if not title and not url:
+                continue
+            pub = item.get("PublishTime") or item.get("publish_date")
+            rows.append(
+                {
+                    "title": title or url,
+                    "url": url,
+                    "snippet": snippet,
+                    "publish_date": str(pub) if pub else None,
+                    "source": self.name,
+                }
+            )
+        return rows
+
+
 def get_search_adapters() -> tuple[SearchAdapter, SearchAdapter]:
     provider = (os.getenv("SEARCH_PROVIDER") or "mock").strip().lower()
-    if provider == "mock" or provider not in ("doubao", "zhipu"):
-        return MockSearchAdapter("mock_doubao"), MockSearchAdapter("mock_zhipu")
-    # Live HTTP adapters land in 79.1 / 79.2; mock pair keeps tests isolated.
-    return MockSearchAdapter("mock_doubao"), MockSearchAdapter("mock_zhipu")
+    backup: SearchAdapter = MockSearchAdapter("mock_zhipu")
+    if provider == "doubao":
+        return DoubaoSearchAdapter(), backup
+    return MockSearchAdapter("mock_doubao"), backup
