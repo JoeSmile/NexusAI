@@ -6,10 +6,10 @@ import logging
 
 from sqlalchemy import text
 
-from packages.text_normalize import make_normalized_query_hash
 from packages.database.pgvector_session import get_pg_session
 from packages.observability.decorators import observe
 from packages.pipeline.state import PipelineState
+from packages.text_normalize import make_normalized_query_hash
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +71,7 @@ async def cache_check(state: PipelineState) -> PipelineState:
 
         if exact:
             state["cache_hit"] = True
+            state["cache_type"] = "exact"
             state["cache_value"] = exact.value
             state["response"] = exact.value
             state["finish_reason"] = "cache_hit"
@@ -93,6 +94,7 @@ async def cache_check(state: PipelineState) -> PipelineState:
             ).fetchone()
             if template:
                 state["cache_hit"] = True
+                state["cache_type"] = "template"
                 state["cache_value"] = template.value
                 state["response"] = template.value
                 state["finish_reason"] = "cache_hit"

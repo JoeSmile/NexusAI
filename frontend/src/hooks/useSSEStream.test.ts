@@ -79,6 +79,23 @@ describe('SSE parse frames', () => {
     )
   })
 
+  it('passes cache_hit fields on typed done frame (Task 80.2)', () => {
+    const onDone = vi.fn()
+    expect(
+      dispatchSSEData(
+        '{"type":"done","finish_reason":"cache_hit","cache_hit":true,"cache_type":"exact"}',
+        { onDone },
+      ),
+    ).toBe('done')
+    expect(onDone).toHaveBeenCalledWith(
+      expect.objectContaining({
+        finish_reason: 'cache_hit',
+        cache_hit: true,
+        cache_type: 'exact',
+      }),
+    )
+  })
+
   it('handles tool_call and cancelled events', () => {
     const onToolCall = vi.fn()
     const onCancelled = vi.fn()

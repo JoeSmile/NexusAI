@@ -26,6 +26,7 @@ import { ExecutionPanel } from '@/components/agent/ExecutionPanel'
 import { BookmarksDrawer } from '@/components/agent/BookmarksDrawer'
 import { ClientInputGuardrailBar } from '@/components/agent/ClientInputGuardrailBar'
 import { ClarificationCard } from '@/components/agent/ClarificationCard'
+import { CacheAnswerBadge } from '@/components/agent/CacheAnswerBadge'
 import { DislikeReasonDialog } from '@/components/agent/DislikeReasonDialog'
 import { HistoryDrawer } from '@/components/agent/HistoryDrawer'
 import { HotspotDayCollectionDialog } from '@/components/agent/HotspotDayCollectionDialog'
@@ -697,6 +698,9 @@ export default function HomeChatPage() {
               </div>
             )}
           </Bubble>
+          {!isUser && localMsg?.cacheHit ? (
+            <CacheAnswerBadge cacheType={localMsg.cacheType} />
+          ) : null}
           {!isUser && status === 'done' ? (
             <div className="chat-bubble-actions" data-client-message-id={cid}>
               <button

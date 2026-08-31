@@ -103,3 +103,72 @@ async def test_cache_check_skips_stale_exact_when_followup_bypassed(
     out = await cache_check(state)
     assert out.get("cache_hit") is False
     assert out.get("finish_reason") != "cache_hit"
+
+
+class _ValueRow:
+    def __init__(self, value: str) -> None:
+        self.value = value
+
+
+class _SessionCM:
+    def __init__(self, rows: list[object | None]) -> None:
+        self._rows = list(rows)
+
+    def __enter__(self) -> _SessionCM:
+        return self
+
+    def __exit__(self, *a: object) -> bool:
+        return False
+
+    def execute(self, *a: object, **k: object) -> object:
+        row = self._rows.pop(0) if self._rows else None
+
+        class _Result:
+            def fetchone(self) -> object:
+                return row
+
+        return _Result()
+
+
+class _SessionFactory:
+    def __init__(self, rows: list[object | None]) -> None:
+        self._rows = rows
+
+    def Session(self) -> _SessionCM:
+        return _SessionCM(self._rows)
+
+
+@pytest.mark.asyncio
+async def test_cache_check_sets_cache_type_exact(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from packages.pipeline.nodes.cache_check import cache_check
+
+    monkeypatch.setattr(
+        "packages.pipeline.nodes.cache_check.get_pg_session",
+        lambda: _SessionFactory([_ValueRow("cached-exact")]),
+    )
+    state = make_initial_state("t1", "u1", "s1", "北京天气")
+    state["query_hash"] = "qh1"
+    out = await cache_check(state)
+    assert out["cache_hit"] is True
+    assert out["cache_type"] == "exact"
+    assert out["finish_reason"] == "cache_hit"
+
+
+@pytest.mark.asyncio
+async def test_cache_check_sets_cache_type_template(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from packages.pipeline.nodes.cache_check import cache_check
+
+    monkeypatch.setattr(
+        "packages.pipeline.nodes.cache_check.get_pg_session",
+        lambda: _SessionFactory([None, _ValueRow("cached-hi")]),
+    )
+    state = make_initial_state("t1", "u1", "s1", "你好")
+    state["query_hash"] = "qh2"
+    out = await cache_check(state)
+    assert out["cache_hit"] is True
+    assert out["cache_type"] == "template"
+    assert out["finish_reason"] == "cache_hit"

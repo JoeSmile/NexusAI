@@ -14,9 +14,14 @@ from pydantic import BaseModel, Field
 
 from packages.audit import log_audit
 from packages.audit_context import bind_audit_lineage
+from packages.auth.models import TenantContext
+from packages.auth.permissions import require_permission
 from packages.billing.context import bind_billing_context
 from packages.errors import ErrorCode, NexusAIException
 from packages.guardrails.output_guard import DRIFT_PATTERNS, VIOLATION_PATTERNS
+from packages.observability.decorators import observe
+from packages.pipeline.graph import compiled_graph
+from packages.pipeline.state import make_initial_state
 from packages.plan.event_bus import (
     event_to_sse_payload,
     get_run_bus,
@@ -28,11 +33,6 @@ from packages.plan.run_cancel import (
     register_run,
     unregister_run,
 )
-from packages.observability.decorators import observe
-from packages.auth.models import TenantContext
-from packages.auth.permissions import require_permission
-from packages.pipeline.graph import compiled_graph
-from packages.pipeline.state import make_initial_state
 
 router = APIRouter(tags=["chat"])
 
@@ -336,12 +336,23 @@ def _sse_buffered_execution_events(trace_id: str | None) -> list[str]:
     ]
 
 
+def _cache_meta(final: dict) -> dict:
+    """SSE / JSON cache badge fields (Task 80.2). Only exact|template, not semantic."""
+    if final.get("finish_reason") != "cache_hit":
+        return {}
+    ctype = final.get("cache_type")
+    if ctype not in ("exact", "template"):
+        return {}
+    return {"cache_hit": True, "cache_type": ctype}
+
+
 def _chat_json_payload(final: dict) -> dict:
     payload: dict = {
         "response": final.get("response", ""),
         "trace_id": final.get("trace_id"),
         "finish_reason": final.get("finish_reason"),
     }
+    payload.update(_cache_meta(final))
     snap = _execution_snapshot(final.get("trace_id"))
     if snap is not None:
         payload["execution_snapshot"] = snap
@@ -361,6 +372,7 @@ def _sse_done_payload(final: dict) -> dict:
         "finish_reason": final.get("finish_reason") or "llm_generated",
         "trace_id": final.get("trace_id"),
     }
+    payload.update(_cache_meta(final))
     snap = _execution_snapshot(final.get("trace_id"))
     if snap is not None:
         payload["execution_snapshot"] = snap

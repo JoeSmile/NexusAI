@@ -9,7 +9,7 @@ import pytest
 
 from packages.fallback import get_fallback
 from packages.harness.llm import LLMHarness
-from packages.pipeline.router import _sse_done_payload
+from packages.pipeline.router import _chat_json_payload, _sse_done_payload
 
 
 def test_sse_done_payload_includes_finish_reason():
@@ -34,6 +34,71 @@ def test_sse_done_payload_serializable():
     payload = _sse_done_payload({"finish_reason": "fallback", "trace_id": "x"})
     raw = json.dumps(payload, ensure_ascii=False)
     assert "fallback" in raw
+
+
+def test_sse_done_payload_includes_cache_hit_exact():
+    payload = _sse_done_payload(
+        {
+            "finish_reason": "cache_hit",
+            "cache_hit": True,
+            "cache_type": "exact",
+            "trace_id": "t-cache",
+        }
+    )
+    assert payload["cache_hit"] is True
+    assert payload["cache_type"] == "exact"
+
+
+def test_sse_done_payload_includes_cache_hit_template():
+    payload = _sse_done_payload(
+        {
+            "finish_reason": "cache_hit",
+            "cache_hit": True,
+            "cache_type": "template",
+            "trace_id": "t-tpl",
+        }
+    )
+    assert payload["cache_hit"] is True
+    assert payload["cache_type"] == "template"
+
+
+def test_sse_done_payload_omits_cache_on_llm_generated():
+    payload = _sse_done_payload(
+        {"finish_reason": "llm_generated", "cache_hit": False, "trace_id": "t-llm"}
+    )
+    assert payload.get("cache_hit") is not True
+    assert "cache_type" not in payload
+
+
+def test_chat_json_payload_includes_cache_hit_exact():
+    payload = _chat_json_payload(
+        {
+            "finish_reason": "cache_hit",
+            "cache_hit": True,
+            "cache_type": "exact",
+            "response": "cached",
+        }
+    )
+    assert payload["cache_hit"] is True
+    assert payload["cache_type"] == "exact"
+
+
+def test_chat_json_payload_omits_cache_when_miss():
+    payload = _chat_json_payload({"finish_reason": "llm_generated", "response": "fresh"})
+    assert payload.get("cache_hit") is not True
+    assert "cache_type" not in payload
+
+
+def test_sse_done_payload_omits_cache_on_semantic_hit():
+    payload = _sse_done_payload(
+        {
+            "finish_reason": "semantic_cache_hit",
+            "cache_hit": True,
+            "trace_id": "t-sem",
+        }
+    )
+    assert payload.get("cache_hit") is not True
+    assert "cache_type" not in payload
 
 
 @pytest.mark.asyncio

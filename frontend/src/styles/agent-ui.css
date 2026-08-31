@@ -1173,6 +1173,18 @@
   align-items: flex-end;
 }
 
+.chat-cache-badge {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--success, #15803d);
+  background: color-mix(in srgb, var(--success, #22c55e) 12%, white);
+  border-radius: 999px;
+  padding: 2px 8px;
+  cursor: default;
+  user-select: none;
+}
+
 .chat-bubble-plain {
   white-space: pre-wrap;
   word-break: break-word;

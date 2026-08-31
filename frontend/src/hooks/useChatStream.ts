@@ -37,6 +37,9 @@ export interface ChatMessage {
   imagePreview?: string
   /** DB chat_messages.id — history rows only; used as pagination cursor */
   dbId?: number
+  /** Task 80.2 — exact|template cache hit on this assistant turn */
+  cacheHit?: boolean
+  cacheType?: 'exact' | 'template'
 }
 
 /** I1: stable UUID for feedback hydrate across refresh. */
@@ -45,6 +48,18 @@ export function newClientMessageId(): string {
     return crypto.randomUUID()
   }
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+function cacheFromDone(meta?: Record<string, unknown>): {
+  cacheHit?: boolean
+  cacheType?: ChatMessage['cacheType']
+} {
+  const raw = String(meta?.cache_type || '')
+  if (raw !== 'template' && raw !== 'exact') return {}
+  const hit =
+    meta?.cache_hit === true || String(meta?.finish_reason || '') === 'cache_hit'
+  if (!hit) return {}
+  return { cacheHit: true, cacheType: raw }
 }
 
 export function useChatStream(endpoint = '/chat/streaming') {
@@ -288,6 +303,7 @@ export function useChatStream(endpoint = '/chat/streaming') {
               typeof clarificationRaw === 'object'
                 ? (clarificationRaw as ClarificationInfo)
                 : null
+            const cache = cacheFromDone(meta)
             setMessages((msgs) =>
               msgs.map((msg) =>
                 msg.id === asstId
@@ -297,6 +313,7 @@ export function useChatStream(endpoint = '/chat/streaming') {
                       status: 'done',
                       ...(render ? { render } : {}),
                       ...(clarification ? { clarification } : {}),
+                      ...cache,
                     }
                   : msg,
               ),

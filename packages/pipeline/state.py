@@ -48,6 +48,7 @@ class PipelineState(TypedDict):
     fingerprint: str | None
     cache_hit: bool
     cache_value: str | None
+    cache_type: str | None  # exact | template when cache_hit
 
     # ── 护栏 ──
     pii_redacted: bool
@@ -178,6 +179,7 @@ def make_initial_state(
         "fingerprint": None,
         "cache_hit": False,
         "cache_value": None,
+        "cache_type": None,
         "pii_redacted": False,
         "prompt_injection_detected": False,
         "guardrails_passed": True,
