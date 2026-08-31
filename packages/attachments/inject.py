@@ -42,11 +42,27 @@ def wrap_untrusted_block(
 
 def _pick_blocks(blocks: list[dict[str, Any]], query: str) -> list[dict[str, Any]]:
     q = (query or "").strip().lower()
+    pool = list(blocks)
     if q:
         hit = [b for b in blocks if q in str(b.get("text") or "").lower()]
         if hit:
-            return hit[:MAX_INJECT_BLOCKS]
-    return blocks[:MAX_INJECT_BLOCKS]
+            pool = hit
+    extra = len(pool) - MAX_INJECT_BLOCKS
+    if extra > 0:
+        record_file_blocks_truncated(extra)
+    return pool[:MAX_INJECT_BLOCKS]
+
+
+def record_file_blocks_truncated(n: int = 1) -> None:
+    """Dialogue 8k budget does not include file_blocks; overflow is count-capped."""
+    if n <= 0:
+        return
+    try:
+        from packages.metrics_memory import record_file_blocks_truncated as _inc
+
+        _inc(n)
+    except Exception:
+        pass
 
 
 def inject_session_attachments(state: dict[str, Any]) -> dict[str, Any]:
@@ -82,6 +98,11 @@ def inject_session_attachments(state: dict[str, Any]) -> dict[str, Any]:
             )
             chunks.append(wrapped)
             file_blocks.append(b)
+    extra = len(file_blocks) - MAX_INJECT_BLOCKS
+    if extra > 0:
+        record_file_blocks_truncated(extra)
+        file_blocks = file_blocks[:MAX_INJECT_BLOCKS]
+        chunks = chunks[:MAX_INJECT_BLOCKS]
     state["file_blocks"] = file_blocks
     if chunks:
         header = (

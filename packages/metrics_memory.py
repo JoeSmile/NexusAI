@@ -21,6 +21,10 @@ MEMORY_DROPPED = Counter(
     "nexusai_memory_dropped_total",
     "Poison memory stream messages dropped after max deliveries",
 )
+FILE_BLOCKS_TRUNCATED = Counter(
+    "nexusai_file_blocks_truncated_total",
+    "Attachment blocks dropped so file_blocks stay off the dialogue 8k budget",
+)
 
 
 def observe_queue_depth(depth: int | None) -> None:
@@ -43,3 +47,9 @@ def record_degraded(seconds: float = 1.0) -> None:
 
 def record_dropped() -> None:
     MEMORY_DROPPED.inc()
+
+
+def record_file_blocks_truncated(n: int = 1) -> None:
+    if n <= 0:
+        return
+    FILE_BLOCKS_TRUNCATED.inc(n)

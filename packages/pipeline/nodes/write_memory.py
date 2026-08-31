@@ -48,6 +48,27 @@ async def write_memory(state: PipelineState) -> PipelineState:
         )
     except Exception:
         logger.debug("l1 summarize enqueue skipped", exc_info=True)
+    try:
+        from packages.memory.context_summarize import l1_warm_key
+        from packages.memory.hard_reset import maybe_hard_reset_l1
+
+        bundle = await mem.read(
+            user_id=user_id,
+            session_id=session_id,
+            include_warm=True,
+            include_cold=False,
+        )
+        maybe_hard_reset_l1(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            session_id=session_id,
+            unarchived_texts=[
+                str(m.get("content") or "") for m in (bundle.hot or [])
+            ],
+            l1_raw=str((bundle.warm or {}).get(l1_warm_key(session_id)) or ""),
+        )
+    except Exception:
+        logger.debug("l1 hard reset skipped", exc_info=True)
     cold = await mem.maybe_cold_summarize(user_id=user_id, session_id=session_id)
     if cold:
         # 供观测；load_memory 下一轮才会读到 cold 表
