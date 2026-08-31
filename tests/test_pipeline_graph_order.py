@@ -203,7 +203,8 @@ async def test_task_plan_edge_preserved():
     assert 'add_edge("analyze_parallel", "task_planning")' in src
     assert 'add_edge("task_planning", "clarification_gate")' in src
     assert '"continue": "build_context"' in src
-    assert 'add_edge("auth_check", "preprocess")' in src
+    assert 'add_edge("auth_check", "command_gate")' in src
+    assert '"continue": "preprocess"' in src
     assert 'continue": "load_memory"' in src
     assert 'add_edge("load_memory", "intent_funnel")' in src
     assert 'add_edge("intent_funnel", "analyze_parallel")' in src

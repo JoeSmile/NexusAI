@@ -79,6 +79,21 @@ describe('SSE parse frames', () => {
     )
   })
 
+  it('handles command_result as a done system frame (Task 78.4)', () => {
+    const onCommandResult = vi.fn()
+    const onDone = vi.fn()
+    expect(
+      dispatchSSEData(
+        '{"type":"command_result","command":"help","response":"可用命令"}',
+        { onCommandResult, onDone },
+      ),
+    ).toBe('done')
+    expect(onCommandResult).toHaveBeenCalled()
+    expect(onDone).toHaveBeenCalledWith(
+      expect.objectContaining({ finish_reason: 'command_result', command: 'help' }),
+    )
+  })
+
   it('passes cache_hit fields on typed done frame (Task 80.2)', () => {
     const onDone = vi.fn()
     expect(

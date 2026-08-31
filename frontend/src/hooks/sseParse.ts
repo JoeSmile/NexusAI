@@ -58,6 +58,7 @@ export type SSEHandlers = {
   onRetry?: (payload: Record<string, unknown>) => void
   onReplan?: (payload: Record<string, unknown>) => void
   onClarify?: (payload: Record<string, unknown>) => void
+  onCommandResult?: (payload: Record<string, unknown>) => void
   onCancelled?: (reason: string) => void
   onTraceId?: (traceId: string) => void
   onStreamAlert?: (alert: StreamAlert) => void
@@ -236,6 +237,11 @@ export function dispatchSSEData(raw: string, h: SSEHandlers): 'done' | 'continue
   if (t === 'clarify') {
     h.onClarify?.(obj)
     return 'continue'
+  }
+  if (t === 'command_result') {
+    h.onCommandResult?.(obj)
+    h.onDone?.({ ...obj, finish_reason: 'command_result', path: 'long' })
+    return 'done'
   }
   if (t === 'abort') {
     h.onAbort?.(String(obj.reason || 'abort'))

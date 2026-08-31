@@ -121,4 +121,18 @@ describe('useChatStream cache_hit from done frame (Task 80.2)', () => {
     const asst = result.current.messages.find((m) => m.role === 'assistant')
     expect(asst?.cacheHit).toBeFalsy()
   })
+
+  it('turns command_result into a system bubble (Task 78.4)', async () => {
+    startMock.mockImplementation(async (_url, _init, h) => {
+      h.onToken?.('可用命令：')
+      h.onDone?.({ finish_reason: 'command_result', type: 'command_result', command: 'help' })
+    })
+    const { result } = renderHook(() => useChatStream('/chat/streaming'))
+    await act(async () => {
+      await result.current.send('/help')
+    })
+    const sys = result.current.messages.find((m) => m.role === 'system')
+    expect(sys?.content).toContain('可用命令')
+    expect(result.current.messages.find((m) => m.role === 'assistant')).toBeUndefined()
+  })
 })

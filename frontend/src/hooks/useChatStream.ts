@@ -304,6 +304,9 @@ export function useChatStream(endpoint = '/chat/streaming') {
                 ? (clarificationRaw as ClarificationInfo)
                 : null
             const cache = cacheFromDone(meta)
+            const isCommand =
+              finishReason === 'command_result' ||
+              String(meta?.type || '') === 'command_result'
             setMessages((msgs) =>
               msgs.map((msg) =>
                 msg.id === asstId
@@ -311,6 +314,7 @@ export function useChatStream(endpoint = '/chat/streaming') {
                       ...msg,
                       content: msg.content,
                       status: 'done',
+                      ...(isCommand ? { role: 'system' as const } : {}),
                       ...(render ? { render } : {}),
                       ...(clarification ? { clarification } : {}),
                       ...cache,

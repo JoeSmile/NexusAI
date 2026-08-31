@@ -21,6 +21,7 @@ _SHORT_FINISH = frozenset(
         "AUTH_002",
         "clarification_pending",
         "attachment_parsing",
+        "command_result",
     }
 )
 

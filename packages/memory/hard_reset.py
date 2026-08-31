@@ -57,3 +57,43 @@ def maybe_hard_reset_l1(
         return False
     drop_l1_narrative(tenant_id, user_id, session_id)
     return True
+
+
+def archive_all_live_turns(tenant_id: str, user_id: str, session_id: str) -> int:
+    """Stamp archived_at on every live turn in this session (``/reset`` / ``/new``)."""
+    from datetime import datetime
+
+    from packages.database.pgvector_session import ChatMessage, get_pg_session
+
+    session_factory = get_pg_session()
+    with session_factory.Session() as session:
+        n = (
+            session.query(ChatMessage)
+            .filter_by(
+                tenant_id=tenant_id,
+                user_id=user_id,
+                session_id=session_id,
+            )
+            .filter(ChatMessage.archived_at.is_(None))
+            .update(
+                {ChatMessage.archived_at: datetime.utcnow()},
+                synchronize_session=False,
+            )
+        )
+        session.commit()
+    try:
+        from packages.memory.memory_service import get_unified_memory_service
+
+        get_unified_memory_service(tenant_id=tenant_id)._invalidate_mem_bundle(
+            user_id
+        )
+    except Exception:
+        pass
+    return int(n or 0)
+
+
+def session_hard_reset(tenant_id: str, user_id: str, session_id: str) -> dict[str, object]:
+    """Shared ``/reset`` path: drop L0 live turns + L1. Never touches belief."""
+    archived = archive_all_live_turns(tenant_id, user_id, session_id)
+    dropped = drop_l1_narrative(tenant_id, user_id, session_id)
+    return {"archived": archived, "l1_dropped": dropped}

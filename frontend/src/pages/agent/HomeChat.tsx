@@ -698,7 +698,7 @@ export default function HomeChatPage() {
               </div>
             )}
           </Bubble>
-          {!isUser && localMsg?.cacheHit ? (
+          {!isUser && localMsg?.role !== 'system' && localMsg?.cacheHit ? (
             <CacheAnswerBadge cacheType={localMsg.cacheType} />
           ) : null}
           {!isUser && status === 'done' ? (
@@ -712,6 +712,8 @@ export default function HomeChatPage() {
               >
                 <Copy size={15} strokeWidth={1.75} />
               </button>
+              {localMsg?.role === 'system' ? null : (
+                <>
               <button
                 type="button"
                 className={`chat-bubble-action-btn${liked ? ' is-liked' : ''}`}
@@ -752,6 +754,8 @@ export default function HomeChatPage() {
                   fill={bookmarked ? 'currentColor' : 'none'}
                 />
               </button>
+                </>
+              )}
             </div>
           ) : null}
         </div>
@@ -839,7 +843,14 @@ export default function HomeChatPage() {
                     type="text"
                     content={{ text: msg.content, status: msg.status }}
                     position={msg.role === 'user' ? 'right' : 'left'}
-                    user={{ name: msg.role === 'user' ? '你' : 'N' }}
+                    user={{
+                      name:
+                        msg.role === 'user'
+                          ? '你'
+                          : msg.role === 'system'
+                            ? '系统'
+                            : 'N',
+                    }}
                     renderMessageContent={renderMessageContent}
                   />
                 ))}

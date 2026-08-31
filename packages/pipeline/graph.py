@@ -14,6 +14,7 @@ from packages.pipeline.nodes.clarification_gate import (
     clarification_gate,
     route_after_clarification,
 )
+from packages.pipeline.nodes.command_gate import command_gate, route_after_command
 from packages.pipeline.nodes.conversion_hook import conversion_hook
 from packages.pipeline.nodes.experiment_hook import experiment_hook
 from packages.pipeline.nodes.guardrails_input import (
@@ -80,6 +81,7 @@ def build_pipeline():
     builder = StateGraph(PipelineState)
 
     builder.add_node("auth_check", _lf_node("auth_check", auth_check))
+    builder.add_node("command_gate", _lf_node("command_gate", command_gate))
     builder.add_node("preprocess", _lf_node("preprocess", preprocess))
     builder.add_node("rate_limiter", _lf_node("rate_limiter", rate_limiter))
     builder.add_node("cache_check", _lf_node("cache_check", cache_check))
@@ -103,7 +105,15 @@ def build_pipeline():
 
     builder.set_entry_point("auth_check")
 
-    builder.add_edge("auth_check", "preprocess")
+    builder.add_edge("auth_check", "command_gate")
+    builder.add_conditional_edges(
+        "command_gate",
+        route_after_command,
+        {
+            "end": END,
+            "continue": "preprocess",
+        },
+    )
     builder.add_conditional_edges(
         "preprocess",
         should_gate_block,

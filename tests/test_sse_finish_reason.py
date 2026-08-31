@@ -89,6 +89,20 @@ def test_chat_json_payload_omits_cache_when_miss():
     assert "cache_type" not in payload
 
 
+def test_chat_json_payload_command_result():
+    payload = _chat_json_payload(
+        {
+            "finish_reason": "command_result",
+            "response": "可用命令",
+            "command": "help",
+            "trace_id": "t-cmd",
+        }
+    )
+    assert payload["type"] == "command_result"
+    assert payload["command"] == "help"
+    assert payload.get("cache_hit") is not True
+
+
 def test_sse_done_payload_omits_cache_on_semantic_hit():
     payload = _sse_done_payload(
         {

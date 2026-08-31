@@ -362,6 +362,11 @@ def _chat_json_payload(final: dict) -> dict:
     clarification = final.get("clarification")
     if isinstance(clarification, dict) and clarification:
         payload["clarification"] = clarification
+    if final.get("finish_reason") == "command_result":
+        payload["type"] = "command_result"
+        cmd = final.get("command")
+        if cmd:
+            payload["command"] = cmd
     return payload
 
 
