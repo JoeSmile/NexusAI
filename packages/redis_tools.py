@@ -244,6 +244,7 @@ CACHE_KEY_DOMAINS: dict[str, str] = {
     "rl": "限流桶 (rl:cap / rl:rag / …)",
     "mem": "记忆热缓存 (mem:bundle 读结果 TTL 30s)",
     "llm": "LLM 并发 in-flight (llm:in-flight:global / llm:in-flight:{hash})",
+    "belief": "意图漏斗当前任务 (belief:cur:{tid}:{uid}:{session})",
 }
 
 
