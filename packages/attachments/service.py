@@ -33,6 +33,7 @@ def ingest_bytes(
             "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             "csv": "text/csv",
             "txt": "text/plain",
+            "image": "image/jpeg",
         }.get(kind, "application/octet-stream")
         aid = store.save(
             tenant_id=tenant_id,

@@ -254,4 +254,22 @@ BUILTIN_TOOL_SPECS: list[dict[str, Any]] = [
         risk_level="low",
         permission="chat:read",
     ),
+    _tool(
+        "image.describe",
+        description="Describe a session image attachment via tenant vision BYOK or OCR",
+        contract=generic_contract(
+            "image.describe",
+            description="Return a caption for an image attachment in the current chat session.",
+            input_props={
+                "attachment_id": _STR,
+                "session_id": _STR,
+                "query_hint": _STR,
+            },
+            required=["attachment_id", "session_id"],
+            idempotent=True,
+            idempotency_key_args=["attachment_id", "session_id"],
+        ),
+        risk_level="low",
+        permission="chat:write",
+    ),
 ]

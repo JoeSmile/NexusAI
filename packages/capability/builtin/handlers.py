@@ -7,10 +7,10 @@ import logging
 import time
 from typing import Any
 
-from packages.memory.memory_service import get_unified_memory_service
-from packages.notification.service import notify
 from packages.auth.models import TenantContext
 from packages.capability.exec_policy import resolve_exec_policy
+from packages.memory.memory_service import get_unified_memory_service
+from packages.notification.service import notify
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +72,7 @@ async def _dispatch(
         "sys.metrics": _sys_metrics,
         "plan.status": _plan_status,
         "blackboard.search": _blackboard_search,
+        "image.describe": _image_describe,
     }
     fn = handlers.get(handler_id)
     if fn is None:
@@ -337,6 +338,34 @@ async def _blackboard_search(
         "ok": True,
         "entries": results,
         "count": len(results),
+    }
+
+
+async def _image_describe(
+    payload: dict[str, Any], tenant: TenantContext
+) -> dict[str, Any]:
+    from packages.attachments.describe import DescribeError, describe_image
+
+    aid = str(payload.get("attachment_id") or "").strip()
+    sid = str(payload.get("session_id") or "").strip()
+    if not aid or not sid:
+        raise ValueError("attachment_id and session_id required")
+    hint = str(payload.get("query_hint") or "").strip() or None
+    try:
+        data = await describe_image(
+            tenant_id=tenant.tenant_id,
+            user_id=tenant.user_id,
+            session_id=sid,
+            attachment_id=aid,
+            query_hint=hint,
+        )
+    except DescribeError as exc:
+        return {"ok": False, "error": exc.message, "code": exc.code}
+    return {
+        "text": data.get("text"),
+        "source": data.get("source"),
+        "model": data.get("model"),
+        "cached": data.get("cached"),
     }
 
 

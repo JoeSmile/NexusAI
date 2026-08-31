@@ -154,6 +154,18 @@ def _parse_xlsx(data: bytes) -> list[dict]:
     return chunks
 
 
+def _image_media_type(data: bytes) -> str:
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if data.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if data.startswith(b"GIF87a") or data.startswith(b"GIF89a"):
+        return "image/gif"
+    if len(data) >= 12 and data.startswith(b"RIFF") and data[8:12] == b"WEBP":
+        return "image/webp"
+    return "image/jpeg"
+
+
 def parse_document(data: bytes, filename: str) -> ParseResult:
     kind = validate_attachment_bytes(filename=filename, data=data)
     media = {
@@ -162,8 +174,11 @@ def parse_document(data: bytes, filename: str) -> ParseResult:
         "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "csv": "text/csv",
         "txt": "text/plain",
+        "image": _image_media_type(data),
     }.get(kind, "application/octet-stream")
     try:
+        if kind == "image":
+            return ParseResult(status="ready", media_type=media, blocks=[])
         if kind == "pdf":
             status, raw = _parse_pdf(data)
         elif kind == "docx":

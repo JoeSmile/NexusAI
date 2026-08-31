@@ -19,6 +19,11 @@ _KIND_BY_SUFFIX = {
     "csv": "csv",
     "docx": "docx",
     "xlsx": "xlsx",
+    "png": "image",
+    "jpg": "image",
+    "jpeg": "image",
+    "gif": "image",
+    "webp": "image",
 }
 
 
@@ -29,12 +34,27 @@ def _suffix(filename: str) -> str:
     return name.rsplit(".", 1)[-1].lower()
 
 
+def _sniff_image(data: bytes) -> str | None:
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image"
+    if data.startswith(b"\xff\xd8\xff"):
+        return "image"
+    if data.startswith(b"GIF87a") or data.startswith(b"GIF89a"):
+        return "image"
+    if len(data) >= 12 and data.startswith(b"RIFF") and data[8:12] == b"WEBP":
+        return "image"
+    return None
+
+
 def _sniff_kind(data: bytes, filename: str) -> str:
     suf = _suffix(filename)
     if suf == "xlsm":
         raise ParseError("FILE_MACRO", "xlsm_not_allowed")
     if data.startswith(b"%PDF"):
         return "pdf"
+    image_kind = _sniff_image(data)
+    if image_kind:
+        return image_kind
     if data.startswith(b"PK"):
         try:
             with zipfile.ZipFile(io.BytesIO(data)) as zf:
