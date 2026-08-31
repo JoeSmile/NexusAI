@@ -20,6 +20,7 @@ _SHORT_FINISH = frozenset(
         "blocked",
         "AUTH_002",
         "clarification_pending",
+        "attachment_parsing",
     }
 )
 

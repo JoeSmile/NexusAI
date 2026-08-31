@@ -47,6 +47,7 @@ class MemoryAttachmentStore:
             "size": size,
             "status": status,
             "storage_path": storage_path,
+            "parse_attempts": 0,
             "expired_at": expired_at,
             "blocks": [
                 {
@@ -78,6 +79,46 @@ class MemoryAttachmentStore:
         if row["session_id"] != session_id:
             raise AttachmentForbidden("cross_session")
         return row
+
+    def list_session(self, *, tenant_id: str, session_id: str) -> list[dict[str, Any]]:
+        return [
+            dict(row)
+            for row in self.items.values()
+            if row["tenant_id"] == tenant_id and row["session_id"] == session_id
+        ]
+
+    def list_parsing(self, *, limit: int = 8) -> list[dict[str, Any]]:
+        out = [dict(row) for row in self.items.values() if row["status"] == "parsing"]
+        return out[:limit]
+
+    def apply_parse_result(self, *, attachment_id: str, result: Any) -> None:
+        row = self.items.get(attachment_id)
+        if row is None:
+            return
+        row["parse_attempts"] = int(getattr(result, "attempts", 0) or 0)
+        if result.status == "ready":
+            row["status"] = "ready"
+            row["blocks"] = [
+                {
+                    "block_index": b.block_index,
+                    "kind": b.kind,
+                    "text": b.text,
+                    "char_count": b.char_count,
+                    "page": b.page,
+                    "sheet": b.sheet,
+                    "rows": b.rows,
+                }
+                for b in (result.blocks or [])
+            ]
+            return
+        if result.status == "ocr_required":
+            row["status"] = "ocr_required"
+            row["blocks"] = []
+            return
+        if not getattr(result, "should_retry", False):
+            row["status"] = "failed"
+            return
+        row["status"] = "parsing"
 
 
 class PgAttachmentStore:
@@ -112,6 +153,7 @@ class PgAttachmentStore:
                     size=size,
                     status=status,
                     storage_path=storage_path,
+                    parse_attempts=0,
                     expired_at=expired_at,
                 )
             )
@@ -171,6 +213,7 @@ class PgAttachmentStore:
                 "size": row.size,
                 "status": row.status,
                 "storage_path": row.storage_path,
+                "parse_attempts": int(getattr(row, "parse_attempts", 0) or 0),
                 "expired_at": row.expired_at,
                 "blocks": [
                     {
@@ -185,6 +228,87 @@ class PgAttachmentStore:
                     for b in blocks
                 ],
             }
+
+    def list_session(self, *, tenant_id: str, session_id: str) -> list[dict[str, Any]]:
+        from packages.database.pgvector_session import Attachment, get_pg_session
+
+        sf = get_pg_session()
+        with sf.Session() as session:
+            rows = (
+                session.query(Attachment)
+                .filter(
+                    Attachment.tenant_id == tenant_id,
+                    Attachment.session_id == session_id,
+                )
+                .all()
+            )
+            return [_attachment_row(r) for r in rows]
+
+    def list_parsing(self, *, limit: int = 8) -> list[dict[str, Any]]:
+        from packages.database.pgvector_session import Attachment, get_pg_session
+
+        sf = get_pg_session()
+        with sf.Session() as session:
+            rows = (
+                session.query(Attachment)
+                .filter(Attachment.status == "parsing")
+                .limit(limit)
+                .all()
+            )
+            return [_attachment_row(r) for r in rows]
+
+    def apply_parse_result(self, *, attachment_id: str, result: Any) -> None:
+        from packages.database.pgvector_session import Attachment, AttachmentBlock, get_pg_session
+
+        sf = get_pg_session()
+        with sf.Session() as session:
+            row = session.query(Attachment).filter(Attachment.id == attachment_id).first()
+            if row is None:
+                return
+            row.parse_attempts = int(getattr(result, "attempts", 0) or 0)
+            if result.status == "ready":
+                row.status = "ready"
+                session.query(AttachmentBlock).filter(
+                    AttachmentBlock.attachment_id == attachment_id
+                ).delete()
+                for b in result.blocks or []:
+                    session.add(
+                        AttachmentBlock(
+                            attachment_id=attachment_id,
+                            tenant_id=row.tenant_id,
+                            session_id=row.session_id,
+                            block_index=b.block_index,
+                            kind=b.kind,
+                            page=b.page,
+                            sheet=b.sheet,
+                            rows=b.rows,
+                            text=b.text,
+                            char_count=b.char_count,
+                        )
+                    )
+            elif result.status == "ocr_required":
+                row.status = "ocr_required"
+            elif not getattr(result, "should_retry", False):
+                row.status = "failed"
+            else:
+                row.status = "parsing"
+            session.commit()
+
+
+def _attachment_row(row: Any) -> dict[str, Any]:
+    return {
+        "id": row.id,
+        "tenant_id": row.tenant_id,
+        "session_id": row.session_id,
+        "uploaded_by": row.uploaded_by,
+        "name": row.name,
+        "media_type": row.media_type,
+        "size": row.size,
+        "status": row.status,
+        "storage_path": row.storage_path,
+        "parse_attempts": int(getattr(row, "parse_attempts", 0) or 0),
+        "expired_at": row.expired_at,
+    }
 
 
 _STORE: MemoryAttachmentStore | PgAttachmentStore | None = None

@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 
+from packages.attachments.notice import parsing_notice_for_session
 from packages.guardrails.deny_list import deny_list_hit
 from packages.metrics import guardrails_blocked
 from packages.observability.decorators import observe
@@ -133,6 +134,13 @@ async def preprocess(state: PipelineState) -> PipelineState:
         )
 
     state["message"] = normalized
+    notice = parsing_notice_for_session(
+        tenant_id=state["tenant_id"], session_id=state["session_id"]
+    )
+    if notice:
+        state["response"] = notice
+        state["finish_reason"] = "attachment_parsing"
+        return state
     return state
 
 
@@ -141,5 +149,7 @@ def should_gate_block(state: PipelineState) -> str:
     if state.get("finish_reason") == "blocked" and str(
         state.get("error_code") or ""
     ).startswith("GATE_"):
+        return "end"
+    if state.get("finish_reason") == "attachment_parsing":
         return "end"
     return "continue"

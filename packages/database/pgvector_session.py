@@ -310,6 +310,7 @@ class Attachment(Base):
     size = Column(Integer, nullable=False, default=0)
     status = Column(String(20), nullable=False, default="parsing")
     storage_path = Column(Text, nullable=False, default="")
+    parse_attempts = Column(Integer, nullable=False, default=0)
     uploaded_at = Column(DateTime, default=datetime.utcnow)
     expired_at = Column(DateTime, nullable=False)
     __table_args__ = (
