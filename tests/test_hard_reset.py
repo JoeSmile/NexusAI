@@ -164,3 +164,45 @@ async def test_file_blocks_capped_separately_from_dialogue_window() -> None:
         assert all("合同" in str(b.get("text") or "") for b in state["file_blocks"])
     finally:
         set_attachment_store(None)
+
+
+def test_session_hard_reset_does_not_delete_attachments() -> None:
+    from packages.memory.hard_reset import session_hard_reset
+
+    store = MemoryAttachmentStore()
+    store.save(
+        tenant_id="t1",
+        session_id="s1",
+        uploaded_by="u1",
+        name="shot.png",
+        media_type="image/png",
+        size=12,
+        status="ready",
+        storage_path="/tmp/shot.png",
+        expired_at=datetime.now(UTC) + timedelta(days=7),
+        blocks=[],
+        attachment_id="img1",
+    )
+    store.append_caption("img1", "窗台上的橘猫")
+    deleted: list[str] = []
+    orig = store.delete
+
+    def _spy(*, attachment_id: str):
+        deleted.append(attachment_id)
+        return orig(attachment_id=attachment_id)
+
+    store.delete = _spy  # type: ignore[method-assign]
+    set_attachment_store(store)
+    try:
+        with patch(
+            "packages.memory.hard_reset.archive_all_live_turns", return_value=0
+        ), patch(
+            "packages.memory.hard_reset.drop_l1_narrative", return_value=True
+        ):
+            session_hard_reset("t1", "u1", "s1")
+        assert deleted == []
+        row = store.get(tenant_id="t1", session_id="s1", attachment_id="img1")
+        assert row is not None
+        assert any(b.get("kind") == "caption" for b in (row.get("blocks") or []))
+    finally:
+        set_attachment_store(None)

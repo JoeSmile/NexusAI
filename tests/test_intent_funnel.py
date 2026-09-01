@@ -7,7 +7,7 @@ import time
 
 import pytest
 
-from packages.intent.belief_store import set_belief
+from packages.intent.belief_store import get_belief, set_belief
 from packages.pipeline.followup_lexicon import (
     is_followup_utterance,
     is_topic_switch_utterance,
@@ -139,6 +139,53 @@ async def test_topic_switch_is_new_and_hello_allows_greeting(
     hello = await run_funnel(make_initial_state("t1", "u1", "s9", "你好"))
     assert hello["funnel_block_short_path"] is False
     assert hello["is_new_topic"] is True
+
+
+@pytest.mark.asyncio
+async def test_is_new_topic_does_not_unload_session_attachments(
+    belief_redis: _FakeRedis,
+) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from packages.attachments.inject import inject_session_attachments
+    from packages.attachments.parse import AttachmentBlock
+    from packages.attachments.store import MemoryAttachmentStore, set_attachment_store
+
+    store = MemoryAttachmentStore()
+    store.save(
+        tenant_id="t1",
+        session_id="s1",
+        uploaded_by="u1",
+        name="合同.pdf",
+        media_type="application/pdf",
+        size=100,
+        status="ready",
+        storage_path="/tmp/c.pdf",
+        expired_at=datetime.now(UTC) + timedelta(days=7),
+        blocks=[
+            AttachmentBlock(
+                block_index=0,
+                kind="page",
+                text="合同第12条 违约责任",
+                char_count=12,
+                page=1,
+            )
+        ],
+        attachment_id="a1",
+    )
+    set_attachment_store(store)
+    try:
+        set_belief("t1", "u1", "s1", {"status": "ACTIVE", "slots": {}, "summary": "订票"})
+        switch = await run_funnel(make_initial_state("t1", "u1", "s1", "另外问报销"))
+        assert switch["is_new_topic"] is True
+        assert get_belief("t1", "u1", "s1") is None
+        state = make_initial_state("t1", "u1", "s1", "违约条款呢")
+        await inject_session_attachments(state)
+        blob = state.get("memory_prompt_block") or ""
+        assert state.get("file_blocks")
+        assert "违约" in blob
+    finally:
+        set_attachment_store(None)
 
 
 @pytest.mark.asyncio

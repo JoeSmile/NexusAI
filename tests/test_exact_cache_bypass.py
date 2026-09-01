@@ -172,3 +172,32 @@ async def test_cache_check_sets_cache_type_template(
     assert out["cache_hit"] is True
     assert out["cache_type"] == "template"
     assert out["finish_reason"] == "cache_hit"
+
+
+@pytest.mark.asyncio
+async def test_preprocess_ready_image_session_bypasses_summary() -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from packages.attachments.store import MemoryAttachmentStore, set_attachment_store
+
+    store = MemoryAttachmentStore()
+    store.save(
+        tenant_id="t1",
+        session_id="s1",
+        uploaded_by="u1",
+        name="shot.png",
+        media_type="image/png",
+        size=12,
+        status="ready",
+        storage_path="/tmp/shot.png",
+        expired_at=datetime.now(UTC) + timedelta(days=7),
+        blocks=[],
+        attachment_id="img1",
+    )
+    store.append_caption("img1", "一只橘猫坐在窗台")
+    set_attachment_store(store)
+    try:
+        out = await preprocess(make_initial_state("t1", "u1", "s1", "总结一下"))
+        assert out["cache_bypass"] is True
+    finally:
+        set_attachment_store(None)
