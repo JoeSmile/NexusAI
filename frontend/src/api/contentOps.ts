@@ -175,19 +175,34 @@ export async function generateScript(body: {
   }>('/api/content/scripts/generate', body)
 }
 
+export type ContentArtifactItem = {
+  id: string
+  kind: string
+  title: string
+  body: unknown
+  created_at?: string
+  creator_id?: string | null
+  owner_user_id?: string
+  visibility?: 'private' | 'shared'
+  is_owner?: boolean
+}
+
 export async function listArtifacts(kind?: string) {
   const q = kind ? `?kind=${encodeURIComponent(kind)}` : ''
   return apiGet<{
-    items: Array<{
-      id: string
-      kind: string
-      title: string
-      body: unknown
-      created_at?: string
-      creator_id?: string | null
-    }>
+    items: ContentArtifactItem[]
     count: number
   }>(`/api/content/artifacts${q}`)
+}
+
+export async function setArtifactVisibility(
+  artifactId: string,
+  visibility: 'private' | 'shared',
+) {
+  return apiPost<ContentArtifactItem>(
+    `/api/content/artifacts/${encodeURIComponent(artifactId)}/visibility`,
+    { visibility },
+  )
 }
 
 export async function excludeHotspot(title: string) {

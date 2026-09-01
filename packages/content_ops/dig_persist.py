@@ -8,13 +8,14 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from packages.database.pgvector_session import ContentArtifact
+from packages.content_ops.artifact_visibility import VISIBILITY_PRIVATE
 from packages.content_ops.hotspot import (
     annotate_similar_to_previous,
     day_collection_hash,
     merge_hotspot_pool,
     normalize_title_token_set,
 )
+from packages.database.pgvector_session import ContentArtifact
 
 
 def _title_excluded(title: str, excluded: list[str]) -> bool:
@@ -45,8 +46,12 @@ def persist_dig_result(
     tenant_id: str,
     result: dict[str, Any],
     save: bool = True,
+    owner_user_id: str = "",
 ) -> dict[str, Any]:
-    """Merge dig items into hotspot_day; append hotspot_run (idempotent by content_hash)."""
+    """Merge dig items into the owner's daily pool; run log is idempotent per owner."""
+    owner = (owner_user_id or "").strip()
+    if save and not owner:
+        raise ValueError("owner_user_id_required")
     dig_hash = str(result.get("content_hash") or "")
     dig_items = list(result.get("items") or [])
     day = date.today().isoformat()
@@ -56,6 +61,7 @@ def persist_dig_result(
         session.query(ContentArtifact)
         .filter(
             ContentArtifact.tenant_id == tenant_id,
+            ContentArtifact.owner_user_id == owner,
             ContentArtifact.kind == "hotspot_day",
             ContentArtifact.content_hash == day_hash,
         )
@@ -99,6 +105,7 @@ def persist_dig_result(
             session.query(ContentArtifact)
             .filter(
                 ContentArtifact.tenant_id == tenant_id,
+                ContentArtifact.owner_user_id == owner,
                 ContentArtifact.kind.in_(("hotspot_run", "hotspot")),
                 ContentArtifact.content_hash == dig_hash,
             )
@@ -129,6 +136,8 @@ def persist_dig_result(
                     title=f"今日热点合集 {day}",
                     body=day_body,
                     content_hash=day_hash,
+                    owner_user_id=owner,
+                    visibility=VISIBILITY_PRIVATE,
                 )
             )
         else:
@@ -150,6 +159,8 @@ def persist_dig_result(
                     "day_artifact_id": day_artifact_id,
                 },
                 content_hash=dig_hash or None,
+                owner_user_id=owner,
+                visibility=VISIBILITY_PRIVATE,
             )
         )
 

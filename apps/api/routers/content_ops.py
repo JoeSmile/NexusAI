@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import Any
 
@@ -11,6 +12,13 @@ from pydantic import BaseModel, Field
 from packages.audit import write_audit_sync
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
+from packages.content_ops.artifact_visibility import (
+    ArtifactNotFound,
+    ArtifactShareForbidden,
+    artifact_public_dict,
+    list_visible_artifacts,
+    set_artifact_visibility,
+)
 from packages.content_ops.dig_persist import persist_dig_result
 from packages.content_ops.hotspot import HotspotCrawlError, dig_hotspots
 from packages.content_ops.offerings import get_offering, list_offerings
@@ -29,6 +37,7 @@ from packages.database.pgvector_session import ContentArtifact, get_pg_session
 from packages.rate_limiter import check_endpoint_rate_limit
 
 router = APIRouter(tags=["content-ops"])
+_log = logging.getLogger(__name__)
 
 _DIG_PER_MIN = 30
 _UPLOAD_PER_MIN = 10
@@ -330,6 +339,7 @@ async def api_dig_hotspots(
         out = persist_dig_result(
             session,
             tenant_id=tenant.tenant_id,
+            owner_user_id=tenant.user_id,
             result=result,
             save=body.save,
         )
@@ -406,6 +416,8 @@ async def api_generate_script(
                     title=str(title)[:200],
                     body=out,
                     creator_id=body.creator_id,
+                    owner_user_id=tenant.user_id,
+                    visibility="private",
                 )
             )
         session.commit()
@@ -436,6 +448,7 @@ async def exclude_hotspot_from_day(
             session.query(ContentArtifact)
             .filter(
                 ContentArtifact.tenant_id == tenant.tenant_id,
+                ContentArtifact.owner_user_id == tenant.user_id,
                 ContentArtifact.kind == "hotspot_day",
                 ContentArtifact.content_hash == day_hash,
             )
@@ -470,6 +483,10 @@ async def exclude_hotspot_from_day(
     }
 
 
+class ArtifactVisibilityBody(BaseModel):
+    visibility: str = Field(..., min_length=1)
+
+
 @router.get("/api/content/artifacts")
 async def api_list_artifacts(
     kind: str | None = Query(default=None),
@@ -478,22 +495,65 @@ async def api_list_artifacts(
 ) -> dict[str, Any]:
     sf = get_pg_session()
     with sf.Session() as session:
-        q = session.query(ContentArtifact).filter(
-            ContentArtifact.tenant_id == tenant.tenant_id
+        rows = list_visible_artifacts(
+            session,
+            tenant_id=tenant.tenant_id,
+            user_id=tenant.user_id,
+            kind=kind,
+            limit=limit,
         )
-        if kind:
-            q = q.filter(ContentArtifact.kind == kind)
-        rows = q.order_by(ContentArtifact.created_at.desc()).limit(limit).all()
         items = [
-            {
-                "id": r.id,
-                "kind": r.kind,
-                "title": r.title,
-                "body": r.body,
-                "content_hash": r.content_hash,
-                "creator_id": r.creator_id,
-                "created_at": r.created_at.isoformat() if r.created_at else None,
-            }
-            for r in rows
+            artifact_public_dict(r, viewer_id=tenant.user_id) for r in rows
         ]
     return {"items": items, "count": len(items)}
+
+
+@router.post("/api/content/artifacts/{artifact_id}/visibility")
+async def api_set_artifact_visibility(
+    artifact_id: str,
+    body: ArtifactVisibilityBody,
+    tenant: TenantContext = Depends(verify_human_or_legacy_key),
+) -> dict[str, Any]:
+    sf = get_pg_session()
+    with sf.Session() as session:
+        try:
+            row = set_artifact_visibility(
+                session,
+                tenant_id=tenant.tenant_id,
+                user_id=tenant.user_id,
+                artifact_id=artifact_id,
+                visibility=body.visibility,
+            )
+        except ArtifactNotFound as e:
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "ARTIFACT_001", "message": "not_found"},
+            ) from e
+        except ArtifactShareForbidden as e:
+            raise HTTPException(
+                status_code=403,
+                detail={"code": "ARTIFACT_003", "message": "owner_only"},
+            ) from e
+        except ValueError as e:
+            raise HTTPException(
+                status_code=400,
+                detail={"code": "ARTIFACT_002", "message": "invalid_visibility"},
+            ) from e
+        session.commit()
+        item = artifact_public_dict(row, viewer_id=tenant.user_id)
+    try:
+        write_audit_sync(
+            {
+                "tenant_id": tenant.tenant_id,
+                "user_id": tenant.user_id,
+                "action": "content.artifact_visibility",
+                "trace_id": "",
+                "input_text": artifact_id[:64],
+                "output_text": str(item.get("visibility") or "")[:32],
+                "model": "",
+                "error_code": None,
+            }
+        )
+    except Exception:
+        _log.debug("content.artifact_visibility audit skipped", exc_info=True)
+    return item

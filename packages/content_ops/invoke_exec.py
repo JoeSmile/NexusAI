@@ -75,6 +75,7 @@ async def invoke_content_ops(
             result = persist_dig_result(
                 session,
                 tenant_id=tid,
+                owner_user_id=tenant.user_id,
                 result=result,
                 save=bool(save),
             )

@@ -701,6 +701,7 @@ class ContentArtifact(Base):
       - hotspot_run — 单次抓取记录（同 content_hash 幂等）
       - hotspot — 旧版单次抓取（兼容展示）
       - script — 口播稿
+    Visibility (45b.4): default private; ``shared`` = tenant-wide. All kinds.
     """
 
     __tablename__ = "content_artifacts"
@@ -712,9 +713,17 @@ class ContentArtifact(Base):
     content_hash = Column(String(64), nullable=True)
     run_id = Column(String(36), nullable=True)
     creator_id = Column(String(64), nullable=True)
+    owner_user_id = Column(String(64), nullable=False, default="")
+    visibility = Column(String(16), nullable=False, default="private")
     created_at = Column(DateTime, default=datetime.utcnow)
     __table_args__ = (
         Index("ix_content_artifacts_tenant_kind_created", "tenant_id", "kind", "created_at"),
+        Index(
+            "ix_content_artifacts_tenant_owner_kind",
+            "tenant_id",
+            "owner_user_id",
+            "kind",
+        ),
     )
 
 

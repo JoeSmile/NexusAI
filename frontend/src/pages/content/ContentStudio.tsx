@@ -93,6 +93,7 @@ export default function ContentStudioPage() {
       script: string
       creator_id?: string | null
       created_at?: string
+      visibility?: 'private' | 'shared'
     }>
   >([])
   const [hint, setHint] = useState('')
@@ -137,6 +138,7 @@ export default function ContentStudioPage() {
             script: typeof body?.script === 'string' ? body.script : '',
             creator_id: row.creator_id,
             created_at: row.created_at,
+            visibility: row.visibility,
           }
         })
         .filter((r) => r.script)
@@ -531,6 +533,9 @@ export default function ContentStudioPage() {
                         }}
                       >
                         <div className="text-sm font-medium text-[#0F172A]">{s.title}</div>
+                        <div className="mt-0.5 text-[11px] text-[#94A3B8]">
+                          {s.visibility === 'shared' ? '已共享' : '私有'}
+                        </div>
                         <div className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">
                           {s.script.slice(0, 120)}
                           {s.script.length > 120 ? '…' : ''}

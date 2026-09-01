@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { X } from 'lucide-react'
 
-import { listArtifacts, type HotspotItem } from '@/api/contentOps'
+import { listArtifacts, setArtifactVisibility, type HotspotItem } from '@/api/contentOps'
 import { formatApiError } from '@/api/http'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -26,6 +26,8 @@ type ArtifactRow = {
   title: string
   body: unknown
   created_at?: string
+  visibility?: 'private' | 'shared'
+  is_owner?: boolean
 }
 
 const TABS: { id: TabId; label: string }[] = [
@@ -74,6 +76,8 @@ export default function ContentLibraryPage() {
   const [busy, setBusy] = useState(false)
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState<ArtifactRow | null>(null)
+  const [shareBusy, setShareBusy] = useState(false)
+  const [shareConfirm, setShareConfirm] = useState(false)
   const [view, setView] = useState<'list' | 'grid'>('grid')
 
   const refresh = useCallback(async () => {
@@ -101,9 +105,33 @@ export default function ContentLibraryPage() {
 
   const openRow = (row: ArtifactRow) => {
     setActive(row)
+    setShareConfirm(false)
     setOpen(true)
   }
 
+  const toggleShare = async () => {
+    if (!active?.id || !active.is_owner || shareBusy) return
+    const next = active.visibility === 'shared' ? 'private' : 'shared'
+    setShareBusy(true)
+    try {
+      const updated = await setArtifactVisibility(active.id, next)
+      const vis = updated.visibility === 'shared' ? 'shared' : 'private'
+      setActive({ ...active, visibility: vis, is_owner: updated.is_owner })
+      setRows((prev) =>
+        prev.map((r) =>
+          r.id === active.id ? { ...r, visibility: vis, is_owner: updated.is_owner } : r,
+        ),
+      )
+    } catch (e) {
+      setHint(formatApiError(e))
+    } finally {
+      setShareBusy(false)
+      setShareConfirm(false)
+    }
+  }
+
+  const visLabel = (row: ArtifactRow) =>
+    row.visibility === 'shared' ? '已共享' : '私有'
   const detailHotspots = active ? asHotspots(active.body) : []
   const detailScript = active ? asScript(active.body) : ''
   const isScript = active?.kind === 'script'
@@ -196,7 +224,12 @@ export default function ContentLibraryPage() {
                   <span className="content-thumb-icon">{kindLabel(row.kind)}</span>
                 </div>
                 <div style={{ padding: '12px 14px' }}>
-                  <div className="mb-1 text-sm font-semibold text-[#0F172A]">{row.title}</div>
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <div className="text-sm font-semibold text-[#0F172A]">{row.title}</div>
+                    <Badge variant="outline" className="shrink-0 text-[10px]">
+                      {visLabel(row)}
+                    </Badge>
+                  </div>
                   <div className="line-clamp-2 text-xs text-[#64748B]">{summary}</div>
                   <div className="mt-2 text-xs text-[#94A3B8]">
                     {row.created_at?.replace('T', ' ').slice(0, 19) || '—'}
@@ -214,13 +247,14 @@ export default function ContentLibraryPage() {
               <th className="px-4 py-3 font-semibold">类型</th>
               <th className="px-4 py-3 font-semibold">标题</th>
               <th className="px-4 py-3 font-semibold">摘要</th>
+              <th className="px-4 py-3 font-semibold">可见性</th>
               <th className="px-4 py-3 font-semibold">时间</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-10 text-center text-[#64748B]">
+                <td colSpan={5} className="px-4 py-10 text-center text-[#64748B]">
                   {busy
                     ? '加载中…'
                     : tab === 'day'
@@ -248,6 +282,9 @@ export default function ContentLibraryPage() {
                     </td>
                     <td className="px-4 py-3 font-medium text-[#0F172A]">{row.title}</td>
                     <td className="max-w-xs truncate px-4 py-3 text-[#64748B]">{summary}</td>
+                    <td className="px-4 py-3">
+                      <Badge variant="outline">{visLabel(row)}</Badge>
+                    </td>
                     <td className="px-4 py-3 whitespace-nowrap text-[#64748B]">
                       {row.created_at?.replace('T', ' ').slice(0, 19) || '—'}
                     </td>
@@ -270,6 +307,11 @@ export default function ContentLibraryPage() {
             <DialogHeader className={MODAL.header}>
               <DialogTitle className={MODAL.title}>
                 {active?.title || '详情'}
+                {active ? (
+                  <Badge variant="outline" className="ml-2 align-middle text-[10px]">
+                    {visLabel(active)}
+                  </Badge>
+                ) : null}
               </DialogTitle>
               <button
                 type="button"
@@ -314,13 +356,53 @@ export default function ContentLibraryPage() {
               )}
             </div>
             <DialogFooter className={MODAL.footer}>
-              <Button
-                type="button"
-                className="h-11 rounded-xl bg-[#165DFF] px-6 font-semibold text-white hover:bg-[#1263D8]"
-                onClick={() => setOpen(false)}
-              >
-                关闭
-              </Button>
+              {shareConfirm && active?.is_owner ? (
+                <>
+                  <p className="mr-auto text-sm text-[#64748B]">
+                    {active.visibility === 'shared'
+                      ? '取消后仅自己可见，本租户其他人将看不到。'
+                      : '确认后本租户其他成员可在内容库看到此产物。'}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 rounded-xl px-6"
+                    disabled={shareBusy}
+                    onClick={() => setShareConfirm(false)}
+                  >
+                    返回
+                  </Button>
+                  <Button
+                    type="button"
+                    className="h-11 rounded-xl bg-[#165DFF] px-6 font-semibold text-white hover:bg-[#1263D8]"
+                    disabled={shareBusy}
+                    onClick={() => void toggleShare()}
+                  >
+                    {active.visibility === 'shared' ? '确认取消共享' : '确认共享'}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  {active?.is_owner ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11 rounded-xl px-6"
+                      disabled={shareBusy}
+                      onClick={() => setShareConfirm(true)}
+                    >
+                      {active.visibility === 'shared' ? '取消共享' : '共享给本租户'}
+                    </Button>
+                  ) : null}
+                  <Button
+                    type="button"
+                    className="h-11 rounded-xl bg-[#165DFF] px-6 font-semibold text-white hover:bg-[#1263D8]"
+                    onClick={() => setOpen(false)}
+                  >
+                    关闭
+                  </Button>
+                </>
+              )}
             </DialogFooter>
           </div>
         </DialogContent>
