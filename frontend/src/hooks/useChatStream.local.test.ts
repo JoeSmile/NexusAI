@@ -136,3 +136,24 @@ describe('useChatStream cache_hit from done frame (Task 80.2)', () => {
     expect(result.current.messages.find((m) => m.role === 'assistant')).toBeUndefined()
   })
 })
+
+describe('useChatStream image extra (76b)', () => {
+  it('keeps imagePreview on the user bubble and omits it from the JSON body', async () => {
+    const { result } = renderHook(() => useChatStream('/chat/streaming'))
+    await act(async () => {
+      await result.current.send('请看看这张图片', {
+        session_id: 'workspace-chat',
+        imagePreview: 'blob:preview',
+      })
+    })
+    const user = result.current.messages.find((m) => m.role === 'user')
+    expect(user?.imagePreview).toBe('blob:preview')
+    expect(startMock).toHaveBeenCalledTimes(1)
+    const init = startMock.mock.calls[0][1] as { body: string }
+    const payload = JSON.parse(init.body) as Record<string, unknown>
+    expect(payload.message).toBe('请看看这张图片')
+    expect(payload.session_id).toBe('workspace-chat')
+    expect(payload).not.toHaveProperty('imagePreview')
+    expect(payload).not.toHaveProperty('attachment_ids')
+  })
+})

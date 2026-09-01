@@ -1,3 +1,5 @@
+/** @deprecated Task 58 legacy vision chat. HomeChat uses POST /api/files (76b). */
+
 import { apiFetch } from '@/api/http'
 
 export type MultimodalChatResponse = {

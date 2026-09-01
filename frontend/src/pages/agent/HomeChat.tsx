@@ -18,7 +18,7 @@ import {
   fetchChatHistory,
   postChatNote,
 } from '@/api/chat'
-import { postMultimodalChat } from '@/api/multimodal'
+import { uploadSessionFile } from '@/api/files'
 import { formatApiError } from '@/api/http'
 import { fetchTermsPending } from '@/api/terms'
 import { ContextPanel } from '@/components/agent/ContextPanel'
@@ -46,7 +46,6 @@ import { runHotspotDigInPlace } from '@/lib/runHotspotDigInPlace'
 import { detectSensitiveHints, validateChatInput } from '@/lib/clientGuardrails'
 import { runScriptGenInPlace } from '@/lib/runScriptGenInPlace'
 import { useChatPrefsStore } from '@/stores/chatPrefsStore'
-import { useAuthStore } from '@/stores/authStore'
 import { useWorkflowTriggerStore } from '@/stores/workflowTriggerStore'
 import { TermsAcceptanceDialog } from '@/components/legal/TermsAcceptanceDialog'
 import { StreamAlertBanner } from '@/components/agent/StreamAlert'
@@ -94,14 +93,14 @@ export default function HomeChatPage() {
   const [termsPending, setTermsPending] = useState<TermsDoc[]>([])
   const [pendingImage, setPendingImage] = useState<File | null>(null)
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
-  const [visionErr, setVisionErr] = useState<string | null>(null)
+  const [attachErr, setAttachErr] = useState<string | null>(null)
+  const [attachBusy, setAttachBusy] = useState(false)
   const [guardrailError, setGuardrailError] = useState<string | null>(null)
   const [sensitiveOpen, setSensitiveOpen] = useState(false)
   const pendingSendRef = useRef<string | null>(null)
   const sensitiveFindings = useMemo(() => detectSensitiveHints(input), [input])
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const role = useAuthStore((s) => s.activeRole)
-  const canVision = role === 'tenant_admin' || role === 'super_admin'
+  const attachBusyRef = useRef(false)
   /** 历史首屏加载完成后强制滚底（内容运营切回对话） */
   const [historyScrollNonce, setHistoryScrollNonce] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -455,39 +454,42 @@ export default function HomeChatPage() {
 
   const executeSend = useCallback(
     async (text: string) => {
+      if (attachBusyRef.current) return
       if (streaming) {
         abort()
       }
-      setInput('')
-      setVisionErr(null)
+      setAttachErr(null)
       setGuardrailError(null)
 
       if (pendingImage) {
         const preview = imagePreviewUrl
         const file = pendingImage
+        attachBusyRef.current = true
+        setAttachBusy(true)
+        try {
+          await uploadSessionFile(file, WORKSPACE_CHAT_SESSION)
+        } catch (e) {
+          setAttachErr(formatApiError(e))
+          attachBusyRef.current = false
+          setAttachBusy(false)
+          return
+        }
+        attachBusyRef.current = false
+        setAttachBusy(false)
         setPendingImage(null)
         setImagePreviewUrl(null)
-        const userId = appendLocal(
-          'user',
-          text || '（图片）',
-          'done',
-          preview || undefined,
-        )
-        const asstId = appendLocal('assistant', '', 'streaming')
-        try {
-          const res = await postMultimodalChat(file, text || '请描述这张图片', {
-            session_id: WORKSPACE_CHAT_SESSION,
-            ...(modelId ? { model: modelId } : {}),
-          })
-          patchLocal(asstId, res.response, 'done')
-        } catch (e) {
-          patchLocal(asstId, formatApiError(e, 'multimodal:vision'), 'error')
-          setVisionErr(formatApiError(e, 'multimodal:vision'))
-        }
-        void userId
+        setInput('')
+        await send(text.trim() ? text : '请看看这张图片', {
+          session_id: WORKSPACE_CHAT_SESSION,
+          ...(modelId ? { model: modelId } : {}),
+          temperature,
+          ...(maxTokens > 0 ? { max_tokens: maxTokens } : {}),
+          ...(preview ? { imagePreview: preview } : {}),
+        })
         return
       }
 
+      setInput('')
       await send(text, {
         session_id: WORKSPACE_CHAT_SESSION,
         ...(modelId ? { model: modelId } : {}),
@@ -500,8 +502,6 @@ export default function HomeChatPage() {
       abort,
       pendingImage,
       imagePreviewUrl,
-      appendLocal,
-      patchLocal,
       modelId,
       send,
       temperature,
@@ -510,6 +510,7 @@ export default function HomeChatPage() {
   )
 
   const onSend = async () => {
+    if (attachBusyRef.current) return
     const text = input
     if (!text.trim() && !pendingImage) {
       setGuardrailError('请输入消息内容（不能只发空白）')
@@ -896,9 +897,9 @@ export default function HomeChatPage() {
             ))}
           </div>
           {wfToast ? <div className="chat-wf-toast">{wfToast}</div> : null}
-          {visionErr ? (
+          {attachErr ? (
             <div style={{ fontSize: 12, color: 'var(--color-danger)', padding: '0 8px' }}>
-              {visionErr}
+              {attachErr}
             </div>
           ) : null}
           {imagePreviewUrl ? (
@@ -911,6 +912,7 @@ export default function HomeChatPage() {
               <button
                 type="button"
                 className="input-action-btn"
+                disabled={attachBusy}
                 onClick={() => {
                   setPendingImage(null)
                   if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl)
@@ -924,7 +926,7 @@ export default function HomeChatPage() {
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/gif"
+            accept="image/jpeg,image/png,image/gif,image/webp"
             style={{ display: 'none' }}
             onChange={(e) => {
               const f = e.target.files?.[0]
@@ -945,12 +947,15 @@ export default function HomeChatPage() {
               ref={textareaRef}
               className="input-textarea"
               placeholder={
-                digBusy
-                  ? '热点抓取进行中…可继续发消息（不中断抓取）'
-                  : streaming
-                    ? '生成中…可继续输入；Enter 将停止当前回复并发送新消息'
-                    : '输入你的问题，Enter 发送 · Shift+Enter 换行'
+                attachBusy
+                  ? '上传并识别中…'
+                  : digBusy
+                    ? '热点抓取进行中…可继续发消息（不中断抓取）'
+                    : streaming
+                      ? '生成中…可继续输入；Enter 将停止当前回复并发送新消息'
+                      : '输入你的问题，Enter 发送 · Shift+Enter 换行'
               }
+              disabled={attachBusy}
               value={input}
               onChange={(e) => {
                 setInput(e.target.value)
@@ -961,15 +966,14 @@ export default function HomeChatPage() {
             />
             <div className="input-footer">
               <div className="input-actions-left">
-                {canVision ? (
-                  <button
-                    type="button"
-                    className="input-action-btn with-label"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    图片
-                  </button>
-                ) : null}
+                <button
+                  type="button"
+                  className="input-action-btn with-label"
+                  disabled={attachBusy}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  图片
+                </button>
                 <button
                   type="button"
                   className="input-action-btn with-label"
@@ -1045,7 +1049,7 @@ export default function HomeChatPage() {
                     type="button"
                     className="send-btn"
                     onClick={() => void onSend()}
-                    disabled={!input.trim() && !pendingImage}
+                    disabled={attachBusy || (!input.trim() && !pendingImage)}
                     aria-label="发送"
                   >
                     ↑

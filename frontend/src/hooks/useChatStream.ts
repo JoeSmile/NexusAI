@@ -111,9 +111,20 @@ export function useChatStream(endpoint = '/chat/streaming') {
         setStreaming(false)
       }
 
+      const extraIn = extra || {}
+      const preview =
+        typeof extraIn.imagePreview === 'string' ? extraIn.imagePreview : ''
+      const payloadExtra = { ...extraIn }
+      delete payloadExtra.imagePreview
+
       const userId = newClientMessageId()
       const asstId = newClientMessageId()
-      const userMsg: ChatMessage = { id: userId, role: 'user', content: trimmed }
+      const userMsg: ChatMessage = {
+        id: userId,
+        role: 'user',
+        content: trimmed,
+        ...(preview ? { imagePreview: preview } : {}),
+      }
       setMessages((m) => [
         ...m,
         userMsg,
@@ -182,7 +193,7 @@ export function useChatStream(endpoint = '/chat/streaming') {
             message: trimmed,
             user_client_message_id: userId,
             assistant_client_message_id: asstId,
-            ...extra,
+            ...payloadExtra,
           }),
         },
         {
