@@ -58,12 +58,13 @@ def test_wrap_untrusted_escapes_and_marks() -> None:
     assert "c.pdf" in wrapped
 
 
-def test_inject_followup_without_attachment_ids() -> None:
+@pytest.mark.asyncio
+async def test_inject_followup_without_attachment_ids() -> None:
     store = _ready_store()
     set_attachment_store(store)
     try:
         state = make_initial_state("t1", "u1", "s1", "那赔偿呢")
-        inject_session_attachments(state)
+        await inject_session_attachments(state)
         assert state["file_blocks"]
         assert "违约" in (state.get("memory_prompt_block") or "")
         assert "UNTRUSTED" in (state.get("memory_prompt_block") or "")
@@ -72,12 +73,13 @@ def test_inject_followup_without_attachment_ids() -> None:
         set_attachment_store(None)
 
 
-def test_cross_session_not_injected() -> None:
+@pytest.mark.asyncio
+async def test_cross_session_not_injected() -> None:
     store = _ready_store(session_id="s1")
     set_attachment_store(store)
     try:
         state = make_initial_state("t1", "u1", "s2", "那赔偿呢")
-        inject_session_attachments(state)
+        await inject_session_attachments(state)
         assert state.get("file_blocks") == []
         assert "违约" not in (state.get("memory_prompt_block") or "")
         assert session_has_ready_attachments("t1", "u1", "s2") is False
@@ -174,12 +176,13 @@ class _ListWithoutBlocks:
         return self._inner.get(**kwargs)
 
 
-def test_inject_loads_blocks_via_get_when_list_omits_them() -> None:
+@pytest.mark.asyncio
+async def test_inject_loads_blocks_via_get_when_list_omits_them() -> None:
     inner = _ready_store()
     set_attachment_store(_ListWithoutBlocks(inner))  # type: ignore[arg-type]
     try:
         state = make_initial_state("t1", "u1", "s1", "那赔偿呢")
-        inject_session_attachments(state)
+        await inject_session_attachments(state)
         assert state["file_blocks"]
         assert "违约" in (state.get("memory_prompt_block") or "")
     finally:
@@ -200,5 +203,71 @@ def test_append_caption_keeps_existing_page_blocks() -> None:
         assert "违约" in "".join(texts)
         assert "月份" in "".join(texts)
         assert kinds.count("page") == 1
+    finally:
+        set_attachment_store(None)
+
+
+def _image_pending_store(*, attempts: int, pending: bool = True) -> MemoryAttachmentStore:
+    store = MemoryAttachmentStore()
+    store.save(
+        tenant_id="t1",
+        session_id="s1",
+        uploaded_by="u1",
+        name="shot.png",
+        media_type="image/png",
+        size=10,
+        status="ready",
+        storage_path="/tmp/shot.png",
+        expired_at=datetime.now(UTC) + timedelta(days=7),
+        blocks=[],
+        attachment_id="img1",
+    )
+    store.items["img1"]["describe_pending"] = pending
+    store.items["img1"]["describe_attempts"] = attempts
+    return store
+
+
+@pytest.mark.asyncio
+async def test_inject_retries_pending_describe_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from unittest.mock import AsyncMock
+
+    store = _image_pending_store(attempts=1)
+    set_attachment_store(store)
+    monkeypatch.setattr(
+        "packages.attachments.inject.describe_image",
+        AsyncMock(return_value={"text": "重试后的描述", "source": "vision"}),
+    )
+    try:
+        state = make_initial_state("t1", "u1", "s1", "这张图说什么")
+        await inject_session_attachments(state)
+        assert "重试后的描述" in (state.get("memory_prompt_block") or "")
+        row = store.get(tenant_id="t1", session_id="s1", attachment_id="img1")
+        assert row is not None
+        assert any(b.get("kind") == "caption" for b in row["blocks"])
+        assert row.get("describe_pending") is False
+    finally:
+        set_attachment_store(None)
+
+
+@pytest.mark.asyncio
+async def test_inject_notice_when_attempts_exhausted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from unittest.mock import AsyncMock
+
+    store = _image_pending_store(attempts=2)
+    set_attachment_store(store)
+    spy = AsyncMock()
+    monkeypatch.setattr("packages.attachments.inject.describe_image", spy)
+    try:
+        state = make_initial_state("t1", "u1", "s1", "这张图说什么")
+        await inject_session_attachments(state)
+        spy.assert_not_called()
+        prompt = state.get("memory_prompt_block") or ""
+        assert "shot.png" in prompt
+        assert "无法解析" in prompt
+        assert "UNTRUSTED" in prompt
     finally:
         set_attachment_store(None)

@@ -118,7 +118,8 @@ def test_maybe_hard_reset_keeps_l1_under_cap() -> None:
     _del.assert_not_called()
 
 
-def test_file_blocks_capped_separately_from_dialogue_window() -> None:
+@pytest.mark.asyncio
+async def test_file_blocks_capped_separately_from_dialogue_window() -> None:
     from packages.attachments import inject as inj
 
     store = MemoryAttachmentStore()
@@ -156,7 +157,7 @@ def test_file_blocks_capped_separately_from_dialogue_window() -> None:
             "packages.attachments.inject.record_file_blocks_truncated", _inc
         ):
             state = make_initial_state("t1", "u1", "s1", "总结合同")
-            inj.inject_session_attachments(state)
+            await inj.inject_session_attachments(state)
         assert len(state["file_blocks"]) == 3
         assert truncated["n"] >= 1
         # Dialogue 8k budget is not used to squeeze file_blocks away:

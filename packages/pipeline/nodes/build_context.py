@@ -102,5 +102,5 @@ async def build_context(state: PipelineState) -> PipelineState:
     )
     from packages.attachments.inject import inject_session_attachments
 
-    inject_session_attachments(state)
+    await inject_session_attachments(state)
     return state

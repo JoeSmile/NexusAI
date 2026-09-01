@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
+from packages.attachments.describe import DescribeError, describe_image
 from packages.attachments.notice import row_is_live
 from packages.guardrails.rag_sanitize import sanitize_fragment
 
 MAX_INJECT_BLOCKS = 12
 MAX_BLOCK_CHARS = 1200
+VISION_UNAVAILABLE_NOTICE = "该图片无法解析（{filename}）：未配置视觉模型或 OCR 失败。"
 
 
 def wrap_untrusted_block(
@@ -65,11 +67,83 @@ def record_file_blocks_truncated(n: int = 1) -> None:
         pass
 
 
-def inject_session_attachments(state: dict[str, Any]) -> dict[str, Any]:
+def _is_image_row(row: dict[str, Any]) -> bool:
+    return str(row.get("media_type") or "").startswith("image/")
+
+
+def _has_caption(blocks: list[dict[str, Any]]) -> bool:
+    return any(
+        b.get("kind") == "caption" and str(b.get("text") or "").strip() for b in blocks
+    )
+
+
+async def _refresh_image_blocks(
+    store: Any,
+    full: dict[str, Any],
+    *,
+    tenant_id: str,
+    user_id: str,
+    session_id: str,
+) -> dict[str, Any]:
+    if not _is_image_row(full):
+        return full
+    aid = str(full.get("id") or "")
+    blocks = list(full.get("blocks") or [])
+    if _has_caption(blocks):
+        return full
+    pending = bool(full.get("describe_pending"))
+    attempts = int(full.get("describe_attempts") or 0)
+    if pending and attempts < 2:
+        try:
+            result = await describe_image(
+                tenant_id=tenant_id,
+                user_id=user_id,
+                session_id=session_id,
+                attachment_id=aid,
+            )
+            text = str(result.get("text") or "").strip()
+            if text:
+                store.append_caption(aid, text)
+                store.mark_describe_pending(aid, pending=False, increment=False)
+            else:
+                store.mark_describe_pending(aid, pending=True, increment=True)
+        except DescribeError:
+            store.mark_describe_pending(aid, pending=True, increment=True)
+        except Exception:
+            store.mark_describe_pending(aid, pending=True, increment=True)
+        refreshed = store.get(
+            tenant_id=tenant_id, session_id=session_id, attachment_id=aid
+        )
+        if refreshed:
+            full = refreshed
+            blocks = list(full.get("blocks") or [])
+            pending = bool(full.get("describe_pending"))
+            attempts = int(full.get("describe_attempts") or 0)
+    if pending and attempts >= 2 and not _has_caption(blocks):
+        name = str(full.get("name") or "image")
+        notice = VISION_UNAVAILABLE_NOTICE.format(filename=name)
+        blocks = [
+            *blocks,
+            {
+                "block_index": len(blocks),
+                "kind": "caption",
+                "text": notice,
+                "char_count": len(notice),
+                "page": None,
+                "sheet": None,
+                "rows": None,
+            },
+        ]
+        full = {**full, "blocks": blocks}
+    return full
+
+
+async def inject_session_attachments(state: dict[str, Any]) -> dict[str, Any]:
     """Load this session's ready blocks into file_blocks + memory_prompt_block."""
     from packages.attachments.store import AttachmentForbidden, get_attachment_store
 
     tenant_id = str(state.get("tenant_id") or "")
+    user_id = str(state.get("user_id") or "")
     session_id = str(state.get("session_id") or "")
     store = get_attachment_store()
     state.setdefault("file_blocks", [])
@@ -96,6 +170,13 @@ def inject_session_attachments(state: dict[str, Any]) -> dict[str, Any]:
             continue
         if full is None:
             continue
+        full = await _refresh_image_blocks(
+            store,
+            full,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            session_id=session_id,
+        )
         picked = _pick_blocks(list(full.get("blocks") or []), query)
         name = str(full.get("name") or row.get("name") or "file")
         for b in picked:
