@@ -214,9 +214,8 @@ async def test_describe_redis_cache_ttl_matches_attachment(
     _key, _val, ex = fake.set_calls[0]
     assert ex is not None
     assert 7 * 24 * 3600 - 120 <= int(ex) <= 7 * 24 * 3600
-    assert desc.describe_cache_key("t1", image_row["aid"]) in _key or _key.endswith(
-        image_row["aid"]
-    )
+    digest = desc.content_digest(image_row["data"])
+    assert _key == desc.describe_cache_key("t1", digest)
 
     second = await desc.describe_image(
         tenant_id="t1",
@@ -392,3 +391,164 @@ def test_upload_png_session_attachment(tmp_path, monkeypatch: pytest.MonkeyPatch
     assert body["status"] == "ready"
     assert body["blocks"] == []
     assert body["attachment_id"]
+
+
+def test_describe_cache_key_uses_content_digest_not_attachment_id() -> None:
+    from packages.attachments.describe import content_digest, describe_cache_key
+
+    digest = content_digest(_png_bytes())
+    assert len(digest) == 16
+    key = describe_cache_key("t1", digest)
+    assert key.startswith("img:desc:t1:")
+    assert "attimg" not in key
+    assert digest in key
+
+
+@pytest.mark.asyncio
+async def test_same_bytes_second_attachment_hits_hash_cache(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from packages.attachments import describe as desc
+    from packages.harness.base import HarnessResult
+
+    store = MemoryAttachmentStore()
+    set_attachment_store(store)
+    data = _png_bytes()
+    calls = {"n": 0}
+
+    def _save(tid: str, sid: str, aid: str) -> str:
+        path = tmp_path / f"{aid}.png"
+        path.write_bytes(data)
+        return store.save(
+            tenant_id=tid,
+            session_id=sid,
+            uploaded_by="u1",
+            name="shot.png",
+            media_type="image/png",
+            size=len(data),
+            status="ready",
+            storage_path=str(path),
+            expired_at=datetime.now(UTC) + timedelta(days=7),
+            blocks=[],
+            attachment_id=aid,
+        )
+
+    aid1 = _save("t1", "s1", "a" * 32)
+    aid2 = _save("t1", "s1", "b" * 32)
+    fake = _FakeRedis()
+    monkeypatch.setattr(desc, "get_sync_redis", lambda **_k: fake)
+    monkeypatch.setattr(desc, "tenant_has_vision", AsyncMock(return_value=True))
+    monkeypatch.setattr(
+        desc,
+        "resolve_vision_credentials",
+        AsyncMock(return_value=("qwen-vl-plus", "k", "http://x", "qwen")),
+    )
+
+    class _H:
+        async def generate(self, **_k):
+            calls["n"] += 1
+            return HarnessResult(output="same-bytes-caption", success=True, metadata={})
+
+    monkeypatch.setattr(desc, "_harness", _H())
+    first = await desc.describe_image(
+        tenant_id="t1", user_id="u1", session_id="s1", attachment_id=aid1
+    )
+    second = await desc.describe_image(
+        tenant_id="t1", user_id="u1", session_id="s1", attachment_id=aid2
+    )
+    set_attachment_store(None)
+    assert first["text"] == "same-bytes-caption"
+    assert second["cached"] is True
+    assert second["text"] == "same-bytes-caption"
+    assert calls["n"] == 1
+    assert fake.set_calls
+    digest = desc.content_digest(data)
+    assert desc.describe_cache_key("t1", digest) == fake.set_calls[0][0]
+
+
+@pytest.mark.asyncio
+async def test_same_bytes_other_tenant_does_not_share_cache(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from packages.attachments import describe as desc
+    from packages.harness.base import HarnessResult
+
+    store = MemoryAttachmentStore()
+    set_attachment_store(store)
+    data = _png_bytes()
+    calls = {"n": 0}
+
+    def _save(tid: str, aid: str) -> str:
+        path = tmp_path / f"{aid}.png"
+        path.write_bytes(data)
+        return store.save(
+            tenant_id=tid,
+            session_id="s1",
+            uploaded_by="u1",
+            name="shot.png",
+            media_type="image/png",
+            size=len(data),
+            status="ready",
+            storage_path=str(path),
+            expired_at=datetime.now(UTC) + timedelta(days=7),
+            blocks=[],
+            attachment_id=aid,
+        )
+
+    _save("t1", "a" * 32)
+    _save("t2", "c" * 32)
+    fake = _FakeRedis()
+    monkeypatch.setattr(desc, "get_sync_redis", lambda **_k: fake)
+    monkeypatch.setattr(desc, "tenant_has_vision", AsyncMock(return_value=True))
+    monkeypatch.setattr(
+        desc,
+        "resolve_vision_credentials",
+        AsyncMock(return_value=("qwen-vl-plus", "k", "http://x", "qwen")),
+    )
+
+    class _H:
+        async def generate(self, **_k):
+            calls["n"] += 1
+            return HarnessResult(output=f"cap-{calls['n']}", success=True, metadata={})
+
+    monkeypatch.setattr(desc, "_harness", _H())
+    await desc.describe_image(
+        tenant_id="t1", user_id="u1", session_id="s1", attachment_id="a" * 32
+    )
+    other = await desc.describe_image(
+        tenant_id="t2", user_id="u1", session_id="s1", attachment_id="c" * 32
+    )
+    set_attachment_store(None)
+    assert calls["n"] == 2
+    assert other.get("cached") is not True
+    assert other["text"] == "cap-2"
+
+
+@pytest.mark.asyncio
+async def test_legacy_attachment_id_cache_key_still_read(
+    image_row, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import json
+
+    from packages.attachments import describe as desc
+    from packages.harness.base import HarnessResult
+
+    fake = _FakeRedis()
+    old_key = desc.legacy_describe_cache_key("t1", image_row["aid"])
+    fake.kv[old_key] = json.dumps({"text": "from-legacy", "source": "vision", "tokens": 1})
+    monkeypatch.setattr(desc, "get_sync_redis", lambda **_k: fake)
+    monkeypatch.setattr(desc, "tenant_has_vision", AsyncMock(return_value=True))
+
+    class _H:
+        async def generate(self, **_k):
+            return HarnessResult(output="should-not-run", success=True, metadata={})
+
+    monkeypatch.setattr(desc, "_harness", _H())
+    result = await desc.describe_image(
+        tenant_id="t1",
+        user_id="u1",
+        session_id="s1",
+        attachment_id=image_row["aid"],
+    )
+    assert result["cached"] is True
+    assert result["text"] == "from-legacy"

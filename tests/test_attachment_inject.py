@@ -153,3 +153,52 @@ def test_attachment_ingest_does_not_touch_knowledge_base() -> None:
     src = Path("packages/attachments/service.py").read_text(encoding="utf-8")
     assert "knowledge_chunks" not in src
     assert "embed" not in src.lower()
+
+
+class _ListWithoutBlocks:
+    """PG-shaped store: list_session omits blocks; get() still has them."""
+
+    def __init__(self, inner: MemoryAttachmentStore) -> None:
+        self._inner = inner
+
+    def list_session(self, *, tenant_id: str, session_id: str) -> list[dict]:
+        rows = self._inner.list_session(tenant_id=tenant_id, session_id=session_id)
+        out = []
+        for row in rows:
+            slim = dict(row)
+            slim.pop("blocks", None)
+            out.append(slim)
+        return out
+
+    def get(self, **kwargs):
+        return self._inner.get(**kwargs)
+
+
+def test_inject_loads_blocks_via_get_when_list_omits_them() -> None:
+    inner = _ready_store()
+    set_attachment_store(_ListWithoutBlocks(inner))  # type: ignore[arg-type]
+    try:
+        state = make_initial_state("t1", "u1", "s1", "那赔偿呢")
+        inject_session_attachments(state)
+        assert state["file_blocks"]
+        assert "违约" in (state.get("memory_prompt_block") or "")
+    finally:
+        set_attachment_store(None)
+
+
+def test_append_caption_keeps_existing_page_blocks() -> None:
+    store = _ready_store()
+    set_attachment_store(store)
+    try:
+        store.append_caption("a1", "图表横轴是月份")
+        row = store.get(tenant_id="t1", session_id="s1", attachment_id="a1")
+        assert row is not None
+        kinds = [b["kind"] for b in row["blocks"]]
+        texts = [b["text"] for b in row["blocks"]]
+        assert "page" in kinds
+        assert "caption" in kinds
+        assert "违约" in "".join(texts)
+        assert "月份" in "".join(texts)
+        assert kinds.count("page") == 1
+    finally:
+        set_attachment_store(None)

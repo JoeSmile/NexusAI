@@ -48,6 +48,8 @@ class MemoryAttachmentStore:
             "status": status,
             "storage_path": storage_path,
             "parse_attempts": 0,
+            "describe_pending": False,
+            "describe_attempts": 0,
             "expired_at": expired_at,
             "blocks": [
                 {
@@ -79,6 +81,29 @@ class MemoryAttachmentStore:
         if row["session_id"] != session_id:
             raise AttachmentForbidden("cross_session")
         return row
+
+    def append_caption(self, attachment_id: str, text: str) -> None:
+        row = self.items.get(attachment_id)
+        if row is None:
+            return
+        body = (text or "").strip()
+        if not body:
+            return
+        blocks = list(row.get("blocks") or [])
+        nxt = max((int(b.get("block_index") or 0) for b in blocks), default=-1) + 1
+        blocks.append(
+            {
+                "block_index": nxt,
+                "kind": "caption",
+                "text": body,
+                "char_count": len(body),
+                "page": None,
+                "sheet": None,
+                "rows": None,
+            }
+        )
+        row["blocks"] = blocks
+        row["describe_pending"] = False
 
     def list_session(self, *, tenant_id: str, session_id: str) -> list[dict[str, Any]]:
         return [
@@ -166,6 +191,8 @@ class PgAttachmentStore:
                     status=status,
                     storage_path=storage_path,
                     parse_attempts=0,
+                    describe_pending=False,
+                    describe_attempts=0,
                     expired_at=expired_at,
                 )
             )
@@ -226,6 +253,8 @@ class PgAttachmentStore:
                 "status": row.status,
                 "storage_path": row.storage_path,
                 "parse_attempts": int(getattr(row, "parse_attempts", 0) or 0),
+                "describe_pending": bool(getattr(row, "describe_pending", False)),
+                "describe_attempts": int(getattr(row, "describe_attempts", 0) or 0),
                 "expired_at": row.expired_at,
                 "blocks": [
                     {
@@ -306,6 +335,42 @@ class PgAttachmentStore:
                 row.status = "parsing"
             session.commit()
 
+    def append_caption(self, attachment_id: str, text: str) -> None:
+        from packages.database.pgvector_session import Attachment, AttachmentBlock, get_pg_session
+
+        body = (text or "").strip()
+        if not body:
+            return
+        sf = get_pg_session()
+        with sf.Session() as session:
+            row = session.query(Attachment).filter(Attachment.id == attachment_id).first()
+            if row is None:
+                return
+            nxt = (
+                session.query(AttachmentBlock.block_index)
+                .filter(AttachmentBlock.attachment_id == attachment_id)
+                .order_by(AttachmentBlock.block_index.desc())
+                .first()
+            )
+            idx = int(nxt[0]) + 1 if nxt else 0
+            session.add(
+                AttachmentBlock(
+                    attachment_id=attachment_id,
+                    tenant_id=row.tenant_id,
+                    session_id=row.session_id,
+                    block_index=idx,
+                    kind="caption",
+                    page=None,
+                    sheet=None,
+                    rows=None,
+                    text=body,
+                    char_count=len(body),
+                )
+            )
+            if hasattr(row, "describe_pending"):
+                row.describe_pending = False
+            session.commit()
+
     def list_expired(self, *, now: datetime) -> list[dict[str, Any]]:
         from packages.database.pgvector_session import Attachment, get_pg_session
 
@@ -340,6 +405,8 @@ def _attachment_row(row: Any) -> dict[str, Any]:
         "status": row.status,
         "storage_path": row.storage_path,
         "parse_attempts": int(getattr(row, "parse_attempts", 0) or 0),
+        "describe_pending": bool(getattr(row, "describe_pending", False)),
+        "describe_attempts": int(getattr(row, "describe_attempts", 0) or 0),
         "expired_at": row.expired_at,
     }
 

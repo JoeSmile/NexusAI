@@ -67,15 +67,14 @@ def record_file_blocks_truncated(n: int = 1) -> None:
 
 def inject_session_attachments(state: dict[str, Any]) -> dict[str, Any]:
     """Load this session's ready blocks into file_blocks + memory_prompt_block."""
-    from packages.attachments.store import get_attachment_store
+    from packages.attachments.store import AttachmentForbidden, get_attachment_store
 
     tenant_id = str(state.get("tenant_id") or "")
     session_id = str(state.get("session_id") or "")
+    store = get_attachment_store()
     state.setdefault("file_blocks", [])
     try:
-        rows = get_attachment_store().list_session(
-            tenant_id=tenant_id, session_id=session_id
-        )
+        rows = store.list_session(tenant_id=tenant_id, session_id=session_id)
     except Exception:
         return state
 
@@ -86,12 +85,22 @@ def inject_session_attachments(state: dict[str, Any]) -> dict[str, Any]:
     for row in rows:
         if row.get("status") != "ready" or not row_is_live(row):
             continue
-        if wanted and str(row.get("id")) not in wanted:
+        aid = str(row.get("id") or "")
+        if wanted and aid not in wanted:
             continue
-        picked = _pick_blocks(list(row.get("blocks") or []), query)
+        try:
+            full = store.get(
+                tenant_id=tenant_id, session_id=session_id, attachment_id=aid
+            )
+        except AttachmentForbidden:
+            continue
+        if full is None:
+            continue
+        picked = _pick_blocks(list(full.get("blocks") or []), query)
+        name = str(full.get("name") or row.get("name") or "file")
         for b in picked:
             wrapped = wrap_untrusted_block(
-                name=str(row.get("name") or "file"),
+                name=name,
                 page=b.get("page"),
                 sheet=b.get("sheet"),
                 text=str(b.get("text") or ""),

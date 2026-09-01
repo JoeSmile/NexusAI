@@ -246,7 +246,7 @@ CACHE_KEY_DOMAINS: dict[str, str] = {
     "llm": "LLM 并发 in-flight (llm:in-flight:global / llm:in-flight:{hash})",
     "belief": "意图漏斗当前任务 (belief:cur:{tid}:{uid}:{session})",
     "search": "热点付费搜索次数帽 (search:cap:global:{month} / search:cap:{tid}:{day|month})",
-    "img": "会话图片描述缓存 (img:desc:{tid}:{attachment_id}，TTL 与附件一致默认 7 天)",
+    "img": "会话图片描述缓存 (img:desc:{tid}:{sha256[:16]}，旧 attachment_id key 只读兼容)",
 }
 
 

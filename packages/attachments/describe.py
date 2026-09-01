@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import logging
@@ -46,7 +47,15 @@ class DescribeError(Exception):
         super().__init__(message)
 
 
-def describe_cache_key(tenant_id: str, attachment_id: str) -> str:
+def content_digest(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()[:16]
+
+
+def describe_cache_key(tenant_id: str, digest: str) -> str:
+    return cache_key("img", "desc", tenant_id, digest)
+
+
+def legacy_describe_cache_key(tenant_id: str, attachment_id: str) -> str:
     return cache_key("img", "desc", tenant_id, attachment_id)
 
 
@@ -159,19 +168,7 @@ def _audit(
         logger.debug("image.describe audit skipped", exc_info=True)
 
 
-def _cache_get(tenant_id: str, attachment_id: str) -> dict[str, Any] | None:
-    try:
-        client = get_sync_redis(decode_responses=True)
-    except Exception:
-        return None
-    if client is None:
-        return None
-    key = describe_cache_key(tenant_id, attachment_id)
-    try:
-        raw = client.get(key)
-    except Exception:
-        logger.debug("image.describe cache get failed", exc_info=True)
-        return None
+def _parse_cached(raw: Any) -> dict[str, Any] | None:
     if not raw:
         return None
     try:
@@ -183,14 +180,39 @@ def _cache_get(tenant_id: str, attachment_id: str) -> dict[str, Any] | None:
     return row
 
 
-def _cache_set(tenant_id: str, attachment_id: str, payload: dict[str, Any], ttl: int) -> None:
+def _cache_get(
+    tenant_id: str, *, digest: str, attachment_id: str
+) -> dict[str, Any] | None:
+    try:
+        client = get_sync_redis(decode_responses=True)
+    except Exception:
+        return None
+    if client is None:
+        return None
+    keys = [
+        describe_cache_key(tenant_id, digest),
+        legacy_describe_cache_key(tenant_id, attachment_id),
+    ]
+    for key in keys:
+        try:
+            raw = client.get(key)
+        except Exception:
+            logger.debug("image.describe cache get failed", exc_info=True)
+            return None
+        hit = _parse_cached(raw)
+        if hit:
+            return hit
+    return None
+
+
+def _cache_set(tenant_id: str, digest: str, payload: dict[str, Any], ttl: int) -> None:
     try:
         client = get_sync_redis(decode_responses=True)
     except Exception:
         return
     if client is None:
         return
-    key = describe_cache_key(tenant_id, attachment_id)
+    key = describe_cache_key(tenant_id, digest)
     try:
         client.set(key, json.dumps(payload, ensure_ascii=False), ex=ttl)
     except Exception:
@@ -242,7 +264,16 @@ async def describe_image(
     if not _is_image(row):
         raise DescribeError("FILE_TYPE", "not_an_image")
 
-    cached = _cache_get(tenant_id, attachment_id)
+    path = str(row.get("storage_path") or "")
+    try:
+        data = Path(path).read_bytes() if path else b""
+    except OSError as exc:
+        raise DescribeError("FILE_NOT_FOUND", "image_unreadable") from exc
+    if not data:
+        raise DescribeError("FILE_EMPTY", "empty_image")
+
+    digest = content_digest(data)
+    cached = _cache_get(tenant_id, digest=digest, attachment_id=attachment_id)
     if cached:
         return {
             "text": str(cached["text"]),
@@ -251,14 +282,6 @@ async def describe_image(
             "tokens": int(cached.get("tokens") or 0),
             "cached": True,
         }
-
-    path = str(row.get("storage_path") or "")
-    try:
-        data = Path(path).read_bytes() if path else b""
-    except OSError as exc:
-        raise DescribeError("FILE_NOT_FOUND", "image_unreadable") from exc
-    if not data:
-        raise DescribeError("FILE_EMPTY", "empty_image")
 
     prompt = (query_hint or "").strip() or DEFAULT_PROMPT
     media = str(row.get("media_type") or "image/png")
@@ -327,7 +350,7 @@ async def describe_image(
         "input_tokens": in_tok,
         "output_tokens": out_tok,
     }
-    _cache_set(tenant_id, attachment_id, payload, _ttl_seconds(row))
+    _cache_set(tenant_id, digest, payload, _ttl_seconds(row))
     _audit(
         tenant_id=tenant_id,
         user_id=user_id,
