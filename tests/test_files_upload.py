@@ -141,3 +141,121 @@ def test_docx_paragraphs(files_api) -> None:
     assert r.status_code == 200, r.text
     assert r.json()["status"] == "ocr_required"
     assert r.json()["blocks"] == []
+
+
+def _png_bytes() -> bytes:
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (8, 8), color=(12, 80, 160)).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def test_upload_png_auto_describe_appends_caption(
+    files_api, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from unittest.mock import AsyncMock
+
+    import packages.attachments.auto_describe as auto_mod
+
+    as_client, store, _, _ = files_api
+    monkeypatch.setenv("ATTACH_AUTO_DESCRIBE_IMAGES", "1")
+    monkeypatch.setattr(
+        auto_mod,
+        "describe_image",
+        AsyncMock(return_value={"text": "图里有柱状图", "source": "vision"}),
+    )
+    r = as_client("t1", "u1").post(
+        "/api/files",
+        files={"file": ("shot.png", _png_bytes(), "image/png")},
+        data={"session_id": "s1"},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["describe_status"] == "ready"
+    assert "柱状图" not in r.text
+    aid = body["attachment_id"]
+    row = store.get(tenant_id="t1", session_id="s1", attachment_id=aid)
+    assert row is not None
+    kinds = [b["kind"] for b in row["blocks"]]
+    assert "caption" in kinds
+    assert any("柱状图" in str(b.get("text") or "") for b in row["blocks"])
+    assert row.get("describe_pending") is False
+
+
+def test_upload_png_no_vision_still_200_pending(
+    files_api, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from unittest.mock import AsyncMock
+
+    import packages.attachments.auto_describe as auto_mod
+    from packages.attachments.describe import DescribeError
+
+    as_client, store, _, _ = files_api
+    monkeypatch.setenv("ATTACH_AUTO_DESCRIBE_IMAGES", "1")
+    monkeypatch.setattr(
+        auto_mod,
+        "describe_image",
+        AsyncMock(side_effect=DescribeError("VISION_UNAVAILABLE", "vision_not_configured")),
+    )
+    r = as_client("t1", "u1").post(
+        "/api/files",
+        files={"file": ("shot.png", _png_bytes(), "image/png")},
+        data={"session_id": "s1"},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["describe_status"] == "pending"
+    row = store.get(
+        tenant_id="t1", session_id="s1", attachment_id=body["attachment_id"]
+    )
+    assert row is not None
+    assert row.get("status") == "ready"
+    assert row.get("describe_pending") is True
+    assert int(row.get("describe_attempts") or 0) >= 1
+
+
+def test_auto_describe_disabled_skips(
+    files_api, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from unittest.mock import AsyncMock
+
+    import packages.attachments.auto_describe as auto_mod
+
+    as_client, store, _, _ = files_api
+    spy = AsyncMock()
+    monkeypatch.setenv("ATTACH_AUTO_DESCRIBE_IMAGES", "0")
+    monkeypatch.setattr(auto_mod, "describe_image", spy)
+    r = as_client("t1", "u1").post(
+        "/api/files",
+        files={"file": ("shot.png", _png_bytes(), "image/png")},
+        data={"session_id": "s1"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["describe_status"] == "skipped"
+    spy.assert_not_called()
+    row = store.get(
+        tenant_id="t1", session_id="s1", attachment_id=r.json()["attachment_id"]
+    )
+    assert row is not None
+    assert not any(b.get("kind") == "caption" for b in row["blocks"])
+
+
+def test_txt_upload_does_not_describe(
+    files_api, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from unittest.mock import AsyncMock
+
+    import packages.attachments.auto_describe as auto_mod
+
+    spy = AsyncMock()
+    monkeypatch.setattr(auto_mod, "describe_image", spy)
+    as_client, _, _, _ = files_api
+    r = as_client("t1", "u1").post(
+        "/api/files",
+        files={"file": ("note.txt", b"hello\n", "text/plain")},
+        data={"session_id": "s1"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json().get("describe_status") in {None, "skipped"}
+    spy.assert_not_called()

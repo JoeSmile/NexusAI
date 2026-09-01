@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import text
 
+from packages.attachments.auto_describe import maybe_describe_on_upload
 from packages.attachments.errors import ParseError
 from packages.attachments.service import ingest_bytes
 from packages.attachments.store import AttachmentForbidden, get_attachment_store
@@ -101,7 +102,22 @@ async def upload_session_attachment(
             status_code=400,
             detail={"code": exc.code, "message": exc.message},
         ) from exc
+    store = get_attachment_store()
+    row = store.get(
+        tenant_id=tenant.tenant_id,
+        session_id=sid,
+        attachment_id=str(result.get("attachment_id") or aid),
+    )
+    media = str((row or {}).get("media_type") or "")
+    describe_status = await maybe_describe_on_upload(
+        tenant_id=tenant.tenant_id,
+        user_id=tenant.user_id,
+        session_id=sid,
+        attachment_id=str(result.get("attachment_id") or aid),
+        media_type=media,
+    )
     result["size"] = len(content)
+    result["describe_status"] = describe_status
     return result
 
 

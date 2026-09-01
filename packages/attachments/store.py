@@ -105,6 +105,20 @@ class MemoryAttachmentStore:
         row["blocks"] = blocks
         row["describe_pending"] = False
 
+    def mark_describe_pending(
+        self,
+        attachment_id: str,
+        *,
+        pending: bool,
+        increment: bool = False,
+    ) -> None:
+        row = self.items.get(attachment_id)
+        if row is None:
+            return
+        row["describe_pending"] = bool(pending)
+        if increment:
+            row["describe_attempts"] = int(row.get("describe_attempts") or 0) + 1
+
     def list_session(self, *, tenant_id: str, session_id: str) -> list[dict[str, Any]]:
         return [
             dict(row)
@@ -369,6 +383,26 @@ class PgAttachmentStore:
             )
             if hasattr(row, "describe_pending"):
                 row.describe_pending = False
+            session.commit()
+
+    def mark_describe_pending(
+        self,
+        attachment_id: str,
+        *,
+        pending: bool,
+        increment: bool = False,
+    ) -> None:
+        from packages.database.pgvector_session import Attachment, get_pg_session
+
+        sf = get_pg_session()
+        with sf.Session() as session:
+            row = session.query(Attachment).filter(Attachment.id == attachment_id).first()
+            if row is None:
+                return
+            if hasattr(row, "describe_pending"):
+                row.describe_pending = bool(pending)
+            if increment and hasattr(row, "describe_attempts"):
+                row.describe_attempts = int(getattr(row, "describe_attempts", 0) or 0) + 1
             session.commit()
 
     def list_expired(self, *, now: datetime) -> list[dict[str, Any]]:
