@@ -158,6 +158,19 @@ export async function digHotspots(body: {
   }>('/api/content/hotspots/dig', body)
 }
 
+export async function generateTopicBrief(body: { title: string; summary?: string }) {
+  return apiPost<{
+    kind: string
+    title: string
+    summary?: string
+    background?: string
+    key_points?: string[]
+    risks?: string[]
+    bilibili?: unknown[]
+    artifact_id?: string | null
+  }>('/api/content/topics/brief', body)
+}
+
 export async function generateScript(body: {
   creator_id?: string
   hotspots?: HotspotItem[]
@@ -166,6 +179,7 @@ export async function generateScript(body: {
   extra_instruction?: string
   student_names?: string[]
   save?: boolean
+  brief?: Record<string, unknown>
 }) {
   return apiPost<{
     script: string

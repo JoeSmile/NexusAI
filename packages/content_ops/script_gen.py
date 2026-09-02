@@ -89,6 +89,24 @@ _METHODOLOGY = """【写作方法论 — 短视频口播核心,必须遵守】
 - 整篇按口播节奏分段(钩子一段 / 痛点一段 / 方法几点 / 号召一段)"""
 
 
+def _brief_block(brief: dict[str, Any] | None) -> str:
+    if not brief:
+        return ""
+    points = brief.get("key_points") or []
+    if not isinstance(points, list):
+        points = [points]
+    lines = [
+        "【素材简报】",
+        f"选题：{brief.get('title') or ''} — {brief.get('summary') or ''}",
+        f"背景：{brief.get('background') or ''}",
+        "关键信息点：",
+        *[f"- {p}" for p in points if p],
+        f"风险：{'; '.join(str(x) for x in (brief.get('risks') or []) if x)}",
+        "口播只用以上骨架，禁止编造无来源数字/政策条款/具体个人。",
+    ]
+    return "\n".join(lines)
+
+
 def build_script_prompt(
     *,
     style: dict[str, Any],
@@ -97,7 +115,10 @@ def build_script_prompt(
     duration_sec: int = 60,
     platform: str = "短视频",
     extra_instruction: str = "",
+    brief: dict[str, Any] | None = None,
 ) -> str:
+    brief_part = _brief_block(brief)
+    extra_brief = f"\n\n{brief_part}" if brief_part else ""
     return f"""你是教培机构短视频内容主编,专写能留住人的口播稿。约{duration_sec}秒,{platform}。
 必须服务本公司业务(勿写成无关个人号),遵守合规红线。
 
@@ -110,7 +131,7 @@ def build_script_prompt(
 {_org_block(org_profile)}
 
 【热点/选题 — 从中选或结合】
-{_hotspot_block(hotspots)}
+{_hotspot_block(hotspots)}{extra_brief}
 
 【附加要求】
 {extra_instruction or '无'}
@@ -142,6 +163,7 @@ async def generate_script(
     student_names: list[str] | None = None,
     warm: dict[str, str] | None = None,
     model: str | None = None,
+    brief: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """LLM generate + G7 redact. Fail-open on redaction errors."""
     prompt = build_script_prompt(
@@ -151,6 +173,7 @@ async def generate_script(
         duration_sec=duration_sec,
         platform=platform,
         extra_instruction=extra_instruction,
+        brief=brief,
     )
     text = ""
     try:

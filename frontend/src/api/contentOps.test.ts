@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { setArtifactVisibility } from '@/api/contentOps'
+import { generateTopicBrief, setArtifactVisibility } from '@/api/contentOps'
 
 const { apiPostMock } = vi.hoisted(() => ({
   apiPostMock: vi.fn(),
@@ -32,5 +32,16 @@ describe('setArtifactVisibility (45b.4)', () => {
       '/api/content/artifacts/a1/visibility',
       { visibility: 'shared' },
     )
+  })
+})
+
+describe('generateTopicBrief (45b.5)', () => {
+  it('POSTs /api/content/topics/brief', async () => {
+    apiPostMock.mockResolvedValueOnce({ kind: 'brief', title: '专升本报名', key_points: [] })
+    await generateTopicBrief({ title: '专升本报名', summary: '窗口将至' })
+    expect(apiPostMock).toHaveBeenCalledWith('/api/content/topics/brief', {
+      title: '专升本报名',
+      summary: '窗口将至',
+    })
   })
 })

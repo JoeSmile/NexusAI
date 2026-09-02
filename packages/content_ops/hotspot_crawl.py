@@ -149,7 +149,7 @@ def _parse_eol(soup: BeautifulSoup, base: str) -> list[dict[str, Any]]:
     for it in items:
         t = it["title"]
         if re.search(
-            r"教育|高考|中考|研|职教|高校|学校|招生|志愿|留学|双减|分流",
+            r"教育|高考|中考|研|职教|高校|学校|招生|志愿|留学|双减|分流|专升本|成考|合作办学|在职",
             t,
         ):
             it["summary"] = "中国教育在线 · 行业资讯"
@@ -266,6 +266,114 @@ HOTSPOT_SOURCES: list[SourceSpec] = [
 ]
 
 
+# Vertical hubs (45b.5). Unmatched categories → HOTSPOT_SOURCES.
+CATEGORY_SOURCES: dict[str, list[SourceSpec]] = {
+    "专升本": [
+        (
+            "eol_zsb",
+            "教育在线专升本",
+            "https://www.eol.cn/html/g/zsb/",
+            _parse_eol,
+        ),
+        (
+            "eol_ck",
+            "教育在线成考",
+            "https://www.eol.cn/html/ceee/",
+            _parse_eol,
+        ),
+    ],
+    "考研": [
+        (
+            "chsi_ky",
+            "研招网资讯",
+            "https://yz.chsi.com.cn/kyzx/",
+            _parse_chsi,
+        ),
+        (
+            "chsi_home",
+            "研招网",
+            "https://yz.chsi.com.cn/",
+            _parse_chsi,
+        ),
+    ],
+    "中外合作办学": [
+        (
+            "moe_jw",
+            "教育部新闻",
+            "https://www.moe.gov.cn/jyb_xwfb/",
+            _parse_moe,
+        ),
+        (
+            "cscse",
+            "留服中心",
+            "https://www.cscse.edu.cn/",
+            _parse_eol,
+        ),
+    ],
+    "在职研究生": [
+        (
+            "chsi_zx",
+            "学信网",
+            "https://www.chsi.com.cn/",
+            _parse_chsi,
+        ),
+        (
+            "eol_zy",
+            "教育在线在职研",
+            "https://www.eol.cn/html/kaoyan/",
+            _parse_eol,
+        ),
+    ],
+}
+
+_CAT_ALIASES: dict[str, str] = {
+    "专升本": "专升本",
+    "成考": "专升本",
+    "统招专升本": "专升本",
+    "考研": "考研",
+    "研究生招生": "考研",
+    "中外合作办学": "中外合作办学",
+    "合作办学": "中外合作办学",
+    "在职研究生": "在职研究生",
+    "在职研": "在职研究生",
+    "mba": "在职研究生",
+}
+
+
+def _canonical_category(raw: str) -> str | None:
+    key = re.sub(r"\s+", "", (raw or "").strip())
+    if not key:
+        return None
+    if key in _CAT_ALIASES:
+        return _CAT_ALIASES[key]
+    low = key.lower()
+    if low in _CAT_ALIASES:
+        return _CAT_ALIASES[low]
+    for alias, canon in _CAT_ALIASES.items():
+        if alias in key or key in alias:
+            return canon
+    return None
+
+
+def sources_for_categories(categories: list[str] | None) -> list[SourceSpec]:
+    """Pick vertical column URLs; unknown/empty → default 5 hubs."""
+    if not categories:
+        return list(HOTSPOT_SOURCES)
+    picked: list[SourceSpec] = []
+    seen: set[str] = set()
+    for raw in categories:
+        canon = _canonical_category(str(raw))
+        if not canon:
+            continue
+        for spec in CATEGORY_SOURCES.get(canon) or []:
+            url = spec[2]
+            if url in seen:
+                continue
+            seen.add(url)
+            picked.append(spec)
+    return picked or list(HOTSPOT_SOURCES)
+
+
 def _fetch_html(session: requests.Session, url: str) -> str | None:
     try:
         r = session.get(url, timeout=_TIMEOUT, allow_redirects=True)
@@ -359,9 +467,16 @@ def crawl_hotspots(
     *,
     per_source: int = _PER_SOURCE,
     sources: list[SourceSpec] | None = None,
+    categories: list[str] | None = None,
 ) -> dict[str, Any]:
     """Crawl configured hubs; return items + per-source crawl report."""
-    specs = sources or HOTSPOT_SOURCES
+    cat_label = ""
+    for raw in categories or []:
+        canon = _canonical_category(str(raw))
+        if canon:
+            cat_label = canon
+            break
+    specs = sources if sources is not None else sources_for_categories(categories)
     session = _session()
     all_items: list[dict[str, Any]] = []
     reports: list[dict[str, Any]] = []
@@ -375,7 +490,11 @@ def crawl_hotspots(
             per_source=per_source,
         )
         reports.append(meta)
-        all_items.extend(items)
+        for it in items:
+            row = dict(it)
+            if cat_label:
+                row["category"] = cat_label
+            all_items.append(row)
 
     # 去重：标题 token 集相同则保留更高分 / 先到
     from packages.content_ops.hotspot import (

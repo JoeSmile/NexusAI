@@ -9,6 +9,7 @@ import { Link } from 'react-router-dom'
 import {
   excludeHotspot,
   generateScript,
+  generateTopicBrief,
   getOrgProfile,
   listArtifacts,
   listStyles,
@@ -104,6 +105,7 @@ export default function ContentStudioPage() {
     HotspotItem[] | undefined
   >(undefined)
   const [activeHotspot, setActiveHotspot] = useState<HotspotItem | null>(null)
+  const [topicBrief, setTopicBrief] = useState<Record<string, unknown> | null>(null)
   const [activeScript, setActiveScript] = useState<{
     id: string
     title: string
@@ -172,6 +174,7 @@ export default function ContentStudioPage() {
         duration_sec: form.duration_sec,
         extra_instruction: form.extra_instruction,
         save: true,
+        ...(topicBrief ? { brief: topicBrief } : {}),
       })
       // eslint-disable-next-line no-console -- QA context
       console.log('[script.gen] content-ops response', {
@@ -181,8 +184,27 @@ export default function ContentStudioPage() {
       })
       setScriptOpen(false)
       setScriptSeedHotspots(undefined)
+      setTopicBrief(null)
       setHint('口播已生成（内容运营就地，未写入对话）')
       await refresh()
+    } catch (e) {
+      setHint(formatApiError(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onGenerateBrief = async () => {
+    if (!activeHotspot?.title) return
+    setBusy(true)
+    setHint('正在生成选题简报…')
+    try {
+      const brief = await generateTopicBrief({
+        title: activeHotspot.core_topic || activeHotspot.title,
+        summary: activeHotspot.short_desc || activeHotspot.summary || '',
+      })
+      setTopicBrief(brief as Record<string, unknown>)
+      setHint('简报已生成（私有）。生成口播时会带上素材骨架。')
     } catch (e) {
       setHint(formatApiError(e))
     } finally {
@@ -490,7 +512,10 @@ export default function ContentStudioPage() {
                       <button
                         type="button"
                         className="w-full rounded-lg border border-border/80 bg-background px-3 py-2 text-left transition hover:border-[#165DFF]/40 hover:bg-[rgba(22,93,255,0.04)]"
-                        onClick={() => setActiveHotspot(h)}
+                        onClick={() => {
+                          setTopicBrief(null)
+                          setActiveHotspot(h)
+                        }}
                       >
                         <div className="text-sm font-medium text-[#0F172A]">
                           {h.core_topic || h.title}
@@ -594,6 +619,24 @@ export default function ContentStudioPage() {
                     activeHotspot.summary ||
                     '（无摘要）'}
                 </p>
+                {topicBrief ? (
+                  <div className="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] px-3 py-2 text-xs text-[#334155]">
+                    <div className="font-medium text-[#0F172A]">素材简报</div>
+                    <ul className="mt-1 list-disc pl-4">
+                      {(Array.isArray(topicBrief.key_points)
+                        ? topicBrief.key_points
+                        : []
+                      )
+                        .slice(0, 5)
+                        .map((p) => (
+                          <li key={String(p)}>{String(p)}</li>
+                        ))}
+                    </ul>
+                    {Array.isArray(topicBrief.risks) && topicBrief.risks[0] ? (
+                      <p className="mt-1 text-[#94A3B8]">{String(topicBrief.risks[0])}</p>
+                    ) : null}
+                  </div>
+                ) : null}
                 <div className="flex flex-wrap gap-2 text-xs">
                   <Badge variant="secondary">
                     热度 {activeHotspot.hot_score ?? activeHotspot.score ?? '-'}
@@ -790,6 +833,15 @@ export default function ContentStudioPage() {
               }
             >
               不喜欢
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 min-w-[5.5rem]"
+              disabled={busy || !activeHotspot?.title}
+              onClick={() => void onGenerateBrief()}
+            >
+              生成简报
             </Button>
             <Button
               type="button"

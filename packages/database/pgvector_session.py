@@ -701,6 +701,7 @@ class ContentArtifact(Base):
       - hotspot_run — 单次抓取记录（同 content_hash 幂等）
       - hotspot — 旧版单次抓取（兼容展示）
       - script — 口播稿
+      - brief — 选题素材简报（45b.5）
     Visibility (45b.4): default private; ``shared`` = tenant-wide. All kinds.
     """
 

@@ -402,12 +402,12 @@ def _topic_agent_items(
     ``user_note`` only re-ranks candidates; never written into title/summary.
     Returns (items, crawl_meta).
     """
-    del org_profile, categories, region  # reserved for future ranking filters
+    del org_profile, region
     crawl_meta: dict[str, Any] = {"mode": "web_crawl", "ok": False}
     try:
         from packages.content_ops.hotspot_crawl import crawl_hotspots
 
-        crawled = crawl_hotspots(per_source=5)
+        crawled = crawl_hotspots(per_source=5, categories=categories)
         crawl_meta = {
             "mode": "web_crawl",
             "ok": bool(crawled.get("items")),

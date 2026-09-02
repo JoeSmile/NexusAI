@@ -95,6 +95,7 @@ class ScriptBody(BaseModel):
     extra_instruction: str = ""
     student_names: list[str] | None = None
     save: bool = True
+    brief: dict[str, Any] | None = None
 
 
 class StyleExtractBody(BaseModel):
@@ -378,6 +379,7 @@ async def api_generate_script(
             duration_sec=body.duration_sec,
             platform=body.platform,
             extra_instruction=body.extra_instruction,
+            brief=body.brief,
         )
         _log.info(
             "script.gen context tenant=%s creator=%s style_keys=%s org_keys=%s "
@@ -403,6 +405,7 @@ async def api_generate_script(
             platform=body.platform,
             extra_instruction=body.extra_instruction,
             student_names=body.student_names,
+            brief=body.brief,
         )
         artifact_id = None
         if body.save:
@@ -481,6 +484,28 @@ async def exclude_hotspot_from_day(
         "remaining": len(kept),
         "excluded_count": len(excluded),
     }
+
+
+class TopicBriefBody(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    summary: str = ""
+
+
+@router.post("/api/content/topics/brief")
+async def api_topic_brief(
+    body: TopicBriefBody,
+    tenant: TenantContext = Depends(verify_human_or_legacy_key),
+) -> dict[str, Any]:
+    from packages.content_ops.topic_brief import generate_topic_brief
+
+    _enforce_rate(tenant.tenant_id, "content_topic_brief", _DIG_PER_MIN)
+    return await generate_topic_brief(
+        tenant_id=tenant.tenant_id,
+        user_id=tenant.user_id,
+        title=body.title,
+        summary=body.summary,
+        persist=True,
+    )
 
 
 class ArtifactVisibilityBody(BaseModel):
