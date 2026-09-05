@@ -37,10 +37,11 @@ _RULE_CASES: list[tuple[str, IntentType]] = [
     ("提醒我明天开会", IntentType.FUNCTION),
     ("帮我记个事，明天上午开会", IntentType.FUNCTION),
     ("设置闹钟", IntentType.FUNCTION),
-    # conversation
+    # greeting（身份问句走问候短路径，禁止丢给 LLM）
+    ("你是谁", IntentType.GREETING),
+    # conversation（问模型归属仍走会话，避免「模型」误伤售前）
     ("你使用的是什么模型", IntentType.CONVERSATION),
     ("你们用的什么模型", IntentType.CONVERSATION),
-    ("你是谁", IntentType.CONVERSATION),
 ]
 
 

@@ -8,9 +8,9 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from config import get_settings
 from packages.auth.models import TenantContext
 from packages.auth.permissions import require_permission
-from config import get_settings
 
 from ..models.intent_models import IntentRequest, IntentResult, IntentType
 from ..services.intent_metrics import default_since, query_intent_metrics
@@ -36,6 +36,21 @@ def get_intent_service() -> IntentService:
         settings = get_settings()
         _intent_service = IntentService(model_path=settings.intent_model_path)
     return _intent_service
+
+
+def intent_runtime_status() -> dict[str, Any]:
+    """进程内意图后端状态（不新建分类器，避免 /health 反复加载 BERT）。"""
+    from packages.intent.core.intent_classifier import resolve_intent_model_path
+
+    path = resolve_intent_model_path()
+    weights = (path / "config.json").is_file()
+    payload: dict[str, Any] = {"path": str(path), "weights": weights}
+    if _intent_service is None:
+        payload["status"] = "not_warmed"
+        return payload
+    loaded = _intent_service.intent_classifier.ml_classifier.is_loaded
+    payload["status"] = "bert" if loaded else "rule_fallback"
+    return payload
 
 
 @router.post("/analyze", response_model=dict[str, Any])

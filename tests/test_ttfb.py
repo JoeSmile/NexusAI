@@ -23,6 +23,21 @@ def test_default_stream_skips_async_plan_for_ttfb(monkeypatch: pytest.MonkeyPatc
     assert should_async_plan_on_stream(state) is False
 
 
+def test_orchestrator_on_does_not_wait_8s_plan_before_tokens(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """编排开关只跑已有 PlanIR，不得把每条流式消息卡在规划 LLM 上。"""
+    monkeypatch.delenv("ASYNC_TASK_PLAN_ON_STREAM", raising=False)
+    monkeypatch.delenv("FORCE_TASK_PLAN_ON_STREAM", raising=False)
+    monkeypatch.setenv("ORCHESTRATOR_ENABLED", "true")
+
+    state = make_initial_state("t", "u", "s", "帮我写个口播稿")
+    state["stream_mode"] = True
+    state["intent"] = "content_creation"
+    state["intent_confidence"] = 0.5
+    assert should_async_plan_on_stream(state) is False
+
+
 def test_short_path_never_async_plans(monkeypatch: pytest.MonkeyPatch) -> None:
     from packages.skills.registry import registry
 

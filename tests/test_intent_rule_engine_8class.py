@@ -41,6 +41,20 @@ def test_rule_engine_business_intents(text: str, expected: IntentType):
     assert result.confidence >= 0.8
 
 
+def test_who_are_you_is_greeting_short_path():
+    """「你是谁」必须问候短路径，不能当 conversation 去打 LLM。"""
+    hit = RuleBasedIntentEngine().detect_intent("你是谁")
+    assert hit is not None
+    assert hit.intent == IntentType.GREETING
+    state = make_initial_state("t", "u", "s", "你是谁")
+    state["intent"] = hit.intent.value
+    state["intent_confidence"] = hit.confidence
+    skill = resolve_short_path_skill(state)
+    assert skill is not None
+    assert skill.id == "greeting"
+    assert short_path_predicate(state) is True
+
+
 def test_short_path_after_sales_refund():
     state = make_initial_state("t", "u", "s", "怎么退款")
     state["intent"] = "after_sales"
