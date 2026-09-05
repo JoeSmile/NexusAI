@@ -59,6 +59,8 @@ def stub_structure(content_text: str) -> dict[str, Any]:
     text = (content_text or "")[:500]
     return {
         "stub": True,
+        "market": {},
+        "close_reads": [],
         "golden_hook": "",
         "attraction": "",
         "storytelling": "",
@@ -84,36 +86,44 @@ async def analyze_structure(
     if len(body) < 20:
         return stub_structure(body)
 
-    prompt = f"""你是短视频口播教练,帮创作者「看懂一条稿子的结构,学会自己写」。输入是对标账号的完整口播文稿(逐字稿/字幕)。请做逐段、分层的结构拆解,既要展示结构,也要教用户这个结构是什么、为什么这么写、怎么改。
+    prompt = f"""你是顶级的短视频内容导演兼口播教练，不是语文老师。你的工作：把一条对标爆款稿**拆到骨子里**——让创作者不仅看懂结构，更看懂"这句话为什么能留住人、换个平庸说法会死在哪"。
 
-要求:
-- **逐段覆盖**:原文每一段都要拆到(segments),不遗漏;每段摘录原文关键句(不 paraphrase)
-- **分层讲**:先给整篇总链(overview),再逐段标功能(钩子/痛点/方法/过渡/号召),再讲段内技巧(句式/节奏/观众心理)
-- **教学化**:每个结构点讲清楚"为什么这么写"——观众心理、停留逻辑、可替换写法;让用户看完能自己改稿
-- 用中文写完整段落,结合原文具体句子,不要空泛形容词
-- 不要复述全文,不要写「字段说明」,不要 markdown 标题
-- 只输出一个 JSON 对象
+输入是对标账号的完整口播文稿（逐字稿/字幕）。这是别人反复打磨过的作品，**每一句都有存在的理由**，你要做的就是把那些理由挖出来。
+
+【拆解纪律 — 防止"小学生作文式"输出】
+- **禁止**给段落贴标签就完事（"这段是痛点，引起共鸣"= 零分）。每段必须回答：它具体戳中什么心理？用了什么具体的语言机制（具体数字/场景细节/身份代入/反常识/损失厌恶/社会认同）？如果平庸地写会是什么样？
+- **逐句而非逐段**：2 分钟稿 ≈ 300-500 字，挑出信息密度最高的 8-12 处关键句，逐句拆。每处都要问三遍：这句删了损失什么？为什么用这个词不用近义词？观众听到这秒的心理状态是什么？
+- **不要复述**：原文已有的话不要转述一遍，直接给"它做了什么"。
+- 你的分析本身也要像好文案——具体、有洞察、不空泛。宁可狠，不要温吞。
+
+【市场维度 — 为什么这条能火】
+在拆结构前，先判断这条稿在**吃哪个市场情绪**：焦虑贩卖？身份认同？信息差优越感？从众恐惧？痛点共情？还是纯娱乐？说清楚它瞄准的人群和他们的心理开关。
+
+【对标基准 — 什么算"写得好"】
+判断标准不是"对不对"，是"狠不狠"：这句话是不是像经典台词一样经得起反复琢磨？换个人能不能写出这句？如果 100 个同行都讲这话题，这句是不是让他们显得平庸的那句？
 
 平台: {platform}
 标题: {title or "（无）"}
 口播文稿:
 \"\"\"{body[:5000]}\"\"\"
 
-JSON 字段:
-- overview: 一段话概括整篇功能链(如「反常识钩子 → 身份代入痛点 → 3个方法点 → 软号召」),点出这条稿最值得学的 1 个地方。
-- segments: 数组,逐段拆解,每段: {{"quote": "原文关键句摘录", "role": "hook|pain|method|transition|cta|other", "analysis": "这段在结构里干什么、为什么这么写(观众心理)、可替换写法"}}
-- golden_hook: 黄金钩子。点出前 1–2 句原话,说明它为什么能停住拇指(反差/数字/身份/威胁/提问等),以及起势节奏,给 1 个同类替换写法。
-- attraction: 怎么吸引人。从开场到中段用了哪些承诺、冲突、利益或身份认同来留人,每点带原句。
-- storytelling: 怎么讲故事。场景/人物/转折/案例/对比如何铺,观众代入点在哪,带原句。
-- logic: 语言逻辑结构。写成「钩子 → … → 收束」的功能链,说明每段在说服上干什么,以及句式节奏(短句/排比/设问)。
-- template_type: 利益直给|拦路式|清单式|趋势恐吓|疑问式|generic 之一(给模版归类,不要解释)
-- hooks: 短标签数组(钩子句式类型,不要长原文)
-- outline: 数组,每项 {{"role":"hook|pain|method|cta|other","text":"该段功能一句"}}
-- template_skeleton: 可复用骨架(给后续抽模板用): {{"order": ["hook","pain","method","cta"], "per_section": {{"hook": "句式模板,如: 先问一个反常识问题+给出冲突答案", "pain": "…", "method": "…"}}, "slots": ["可替换槽位,如: 具体数字/人群身份/方法个数"]}}
-- teaching: 教学要点数组,3-5 条:这条稿子教会你什么(新手最容易踩的坑、最值得模仿的手法)。
-- topics: 话题词数组
-- replicables: 可复用手法(一句一条)
-不要 markdown,不要 JSON 以外的字。"""
+只输出一个 JSON 对象，字段如下：
+- market: 市场分析对象。{{"emotion": "这条稿在吃哪种市场情绪", "audience": "目标人群画像", "psychology": "人群的心理开关/痛点", "why_it_works": "为什么这选题这讲法能火"}}
+- overview: 一段话概括整篇功能链（如「反常识钩子 → 身份代入痛点 → 3个方法点 → 软号召」），点出这条稿最值得学的 1 个地方（要具体到某句某手法，不要"结构清晰"这类废话）。
+- segments: 数组，逐段拆解，每段: {{"quote": "原文关键句摘录", "role": "hook|pain|method|transition|cta|other", "analysis": "这段在结构里干什么+具体戳什么心理+用了什么语言机制+平庸写法会是什么样"}}
+- close_reads: **逐句精读数组（本条的灵魂）**，挑 8-12 处最关键的句子，每项: {{"quote": "原句", "mechanism": "这句话具体用了什么机制（数字/场景/反常识/身份/损失厌恶/对比/设问…）", "psychology": "观众听到这秒的心理状态变化", "why_strong": "为什么这个词/这说法有力量，换平庸说法会损失什么", "craft": "创作者在这里的打磨痕迹（节奏/停顿/重复/押韵/留白…）"}}
+- golden_hook: 黄金钩子。点出前 1-2 句原话，说明它为什么能停住拇指，给 1 个同类替换写法。
+- attraction: 中段用了哪些承诺/冲突/利益/身份认同留人，每点带原句。
+- storytelling: 场景/人物/转折/案例/对比怎么铺，观众代入点在哪，带原句。
+- logic: 语言逻辑功能链（「钩子 → … → 收束」）+ 句式节奏（短句/排比/设问/停顿）。
+- template_type: 利益直给|拦路式|清单式|趋势恐吓|疑问式|generic 之一（只给归类，不解释）。
+- hooks: 短标签数组（钩子句式类型）。
+- outline: 数组，每项 {{"role":"hook|pain|method|cta|other","text":"该段功能一句"}}。
+- template_skeleton: 可复用骨架: {{"order": ["hook","pain","method","cta"], "per_section": {{"hook": "句式模板", "pain": "…", "method": "…"}}, "slots": ["可替换槽位"]}}。
+- teaching: 教学要点数组，3-5 条，每条必须是"这条稿教的具体手法"，不是"要吸引观众"这类正确的废话。
+- topics: 话题词数组。
+- replicables: 可复用手法（一句一条，要具体到句式/机制级别）。
+不要 markdown，不要 JSON 以外的字。"""
 
     try:
         from packages.harness import LLMHarness
@@ -123,7 +133,7 @@ JSON 字段:
             model=_default_model(),
             messages=[{"role": "user", "content": prompt}],
             tenant_id=tenant_id,
-            max_tokens=1600,
+            max_tokens=2200,
         )
         if not result.success:
             logger.warning("social analyze harness fail: %s", result.error)
@@ -132,6 +142,8 @@ JSON 字段:
         if not parsed:
             return stub_structure(body)
         parsed["stub"] = False
+        parsed.setdefault("market", {})
+        parsed.setdefault("close_reads", [])
         parsed.setdefault("golden_hook", "")
         parsed.setdefault("attraction", "")
         parsed.setdefault("storytelling", "")

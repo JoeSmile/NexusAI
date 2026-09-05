@@ -24,13 +24,21 @@ _UA = (
     "Mozilla/5.0 (compatible; NexusAI-TopicBrief/1.0; +https://localhost)"
 )
 
-_BRIEF_PROMPT = """你是教培选题编辑。根据选题标题和摘要写素材骨架 JSON（不要 markdown）。
+_BRIEF_PROMPT = """你是教培行业选题主编，给机构短视频运营做「选题作战简报」。目标是：让拿到这份简报的写手，一眼知道这条选题**为谁、切什么角度、凭什么跟同行不一样**，然后能直接产出能发的内容。
+
 禁止编造具体数字、政策条款号、某校录取数据、真实个人姓名。
 数据类要么写「以官方为准」，要么写「待核实，以官方为准」。
 案例只写方向（如「在职备考节奏」），不写具体考生。
 
 输出 JSON 对象，键：
-background, key_points(数组3-5条), misconceptions(数组), case_directions(数组), risks(数组)
+- audience: 这条选题的核心人群画像（谁会被这条内容戳中，如「大三考研党/在职备考者/焦虑的家长」）
+- angle: 推荐切入角度（1-2 个，具体到"从什么视角讲、讲什么冲突"），避免烂大街的讲法
+- background: 背景（政策/趋势/人群处境）
+- key_points: 核心信息点 3-5 条（每条必须是能支撑内容的事实/观点，不是空话）
+- misconceptions: 目标人群常见的错误认知（纠错点 = 天然的内容钩子）
+- case_directions: 案例方向数组（场景化的，不写具体个人）
+- differentiation: 这条选题的差异化机会——同行通常怎么讲、我们从哪个没人讲的角度切
+- risks: 合规风险（绝对化/保过/价格承诺等）
 """
 
 
@@ -125,9 +133,12 @@ async def generate_topic_brief(
     summary = (summary or "").strip()[:800]
     bili = search_bilibili_topics(title)
     background = "政策与数据以官方发布为准。"
+    audience = ""
+    angle = []
     key_points: list[str] = ["以省级教育考试院或教育部公开信息为准"]
     misconceptions: list[str] = ["不要轻信无来源录取率"]
     case_directions: list[str] = ["讲备考节奏与材料清单，不写具体个人"]
+    differentiation = []
     risks: list[str] = [UNVERIFIED_HINT]
     try:
         result = await _harness().generate(
@@ -146,12 +157,18 @@ async def generate_topic_brief(
             parsed = _parse_llm_json(str(result.output))
             if parsed.get("background"):
                 background = str(parsed["background"])
+            if parsed.get("audience"):
+                audience = str(parsed["audience"])
+            if isinstance(parsed.get("angle"), list) and parsed["angle"]:
+                angle = [str(x) for x in parsed["angle"] if x][:4]
             if isinstance(parsed.get("key_points"), list) and parsed["key_points"]:
                 key_points = [str(x) for x in parsed["key_points"] if x][:8]
             if isinstance(parsed.get("misconceptions"), list) and parsed["misconceptions"]:
                 misconceptions = [str(x) for x in parsed["misconceptions"] if x][:8]
             if isinstance(parsed.get("case_directions"), list) and parsed["case_directions"]:
                 case_directions = [str(x) for x in parsed["case_directions"] if x][:8]
+            if isinstance(parsed.get("differentiation"), list) and parsed["differentiation"]:
+                differentiation = [str(x) for x in parsed["differentiation"] if x][:4]
             if isinstance(parsed.get("risks"), list) and parsed["risks"]:
                 risks = [str(x) for x in parsed["risks"] if x][:8]
     except Exception:
@@ -162,10 +179,13 @@ async def generate_topic_brief(
             "title": title,
             "summary": summary,
             "bilibili": bili,
+            "audience": audience,
+            "angle": angle,
             "background": background,
             "key_points": key_points,
             "misconceptions": misconceptions,
             "case_directions": case_directions,
+            "differentiation": differentiation,
             "risks": risks,
         }
     )

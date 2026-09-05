@@ -73,7 +73,19 @@ def _style_block(style: dict[str, Any]) -> str:
         f"禁说：{', '.join(style.get('taboos') or [])}",
         f"开场参考：{', '.join(style.get('sample_openers') or [])}",
     ]
-    return "\n".join(p for p in parts if p and not p.endswith("（）"))
+    # 说话逻辑层（2026-09-05 深度化）— 可迁移的"讲法"，比词表更接近人设
+    logic = [
+        ("讲道理", style.get("explain_style")),
+        ("讲例子", style.get("example_style")),
+        ("转场", style.get("transition_style")),
+        ("节奏", style.get("pacing")),
+        ("情绪基调", style.get("emotional_tone")),
+        ("修辞", style.get("rhetoric")),
+    ]
+    logic_lines = [f"{k}：{v}" for k, v in logic if v and str(v).strip()]
+    return "\n".join(p for p in parts if p and not p.endswith("（）")) + (
+        "\n" + "\n".join(logic_lines) if logic_lines else ""
+    )
 
 
 def _hotspot_block(hotspots: list[dict[str, Any]]) -> str:
@@ -209,15 +221,30 @@ def _brief_block(brief: dict[str, Any] | None) -> str:
     points = brief.get("key_points") or []
     if not isinstance(points, list):
         points = [points]
+    angles = brief.get("angle") or []
+    if not isinstance(angles, list):
+        angles = [angles]
     lines = [
         "【素材简报】",
         f"选题：{brief.get('title') or ''} — {brief.get('summary') or ''}",
-        f"背景：{brief.get('background') or ''}",
-        "关键信息点：",
-        *[f"- {p}" for p in points if p],
-        f"风险：{'; '.join(str(x) for x in (brief.get('risks') or []) if x)}",
-        "口播只用以上骨架，禁止编造无来源数字/政策条款/具体个人。",
     ]
+    if brief.get("audience"):
+        lines.append(f"目标人群：{brief['audience']}")
+    lines.append(f"背景：{brief.get('background') or ''}")
+    if angles:
+        lines.append("切入角度：")
+        lines += [f"- {a}" for a in angles if a]
+    lines.append("关键信息点：")
+    lines += [f"- {p}" for p in points if p]
+    if brief.get("misconceptions"):
+        lines.append(
+            "人群常见误区（可作钩子）："
+            + "; ".join(str(x) for x in brief["misconceptions"] if x)
+        )
+    if brief.get("differentiation"):
+        lines.append("差异化机会：" + "; ".join(str(x) for x in brief["differentiation"] if x))
+    lines.append(f"风险：{'; '.join(str(x) for x in (brief.get('risks') or []) if x)}")
+    lines.append("口播只用以上骨架，禁止编造无来源数字/政策条款/具体个人。")
     return "\n".join(lines)
 
 
@@ -236,7 +263,10 @@ def build_script_prompt(
     extra_brief = f"\n\n{brief_part}" if brief_part else ""
     template_part = _template_block(templates or [])
     template_brief = (
-        f"\n\n【对标爆款结构 — 按这些高频骨架组织口播，不是内容来源】\n{template_part}"
+        f"\n\n【对标爆款结构 — 只参考节奏与功能排布，不是模具、不是内容来源】\n{template_part}\n"
+        f"使用方式：先想清楚**这条内容天生的最佳讲法**（素材是故事型还是方法型还是观点型），"
+        f"再决定借对标骨架的哪一段节奏。允许合并/删减/换序，只要整体留住人的逻辑是通的。"
+        f"禁止：把模板当填空题硬套、用模板里不存在的角色口吻、为了贴合模板强行改内容。"
         if template_part
         else ""
     )
@@ -245,8 +275,10 @@ def build_script_prompt(
 
 {_METHODOLOGY}
 
-【风格 — 本机构主讲人设,方法论的个性化外壳】
+【风格 — 本机构主讲人设,方法论的个性化外壳。不是贴上去的标签,是每句话的腔调】
 {_style_block(style)}
+写的时候让这个人设替你开口:ta会怎么称呼观众、用什么句式、哪里会停顿、哪里会自嘲。整篇稿子换掉署名后,
+不能像任何其他机构能发的稿——要有本机构主讲人独有的味道。
 
 【机构 — 内容必须围绕它】
 {_org_block(org_profile)}
@@ -256,6 +288,12 @@ def build_script_prompt(
 
 【附加要求】
 {extra_instruction or '无'}
+
+【写完自查 — 改到能发再交】
+1. 有没有任何一句话是"任何机构都能发的通用句"?有就改成只属于本机构/本讲法的表达。
+2. 有没有可整句删掉而不损失信息的废话?有就删。
+3. 开场第一句,100 个同行都在讲这话题时,它能不能让人停下来?不能就重写钩子。
+4. 方法部分是不是真能落地(观众听完知道第一步做什么)?还是正确的空话?
 
 【输出格式】
 直接输出口播正文(钩子一行/痛点一行/方法各一行/号召一行),不要标题、不要"好的/以下是"等前缀、不要解释。""".strip()
