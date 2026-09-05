@@ -153,6 +153,34 @@ services:
         condition: service_completed_successfully
     restart: always
 
+  # Task 83: RAG PDF ingest. Must share nexusai ./uploads — do not
+  # parse from memory-worker (that service has no uploads volume).
+  knowledge-worker:
+    build: .
+    command: ["python", "-m", "apps.knowledge_worker"]
+    healthcheck:
+      test: ["CMD", "python", "scripts/worker_liveness.py", "knowledge"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    env_file: config.env
+    environment:
+      <<: *nexus-env
+      UPLOADS_DIR: /app/uploads
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: always
+
   social-worker:
     build: .
     command: ["python", "-m", "apps.social_worker"]

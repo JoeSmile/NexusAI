@@ -205,8 +205,8 @@ services:
       LANGFUSE_INIT_ORG_NAME: NexusAI
       LANGFUSE_INIT_PROJECT_ID: nexusai-project
       LANGFUSE_INIT_PROJECT_NAME: NexusAI Local
-      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: pk-lf-local-nexusai
-      LANGFUSE_INIT_PROJECT_SECRET_KEY: sk-lf-local-nexusai
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:?set LANGFUSE_PUBLIC_KEY in .env}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_SECRET_KEY:?set LANGFUSE_SECRET_KEY in .env}
       LANGFUSE_INIT_USER_EMAIL: admin@nexusai.local
       LANGFUSE_INIT_USER_NAME: admin
       # v4 要求 init 密码 ≥ 8；LANGFUSE_INIT_* 仅首次建库生效
@@ -250,6 +250,39 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       REDIS_PASSWORD: ${REDIS_PASSWORD:-nexusai_redis}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - nexusai_local
+
+  knowledge-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "-m", "apps.knowledge_worker"]
+    healthcheck:
+      test: ["CMD", "python", "scripts/worker_liveness.py", "knowledge"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    environment:
+      DATABASE_URL: postgresql://nexusai:nexusai_local@postgres:5432/nexusai
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-nexusai_redis}
+      UPLOADS_DIR: /app/uploads
+      UPLOAD_DIR: /app/uploads
+    env_file:
+      - config.env
+    volumes:
+      - .:/app
+      - /app/.venv
+      - ./uploads:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy

@@ -1,4 +1,4 @@
-.PHONY: help sync lock install up up-langfuse up-all down db-init run lint typecheck test check verify seed fmt docker-up docker-down clean backup audit pack-release pack-intent
+.PHONY: help sync lock install intent-setup up up-langfuse up-all down db-init run lint typecheck test check verify seed fmt docker-up docker-down clean backup audit pack-release pack-intent
 
 ROOT_DIR := $(patsubst %/,%,$(dir $(abspath $(firstword $(MAKEFILE_LIST)))))
 UV := $(shell command -v uv 2> /dev/null)
@@ -21,6 +21,7 @@ help:
 	@echo "  make up-all          起全部 compose 服务"
 	@echo "  make down            停止本地基础设施"
 	@echo "  make db-init         初始化 pgvector 表"
+	@echo "  make intent-setup    安装 torch extra + 拷贝/检查意图 BERT"
 	@echo "  make run             启动 API (uvicorn --reload)"
 	@echo "  make seed            写入开发用 API Key + 示例数据"
 	@echo "  make lint            ruff check"
@@ -32,12 +33,17 @@ help:
 	@echo "  make pack-release    白名单上架包 → artifacts/nexusai-release-*.tar.gz"
 	@echo "  make pack-intent     意图模型包 → artifacts/intent_v8.tar.gz"
 	@echo ""
-	@echo "典型流程: make up && make sync && make db-init && make seed && make run"
+	@echo "典型流程: make up && make sync && make intent-setup && make db-init && make seed && make run"
 	@echo "上架: cd frontend && pnpm build && make pack-release"
 
 sync install:
 	$(require_uv)
 	cd $(ROOT_DIR) && uv sync --extra dev
+
+intent-setup:
+	$(require_uv)
+	cd $(ROOT_DIR) && uv sync --extra intent-model --extra dev
+	cd $(ROOT_DIR) && uv run --no-sync python scripts/check_intent_model.py --setup
 
 lock:
 	$(require_uv)

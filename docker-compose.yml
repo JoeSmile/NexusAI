@@ -136,6 +136,44 @@ services:
     networks:
       - nexusai_network
 
+  # Task 83: RAG PDF ingest — same ./uploads as nexusai / file-worker
+  knowledge-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "-m", "apps.knowledge_worker"]
+    healthcheck:
+      test: ["CMD", "python", "scripts/worker_liveness.py", "knowledge"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    env_file:
+      - config.env
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql://nexusai:nexusai_password@postgres:5432/nexusai
+      - DB_TYPE=postgresql
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-nexusai_redis}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - LLM_API_KEY=${LLM_API_KEY:-${OPENAI_API_KEY:-}}
+      - USE_SQLITE_FALLBACK=0
+      - UPLOADS_DIR=/app/uploads
+      - UPLOAD_DIR=/app/uploads
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - nexusai_network
+
   # Task 52：社媒对标 worker（SKIP LOCKED）
   social-worker:
     build:
