@@ -470,3 +470,84 @@ async def test_async_plan_timeout_degrades(monkeypatch):
     assert out.get("task_plan_async_status") == "timeout"
     done = [e for e in bus.events_all() if e.type == "task_plan_done"]
     assert done and done[-1].payload.get("status") == "timeout"
+
+
+# ── P1 prompt 深度优化契约（2026-09-05）──────────────────────────────
+# 规划器系统提示必须携带决策准则；能力白名单格式可被模型解析；与硬校验常量一致。
+
+def test_planner_system_prompt_has_decision_guidelines():
+    """P1: 系统提示含决策准则（不是纯 schema 说明书）。"""
+    from packages.pipeline.nodes.task_plan import _PLANNER_SYSTEM_PROMPT
+
+    for needle in (
+        "核心思维准则",
+        "原子执行单元",  # 命中流程资产 → 单步，不重拆
+        "失败策略",  # on_fail 选型准则
+        "澄清时机",  # clarification_needed 判断
+        "严禁环",  # 死循环防护
+        "输出契约",
+        "能力白名单",
+    ):
+        assert needle in _PLANNER_SYSTEM_PROMPT, f"缺失决策准则: {needle}"
+    # 硬校验常量对齐
+    assert "on_fail" in _PLANNER_SYSTEM_PROMPT
+    assert "replan" in _PLANNER_SYSTEM_PROMPT or "replan" in _PLANNER_SYSTEM_PROMPT
+
+
+def test_build_messages_injects_capability_descriptions():
+    """P1: 能力清单带 description，行首 id 可解析，无破折号前缀。"""
+    from packages.pipeline.nodes.task_plan import _build_messages
+
+    caps = [
+        {
+            "id": "web.search",
+            "name": "web.search",
+            "permission": "user",
+            "description": "搜索全网内容",
+            "param_spec": {},
+        },
+        {
+            "id": "rag.ask",
+            "name": "知识库问答",
+            "permission": "user",
+            "description": "知识库问答",
+            "param_spec": {},
+        },
+    ]
+    msgs = _build_messages(
+        message="帮我查下报销制度",
+        intent="knowledge",
+        confidence=0.9,
+        caps=caps,
+        skill_asset_hit=None,
+    )
+    user = msgs[1]["content"]
+    assert "能力白名单" in user
+    assert "web.search: web.search" in user  # 行首 id（无破折号前缀）
+    assert "搜索全网内容" in user  # description 注入
+    assert "rag.ask" in user
+    # 两段消息结构保持
+    assert msgs[0]["role"] == "system"
+    assert msgs[1]["role"] == "user"
+
+
+def test_build_messages_skill_hit_marks_atomic():
+    """P1: 命中流程资产时提示原子执行（不重拆）。"""
+    from packages.pipeline.nodes.task_plan import _build_messages
+
+    msgs = _build_messages(
+        message="帮我写个口播稿",
+        intent="content",
+        confidence=0.8,
+        caps=[{"id": "script.gen", "name": "口播稿", "permission": "user",
+               "description": "", "param_spec": {}}],
+        skill_asset_hit={
+            "id": "a1",
+            "name": "口播稿流程",
+            "cot_template": "1. 查热点 2. 生成",
+            "score": 0.9,
+        },
+    )
+    sys_content = msgs[0]["content"]
+    assert "已命中的流程资产 CoT" in sys_content
+    assert "原子执行单元" in sys_content

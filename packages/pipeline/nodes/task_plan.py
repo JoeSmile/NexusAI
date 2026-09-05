@@ -33,6 +33,46 @@ from packages.plan.validator import validate_plan_ir
 logger = logging.getLogger(__name__)
 harness = LLMHarness()
 
+# ── 规划器系统提示（2026-09-05 深度优化 P1）─────────────────────────────
+# 决策准则（中文，教模型"怎么想"）+ 输出契约（JSON，教模型"交什么"）。
+# 与 packages/plan/validator.py / models.py 的硬校验保持一致：
+#   MAX_STEPS=32 / MAX_DEPTH=3 / params≤4096B / 白名单 capability /
+#   禁 key / on_fail ∈ {fail,retry,skip,replan} / depends_on 必须指向前序步骤。
+_PLANNER_SYSTEM_PROMPT = """你是一个资深任务规划器，负责把用户的真实需求拆成可执行的步骤序列（PlanIR JSON）。
+
+【核心思维准则】
+1. 先判断"这是什么类型的需求"，再决定拆法：
+   - 用户消息命中【已命中的流程资产 CoT】→ 该流程是一个**原子执行单元**，只产出一个 step 调用它，绝不把它拆散重排。
+   - 简单需求（查资料/算东西/问知识）→ 1 个 step 就够，不要为了"看起来专业"而多拆。
+   - 复杂需求（多步才能完成：先查→再分析→再生成）→ 按**真实依赖链**拆成 2-5 个 step，每步只做一件事。
+2. 每个 step 只调一个 capability，参数必须是**执行时能拿到的**：
+   - 参数来自用户原话、前序 step 的语义产出、或 CoT 模板给的槽位。
+   - 拿不准的参数宁可不填（让执行器兜底/澄清），不要编造数字、日期、链接、人名。
+   - params 里禁止出现：密钥、token、完整代码、HTTP 头、明文密码。
+3. 依赖与顺序：
+   - 只有**真需要前一步结果**的 step 才写 depends_on；没有依赖的步骤不要人为串行。
+   - 严禁环：depends_on 只能引用**已出现**的 step id。
+   - 全链深度 ≤3，总步骤 ≤8（复杂任务），简单任务 1-2 步。
+4. 失败策略（on_fail）按步骤性质选：
+   - fail（默认）：该步失败 = 整链失败，适合"没有它后面全错"的关键步。
+   - skip：失败可接受、跳过后继续，适合"锦上添花"步（如补充检索）。
+   - retry：瞬时故障可重试（如网络/超时），配 max≤2。
+   - replan：失败后让执行器重新规划剩余步骤，适合"中途发现方向不对"的多步任务。
+5. 澄清时机（clarification_needed）：
+   - 只在"需求有多个合理解读、且选错会浪费大量执行"时设 true。
+   - 简单歧义（可默认/可兜底）不要澄清，直接给合理默认。
+6. 改写（query_rewrite）：
+   - rewritten_query = 把指代（它/那个/上次说的）消解后的完整需求，给检索/下游用。
+   - sub_queries：需求含多个独立信息维度时拆开；单维度留空数组。
+   - coref_table：用户提到实体（人/事/机构）且与历史有关联时登记；无则空 entries。
+
+【输出契约】
+只输出一个 JSON 对象，不要 markdown、不要注释、不要解释，严格此形状：
+{"query_rewrite":{"rewritten_query":"...","sub_queries":[],"language":"zh","clarification_needed":false,"coref_table":{"entries":[]}},"goal":"一句话目标","version":1,"max_depth":3,"steps":[{"id":"s1","capability_id":"<目录里的 id>","params":{},"depends_on":[],"mode":"serial","on_fail":"fail","post_process":[]}]}
+
+【能力白名单】
+只能用下面 capability 目录里出现的 id。目录格式：id: 名称 perm=权限 | 用途描述。"""
+
 _DEFAULT_MAX_TOKENS = 800
 _JSON_RE = re.compile(r"\{[\s\S]*\}")
 
@@ -98,11 +138,10 @@ def _force_task_plan_on_stream() -> bool:
 
 
 def _async_task_plan_on_stream_enabled() -> bool:
-    """Task 70: 流式等规划必须显式 ASYNC_TASK_PLAN_ON_STREAM。
+    """Task 70 调试开关：非短路径全开异步规划（不要求编排）。
 
-    默认关。ORCHESTRATOR_ENABLED 只表示「有 PlanIR 时跑编排」，
-    不得把每条 SSE 消息卡在规划 LLM（8s 上限也只是砍刀，不是思考时间）。
-    FORCE_TASK_PLAN_ON_STREAM 仍走图内同步（演示用）。
+    默认路径见 ``should_async_plan_on_stream``：复杂任务且编排开着才规划。
+    FORCE 仍走图内同步。
     """
     return os.getenv("ASYNC_TASK_PLAN_ON_STREAM", "").strip().lower() in (
         "1",
@@ -112,13 +151,15 @@ def _async_task_plan_on_stream_enabled() -> bool:
 
 
 def should_async_plan_on_stream(state: PipelineState | dict) -> bool:
-    """Task 70: stream 复杂路径走异步规划（图内同步仍跳过，除非 FORCE）。"""
+    """Stream 上：复杂任务默认异步规划；简单路径不规划。
+
+    ``ASYNC_TASK_PLAN_ON_STREAM=1`` 仍表示「非短路径全开」（调试）。
+    ``FORCE_TASK_PLAN_ON_STREAM`` 走图内同步，避免重复异步规划。
+    编排默认开；``ORCHESTRATOR_ENABLED=false`` 时复杂任务也不规划。
+    """
     if not state.get("stream_mode"):
         return False
-    if not _async_task_plan_on_stream_enabled():
-        return False
     if _force_task_plan_on_stream():
-        # FORCE 时图内已同步规划，避免重复
         return False
     if state.get("triggered_run") or state.get("finish_reason") == "workflow_triggered":
         return False
@@ -126,7 +167,13 @@ def should_async_plan_on_stream(state: PipelineState | dict) -> bool:
         return False
     if short_path_predicate(state):
         return False
-    return should_task_plan(state)
+    if _async_task_plan_on_stream_enabled():
+        return should_task_plan(state)
+    from packages.pipeline.complex_task import is_complex_task
+    from packages.pipeline.nodes.orchestrator import orchestrator_enabled
+
+    # 默认路径：只有编排开着才规划，避免空等 8s 再直答。
+    return is_complex_task(state) and orchestrator_enabled()
 
 
 def validate_task_plan(
@@ -171,29 +218,18 @@ def _build_messages(
 ) -> list[dict[str, str]]:
     cap_lines = []
     for c in caps:
+        desc = str(c.get("description") or "")[:160]
         cap_lines.append(
-            f"- {c['id']}: {c.get('name') or c['id']} perm={c.get('permission') or ''}"
+            f"  {c['id']}: {c.get('name') or c['id']} perm={c.get('permission') or ''}"
+            + (f" | {desc}" if desc and desc != c.get("name") else "")
         )
     template = ""
     if skill_asset_hit and isinstance(skill_asset_hit, dict):
         template = str(skill_asset_hit.get("cot_template") or "")[:2000]
 
-    system = (
-        "You are a task planner for NexusAI Chat. "
-        "Produce a JSON object only (no markdown) with PlanIR shape:\n"
-        '{"query_rewrite":{"rewritten_query":"...","sub_queries":[],"language":"zh",'
-        '"clarification_needed":false,'
-        '"coref_table":{"entries":[{"entity_id":"e1","canonical":"...",'
-        '"mentions":["它"],"resolved_value":"...","confidence":0.9,"source_turn":1}]}},'
-        '"goal":"...","version":1,"max_depth":3,'
-        '"steps":[{"id":"s1","capability_id":"...","params":{},"depends_on":[],'
-        '"mode":"serial","on_fail":"fail","post_process":[]}]}'
-        "\nUse ONLY capability ids from the catalog (whitelist). "
-        "depends_on must reference prior step ids; no cycles. "
-        "Do not include secrets, api keys, code, or headers in params."
-    )
+    system = _PLANNER_SYSTEM_PROMPT
     if template:
-        system += f"\n\nReuse this CoT template when helpful:\n{template}"
+        system += f"\n\n[已命中的流程资产 CoT — 用户需求命中已有流程时，直接产出单步调用它，不要重拆]\n{template}"
 
     user = (
         f"intent={intent} confidence={confidence:.3f}\n"
@@ -208,13 +244,21 @@ def _build_messages(
                 f"agent_type={at.type_id} role={at.role}\n"
                 f"preferred_capabilities={','.join(at.capability_ids)}\n"
             )
+            user += (
+                "【agent_type 提示】当前是特化 agent 会话，优先用 preferred_capabilities "
+                "里的能力；只有它们覆盖不了需求时才考虑白名单其它项。\n"
+            )
     if session_coref and session_coref.get("entries"):
         user += (
             "session_coref_table="
             + json.dumps(session_coref, ensure_ascii=False)[:1500]
             + "\n"
         )
-    user += "capabilities:\n" + ("\n".join(cap_lines) or "(none)")
+    user += (
+        "【能力白名单（只允许这些 id，严格按行首 id 引用，不要自造）】\n"
+        + ("\n".join(cap_lines) or "(none)")
+        + "\n"
+    )
     return [
         {"role": "system", "content": system},
         {"role": "user", "content": user},
