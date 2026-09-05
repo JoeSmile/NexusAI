@@ -216,7 +216,7 @@ def merge_hotspot_pool(
     incoming: list[dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], int, int]:
     """URL canonical first, then title token set. Keep higher score."""
-    from packages.content_ops.search_adapter import canonical_url as _canon
+    from packages.search_service.adapter import canonical_url as _canon
 
     pool: list[dict[str, Any]] = []
     url_index: dict[str, int] = {}
@@ -457,23 +457,14 @@ def _topic_agent_items(
         if any(_kw_hits(it) for it in filtered):
             filtered.sort(key=lambda it: (-_kw_hits(it), -item_hot_score(it)))
         try:
-            from packages.content_ops.search_adapter import (
-                SearchRequest,
-                get_search_adapters,
-                search_hits_to_hotspots,
-            )
-            from packages.content_ops.search_failover import search_with_failover
+            from packages.search_service.adapter import search_hits_to_hotspots
+            from packages.search_service.service import search_web
 
-            primary, backup = get_search_adapters()
-            outcome = search_with_failover(
-                primary,
-                backup,
-                SearchRequest(
-                    query=keywords[:100],
-                    recency="one_week",
-                    count=10,
-                    tenant_id=tenant_id or "",
-                ),
+            outcome = search_web(
+                keywords[:100],
+                recency="one_week",
+                count=10,
+                tenant_id=tenant_id or "",
             )
             extra = search_hits_to_hotspots(outcome.hits)
             extra = _filter_items(

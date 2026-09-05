@@ -108,6 +108,10 @@ async def invoke_content_ops(
             names = [names]
         if not isinstance(names, list):
             names = None
+        brief = payload.get("brief") if isinstance(payload.get("brief"), dict) else None
+        save = payload.get("save")
+        if save is None:
+            save = True
         out = await generate_script(
             tenant_id=tid,
             style=style,
@@ -119,6 +123,10 @@ async def invoke_content_ops(
             student_names=names,
             warm=payload.get("warm") if isinstance(payload.get("warm"), dict) else None,
             model=str(payload.get("model") or "") or None,
+            brief=brief,
+            save=bool(save),
+            owner_user_id=tenant.user_id,
+            creator_id=creator_id,
         )
         yield {"event": "token", "data": out["script"], "cost_source": "invoke"}
         yield {

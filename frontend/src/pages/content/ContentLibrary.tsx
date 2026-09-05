@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { X } from 'lucide-react'
 
-import { listArtifacts, setArtifactVisibility, type HotspotItem } from '@/api/contentOps'
+import { listArtifacts, setArtifactVisibility, deleteArtifact, type HotspotItem } from '@/api/contentOps'
 import { formatApiError } from '@/api/http'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -28,6 +28,7 @@ type ArtifactRow = {
   created_at?: string
   visibility?: 'private' | 'shared'
   is_owner?: boolean
+  can_delete?: boolean
 }
 
 const TABS: { id: TabId; label: string }[] = [
@@ -78,6 +79,8 @@ export default function ContentLibraryPage() {
   const [active, setActive] = useState<ArtifactRow | null>(null)
   const [shareBusy, setShareBusy] = useState(false)
   const [shareConfirm, setShareConfirm] = useState(false)
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [view, setView] = useState<'list' | 'grid'>('grid')
 
   const refresh = useCallback(async () => {
@@ -106,6 +109,7 @@ export default function ContentLibraryPage() {
   const openRow = (row: ArtifactRow) => {
     setActive(row)
     setShareConfirm(false)
+    setDeleteConfirm(false)
     setOpen(true)
   }
 
@@ -127,6 +131,22 @@ export default function ContentLibraryPage() {
     } finally {
       setShareBusy(false)
       setShareConfirm(false)
+    }
+  }
+
+  const removeActive = async () => {
+    if (!active?.id || !active.can_delete || deleteBusy) return
+    setDeleteBusy(true)
+    try {
+      await deleteArtifact(active.id, active.kind)
+      setRows((prev) => prev.filter((r) => r.id !== active.id))
+      setOpen(false)
+      setActive(null)
+      setDeleteConfirm(false)
+    } catch (e) {
+      setHint(formatApiError(e))
+    } finally {
+      setDeleteBusy(false)
     }
   }
 
@@ -381,6 +401,30 @@ export default function ContentLibraryPage() {
                     {active.visibility === 'shared' ? '确认取消共享' : '确认共享'}
                   </Button>
                 </>
+              ) : deleteConfirm && active?.can_delete ? (
+                <>
+                  <p className="mr-auto text-sm text-[#64748B]">
+                    删除后列表里不再显示，口播稿不会跟着热点一起删。
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 rounded-xl px-6"
+                    disabled={deleteBusy}
+                    onClick={() => setDeleteConfirm(false)}
+                  >
+                    返回
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    className="h-11 rounded-xl px-6"
+                    disabled={deleteBusy}
+                    onClick={() => void removeActive()}
+                  >
+                    确认删除
+                  </Button>
+                </>
               ) : (
                 <>
                   {active?.is_owner ? (
@@ -388,10 +432,21 @@ export default function ContentLibraryPage() {
                       type="button"
                       variant="outline"
                       className="h-11 rounded-xl px-6"
-                      disabled={shareBusy}
+                      disabled={shareBusy || deleteBusy}
                       onClick={() => setShareConfirm(true)}
                     >
                       {active.visibility === 'shared' ? '取消共享' : '共享给本租户'}
+                    </Button>
+                  ) : null}
+                  {active?.can_delete ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11 rounded-xl px-6 text-red-600 hover:text-red-700"
+                      disabled={deleteBusy}
+                      onClick={() => setDeleteConfirm(true)}
+                    >
+                      删除
                     </Button>
                   ) : null}
                   <Button

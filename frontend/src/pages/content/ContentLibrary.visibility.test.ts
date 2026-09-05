@@ -12,5 +12,7 @@ describe('ContentLibrary visibility (45b.4)', () => {
     expect(src).toMatch(/确认共享/)
     expect(src).toMatch(/setArtifactVisibility/)
     expect(src).toMatch(/已共享/)
+    expect(src).toMatch(/deleteArtifact/)
+    expect(src).toMatch(/确认删除/)
   })
 })

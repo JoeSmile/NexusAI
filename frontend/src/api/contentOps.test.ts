@@ -1,20 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { generateTopicBrief, setArtifactVisibility } from '@/api/contentOps'
+import { generateTopicBrief, setArtifactVisibility, deleteArtifact } from '@/api/contentOps'
 
-const { apiPostMock } = vi.hoisted(() => ({
+const { apiPostMock, apiDeleteMock } = vi.hoisted(() => ({
   apiPostMock: vi.fn(),
+  apiDeleteMock: vi.fn(),
 }))
 
 vi.mock('@/api/http', () => ({
   apiPost: apiPostMock,
   apiGet: vi.fn(),
   apiPut: vi.fn(),
-  apiDelete: vi.fn(),
+  apiDelete: apiDeleteMock,
 }))
 
 beforeEach(() => {
   apiPostMock.mockReset()
+  apiDeleteMock.mockReset()
   apiPostMock.mockResolvedValue({
     id: 'a1',
     kind: 'script',
@@ -22,6 +24,12 @@ beforeEach(() => {
     body: {},
     visibility: 'shared',
     is_owner: true,
+  })
+  apiDeleteMock.mockResolvedValue({
+    deleted: true,
+    id: 'a1',
+    kind: 'script',
+    title: '稿',
   })
 })
 
@@ -32,6 +40,13 @@ describe('setArtifactVisibility (45b.4)', () => {
       '/api/content/artifacts/a1/visibility',
       { visibility: 'shared' },
     )
+  })
+})
+
+describe('deleteArtifact (84-sec S5)', () => {
+  it('DELETEs artifact by id', async () => {
+    await deleteArtifact('a1', 'script')
+    expect(apiDeleteMock).toHaveBeenCalledWith('/api/content/artifacts/a1?kind=script')
   })
 })
 

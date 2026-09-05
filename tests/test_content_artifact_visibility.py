@@ -151,3 +151,88 @@ def test_idempotent_run_is_per_owner(session: Session) -> None:
     assert again["run_artifact_id"] == first["run_artifact_id"]
     assert other["idempotent"] is False
     assert other["run_artifact_id"] != first["run_artifact_id"]
+
+
+def _script_row(session: Session, *, owner: str = "u1", title: str = "稿") -> ContentArtifact:
+    row = ContentArtifact(
+        id=f"s-{owner}-{title}",
+        tenant_id="t1",
+        kind="script",
+        title=title,
+        body={"script": "正文"},
+        owner_user_id=owner,
+        visibility="private",
+    )
+    session.add(row)
+    session.commit()
+    return row
+
+
+def test_owner_deletes_script_leaves_hotspot(session: Session) -> None:
+    from packages.content_ops.artifact_visibility import delete_artifact
+
+    dig = persist_dig_result(
+        session, tenant_id="t1", owner_user_id="u1", result=_dig(), save=True
+    )
+    session.commit()
+    script = _script_row(session)
+    delete_artifact(
+        session,
+        tenant_id="t1",
+        user_id="u1",
+        artifact_id=script.id,
+        is_tenant_admin=False,
+    )
+    session.commit()
+    assert session.get(ContentArtifact, script.id) is None
+    assert session.get(ContentArtifact, dig["day_artifact_id"]) is not None
+    assert session.get(ContentArtifact, dig["run_artifact_id"]) is not None
+
+
+def test_peer_cannot_delete_others_script(session: Session) -> None:
+    from packages.content_ops.artifact_visibility import (
+        ArtifactShareForbidden,
+        delete_artifact,
+    )
+
+    script = _script_row(session, owner="u1")
+    with pytest.raises(ArtifactShareForbidden):
+        delete_artifact(
+            session,
+            tenant_id="t1",
+            user_id="u2",
+            artifact_id=script.id,
+            is_tenant_admin=False,
+        )
+    assert session.get(ContentArtifact, script.id) is not None
+
+
+def test_tenant_admin_can_delete_others_script(session: Session) -> None:
+    from packages.content_ops.artifact_visibility import delete_artifact
+
+    script = _script_row(session, owner="u1")
+    delete_artifact(
+        session,
+        tenant_id="t1",
+        user_id="admin",
+        artifact_id=script.id,
+        is_tenant_admin=True,
+    )
+    session.commit()
+    assert session.get(ContentArtifact, script.id) is None
+
+
+def test_delete_kind_mismatch_not_found(session: Session) -> None:
+    from packages.content_ops.artifact_visibility import ArtifactNotFound, delete_artifact
+
+    script = _script_row(session)
+    with pytest.raises(ArtifactNotFound):
+        delete_artifact(
+            session,
+            tenant_id="t1",
+            user_id="u1",
+            artifact_id=script.id,
+            kind="hotspot_day",
+            is_tenant_admin=False,
+        )
+

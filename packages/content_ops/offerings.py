@@ -87,9 +87,13 @@ def list_offerings(
 ) -> list[dict[str, Any]]:
     ensure_default_offerings(session)
     try:
-        from packages.content_ops.workflow_seed import ensure_builtin_hotspot_workflow
+        from packages.content_ops.workflow_seed import (
+            ensure_builtin_hotspot_workflow,
+            ensure_builtin_llm_generate_workflow,
+        )
 
         ensure_builtin_hotspot_workflow(session, tenant_id=tenant_id)
+        ensure_builtin_llm_generate_workflow(session, tenant_id=tenant_id)
     except Exception:
         pass
     q = session.query(Offering).filter(

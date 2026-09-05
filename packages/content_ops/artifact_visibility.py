@@ -47,11 +47,17 @@ def list_visible_artifacts(
     return q.order_by(ContentArtifact.created_at.desc()).limit(limit).all()
 
 
-def artifact_public_dict(row: ContentArtifact, *, viewer_id: str) -> dict[str, Any]:
+def artifact_public_dict(
+    row: ContentArtifact,
+    *,
+    viewer_id: str,
+    is_tenant_admin: bool = False,
+) -> dict[str, Any]:
     owner = str(row.owner_user_id or "")
     vis = str(row.visibility or VISIBILITY_PRIVATE)
     if vis not in ALLOWED_VISIBILITY:
         vis = VISIBILITY_PRIVATE
+    is_owner = owner == (viewer_id or "").strip() and bool(owner)
     return {
         "id": row.id,
         "kind": row.kind,
@@ -61,7 +67,8 @@ def artifact_public_dict(row: ContentArtifact, *, viewer_id: str) -> dict[str, A
         "creator_id": row.creator_id,
         "owner_user_id": owner,
         "visibility": vis,
-        "is_owner": owner == (viewer_id or "").strip() and bool(owner),
+        "is_owner": is_owner,
+        "can_delete": bool(is_owner or is_tenant_admin),
         "created_at": row.created_at.isoformat() if row.created_at else None,
     }
 
@@ -90,4 +97,34 @@ def set_artifact_visibility(
     if str(row.owner_user_id or "") != (user_id or "").strip():
         raise ArtifactShareForbidden()
     row.visibility = vis
+    return row
+
+
+def delete_artifact(
+    session: Session,
+    *,
+    tenant_id: str,
+    user_id: str,
+    artifact_id: str,
+    kind: str | None = None,
+    is_tenant_admin: bool = False,
+) -> ContentArtifact:
+    """Hard-delete one artifact. Does not cascade to other kinds."""
+    row = (
+        session.query(ContentArtifact)
+        .filter(
+            ContentArtifact.tenant_id == tenant_id,
+            ContentArtifact.id == artifact_id,
+        )
+        .one_or_none()
+    )
+    if row is None:
+        raise ArtifactNotFound()
+    if kind and str(row.kind or "") != kind:
+        raise ArtifactNotFound()
+    owner = str(row.owner_user_id or "")
+    caller = (user_id or "").strip()
+    if not is_tenant_admin and owner != caller:
+        raise ArtifactShareForbidden()
+    session.delete(row)
     return row

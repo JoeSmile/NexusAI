@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
@@ -16,6 +15,7 @@ from packages.content_ops.artifact_visibility import (
     ArtifactNotFound,
     ArtifactShareForbidden,
     artifact_public_dict,
+    delete_artifact,
     list_visible_artifacts,
     set_artifact_visibility,
 )
@@ -41,6 +41,12 @@ _log = logging.getLogger(__name__)
 
 _DIG_PER_MIN = 30
 _UPLOAD_PER_MIN = 10
+
+
+def _is_content_admin(tenant: TenantContext) -> bool:
+    return tenant.role in ("tenant_admin", "super_admin") or tenant.has_permission(
+        "admin:*"
+    )
 
 
 def _enforce_rate(tenant_id: str, endpoint: str, per_min: int) -> None:
@@ -368,34 +374,6 @@ async def api_generate_script(
             session, tenant.tenant_id, body.creator_id
         )
         org = get_org_content_profile(session, tenant.tenant_id)
-        from packages.content_ops.script_gen import build_script_prompt
-        from packages.logging_config import get_logger
-
-        _log = get_logger(__name__)
-        _prompt = build_script_prompt(
-            style=style or {},
-            org_profile=org or {},
-            hotspots=body.hotspots,
-            duration_sec=body.duration_sec,
-            platform=body.platform,
-            extra_instruction=body.extra_instruction,
-            brief=body.brief,
-        )
-        _log.info(
-            "script.gen context tenant=%s creator=%s style_keys=%s org_keys=%s "
-            "hotspots=%s duration=%s extra=%s\nprompt:\n%s",
-            tenant.tenant_id,
-            body.creator_id,
-            list((style or {}).keys()),
-            list((org or {}).keys()),
-            [
-                {"title": h.get("title"), "summary": (h.get("summary") or "")[:80]}
-                for h in (body.hotspots or [])[:5]
-            ],
-            body.duration_sec,
-            (body.extra_instruction or "")[:200],
-            _prompt,
-        )
         out = await generate_script(
             tenant_id=tenant.tenant_id,
             style=style,
@@ -406,25 +384,20 @@ async def api_generate_script(
             extra_instruction=body.extra_instruction,
             student_names=body.student_names,
             brief=body.brief,
+            save=body.save,
+            owner_user_id=tenant.user_id,
+            creator_id=body.creator_id,
         )
-        artifact_id = None
-        if body.save:
-            artifact_id = str(uuid.uuid4())
-            title = (body.hotspots[0].get("title") if body.hotspots else None) or "口播稿"
-            session.add(
-                ContentArtifact(
-                    id=artifact_id,
-                    tenant_id=tenant.tenant_id,
-                    kind="script",
-                    title=str(title)[:200],
-                    body=out,
-                    creator_id=body.creator_id,
-                    owner_user_id=tenant.user_id,
-                    visibility="private",
-                )
+        if out.get("llm_failed"):
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "code": "LLM_002",
+                    "message": "模型调用失败，请检查租户 LLM Key，或本机 LLM_BASE_URL（Ollama）是否可访问",
+                },
             )
         session.commit()
-    return {**out, "artifact_id": artifact_id}
+    return out
 
 
 
@@ -528,7 +501,12 @@ async def api_list_artifacts(
             limit=limit,
         )
         items = [
-            artifact_public_dict(r, viewer_id=tenant.user_id) for r in rows
+            artifact_public_dict(
+                r,
+                viewer_id=tenant.user_id,
+                is_tenant_admin=_is_content_admin(tenant),
+            )
+            for r in rows
         ]
     return {"items": items, "count": len(items)}
 
@@ -565,7 +543,11 @@ async def api_set_artifact_visibility(
                 detail={"code": "ARTIFACT_002", "message": "invalid_visibility"},
             ) from e
         session.commit()
-        item = artifact_public_dict(row, viewer_id=tenant.user_id)
+        item = artifact_public_dict(
+            row,
+            viewer_id=tenant.user_id,
+            is_tenant_admin=_is_content_admin(tenant),
+        )
     try:
         write_audit_sync(
             {
@@ -582,3 +564,55 @@ async def api_set_artifact_visibility(
     except Exception:
         _log.debug("content.artifact_visibility audit skipped", exc_info=True)
     return item
+
+
+@router.delete("/api/content/artifacts/{artifact_id}")
+async def api_delete_artifact(
+    artifact_id: str,
+    kind: str | None = Query(default=None),
+    tenant: TenantContext = Depends(verify_human_or_legacy_key),
+) -> dict[str, Any]:
+    is_admin = _is_content_admin(tenant)
+    sf = get_pg_session()
+    with sf.Session() as session:
+        try:
+            row = delete_artifact(
+                session,
+                tenant_id=tenant.tenant_id,
+                user_id=tenant.user_id,
+                artifact_id=artifact_id,
+                kind=kind,
+                is_tenant_admin=is_admin,
+            )
+            snapshot = {
+                "id": row.id,
+                "kind": row.kind,
+                "title": row.title,
+            }
+        except ArtifactNotFound as e:
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "ARTIFACT_001", "message": "not_found"},
+            ) from e
+        except ArtifactShareForbidden as e:
+            raise HTTPException(
+                status_code=403,
+                detail={"code": "ARTIFACT_003", "message": "owner_or_admin_only"},
+            ) from e
+        session.commit()
+    try:
+        write_audit_sync(
+            {
+                "tenant_id": tenant.tenant_id,
+                "user_id": tenant.user_id,
+                "action": "content.artifact_delete",
+                "trace_id": "",
+                "input_text": f"{snapshot['id']}:{snapshot['kind']}"[:64],
+                "output_text": str(snapshot.get("title") or "")[:64],
+                "model": "",
+                "error_code": None,
+            }
+        )
+    except Exception:
+        _log.debug("content.artifact_delete audit skipped", exc_info=True)
+    return {"deleted": True, **snapshot}

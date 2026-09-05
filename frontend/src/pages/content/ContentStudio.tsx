@@ -14,6 +14,7 @@ import {
   listArtifacts,
   listStyles,
   putOrgProfile,
+  deleteArtifact,
   uploadStyleSpeech,
   upsertStyle,
   type ContentStyle,
@@ -95,6 +96,7 @@ export default function ContentStudioPage() {
       creator_id?: string | null
       created_at?: string
       visibility?: 'private' | 'shared'
+      can_delete?: boolean
     }>
   >([])
   const [hint, setHint] = useState('')
@@ -111,7 +113,9 @@ export default function ContentStudioPage() {
     title: string
     script: string
     creator_id?: string | null
+    can_delete?: boolean
   } | null>(null)
+  const [scriptDeleteConfirm, setScriptDeleteConfirm] = useState(false)
   const [regenComment, setRegenComment] = useState('')
 
   const [styleEditOpen, setStyleEditOpen] = useState(false)
@@ -141,6 +145,7 @@ export default function ContentStudioPage() {
             creator_id: row.creator_id,
             created_at: row.created_at,
             visibility: row.visibility,
+            can_delete: row.can_delete,
           }
         })
         .filter((r) => r.script)
@@ -555,6 +560,7 @@ export default function ContentStudioPage() {
                         onClick={() => {
                           setActiveScript(s)
                           setRegenComment('')
+                          setScriptDeleteConfirm(false)
                         }}
                       >
                         <div className="text-sm font-medium text-[#0F172A]">{s.title}</div>
@@ -866,6 +872,7 @@ export default function ContentStudioPage() {
           if (!o) {
             setActiveScript(null)
             setRegenComment('')
+            setScriptDeleteConfirm(false)
           }
         }}
       >
@@ -887,25 +894,74 @@ export default function ContentStudioPage() {
             />
           </div>
           <DialogFooter className="flex-wrap gap-2 sm:justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                if (activeScript?.script) {
-                  void navigator.clipboard.writeText(activeScript.script)
-                  setHint('已复制口播')
-                }
-              }}
-            >
-              复制
-            </Button>
-            <Button
-              type="button"
-              disabled={busy}
-              onClick={() => void onRegenScript()}
-            >
-              重新生成
-            </Button>
+            {scriptDeleteConfirm && activeScript?.can_delete ? (
+              <>
+                <p className="text-muted-foreground mr-auto text-sm">确认删除这篇口播？热点合集不会一起删。</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setScriptDeleteConfirm(false)}
+                >
+                  返回
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={busy}
+                  onClick={() => {
+                    void (async () => {
+                      if (!activeScript?.id) return
+                      setBusy(true)
+                      try {
+                        await deleteArtifact(activeScript.id, 'script')
+                        setScripts((prev) => prev.filter((x) => x.id !== activeScript.id))
+                        setActiveScript(null)
+                        setScriptDeleteConfirm(false)
+                        setHint('已删除口播稿')
+                      } catch (e) {
+                        setHint(formatApiError(e))
+                      } finally {
+                        setBusy(false)
+                      }
+                    })()
+                  }}
+                >
+                  确认删除
+                </Button>
+              </>
+            ) : (
+              <>
+                {activeScript?.can_delete ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="text-red-600"
+                    onClick={() => setScriptDeleteConfirm(true)}
+                  >
+                    删除
+                  </Button>
+                ) : null}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    if (activeScript?.script) {
+                      void navigator.clipboard.writeText(activeScript.script)
+                      setHint('已复制口播')
+                    }
+                  }}
+                >
+                  复制
+                </Button>
+                <Button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void onRegenScript()}
+                >
+                  重新生成
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

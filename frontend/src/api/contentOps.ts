@@ -199,6 +199,7 @@ export type ContentArtifactItem = {
   owner_user_id?: string
   visibility?: 'private' | 'shared'
   is_owner?: boolean
+  can_delete?: boolean
 }
 
 export async function listArtifacts(kind?: string) {
@@ -216,6 +217,13 @@ export async function setArtifactVisibility(
   return apiPost<ContentArtifactItem>(
     `/api/content/artifacts/${encodeURIComponent(artifactId)}/visibility`,
     { visibility },
+  )
+}
+
+export async function deleteArtifact(artifactId: string, kind?: string) {
+  const q = kind ? `?kind=${encodeURIComponent(kind)}` : ''
+  return apiDelete<{ deleted: boolean; id: string; kind: string; title: string }>(
+    `/api/content/artifacts/${encodeURIComponent(artifactId)}${q}`,
   )
 }
 
