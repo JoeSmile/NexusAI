@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from collections.abc import Iterator
 from datetime import datetime
 from typing import Any
@@ -18,10 +19,36 @@ logger = logging.getLogger(__name__)
 
 _audit_write_failure_count = 0
 
+AUDIT_BREAKER_FAILS = 3
+AUDIT_BREAKER_TTL_S = 30.0
+
+_breaker_consec = 0
+_breaker_open_until = 0.0
+_breaker_logged_open = False
+_breaker_skip_logged = False
+
 
 def audit_write_failure_count() -> int:
     """进程内审计写入失败次数（供 /health 与单测）。"""
     return _audit_write_failure_count
+
+
+def audit_circuit_open() -> bool:
+    return time.monotonic() < _breaker_open_until
+
+
+def reset_audit_breaker_for_tests() -> None:
+    global _audit_write_failure_count
+    _audit_write_failure_count = 0
+    _close_breaker()
+
+
+def _close_breaker() -> None:
+    global _breaker_consec, _breaker_open_until, _breaker_logged_open, _breaker_skip_logged
+    _breaker_consec = 0
+    _breaker_open_until = 0.0
+    _breaker_logged_open = False
+    _breaker_skip_logged = False
 
 
 def log_audit(
@@ -242,6 +269,13 @@ def build_trace_replay_events(
 
 def _write_audit(record: dict) -> bool:
     """写入 audit_logs 表（供 BackgroundTasks 或 sync 调用）。"""
+    global _breaker_consec, _breaker_open_until, _breaker_logged_open, _breaker_skip_logged
+    if audit_circuit_open():
+        _record_audit_write_failure(record, alert=False)
+        if not _breaker_skip_logged:
+            logger.warning("审计熔断中，跳过写入 circuit_open=1")
+            _breaker_skip_logged = True
+        return False
     try:
         record = {
             "credential_kind": None,
@@ -292,6 +326,7 @@ def _write_audit(record: dict) -> bool:
                     {"tid": record["tenant_id"], "dk": dedupe_key},
                 ).fetchone()
                 if hit:
+                    _close_breaker()
                     return True
             sql = text("""
                 INSERT INTO audit_logs
@@ -319,14 +354,22 @@ def _write_audit(record: dict) -> bool:
             """)
             session.execute(sql, record)
             session.commit()
+        _close_breaker()
         return True
     except Exception:
-        logger.exception("审计日志写入失败")
-        _record_audit_write_failure(record)
+        _breaker_consec += 1
+        if _breaker_consec >= AUDIT_BREAKER_FAILS:
+            _breaker_open_until = time.monotonic() + AUDIT_BREAKER_TTL_S
+        if not _breaker_logged_open:
+            logger.exception("审计日志写入失败")
+            _breaker_logged_open = True
+            _record_audit_write_failure(record, alert=True)
+        else:
+            _record_audit_write_failure(record, alert=False)
         return False
 
 
-def _record_audit_write_failure(record: dict) -> None:
+def _record_audit_write_failure(record: dict, *, alert: bool = True) -> None:
     global _audit_write_failure_count
     _audit_write_failure_count += 1
     try:
@@ -335,7 +378,8 @@ def _record_audit_write_failure(record: dict) -> None:
         audit_write_failures_total.inc()
     except Exception:
         logger.debug("audit failure metric increment skipped", exc_info=True)
-    _alert_audit_write_failure(record)
+    if alert:
+        _alert_audit_write_failure(record)
 
 
 def _alert_audit_write_failure(record: dict) -> None:

@@ -185,20 +185,31 @@ class RAGService:
             logger.warning("LLM rerank 失败，降级截断: %s", e)
         return docs[:top_n]
 
-    def retrieve_documents(self, question: str, search_k: int = 3) -> list:
+    def retrieve_documents(
+        self,
+        question: str,
+        search_k: int = 3,
+        *,
+        tenant_id: str | None = None,
+        org_scope: Any | None = None,
+    ) -> list:
         """HyDE 双路召回 + 可选 LLM ReRank。"""
         hyde_on = bool(getattr(Config, "RAG_HYDE_ENABLED", False))
         rerank_on = bool(getattr(Config, "RAG_RERANK_ENABLED", False))
         pool = int(getattr(Config, "RAG_RERANK_POOL_SIZE", 20) or 20)
         fetch_k = pool if (hyde_on or rerank_on) else search_k
 
-        primary = self.kb_manager.search_similar(question, k=fetch_k)
+        primary = self.kb_manager.search_similar(
+            question, k=fetch_k, tenant_id=tenant_id, org_scope=org_scope
+        )
         docs = list(primary)
 
         if hyde_on:
             hypo = self._hyde_hypothesis(question)
             if hypo:
-                secondary = self.kb_manager.search_similar(hypo, k=fetch_k)
+                secondary = self.kb_manager.search_similar(
+                    hypo, k=fetch_k, tenant_id=tenant_id, org_scope=org_scope
+                )
                 docs = self._merge_docs(primary, secondary)
                 logger.info(
                     "HyDE 双路召回: primary=%s secondary=%s merged=%s",
@@ -241,6 +252,7 @@ class RAGService:
         tenant_id: str = "default",
         user_id: str = "anonymous",
         trace_id: str = "",
+        org_scope: Any | None = None,
     ) -> dict[str, Any]:
         """
         向知识库提问（支持 HyDE + LLM ReRank，由 config 开关控制）
@@ -337,7 +349,12 @@ class RAGService:
                 # 预估本次 embedding 成本:L2 未命中才会真调 API(Task 29 审计修正)
                 embed_cost = estimate_embedding_cost_if_miss(norm_q)
 
-                source_documents = self.retrieve_documents(question, search_k=search_k)
+                source_documents = self.retrieve_documents(
+                    question,
+                    search_k=search_k,
+                    tenant_id=tid,
+                    org_scope=org_scope,
+                )
 
                 if self.llm is None:
                     raise RuntimeError(
@@ -390,22 +407,23 @@ class RAGService:
             logger.error(f"回答问题失败: {e}")
             raise
     
-    def search_knowledge(self, query: str, k: int = 3) -> list[dict[str, Any]]:
+    def search_knowledge(
+        self,
+        query: str,
+        k: int = 3,
+        *,
+        tenant_id: str | None = None,
+        org_scope: Any | None = None,
+    ) -> list[dict[str, Any]]:
         """
         仅搜索知识库，不生成回答
-        
-        Args:
-            query: 查询文本
-            k: 返回结果数量
-            
-        Returns:
-            搜索结果列表
         """
         try:
             logger.info(f"搜索知识库: {query[:50]}...")
             
-            # 带评分的搜索
-            results = self.kb_manager.search_with_score(query, k=k)
+            results = self.kb_manager.search_with_score(
+                query, k=k, tenant_id=tenant_id, org_scope=org_scope
+            )
             
             # 整理结果
             formatted_results = []
@@ -428,7 +446,10 @@ class RAGService:
         self,
         question: str,
         conversation_history: list[dict[str, str]] | None = None,
-        search_k: int = 3
+        search_k: int = 3,
+        *,
+        tenant_id: str | None = None,
+        org_scope: Any | None = None,
     ) -> dict[str, Any]:
         """
         结合对话上下文的知识问答
@@ -450,7 +471,12 @@ class RAGService:
             logger.info(f"结合上下文回答问题: {question[:50]}...")
             
             # HyDE + LLM ReRank（与 ask() 共用；默认关闭，见 RAG_*_ENABLED）
-            knowledge_docs = self.retrieve_documents(question, search_k=search_k)
+            knowledge_docs = self.retrieve_documents(
+                question,
+                search_k=search_k,
+                tenant_id=tenant_id,
+                org_scope=org_scope,
+            )
 
             # 构建增强的上下文
             knowledge_context = "\n\n".join([

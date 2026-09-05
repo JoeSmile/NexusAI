@@ -9,8 +9,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from packages.errors import ErrorCode, NexusAIException
 from packages.database import vector_ops
+from packages.errors import ErrorCode, NexusAIException
 from packages.logging_config import get_logger
 
 from .chunking_selector import ChunkingStrategySelector
@@ -237,11 +237,14 @@ class KnowledgeBaseManager:
                 logger.error(f"传统分块器也失败: {e2}")
                 raise
     
-    def create_vectorstore(self, chunks: list[Document]):
+    def create_vectorstore(
+        self, chunks: list[Document], *, tenant_id: str | None = None
+    ):
         """将文档块写入 pgvector knowledge_chunks"""
         try:
             logger.info(f"开始写入 pgvector 知识库，共 {len(chunks)} 个文档块")
             org_unit_id = getattr(self, "org_unit_id", None)
+            tid = tenant_id if tenant_id is not None else self.tenant_id
             for i, chunk in enumerate(chunks):
                 meta = dict(chunk.metadata or {})
                 meta.setdefault("chunk_id", i)
@@ -263,14 +266,23 @@ class KnowledgeBaseManager:
                     or meta.get("file_type")
                     or ("pdf" if src.lower().endswith(".pdf") else "text")
                 )[:32]
+                page = meta.get("page_no")
+                if not isinstance(page, int):
+                    raw = meta.get("page")
+                    page = raw + 1 if isinstance(raw, int) and raw >= 0 else (
+                        raw if isinstance(raw, int) else None
+                    )
+                ingest_doc_id = getattr(self, "ingest_doc_id", None)
                 vector_ops.add_knowledge(
                     text=chunk.page_content,
                     category=str(meta.get("category", "general")),
-                    tenant_id=self.tenant_id,
+                    tenant_id=tid,
                     metadata=clean_meta,
                     source=src,
                     source_type=st,
                     org_unit_id=org_unit_id,
+                    doc_id=ingest_doc_id,
+                    page_no=page,
                 )
             self.vectorstore = "pgvector"
             logger.info("pgvector 知识库写入完成")
@@ -285,38 +297,49 @@ class KnowledgeBaseManager:
         logger.info("pgvector 知识库就绪")
         return self.vectorstore
     
-    def add_documents(self, documents: list[Document]) -> None:
+    def add_documents(
+        self, documents: list[Document], *, tenant_id: str | None = None
+    ) -> None:
         """向 pgvector 添加文档"""
         try:
             logger.info(f"向知识库添加 {len(documents)} 个文档")
             chunks = self.split_documents(documents)
-            self.create_vectorstore(chunks)
+            self.create_vectorstore(chunks, tenant_id=tenant_id)
             logger.info("文档添加完成")
         except Exception as e:
             logger.error(f"添加文档失败: {e}")
             raise
     
-    def search_similar(self, query: str, k: int = 3, filter: dict[str, Any] | None = None) -> list[Document]:
+    def search_similar(
+        self,
+        query: str,
+        k: int = 3,
+        filter: dict[str, Any] | None = None,
+        *,
+        tenant_id: str | None = None,
+        org_scope: Any | None = None,
+    ) -> list[Document]:
         """pgvector 相似度搜索"""
         try:
             logger.info(f"执行相似度搜索: {query[:50]}...")
+            tid = tenant_id if tenant_id is not None else self.tenant_id
+            scope = org_scope if org_scope is not None else getattr(self, "org_scope", None)
             raw = vector_ops.search_knowledge(
-                query=query, tenant_id=self.tenant_id, n_results=max(k * 3, k)
+                query=query, tenant_id=tid, n_results=max(k * 3, k)
             )
             docs: list[Document] = []
             documents = (raw.get("documents") or [[]])[0]
             metadatas = (raw.get("metadatas") or [[]])[0]
-            org_scope = getattr(self, "org_scope", None)
             for i, content in enumerate(documents):
                 meta = metadatas[i] if i < len(metadatas) else {}
                 if filter:
                     if any(meta.get(fk) != fv for fk, fv in filter.items()):
                         continue
-                if org_scope is not None:
+                if scope is not None:
                     from packages.rag.org_tag import chunk_visible_to_scope
 
                     if not chunk_visible_to_scope(
-                        org_scope,
+                        scope,
                         org_unit_id=meta.get("org_unit_id"),
                         unit_path=meta.get("org_path"),
                     ):
@@ -330,11 +353,20 @@ class KnowledgeBaseManager:
             logger.error(f"相似度搜索失败: {e}")
             return []
     
-    def search_with_score(self, query: str, k: int = 3) -> list[tuple[Document, float]]:
+    def search_with_score(
+        self,
+        query: str,
+        k: int = 3,
+        *,
+        tenant_id: str | None = None,
+        org_scope: Any | None = None,
+    ) -> list[tuple[Document, float]]:
         """带评分的相似度搜索"""
         try:
+            tid = tenant_id if tenant_id is not None else self.tenant_id
+            scope = org_scope if org_scope is not None else getattr(self, "org_scope", None)
             raw = vector_ops.search_knowledge(
-                query=query, tenant_id=self.tenant_id, n_results=k
+                query=query, tenant_id=tid, n_results=max(k * 3, k)
             )
             documents = (raw.get("documents") or [[]])[0]
             metadatas = (raw.get("metadatas") or [[]])[0]
@@ -342,8 +374,19 @@ class KnowledgeBaseManager:
             results = []
             for i, content in enumerate(documents):
                 meta = metadatas[i] if i < len(metadatas) else {}
+                if scope is not None:
+                    from packages.rag.org_tag import chunk_visible_to_scope
+
+                    if not chunk_visible_to_scope(
+                        scope,
+                        org_unit_id=meta.get("org_unit_id"),
+                        unit_path=meta.get("org_path"),
+                    ):
+                        continue
                 dist = distances[i] if i < len(distances) else 1.0
                 results.append((Document(page_content=content, metadata=meta), float(dist)))
+                if len(results) >= k:
+                    break
             return results
         except Exception as e:
             logger.error(f"带评分的相似度搜索失败: {e}")
@@ -366,23 +409,30 @@ class KnowledgeBaseManager:
 
         return _PgRetriever(self, k)
     
-    def delete_collection(self) -> None:
-        """删除当前租户知识块"""
+    def delete_collection(self, *, tenant_id: str | None = None) -> None:
+        """删除指定租户知识块（默认实例 tenant_id）。"""
+        tid = tenant_id if tenant_id is not None else self.tenant_id
         try:
-            from packages.database.pgvector_session import KnowledgeChunk, get_pg_session
+            from packages.database.pgvector_session import (
+                KnowledgeChunk,
+                KnowledgeDocument,
+                get_pg_session,
+            )
 
             sf = get_pg_session()
             with sf.Session() as session:
-                session.query(KnowledgeChunk).filter_by(tenant_id=self.tenant_id).delete()
+                session.query(KnowledgeChunk).filter_by(tenant_id=tid).delete()
+                session.query(KnowledgeDocument).filter_by(tenant_id=tid).delete()
                 session.commit()
             self.vectorstore = None
-            logger.info("知识块已删除")
+            logger.info("知识块已删除 tenant=%s", tid)
         except Exception as e:
             logger.error(f"删除向量集合失败: {e}")
             raise
     
-    def get_stats(self) -> dict[str, Any]:
+    def get_stats(self, *, tenant_id: str | None = None) -> dict[str, Any]:
         """获取知识库统计信息"""
+        tid = tenant_id if tenant_id is not None else self.tenant_id
         try:
             from packages.database.pgvector_session import KnowledgeChunk, get_pg_session
 
@@ -390,7 +440,7 @@ class KnowledgeBaseManager:
             with sf.Session() as session:
                 count = (
                     session.query(KnowledgeChunk)
-                    .filter_by(tenant_id=self.tenant_id)
+                    .filter_by(tenant_id=tid)
                     .count()
                 )
             from packages.database.embeddings import embedding_model_label
@@ -421,7 +471,7 @@ class EnterpriseKnowledgeLoader:
         self.kb_manager = kb_manager
         logger.info("企业知识加载器初始化完成")
     
-    def load_sample_knowledge(self) -> None:
+    def load_sample_knowledge(self, *, tenant_id: str | None = None) -> None:
         """
         加载示例企业知识
         （当没有PDF文档时，使用预设的文本知识）
@@ -467,7 +517,8 @@ class EnterpriseKnowledgeLoader:
 
         for text in sample_texts:
             self.kb_manager.add_documents(
-                [Document(page_content=text.strip())]
+                [Document(page_content=text.strip())],
+                tenant_id=tenant_id,
             )
 
     def _extract_topic(self, text: str) -> str:
@@ -552,7 +603,9 @@ class EnterpriseKnowledgeLoader:
             logger.error(f"从目录加载知识失败: {e}")
             raise
     
-    def load_from_knowledge_base_structure(self, base_path: str = "./knowledge_base") -> None:
+    def load_from_knowledge_base_structure(
+        self, base_path: str = "./knowledge_base", *, tenant_id: str | None = None
+    ) -> None:
         """
         从标准知识库结构加载知识
         
@@ -606,7 +659,7 @@ class EnterpriseKnowledgeLoader:
                 chunks = self.kb_manager.split_documents(all_documents)
                 
                 # 创建向量存储
-                self.kb_manager.create_vectorstore(chunks)
+                self.kb_manager.create_vectorstore(chunks, tenant_id=tenant_id)
                 
                 logger.info(f"成功从知识库结构加载知识，共 {len(all_documents)} 个文档，{len(chunks)} 个文档块")
             else:

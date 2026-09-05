@@ -92,12 +92,12 @@ def test_l2_same_text_one_api_call(fake_redis, monkeypatch):
     monkeypatch.setenv("QWEN_API_KEY", "sk-test")
 
     calls = {"n": 0}
-    vec768 = [0.01 * i for i in range(768)]
+    vec1024 = [0.01 * i for i in range(1024)]
 
     class _Emb:
         def create(self, **kwargs):
             calls["n"] += 1
-            return SimpleNamespace(data=[SimpleNamespace(embedding=list(vec768))])
+            return SimpleNamespace(data=[SimpleNamespace(embedding=list(vec1024))])
 
     class _Client:
         def __init__(self, *a, **k):
@@ -121,18 +121,24 @@ def test_l2_same_text_one_api_call(fake_redis, monkeypatch):
     a = embed_text("Hello World")
     b = embed_text("hello   world")
     assert calls["n"] == 1
+    assert len(a) == 1024
     assert len(a) == emb_mod.EMBED_DIM
     assert a == pytest.approx(b)
     assert emb_mod._last_embed_mode == "cache"  # 第二次为 L2 命中,非真实 API 调用
 
 
 def test_l2_model_key_isolation(fake_redis):
-    v1 = [1.0] * 768
-    v2 = [2.0] * 768
+    v1 = [1.0] * 1024
+    v2 = [2.0] * 1024
     rag_cache.l2_set("model-a", "q", v1)
     rag_cache.l2_set("model-b", "q", v2)
-    assert rag_cache.l2_get("model-a", "q")[0] == pytest.approx(1.0)
-    assert rag_cache.l2_get("model-b", "q")[0] == pytest.approx(2.0)
+    got_a = rag_cache.l2_get("model-a", "q")
+    got_b = rag_cache.l2_get("model-b", "q")
+    assert got_a is not None and got_b is not None
+    assert len(got_a) == 1024
+    assert len(got_b) == 1024
+    assert got_a[0] == pytest.approx(1.0)
+    assert got_b[0] == pytest.approx(2.0)
 
 
 def _make_rag_service(llm_invoke, retrieve_docs=None):
@@ -152,7 +158,7 @@ def _make_rag_service(llm_invoke, retrieve_docs=None):
         SimpleNamespace(page_content="知识A", metadata={"source": "a"})
     ]
 
-    def _retrieve(question, search_k=3):
+    def _retrieve(question, search_k=3, *, tenant_id=None, org_scope=None):
         return docs
 
     svc.retrieve_documents = _retrieve  # type: ignore[method-assign]
@@ -262,8 +268,8 @@ def test_redis_down_silent_degrade(monkeypatch):
 
 
 def test_cache_stats_entries_from_scan(fake_redis):
-    rag_cache.l2_set("m", "q1", [0.1] * 768)
-    rag_cache.l2_set("m", "q2", [0.2] * 768)
+    rag_cache.l2_set("m", "q1", [0.1] * 1024)
+    rag_cache.l2_set("m", "q2", [0.2] * 1024)
     rag_cache.l1_set("t1", "问题一", {"answer": "a", "sources": []})
     snap = rag_cache.cache_stats_snapshot()
     assert snap["entries_source"] == "scan"
@@ -318,7 +324,7 @@ def test_embedding_cost_zero_on_l2_hit(fake_redis, monkeypatch):
     from packages.model_registry import select_embedding_model
 
     spec = select_embedding_model()
-    rag_cache.l2_set(spec.name, rag_cache.normalize("缓存命中问题"), [0.1] * 768)
+    rag_cache.l2_set(spec.name, rag_cache.normalize("缓存命中问题"), [0.1] * 1024)
 
     records: list[dict] = []
     monkeypatch.setattr(

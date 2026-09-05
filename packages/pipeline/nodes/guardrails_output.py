@@ -1,10 +1,10 @@
-"""输出护栏节点 — 长度截断 + 敏感内容 + G7 学员脱敏。"""
+"""输出护栏节点 — 共用生成出口（G7 + 教培红线 + 漂移 profile）。"""
 
 from __future__ import annotations
 
 import logging
 
-from packages.guardrails.output_guard import check_output
+from packages.guardrails.generation_exit import sanitize_generation_exit
 from packages.observability.decorators import observe
 from packages.pipeline.state import PipelineState
 
@@ -33,20 +33,24 @@ def apply_student_output_redaction(state: PipelineState) -> None:
         logger.debug("student output redaction skipped", exc_info=True)
 
 
+async def apply_generation_exit_to_state(state: PipelineState) -> PipelineState:
+    """长/短路径共用：写回 response；BLOCK 时打 finish_reason。"""
+    result = await sanitize_generation_exit(
+        state.get("response") or "",
+        tenant_id=str(state.get("tenant_id") or ""),
+        warm=dict(state.get("warm_memory") or {}) or None,
+    )
+    state["response"] = result.redacted_text
+    if result.action == "blocked":
+        state["finish_reason"] = "blocked"
+        state["error_code"] = "GUARD_003"
+        return state
+    if "g7_student_pii" in (result.reason or ""):
+        state["student_pii_redacted"] = True
+    return state
+
+
 @observe(name="pipeline.guardrails_output")
 async def guardrails_output(state: PipelineState) -> PipelineState:
     """输出安全检查"""
-    result = await check_output(state.get("response") or "")
-
-    if result.action == "blocked":
-        state["response"] = result.redacted_text
-        state["finish_reason"] = "blocked"
-        state["error_code"] = "GUARD_003"
-        apply_student_output_redaction(state)
-        return state
-
-    if result.action == "truncated":
-        state["response"] = result.redacted_text
-
-    apply_student_output_redaction(state)
-    return state
+    return await apply_generation_exit_to_state(state)

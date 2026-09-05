@@ -13,6 +13,9 @@ OUTPUT_BLOCK_PATTERNS = [
     r"PASSWORD",
 ]
 
+# 内容工厂（教培口播）允许的直播话术；企业秘书 profile 仍拦截。
+CONTENT_FACTORY_ALLOWED_DRIFT = (r"家人们", r"直播间")
+
 # 角色漂移词库 — 检测模型从「企业助手」人设漂移为消费域/违规人设。
 # 基准人设: 企业秘书 / HR / 前台助理 — 正式、客观、不推销、不情感化、不涉资金操作。
 # 命中任一 = 整段拦截(人设崩塌比误杀代价更高,只保留高精度标记)。
@@ -48,9 +51,17 @@ VIOLATION_PATTERNS = [
 ]
 
 
-async def check_role_drift(response: str) -> GuardResult:
+def drift_patterns_for(profile: str) -> list[str]:
+    """secretary 全量拦截；content_factory 放开教培口播常用的家人们/直播间。"""
+    if profile == "content_factory":
+        skip = set(CONTENT_FACTORY_ALLOWED_DRIFT)
+        return [p for p in DRIFT_PATTERNS if p not in skip]
+    return list(DRIFT_PATTERNS)
+
+
+async def check_role_drift(response: str, *, profile: str = "secretary") -> GuardResult:
     """检测角色漂移: 企业助手人设 → 消费域/违规人设(带货、陪聊、迷信、资金诱导)。"""
-    for pattern in DRIFT_PATTERNS:
+    for pattern in drift_patterns_for(profile):
         if re.search(pattern, response):
             return GuardResult(
                 action="blocked",
@@ -60,12 +71,22 @@ async def check_role_drift(response: str) -> GuardResult:
     return GuardResult(action="pass", redacted_text=response, reason="")
 
 
-async def check_output(response: str) -> GuardResult:
-    """检查 LLM 输出"""
-    if len(response) > 4000:
+async def check_output(
+    response: str,
+    *,
+    profile: str = "secretary",
+    max_chars: int | None = 4000,
+) -> GuardResult:
+    """检查 LLM 输出。
+
+    本函数默认 profile=secretary，留给直接调用的单测。
+    产品出口必须经 sanitize_generation_exit：未配租户走 content_factory，
+    企业秘书租户写 tenant_config.output_guard_profile=secretary。
+    """
+    if max_chars is not None and len(response) > max_chars:
         return GuardResult(
             action="truncated",
-            redacted_text=response[:4000],
+            redacted_text=response[:max_chars],
             reason="length_exceeded",
         )
 
@@ -77,7 +98,7 @@ async def check_output(response: str) -> GuardResult:
                 reason=f"sensitive_content:{pattern}",
             )
 
-    drift = await check_role_drift(response)
+    drift = await check_role_drift(response, profile=profile)
     if drift.action == "blocked":
         return drift
 

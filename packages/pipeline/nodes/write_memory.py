@@ -36,6 +36,12 @@ async def write_memory(state: PipelineState) -> PipelineState:
         user_client_message_id=state.get("user_client_message_id"),
         assistant_client_message_id=state.get("assistant_client_message_id"),
     )
+    if wrote.get("duplicate"):
+        logger.info(
+            "write_memory: skip audit/extract, duplicate client_message_id tenant=%s",
+            tenant_id,
+        )
+        return state
     try:
         from packages.memory.context_summarize import maybe_enqueue_l1_summarize
 

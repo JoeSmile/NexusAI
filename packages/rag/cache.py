@@ -21,7 +21,7 @@ from packages.text_normalize import (
 
 logger = logging.getLogger(__name__)
 
-EMBED_CACHE_DIM = 768
+EMBED_CACHE_DIM = 1024
 L1_MAX_AGE_SEC = 4 * 3600
 CACHE_VERSION = 1
 
@@ -94,8 +94,7 @@ def reset_redis_for_tests() -> None:
 
 
 def pack_embed_768(vec: list[float]) -> bytes:
-    # EMBED_CACHE_DIM 必须与 EMBEDDING_DIMENSIONS 配置一致(L2 只缓存 API 原始维);
-    # 当前固定 768(text-embedding-v3 配置值),改维度时需同步此常量与 DB 列(1536 补零)。
+    # EMBED_CACHE_DIM 必须与 EMBEDDING_DIMENSIONS 配置一致(L2 只缓存 API 原始维)。
     data = vec[:EMBED_CACHE_DIM] + [0.0] * (EMBED_CACHE_DIM - len(vec[:EMBED_CACHE_DIM]))
     return struct.pack(f"<{EMBED_CACHE_DIM}f", *data)
 
@@ -153,7 +152,7 @@ def l2_set(model: str, text: str, vec: list[float]) -> None:
         return
     try:
         ttl = _env_int("RAG_CACHE_TTL_EMBED", 86400)
-        # 只缓存 API 维(≤768);已是 1536 补零的话取前 768
+        # 只缓存 API 维(≤EMBED_CACHE_DIM);已补零的话取前 EMBED_CACHE_DIM
         r.set(l2_key(model, text), pack_embed_768(vec), ex=ttl)
     except Exception as e:
         logger.debug("L2 set failed: %s", e)

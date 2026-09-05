@@ -58,6 +58,7 @@ class ErrorCode(StrEnum):
     # ── RAG / 多模态 (RAG_0xx) ──
     RAG_DEP_MISSING = "RAG_001"
     RAG_EMPTY_EXTRACT = "RAG_002"
+    EMBED_UNAVAILABLE = "EMBED_UNAVAILABLE"
 
     # ── 缓存 (CACHE_0xx) ──
     CACHE_UNAVAILABLE = "CACHE_001"
@@ -246,6 +247,8 @@ def _code_to_status(code: str) -> int:
         return 400
     if code.startswith("RAG_"):
         return 501 if code == "RAG_001" else 422
+    if code == "EMBED_UNAVAILABLE":
+        return 503
     if code.startswith("CACHE_"):
         return 503
     if code.startswith("COST_"):

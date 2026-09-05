@@ -19,6 +19,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Literal
 
+from sqlalchemy.exc import IntegrityError
+
 from packages.database.pgvector_session import (
     ChatMessage,
     ChatSession,
@@ -523,27 +525,25 @@ class UnifiedMemoryService:
                     )
                 )
                 session.flush()
+            wrote_user = False
+            wrote_assistant = False
             if user_message:
-                session.add(
-                    ChatMessage(
-                        tenant_id=self.tenant_id,
-                        session_id=session_id,
-                        user_id=user_id,
-                        role="user",
-                        content=user_message,
-                        client_message_id=(user_client_message_id or None),
-                    )
+                wrote_user = self._add_turn_message(
+                    session,
+                    user_id=user_id,
+                    session_id=session_id,
+                    role="user",
+                    content=user_message,
+                    client_message_id=user_client_message_id,
                 )
             if assistant_message:
-                session.add(
-                    ChatMessage(
-                        tenant_id=self.tenant_id,
-                        session_id=session_id,
-                        user_id=user_id,
-                        role="assistant",
-                        content=assistant_message,
-                        client_message_id=(assistant_client_message_id or None),
-                    )
+                wrote_assistant = self._add_turn_message(
+                    session,
+                    user_id=user_id,
+                    session_id=session_id,
+                    role="assistant",
+                    content=assistant_message,
+                    client_message_id=assistant_client_message_id,
                 )
             session.flush()
             archived_ids = self._archive_overflow_in_session(
@@ -551,14 +551,73 @@ class UnifiedMemoryService:
             )
             session.commit()
         self._invalidate_mem_bundle(user_id)
+        attempted = bool(user_message) or bool(assistant_message)
+        duplicate = attempted and not wrote_user and not wrote_assistant and bool(
+            (user_client_message_id or "").strip()
+            or (assistant_client_message_id or "").strip()
+        )
         return {
             "tier": "hot",
             "session_id": session_id,
             "user_id": user_id,
-            "wrote_user": bool(user_message),
-            "wrote_assistant": bool(assistant_message),
+            "wrote_user": wrote_user,
+            "wrote_assistant": wrote_assistant,
+            "duplicate": duplicate,
             "archived_ids": archived_ids,
         }
+
+    def _add_turn_message(
+        self,
+        session,
+        *,
+        user_id: str,
+        session_id: str,
+        role: str,
+        content: str,
+        client_message_id: str | None,
+    ) -> bool:
+        cid = (client_message_id or "").strip() or None
+        if cid:
+            found = (
+                session.query(ChatMessage)
+                .filter(
+                    ChatMessage.tenant_id == self.tenant_id,
+                    ChatMessage.client_message_id == cid,
+                    ChatMessage.role == role,
+                )
+                .first()
+            )
+            if found is not None:
+                return False
+        nested = session.begin_nested() if cid else None
+        try:
+            session.add(
+                ChatMessage(
+                    tenant_id=self.tenant_id,
+                    session_id=session_id,
+                    user_id=user_id,
+                    role=role,
+                    content=content,
+                    client_message_id=cid,
+                )
+            )
+            session.flush()
+            if nested is not None:
+                nested.commit()
+            return True
+        except IntegrityError as exc:
+            if nested is None:
+                raise
+            nested.rollback()
+            err = str(getattr(exc, "orig", None) or exc).lower()
+            named = "uq_chat_messages_tenant_client_role" in err
+            sqlite_cid = (
+                "unique constraint failed" in err and "client_message_id" in err
+            )
+            if named or sqlite_cid:
+                logger.debug("chat turn duplicate client_message_id role=%s", role)
+                return False
+            raise
 
     def _archive_overflow_in_session(
         self, session, *, user_id: str, session_id: str

@@ -8,13 +8,14 @@ import asyncio
 import os
 import tempfile
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 
-from packages.errors import ErrorCode, NexusAIException
-from packages.logging_config import get_logger
 from packages.auth.models import TenantContext
 from packages.auth.permissions import require_permission
+from packages.errors import ErrorCode, NexusAIException
+from packages.logging_config import get_logger
 from packages.rag.cache import bump_epoch
 
 from ..core.knowledge_base import EnterpriseKnowledgeLoader, KnowledgeBaseManager
@@ -95,23 +96,56 @@ def _bind_ingest_org(tenant: TenantContext) -> str:
     return oid
 
 
-def _attach_org_scope_to_kb(
-    kb_manager: KnowledgeBaseManager, tenant: TenantContext
-) -> None:
+def _kb_admin_guard(
+    tenant: TenantContext = Depends(require_permission("kb:*")),
+) -> TenantContext:
+    """删除/重置：tenant_admin 的 kb:*，普通 user 禁止。"""
+    from packages.rag.cache import check_rate_limit
+
+    check_rate_limit(tenant.tenant_id, miss=False)
+    return tenant
+
+
+def _resolve_org_scope(tenant: TenantContext):
     from packages.database.pgvector_session import get_pg_session
     from packages.org.scope import resolve_org_scope
 
     sf = get_pg_session()
     with sf.Session() as session:
-        scope = resolve_org_scope(
+        return resolve_org_scope(
             session,
             tenant_id=tenant.tenant_id,
             user_id=tenant.user_id,
             platform_role=tenant.role,
             is_cross_tenant=tenant.is_cross_tenant,
         )
-    kb_manager.org_scope = scope
-    kb_manager.tenant_id = tenant.tenant_id
+
+
+def _client_ip(http_request: Request | None) -> str:
+    if http_request is None or http_request.client is None:
+        return ""
+    return http_request.client.host or ""
+
+
+def _audit_rag_op(
+    tenant: TenantContext,
+    *,
+    action: str,
+    output_text: str = "",
+    http_request: Request | None = None,
+) -> None:
+    from packages.audit import write_audit_sync
+
+    write_audit_sync(
+        {
+            "tenant_id": tenant.tenant_id,
+            "user_id": tenant.user_id,
+            "action": action,
+            "trace_id": "",
+            "output_text": (output_text or "")[:2000],
+            "ip_address": _client_ip(http_request),
+        }
+    )
 
 
 # ========== 请求模型 ==========
@@ -190,7 +224,7 @@ async def get_status(
     获取知识库状态
     """
     kb_manager = get_kb_manager()
-    stats = kb_manager.get_stats()
+    stats = kb_manager.get_stats(tenant_id=tenant.tenant_id)
     
     return {
         "success": True,
@@ -200,6 +234,7 @@ async def get_status(
 @router.post("/init/sample")
 @_rag_errors
 async def init_sample_knowledge(
+    http_request: Request,
     request: LoadSampleRequest | None = None,
     tenant: TenantContext = Depends(_rag_guard),
 ):
@@ -215,22 +250,32 @@ async def init_sample_knowledge(
         request = LoadSampleRequest()
     
     kb_manager = get_kb_manager()
-    
-    # 如果要覆盖，先删除现有集合
+
     if request.overwrite:
+        if not tenant.has_permission("kb:*"):
+            raise HTTPException(
+                status_code=403,
+                detail={"code": "AUTH_002", "message": "insufficient_permissions"},
+            )
         try:
-            kb_manager.delete_collection()
+            kb_manager.delete_collection(tenant_id=tid)
             logger.info("已删除现有知识库")
         except Exception:
             pass
     
     # 加载示例知识
     loader = EnterpriseKnowledgeLoader(kb_manager)
-    loader.load_sample_knowledge()
+    loader.load_sample_knowledge(tenant_id=tid)
     bump_epoch(tid)
+    _audit_rag_op(
+        tenant,
+        action="rag.init.sample",
+        output_text=f"overwrite={request.overwrite}",
+        http_request=http_request,
+    )
     
     # 获取统计信息
-    stats = kb_manager.get_stats()
+    stats = kb_manager.get_stats(tenant_id=tid)
     
     return {
         "success": True,
@@ -241,6 +286,7 @@ async def init_sample_knowledge(
 @router.post("/init/knowledge-base")
 @_rag_errors
 async def init_knowledge_base_structure(
+    http_request: Request,
     request: LoadSampleRequest | None = None,
     tenant: TenantContext = Depends(_rag_guard),
 ):
@@ -256,22 +302,32 @@ async def init_knowledge_base_structure(
         request = LoadSampleRequest()
     
     kb_manager = get_kb_manager()
-    
-    # 如果要覆盖，先删除现有集合
+
     if request.overwrite:
+        if not tenant.has_permission("kb:*"):
+            raise HTTPException(
+                status_code=403,
+                detail={"code": "AUTH_002", "message": "insufficient_permissions"},
+            )
         try:
-            kb_manager.delete_collection()
+            kb_manager.delete_collection(tenant_id=tid)
             logger.info("已删除现有知识库")
         except Exception:
             pass
     
     # 从知识库结构加载知识
     loader = EnterpriseKnowledgeLoader(kb_manager)
-    loader.load_from_knowledge_base_structure()
+    loader.load_from_knowledge_base_structure(tenant_id=tid)
     bump_epoch(tid)
+    _audit_rag_op(
+        tenant,
+        action="rag.init.knowledge_base",
+        output_text=f"overwrite={request.overwrite}",
+        http_request=http_request,
+    )
     
     # 获取统计信息
-    stats = kb_manager.get_stats()
+    stats = kb_manager.get_stats(tenant_id=tid)
     
     return {
         "success": True,
@@ -279,56 +335,46 @@ async def init_knowledge_base_structure(
         "data": stats
     }
 
+def _pdf_202(ack) -> JSONResponse:
+    from packages.rag.ingest import ingest_ack_body
+
+    return JSONResponse(status_code=202, content=ingest_ack_body(ack))
+
+
 @router.post("/upload/pdf")
 @_rag_errors
 async def upload_pdf(
+    http_request: Request,
     file: UploadFile = File(...),
     tenant: TenantContext = Depends(_rag_guard),
 ):
-    """
-    上传PDF文档到知识库
-    """
+    """上传 PDF：落盘 + queued 行，立即 202。解析由 knowledge_worker 串行完成。"""
+    from packages.rag.ingest import enqueue_pdf_upload
+
     tid = tenant.tenant_id
-    logger.info(f"收到PDF上传请求: {file.filename}")
+    logger.info("收到PDF上传请求: %s", file.filename)
     org_unit_id = _bind_ingest_org(tenant)
-    
-    # 验证文件类型
-    if not file.filename.endswith('.pdf'):
+    name = file.filename or ""
+    if not name.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="只支持PDF文件")
-    
-    # 保存临时文件
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
-        content = await file.read()
-        tmp_file.write(content)
-        tmp_path = tmp_file.name
-    
-    try:
-        # 加载PDF到知识库(扫描件/无文本层 → 抛 RAG_002,不静默成功)
-        kb_manager = get_kb_manager()
-        kb_manager.tenant_id = tid
-        kb_manager.org_unit_id = org_unit_id
-        loader = EnterpriseKnowledgeLoader(kb_manager)
-        pages = loader.load_from_pdf(tmp_path, display_name=file.filename)
-        bump_epoch(tid)
-        
-        # 获取统计信息
-        stats = kb_manager.get_stats()
-        
-        return {
-            "success": True,
-            "message": f"PDF文档 {file.filename} 已成功添加到知识库({pages} 页有文本)",
-            "data": stats,
-            "pages_extracted": pages,
-            "filename": file.filename,
-        }
-    finally:
-        # 清理临时文件
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
+    ack = await enqueue_pdf_upload(
+        tenant_id=tid,
+        org_unit_id=org_unit_id,
+        filename=name,
+        read_chunk=file.read,
+    )
+    _audit_rag_op(
+        tenant,
+        action="rag.upload",
+        output_text=f"filename={name}:doc_id={ack.doc_id}:status={ack.status}",
+        http_request=http_request,
+    )
+    return _pdf_202(ack)
     
 
 @router.post("/upload")
 async def upload_multimodal(
+    http_request: Request,
     file: UploadFile = File(...),
     category: str = "general",
     tenant: TenantContext = Depends(_rag_guard),
@@ -337,8 +383,8 @@ async def upload_multimodal(
     统一上传：pdf / text / audio(wav|mp3|m4a) / image(png|jpg)。
     音频/图片需 `uv sync --extra multimodal`。租户取自认证上下文。
     """
-    from packages.file_sanitizer import file_kind, sanitize_filename, validate_file
     from packages.database.vector_ops import add_knowledge
+    from packages.file_sanitizer import file_kind, sanitize_filename, validate_file
     from packages.rag.extractors.audio import MultimodalDependencyError
 
     tenant_id = tenant.tenant_id
@@ -352,6 +398,17 @@ async def upload_multimodal(
         )
 
     kind = file_kind(filename) or "text"
+    if kind == "pdf":
+        from packages.rag.ingest import enqueue_pdf_bytes
+
+        ack = enqueue_pdf_bytes(
+            tenant_id=tenant_id,
+            org_unit_id=org_unit_id,
+            filename=filename,
+            data=content,
+        )
+        return _pdf_202(ack)
+
     safe_name, ext = sanitize_filename(filename)
     tmp_path = None
     chunk_ids: list[int] = []
@@ -360,21 +417,6 @@ async def upload_multimodal(
         with tempfile.NamedTemporaryFile(delete=False, suffix=ext or "") as tmp:
             tmp.write(content)
             tmp_path = tmp.name
-
-        if kind == "pdf":
-            kb_manager = get_kb_manager()
-            kb_manager.tenant_id = tenant_id
-            kb_manager.org_unit_id = org_unit_id
-            loader = EnterpriseKnowledgeLoader(kb_manager)
-            pages = loader.load_from_pdf(tmp_path, display_name=filename)
-            bump_epoch(tenant_id)
-            return {
-                "success": True,
-                "source_type": "pdf",
-                "message": f"PDF {filename} 已入库({pages} 页有文本)",
-                "chunks": pages,
-                "org_unit_id": org_unit_id,
-            }
 
         if kind == "text":
             text = content.decode("utf-8", errors="ignore").strip()
@@ -432,6 +474,12 @@ async def upload_multimodal(
             )
 
         bump_epoch(tenant_id)
+        _audit_rag_op(
+            tenant,
+            action="rag.upload",
+            output_text=f"filename={safe_name}:kind={kind}:chunks={len(chunk_ids)}",
+            http_request=http_request,
+        )
         return {
             "success": True,
             "source_type": kind,
@@ -470,17 +518,15 @@ async def ask_question(
     """
     logger.info(f"收到问答请求: {request.question[:50]}...")
 
-    kb = get_kb_manager()
-    _attach_org_scope_to_kb(kb, tenant)
     rag_service = get_rag_service()
-    rag_service.kb_manager = kb
-    # D6/Wave G: ask 内含 wait_l1 同步轮询——整段丢线程池，不堵事件循环
+    scope = _resolve_org_scope(tenant)
     result = await asyncio.to_thread(
         rag_service.ask,
         request.question,
         request.search_k,
         tenant_id=tenant.tenant_id,
         user_id=tenant.user_id,
+        org_scope=scope,
     )
     
     return {
@@ -501,16 +547,15 @@ async def ask_with_context(
     """
     logger.info(f"收到带上下文的问答请求: {request.question[:50]}...")
 
-    kb = get_kb_manager()
-    _attach_org_scope_to_kb(kb, tenant)
     rag_service = get_rag_service()
-    rag_service.kb_manager = kb
-    # D6/Wave G: ask_with_context 含同步检索/LLM——丢线程池
+    scope = _resolve_org_scope(tenant)
     result = await asyncio.to_thread(
         rag_service.ask_with_context,
         request.question,
         request.conversation_history,
         request.search_k,
+        tenant_id=tenant.tenant_id,
+        org_scope=scope,
     )
     
     return {
@@ -531,13 +576,13 @@ async def search_knowledge(
     """
     logger.info(f"收到搜索请求: {request.query[:50]}...")
 
-    kb = get_kb_manager()
-    _attach_org_scope_to_kb(kb, tenant)
     rag_service = get_rag_service()
-    rag_service.kb_manager = kb
+    scope = _resolve_org_scope(tenant)
     results = rag_service.search_knowledge(
         query=request.query,
-        k=request.k
+        k=request.k,
+        tenant_id=tenant.tenant_id,
+        org_scope=scope,
     )
     
     return {
@@ -549,70 +594,71 @@ async def search_knowledge(
         }
     }
 
+@router.get("/tasks/{task_id}")
+@_rag_errors
+async def get_ingest_task(
+    task_id: str,
+    tenant: TenantContext = Depends(_rag_guard),
+):
+    from packages.rag.ingest import get_task, task_payload
+
+    row = get_task(tenant.tenant_id, task_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="task_not_found")
+    return {"success": True, "data": task_payload(row)}
+
+
+@router.post("/tasks/{task_id}/retry")
+@_rag_errors
+async def retry_ingest_task(
+    task_id: str,
+    tenant: TenantContext = Depends(_rag_guard),
+):
+    from packages.rag.ingest import IngestAck, ingest_ack_body, retry_document
+
+    row = retry_document(tenant.tenant_id, task_id)
+    ack = IngestAck(
+        doc_id=str(row.id),
+        filename=str(row.filename),
+        status=str(row.status),
+        duplicate=False,
+        file_hash=str(row.file_hash),
+        storage_path=str(row.storage_path or ""),
+    )
+    return JSONResponse(status_code=202, content=ingest_ack_body(ack))
+
+
 @router.get("/documents")
 @_rag_errors
 async def list_documents(
     tenant: TenantContext = Depends(_rag_guard),
 ):
-    """按 source 聚合列出本租户已入库文档（chunk 计数）。"""
-    from sqlalchemy import func
+    """列出本租户文档（含 queued/parsing/failed）；旧 chunk 无 doc_id 仍按 source 聚合。"""
+    from packages.rag.ingest import list_documents_for_tenant
 
-    from packages.database.pgvector_session import KnowledgeChunk, get_pg_session
-
-    tid = tenant.tenant_id
-    kb_manager = get_kb_manager()
-    kb_manager.tenant_id = tid
-    sf = get_pg_session()
-    with sf.Session() as session:
-        rows = (
-            session.query(
-                KnowledgeChunk.source,
-                KnowledgeChunk.source_type,
-                func.count(KnowledgeChunk.id),
-                func.max(KnowledgeChunk.created_at),
-            )
-            .filter(KnowledgeChunk.tenant_id == tid)
-            .group_by(KnowledgeChunk.source, KnowledgeChunk.source_type)
-            .order_by(func.max(KnowledgeChunk.created_at).desc())
-            .all()
-        )
-    items = []
-    for source, source_type, chunk_count, created_at in rows:
-        name = (source or "").strip() or "未命名文档"
-        items.append(
-            {
-                "source": source or "",
-                "name": name,
-                "source_type": source_type or "text",
-                "chunk_count": int(chunk_count or 0),
-                "created_at": created_at.isoformat() if created_at else None,
-            }
-        )
+    items = list_documents_for_tenant(tenant.tenant_id)
     return {"success": True, "data": {"items": items, "count": len(items)}}
 
 
 @router.delete("/documents")
 @_rag_errors
 async def delete_document(
+    http_request: Request,
     source: str = Query(..., min_length=1, description="入库 source / 文件名"),
-    tenant: TenantContext = Depends(_rag_guard),
+    tenant: TenantContext = Depends(_kb_admin_guard),
 ):
-    """按 source 删除本租户下该文档的全部 chunk。"""
-    from packages.database.pgvector_session import KnowledgeChunk, get_pg_session
+    """按 source（文件名）删除文档行 + 对应 chunk。"""
+    from packages.rag.ingest import delete_document_for_tenant
 
     tid = tenant.tenant_id
-    sf = get_pg_session()
-    with sf.Session() as session:
-        deleted = (
-            session.query(KnowledgeChunk)
-            .filter(
-                KnowledgeChunk.tenant_id == tid,
-                KnowledgeChunk.source == source,
-            )
-            .delete(synchronize_session=False)
-        )
-        session.commit()
+    deleted = delete_document_for_tenant(tid, source)
     bump_epoch(tid)
+    _audit_rag_op(
+        tenant,
+        action="rag.documents.delete",
+        output_text=f"source={source}:deleted={deleted}",
+        http_request=http_request,
+    )
     return {
         "success": True,
         "message": f"已删除「{source}」共 {deleted} 块",
@@ -623,25 +669,23 @@ async def delete_document(
 @router.delete("/reset")
 @_rag_errors
 async def reset_knowledge_base(
-    tenant: TenantContext = Depends(_rag_guard),
+    http_request: Request,
+    tenant: TenantContext = Depends(_kb_admin_guard),
 ):
     """
     重置知识库
     
-    删除所有向量数据（谨慎使用）
+    删除本租户所有向量数据（谨慎使用）
     """
     tid = tenant.tenant_id
     logger.warning("收到重置知识库请求 tenant=%s", tid)
     
     kb_manager = get_kb_manager()
-    kb_manager.delete_collection()
+    kb_manager.delete_collection(tenant_id=tid)
     bump_epoch(tid)
-    
-    # 重置全局实例
-    global _kb_manager, _rag_service, _integration_service
-    _kb_manager = None
-    _rag_service = None
-    _integration_service = None
+    _audit_rag_op(
+        tenant, action="rag.reset", output_text=f"tenant={tid}", http_request=http_request
+    )
     
     return {
         "success": True,
