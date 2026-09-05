@@ -16,6 +16,9 @@ from packages.capability.models import CapabilityKind, CapabilityProvider
 _STR = {"type": "string"}
 
 
+_OBJ = {"type": "object"}
+
+
 def _tool(
     cap_id: str,
     *,
@@ -26,6 +29,7 @@ def _tool(
     requires_approval: bool = False,
     exec_policy: dict[str, Any] | None = None,
     isolation_mode: str = "direct",
+    param_spec: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     spec: dict[str, Any] = {
         "executor": "builtin",
@@ -38,7 +42,7 @@ def _tool(
     }
     if exec_policy:
         spec["exec_policy"] = exec_policy
-    return {
+    out: dict[str, Any] = {
         "id": cap_id,
         "name": cap_id,
         "kind": CapabilityKind.TOOL.value,
@@ -47,6 +51,9 @@ def _tool(
         "permission": permission,
         "spec": spec,
     }
+    if param_spec:
+        out["param_spec"] = param_spec
+    return out
 
 
 BUILTIN_TOOL_SPECS: list[dict[str, Any]] = [
@@ -271,5 +278,39 @@ BUILTIN_TOOL_SPECS: list[dict[str, Any]] = [
         ),
         risk_level="low",
         permission="chat:write",
+    ),
+    _tool(
+        "llm.generate",
+        description="Execute an LLM generation with instruction and optional context",
+        contract=generic_contract(
+            "llm.generate",
+            description="Generate text via LLMHarness with instruction and optional user material.",
+            input_props={
+                "instruction": _STR,
+                "context": _OBJ,
+                "user_material": _STR,
+                "model": _STR,
+            },
+            required=["instruction"],
+        ),
+        risk_level="low",
+        permission="chat:write",
+        param_spec={
+            "instruction": {
+                "type": "string",
+                "required": True,
+                "description": "生成指令",
+            },
+            "user_material": {
+                "type": "string",
+                "required": False,
+                "description": "用户素材",
+            },
+            "model": {
+                "type": "string",
+                "required": False,
+                "description": "可选模型名",
+            },
+        },
     ),
 ]

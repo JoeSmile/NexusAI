@@ -20,7 +20,6 @@ import {
 } from '@/api/chat'
 import { uploadSessionFile } from '@/api/files'
 import { formatApiError } from '@/api/http'
-import { fetchTermsPending } from '@/api/terms'
 import { ContextPanel } from '@/components/agent/ContextPanel'
 import { ExecutionPanel } from '@/components/agent/ExecutionPanel'
 import { BookmarksDrawer } from '@/components/agent/BookmarksDrawer'
@@ -47,10 +46,8 @@ import { detectSensitiveHints, validateChatInput } from '@/lib/clientGuardrails'
 import { runScriptGenInPlace } from '@/lib/runScriptGenInPlace'
 import { useChatPrefsStore } from '@/stores/chatPrefsStore'
 import { useWorkflowTriggerStore } from '@/stores/workflowTriggerStore'
-import { TermsAcceptanceDialog } from '@/components/legal/TermsAcceptanceDialog'
 import { StreamAlertBanner } from '@/components/agent/StreamAlert'
 import { RenderHost } from '@/components/dynamic/RenderHost'
-import type { TermsDoc } from '@/api/terms'
 import type { RenderAction } from '@/types/render'
 
 export default function HomeChatPage() {
@@ -90,7 +87,6 @@ export default function HomeChatPage() {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [dayCollectionOpen, setDayCollectionOpen] = useState(false)
   const [dislikeCid, setDislikeCid] = useState<string | null>(null)
-  const [termsPending, setTermsPending] = useState<TermsDoc[]>([])
   const [pendingImage, setPendingImage] = useState<File | null>(null)
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
   const [attachErr, setAttachErr] = useState<string | null>(null)
@@ -158,21 +154,6 @@ export default function HomeChatPage() {
       cancelled = true
     }
   }, [replaceHistory, mapHistoryItems, hydrateFeedback])
-
-  useEffect(() => {
-    let cancelled = false
-    void (async () => {
-      try {
-        const res = await fetchTermsPending()
-        if (!cancelled) setTermsPending(res.pending || [])
-      } catch {
-        if (!cancelled) setTermsPending([])
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   // 历史渲染进 PullToRefresh 后再滚底（单次 rAF 常赶不上 commit）
   // 仅跟 historyScrollNonce：勿依赖 messages.length，否则「加载更早」会误滚底
@@ -1122,10 +1103,6 @@ export default function HomeChatPage() {
             if (ok) setDislikeCid(null)
           })
         }}
-      />
-      <TermsAcceptanceDialog
-        pending={termsPending}
-        onAccepted={() => setTermsPending([])}
       />
     </>
   )

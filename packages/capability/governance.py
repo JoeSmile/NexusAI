@@ -11,14 +11,13 @@ import os
 from datetime import UTC, datetime
 from typing import Any
 
-from packages.errors import ErrorCode, NexusAIException
-from packages.guardrails.input_guard import check_input
-from packages.guardrails.output_guard import check_output
 from packages.capability.errors import (
     CapabilityGovernanceRequiredError,
     CapabilityQuotaExceededError,
 )
 from packages.capability.models import CapabilityKind, CapabilitySpec
+from packages.errors import ErrorCode, NexusAIException
+from packages.guardrails.input_guard import check_input
 
 logger = logging.getLogger(__name__)
 
@@ -69,9 +68,11 @@ async def guard_input_text(message: str) -> str:
     return result.redacted_text or message
 
 
-async def guard_output_text(text: str) -> str:
-    """出向护栏；blocked → GUARD_003。"""
-    result = await check_output(text)
+async def guard_output_text(text: str, *, tenant_id: str = "") -> str:
+    """出向护栏；blocked → GUARD_003。红线替换写回文本。"""
+    from packages.guardrails.generation_exit import sanitize_generation_exit
+
+    result = await sanitize_generation_exit(text, tenant_id=tenant_id)
     if result.action == "blocked":
         raise NexusAIException(
             ErrorCode.OUTPUT_BLOCKED.value,

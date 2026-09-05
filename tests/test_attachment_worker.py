@@ -113,8 +113,12 @@ def test_prod_compose_file_worker_shares_uploads_volume() -> None:
     text = Path("docker-compose.prod.yml").read_text(encoding="utf-8")
     assert "file-worker:" in text
     assert "apps.file_worker" in text
-    fw = text.split("file-worker:")[1].split("social-worker:")[0]
+    fw = text.split("file-worker:")[1].split("knowledge-worker:")[0]
     assert "./uploads:/app/uploads" in fw
+    assert "knowledge-worker:" in text
+    assert "apps.knowledge_worker" in text
+    kw = text.split("knowledge-worker:")[1].split("social-worker:")[0]
+    assert "./uploads:/app/uploads" in kw
     mem = text.split("memory-worker:")[1].split("file-worker:")[0]
     assert "./uploads:/app/uploads" not in mem
 

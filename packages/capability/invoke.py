@@ -207,6 +207,18 @@ async def _invoke_rag(
         )
     question = messages[-1]["content"]
     search_k = int(payload.get("search_k") or spec.spec.get("search_k") or 3)
+    from packages.database.pgvector_session import get_pg_session
+    from packages.org.scope import resolve_org_scope
+
+    pg = get_pg_session()
+    with pg.Session() as session:
+        org_scope = resolve_org_scope(
+            session,
+            tenant_id=tenant.tenant_id,
+            user_id=tenant.user_id,
+            platform_role=tenant.role,
+            is_cross_tenant=tenant.is_cross_tenant,
+        )
 
     try:
         result = await asyncio.to_thread(
@@ -215,6 +227,7 @@ async def _invoke_rag(
             search_k,
             tenant_id=tenant.tenant_id,
             user_id=tenant.user_id or "anonymous",
+            org_scope=org_scope,
         )
     except NexusAIException:
         raise
@@ -394,7 +407,7 @@ async def invoke(
             # 出向护栏（整段）后 yield done
             full = "".join(collected)
             if full:
-                await guard_output_text(full)
+                await guard_output_text(full, tenant_id=tenant.tenant_id)
             # 日成本桶：model 路径用粗算（harness 已记 metrics；此处仅配额计数）
             usage_cost = 0.0
             try:
@@ -418,7 +431,7 @@ async def invoke(
                 usage_cost = float((frame.get("data") or {}).get("cost") or 0)
             yield frame
         if collected:
-            await guard_output_text("".join(collected))
+            await guard_output_text("".join(collected), tenant_id=tenant.tenant_id)
         record_cap_quota_usage(tenant.tenant_id, calls=1, cost=usage_cost)
         return
 
@@ -431,7 +444,7 @@ async def invoke(
                 usage_cost = float((frame.get("data") or {}).get("cost") or 0)
             yield frame
         if collected:
-            await guard_output_text("".join(collected))
+            await guard_output_text("".join(collected), tenant_id=tenant.tenant_id)
         record_cap_quota_usage(tenant.tenant_id, calls=1, cost=usage_cost)
         return
 
@@ -447,7 +460,7 @@ async def invoke(
                 continue
             full = "".join(collected)
             if full:
-                await guard_output_text(full)
+                await guard_output_text(full, tenant_id=tenant.tenant_id)
             # model 子路径 harness 已记成本；rag 子路径若无 usage 则上面已累加
             if usage_cost <= 0 and collected:
                 try:

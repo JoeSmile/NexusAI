@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 def test_create_api_key_insert_sets_is_active_and_created_at():
-    src = Path("backend/routers/admin.py").read_text(encoding="utf-8")
+    src = Path("apps/api/routers/admin.py").read_text(encoding="utf-8")
     # 锚定 create_api_key 附近的 INSERT，避免误匹配其它语句
     assert "async def create_api_key" in src
     idx = src.index("async def create_api_key")

@@ -186,6 +186,7 @@ export type SkillSummary = {
   description: string
   source: string
   usage: SkillUsage
+  workflow_id?: string | null
   updated_at: string | null
   created_at: string | null
 }

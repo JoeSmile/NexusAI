@@ -126,6 +126,58 @@ async def test_generate_script_never_requires_style():
 
 
 @pytest.mark.asyncio
+async def test_generate_script_forwards_env_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_API_KEY", "sk-test-script")
+    monkeypatch.setenv("LLM_BASE_URL", "http://127.0.0.1:11434/v1")
+    monkeypatch.setenv("DEFAULT_MODEL", "qwen2.5:7b")
+    captured: dict = {}
+
+    class _Harness:
+        async def stream(self, **kwargs):  # type: ignore[no-untyped-def]
+            captured.update(kwargs)
+            yield "钩子：先问你一件事"
+
+    monkeypatch.setattr("packages.harness.LLMHarness", _Harness)
+
+    out = await generate_script(
+        tenant_id="t1",
+        style=dict(DEFAULT_CONTENT_STYLE),
+        org_profile={},
+        hotspots=[{"title": "开学季", "summary": ""}],
+    )
+    assert "钩子" in out["script"]
+    assert captured.get("api_key") == "sk-test-script"
+    assert captured.get("base_url") == "http://127.0.0.1:11434/v1"
+    assert captured.get("model") == "qwen2.5:7b"
+
+
+@pytest.mark.asyncio
+async def test_generate_script_rejects_busy_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    from packages.content_ops.script_gen import is_llm_busy_fallback
+    from packages.fallback import get_fallback
+
+    assert is_llm_busy_fallback(get_fallback("zh")) is True
+    assert is_llm_busy_fallback("真实口播正文") is False
+
+    class _Harness:
+        async def stream(self, **kwargs):  # type: ignore[no-untyped-def]
+            yield get_fallback("zh")
+
+    monkeypatch.setattr("packages.harness.LLMHarness", _Harness)
+    monkeypatch.setenv("LLM_API_KEY", "sk-test-script")
+    out = await generate_script(
+        tenant_id="t1",
+        style=dict(DEFAULT_CONTENT_STYLE),
+        org_profile={},
+        hotspots=[{"title": "开学季", "summary": ""}],
+        model="qwen2.5:7b",
+    )
+    assert out.get("llm_failed") is True
+    assert out["script"] != get_fallback("zh")
+
+
+
+@pytest.mark.asyncio
 async def test_style_extract_heuristic_short_and_long():
     from packages.content_ops.style_extract import extract_style_from_text
 

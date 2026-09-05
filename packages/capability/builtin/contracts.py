@@ -69,7 +69,7 @@ def rag_search_contract() -> dict[str, Any]:
 def web_search_contract() -> dict[str, Any]:
     return _contract(
         "web.search",
-        description="Aggregate web search with SSRF-safe URL allowlist enforcement.",
+        description="Web search via search_service (query only). Result URLs are display, not fetched.",
         input_schema={
             "type": "object",
             "properties": {"query": _STR, "url": _STR},

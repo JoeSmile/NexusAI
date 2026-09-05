@@ -139,7 +139,7 @@ def test_rag_service_llm_available_without_api_key(mock_provider, monkeypatch):
         def load_vectorstore(self):
             return None
 
-        def search_similar(self, q, k=3):
+        def search_similar(self, q, k=3, **_kwargs):
             return []
 
         def get_retriever(self, search_kwargs=None):

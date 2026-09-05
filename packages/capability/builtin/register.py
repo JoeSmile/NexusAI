@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def builtin_raw_to_spec(raw: dict) -> CapabilitySpec:
+    ps = raw.get("param_spec")
     return CapabilitySpec(
         id=str(raw["id"]),
         name=str(raw.get("name") or raw["id"]),
@@ -26,6 +27,7 @@ def builtin_raw_to_spec(raw: dict) -> CapabilitySpec:
         spec=dict(raw.get("spec") or {}),
         status=CapabilityStatus.ENABLED,
         permission=str(raw.get("permission") or ""),
+        param_spec=dict(ps) if isinstance(ps, dict) else None,
     )
 
 

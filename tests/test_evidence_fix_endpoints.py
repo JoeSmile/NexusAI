@@ -144,13 +144,14 @@ def test_rag_init_sample_uses_add_documents(monkeypatch):
             self.kb_manager = manager
             self.called = False
 
-        def load_sample_knowledge(self):
+        def load_sample_knowledge(self, *, tenant_id=None):
             # 与生产路径一致: Document + add_documents
             from packages.rag.core.langchain_compat import Document
 
             self.called = True
             self.kb_manager.add_documents(
-                [Document(page_content="sample")]
+                [Document(page_content="sample")],
+                tenant_id=tenant_id,
             )
 
     monkeypatch.setattr(rag_mod, "get_kb_manager", lambda: kb)

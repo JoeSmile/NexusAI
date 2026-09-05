@@ -27,6 +27,17 @@ def test_gate_rejects_forbidden_params():
     assert ei.value.code == "GATE_SUPPLY"
 
 
+def test_gate_rejects_forbidden_params_on_nodes():
+    with pytest.raises(GateReject) as ei:
+        run_publish_gates(
+            cot_template="ok",
+            ir_skeleton={
+                "nodes": [{"node_id": "n1", "params": {"api_key": "x"}}]
+            },
+        )
+    assert ei.value.code == "GATE_SUPPLY"
+
+
 def test_gate_permissions_not_amplified():
     perms = run_publish_gates(
         cot_template="safe template",

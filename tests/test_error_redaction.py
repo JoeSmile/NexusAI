@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PIPELINE = ROOT / "backend" / "pipeline"
+PIPELINE = ROOT / "packages" / "pipeline"
 _SAFE_SSE = "生成失败，请稍后重试或换个说法。"
 _MSG_STR_RE = re.compile(r'''["']message["']\s*:\s*str\(''')
 
