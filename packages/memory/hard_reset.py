@@ -32,7 +32,7 @@ def drop_l1_narrative(tenant_id: str, user_id: str, session_id: str) -> bool:
     try:
         from packages.memory.memory_service import get_unified_memory_service
 
-        get_unified_memory_service(tenant_id=tenant_id)._invalidate_mem_bundle(
+        get_unified_memory_service(tenant_id=tenant_id).invalidate_warm(
             user_id
         )
     except Exception:
@@ -81,14 +81,6 @@ def archive_all_live_turns(tenant_id: str, user_id: str, session_id: str) -> int
             )
         )
         session.commit()
-    try:
-        from packages.memory.memory_service import get_unified_memory_service
-
-        get_unified_memory_service(tenant_id=tenant_id)._invalidate_mem_bundle(
-            user_id
-        )
-    except Exception:
-        pass
     return int(n or 0)
 
 

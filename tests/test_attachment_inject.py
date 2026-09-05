@@ -132,7 +132,7 @@ async def test_model_router_skips_short_path_when_file_blocks(
         id = "greet"
 
     monkeypatch.setattr(
-        "packages.pipeline.nodes.model_router.resolve_short_path_skill",
+        "packages.pipeline.short_path.resolve_short_path_skill",
         lambda _s: _Skill(),
     )
 
@@ -141,7 +141,7 @@ async def test_model_router_skips_short_path_when_file_blocks(
         raise AssertionError("must not execute skill")
 
     monkeypatch.setattr(
-        "packages.pipeline.nodes.model_router.registry.execute_skill",
+        "packages.pipeline.short_path.registry.execute_skill",
         _boom,
     )
     out = await model_router(state)

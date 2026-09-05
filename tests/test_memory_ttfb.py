@@ -1,4 +1,4 @@
-"""Task 51 — load_memory Redis cache + warm inject cap."""
+"""Task 51 / S1b — load_memory Redis cache + warm inject cap."""
 
 from __future__ import annotations
 
@@ -66,6 +66,13 @@ class _CountingSession:
     def commit(self) -> None:
         return None
 
+    def execute(self, statement, *args, **kwargs):  # noqa: ANN001
+        self.counter["queries"] += 1
+        raise NotImplementedError(
+            f"_CountingSession.execute() not stubbed for {statement!r}; "
+            "add an explicit branch (do not return empty silently)"
+        )
+
     def __enter__(self):
         return self
 
@@ -76,14 +83,16 @@ class _CountingSession:
 class _Factory:
     def __init__(self, counter: dict) -> None:
         self.counter = counter
+        self.counter.setdefault("sessions", 0)
 
     def Session(self) -> _CountingSession:  # noqa: N802
+        self.counter["sessions"] += 1
         return _CountingSession(self.counter)
 
 
-def test_read_second_hit_skips_db(monkeypatch) -> None:
+def test_read_second_hit_skips_warm_and_cold_db(monkeypatch) -> None:
     fake = _FakeRedis()
-    counter = {"queries": 0}
+    counter = {"queries": 0, "sessions": 0}
     monkeypatch.setattr(
         "packages.redis_tools.get_sync_redis", lambda **_k: fake
     )
@@ -93,17 +102,21 @@ def test_read_second_hit_skips_db(monkeypatch) -> None:
     svc = UnifiedMemoryService(tenant_id="acme")
     b1 = asyncio.run(svc.read(user_id="u1", session_id="s1"))
     first_q = counter["queries"]
-    assert first_q > 0
+    first_sessions = counter["sessions"]
+    assert first_q >= 3
+    assert first_sessions >= 3
     b2 = asyncio.run(svc.read(user_id="u1", session_id="s1"))
-    assert counter["queries"] == first_q
+    assert counter["queries"] == first_q + 1
+    assert counter["sessions"] == first_sessions + 1
     assert b1.warm == b2.warm
+    assert b1.cold == b2.cold
     assert fake.sets >= 1
     assert fake.gets >= 1
 
 
-def test_write_invalidates_bundle_cache(monkeypatch) -> None:
+def test_write_turn_does_not_clear_warm_cold_cache(monkeypatch) -> None:
     fake = _FakeRedis()
-    counter = {"queries": 0}
+    counter = {"queries": 0, "sessions": 0}
     monkeypatch.setattr(
         "packages.redis_tools.get_sync_redis", lambda **_k: fake
     )
@@ -112,8 +125,9 @@ def test_write_invalidates_bundle_cache(monkeypatch) -> None:
     )
     svc = UnifiedMemoryService(tenant_id="acme")
     asyncio.run(svc.read(user_id="u1", session_id="s1"))
-    after_read = counter["queries"]
-    assert any(k.startswith("mem:bundle:") for k in fake.store)
+    warm_keys = [k for k in fake.store if k.startswith("mem:warm:")]
+    cold_keys = [k for k in fake.store if k.startswith("mem:cold:")]
+    assert warm_keys and cold_keys
     asyncio.run(
         svc.write_turn(
             user_id="u1",
@@ -122,13 +136,18 @@ def test_write_invalidates_bundle_cache(monkeypatch) -> None:
             assistant_message="yo",
         )
     )
-    assert not any(k.startswith("mem:bundle:") for k in fake.store)
+    for k in warm_keys:
+        assert k in fake.store
+    for k in cold_keys:
+        assert k in fake.store
+    after_write_q = counter["queries"]
     asyncio.run(svc.read(user_id="u1", session_id="s1"))
-    assert counter["queries"] > after_read
+    # hot always hits DB; warm/cold stay cached so only +1 query
+    assert counter["queries"] == after_write_q + 1
 
 
 def test_read_without_redis_still_works(monkeypatch) -> None:
-    counter = {"queries": 0}
+    counter = {"queries": 0, "sessions": 0}
     monkeypatch.setattr(
         "packages.redis_tools.get_sync_redis", lambda **_k: None
     )
@@ -143,9 +162,9 @@ def test_read_without_redis_still_works(monkeypatch) -> None:
     assert counter["queries"] > 0
 
 
-def test_read_cache_does_not_mix_view_params(monkeypatch) -> None:
+def test_read_include_cold_false_skips_cold_session(monkeypatch) -> None:
     fake = _FakeRedis()
-    counter = {"queries": 0}
+    counter = {"queries": 0, "sessions": 0}
     monkeypatch.setattr(
         "packages.redis_tools.get_sync_redis", lambda **_k: fake
     )
@@ -153,12 +172,12 @@ def test_read_cache_does_not_mix_view_params(monkeypatch) -> None:
         "packages.memory.memory_service.get_pg_session", lambda: _Factory(counter)
     )
     svc = UnifiedMemoryService(tenant_id="acme")
-    asyncio.run(svc.read(user_id="u1", session_id="s1", hot_limit=5, include_cold=True))
-    after_full = counter["queries"]
     asyncio.run(
-        svc.read(user_id="u1", session_id="s1", hot_limit=0, include_cold=False)
+        svc.read(user_id="u1", session_id="s1", include_warm=True, include_cold=False)
     )
-    assert counter["queries"] > after_full
+    assert counter["sessions"] == 2
+    assert any(k.startswith("mem:warm:") for k in fake.store)
+    assert not any(k.startswith("mem:cold:") for k in fake.store)
 
 
 def test_assemble_caps_warm_at_30() -> None:
@@ -168,3 +187,12 @@ def test_assemble_caps_warm_at_30() -> None:
     facts = [ln for ln in block.splitlines() if ln.startswith("- fact:")]
     assert len(facts) == 30
     assert len(block) < 20_000
+
+
+def test_counting_session_execute_text_raises_not_silent() -> None:
+    import pytest
+
+    sess = _CountingSession({"queries": 0})
+    with pytest.raises(NotImplementedError, match="not stubbed"):
+        sess.execute("SELECT 1")
+    assert sess.counter["queries"] == 1

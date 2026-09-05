@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from packages.plan.retrieval_mode import estimate_prompt_tokens
 from packages.pipeline.state import PipelineState
+from packages.plan.retrieval_mode import estimate_prompt_tokens
+from packages.prompt_tokens import trim_token_budget
 
 HOT_HISTORY_TURNS = 10
 CONTEXT_TOKEN_BUDGET = 8000
@@ -21,13 +22,16 @@ def resolved_query(state: PipelineState) -> str:
 
 
 def current_user_content(state: PipelineState) -> str:
-    """Current-turn user text; honors experiment_hook prefix on assembled_prompt."""
-    assembled = (state.get("assembled_prompt") or "").strip()
-    if assembled:
-        if assembled.startswith("user: "):
-            return assembled[6:].strip()
-        return assembled
-    return resolved_query(state)
+    """Current-turn user text; honors experiment_hook user_prompt_prefix."""
+    return effective_user_content(state)
+
+
+def effective_user_content(state: PipelineState) -> str:
+    prefix = str(state.get("user_prompt_prefix") or "").strip()
+    body = resolved_query(state)
+    if prefix:
+        return f"{prefix}\n\n{body}"
+    return body
 
 
 def _normalize_hot_role(role: object) -> str:
@@ -56,9 +60,10 @@ def expand_hot_messages(
             }
         )
     rows = rows[-max_turns:]
+    cap = trim_token_budget(budget_tokens)
     while rows:
         joined = "\n".join(m["content"] for m in rows)
-        if estimate_prompt_tokens(joined) <= budget_tokens:
+        if estimate_prompt_tokens(joined) <= cap:
             break
         rows.pop(0)
     return rows
@@ -72,7 +77,8 @@ def trim_messages_to_budget(
     """Keep system + latest user; drop oldest hot turns when over budget."""
     if not messages:
         return messages
-    if estimate_prompt_tokens("\n".join(m["content"] for m in messages)) <= budget_tokens:
+    cap = trim_token_budget(budget_tokens)
+    if estimate_prompt_tokens("\n".join(m["content"] for m in messages)) <= cap:
         return messages
     if len(messages) < 3:
         return messages
@@ -81,7 +87,7 @@ def trim_messages_to_budget(
     hot = messages[1:-1]
     while hot:
         candidate = [system, *hot, user]
-        if estimate_prompt_tokens("\n".join(m["content"] for m in candidate)) <= budget_tokens:
+        if estimate_prompt_tokens("\n".join(m["content"] for m in candidate)) <= cap:
             break
         hot.pop(0)
     return [system, *hot, user]

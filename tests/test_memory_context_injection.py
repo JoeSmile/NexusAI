@@ -50,7 +50,6 @@ def test_build_llm_messages_injects_memory_and_hot() -> None:
         {"role": "user", "content": "你好"},
         {"role": "assistant", "content": "你好，有什么可以帮你？"},
     ]
-    state["assembled_prompt"] = "user: 我叫小明"
     msgs = build_llm_messages(state, system_template=DEFAULT_CHAT_SYSTEM)
     assert msgs[0]["role"] == "system"
     assert "小明" in msgs[0]["content"]
@@ -96,7 +95,6 @@ async def test_llm_generate_uses_multi_turn_messages(monkeypatch) -> None:
     state["selected_model"] = "deepseek-v4-flash"
     state["memory_prompt_block"] = MEMORY_ISOLATION_HEADER
     state["hot_memory"] = [{"role": "user", "content": "历史"}]
-    state["assembled_prompt"] = "user: 当前问题"
     await lg.llm_generate(state)
     messages = captured.get("messages") or []
     assert messages[0]["role"] == "system"

@@ -230,7 +230,7 @@ async def test_model_router_blocks_greeting_short_path_when_funnel_says_so(
         id = "greet"
 
     monkeypatch.setattr(
-        "packages.pipeline.nodes.model_router.resolve_short_path_skill",
+        "packages.pipeline.short_path.resolve_short_path_skill",
         lambda _s: _Skill(),
     )
 
@@ -239,7 +239,7 @@ async def test_model_router_blocks_greeting_short_path_when_funnel_says_so(
         raise AssertionError("must not execute greeting skill")
 
     monkeypatch.setattr(
-        "packages.pipeline.nodes.model_router.registry.execute_skill",
+        "packages.pipeline.short_path.registry.execute_skill",
         _boom,
     )
     out = await model_router(state)

@@ -242,7 +242,7 @@ CACHE_KEY_DOMAINS: dict[str, str] = {
     "chat": "对话与 PerformanceOptimizer (chat:v / chat:epoch / chat:lock)",
     "ctx": "能力/上下文缓存 (预留)",
     "rl": "限流桶 (rl:cap / rl:rag / …)",
-    "mem": "记忆热缓存 (mem:bundle 读结果 TTL 30s)",
+    "mem": "记忆热缓存 (mem:warm / mem:cold TTL 300s；hot 不缓存)",
     "llm": "LLM 并发 in-flight (llm:in-flight:global / llm:in-flight:{hash})",
     "belief": "意图漏斗当前任务 (belief:cur:{tid}:{uid}:{session})",
     "search": "热点付费搜索次数帽 (search:cap:global:{month} / search:cap:{tid}:{day|month})",

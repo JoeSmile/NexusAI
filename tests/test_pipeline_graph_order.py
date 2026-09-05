@@ -202,7 +202,7 @@ async def test_task_plan_edge_preserved():
     src = inspect.getsource(graph_mod.build_pipeline)
     assert 'add_edge("analyze_parallel", "task_planning")' in src
     assert 'add_edge("task_planning", "clarification_gate")' in src
-    assert '"continue": "build_context"' in src
+    assert '"continue": "experiment_hook"' in src
     assert 'add_edge("auth_check", "command_gate")' in src
     assert '"continue": "preprocess"' in src
     assert 'continue": "load_memory"' in src
@@ -264,8 +264,10 @@ async def test_short_path_graph_invokes_write_memory(monkeypatch):
         analyze_parallel=_analyze,
         task_plan=_passthrough,
         clarification_gate=_passthrough,
-        build_context=_passthrough,
         experiment_hook=_passthrough,
+        context_gate=_passthrough,
+        run_skill=_router,
+        build_context=_passthrough,
         model_router=_router,
         write_memory=_write,
         conversion_hook=_conversion,

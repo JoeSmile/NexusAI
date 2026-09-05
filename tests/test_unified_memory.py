@@ -79,6 +79,12 @@ class _FakeSession:
     def commit(self) -> None:
         self.committed = True
 
+    def execute(self, statement, *args, **kwargs):  # noqa: ANN001
+        raise NotImplementedError(
+            f"_FakeSession.execute() not stubbed for {statement!r}; "
+            "add an explicit branch (do not return empty silently)"
+        )
+
     def __enter__(self):
         return self
 
@@ -89,6 +95,12 @@ class _FakeSession:
 class _FakeFactory:
     def __init__(self, sess: _FakeSession) -> None:
         self.Session = lambda: sess  # noqa: E731
+
+
+def test_fake_session_execute_text_raises_not_silent() -> None:
+    sess = _FakeSession()
+    with pytest.raises(NotImplementedError, match="not stubbed"):
+        sess.execute("SELECT 1")
 
 
 @pytest.mark.asyncio
@@ -423,7 +435,9 @@ async def test_build_context_strips_memory_on_role_drift() -> None:
     out = await build_context(state)
     assert MEMORY_ISOLATION_HEADER in (out.get("memory_prompt_block") or "")
     assert "家人们" not in (out.get("memory_prompt_block") or "")
-    assert "user: 你好" in (out.get("assembled_prompt") or "")
+    from packages.pipeline.context_messages import current_user_content
+
+    assert current_user_content(out) == "你好"
     assert out["raw_input"] == "你好"
 
 

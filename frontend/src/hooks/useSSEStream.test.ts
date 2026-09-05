@@ -66,6 +66,37 @@ describe('SSE parse frames', () => {
     expect(onDone).toHaveBeenCalledWith({ path: 'long' })
   })
 
+  it('PARSE_FAILED is not silent and classifies as framework (Task 85 F4)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const onStreamAlert = vi.fn()
+    expect(dispatchSSEData('{not-json', { onStreamAlert })).toBe('continue')
+    expect(onStreamAlert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: 'PARSE_FAILED',
+        errorClass: 'framework',
+      }),
+    )
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it('maps LLM_002 to business and RATE_001 to rate_limit', () => {
+    const onStreamAlert = vi.fn()
+    dispatchSSEData('{"type":"error","code":"LLM_002","message":"boom"}', {
+      onStreamAlert,
+    })
+    expect(onStreamAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ code: 'LLM_002', errorClass: 'business' }),
+    )
+    onStreamAlert.mockClear()
+    dispatchSSEData('{"type":"error","code":"RATE_001","message":"slow"}', {
+      onStreamAlert,
+    })
+    expect(onStreamAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ code: 'RATE_001', errorClass: 'rate_limit' }),
+    )
+  })
+
   it('passes finish_reason on typed done frame (Task 72 D7)', () => {
     const onDone = vi.fn()
     expect(
@@ -164,7 +195,8 @@ describe('SSE parse frames', () => {
 
   it('surfaces task_plan_pending as info alert', () => {
     const onStreamAlert = vi.fn()
-    const parser = createEventParser({ onStreamAlert })
+    const onPlan = vi.fn()
+    const parser = createEventParser({ onStreamAlert, onPlan })
     parser.feed(
       'data: {"type":"task_plan_pending","status":"pending","message":"正在规划…"}\n\n',
     )
@@ -172,6 +204,11 @@ describe('SSE parse frames', () => {
       expect.objectContaining({
         kind: 'info',
         code: 'TASK_PLAN_PENDING',
+      }),
+    )
+    expect(onPlan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        goal: '正在理解你的需求…',
       }),
     )
   })

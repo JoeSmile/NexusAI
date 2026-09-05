@@ -50,6 +50,10 @@ def _state_with_plan(plan: PlanIR | None = None):
 def test_should_run_orchestrator_requires_flag_and_plan(monkeypatch):
     state = _state_with_plan(_plan_two_parallel())
     monkeypatch.delenv("ORCHESTRATOR_ENABLED", raising=False)
+    assert should_run_orchestrator(state) is True
+    monkeypatch.setenv("ORCHESTRATOR_ENABLED", "false")
+    assert should_run_orchestrator(state) is False
+    monkeypatch.setenv("ORCHESTRATOR_ENABLED", "0")
     assert should_run_orchestrator(state) is False
     monkeypatch.setenv("ORCHESTRATOR_ENABLED", "1")
     assert should_run_orchestrator(state) is True

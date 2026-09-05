@@ -93,8 +93,10 @@ async def clear_session_coref(state: dict[str, Any]) -> None:
     key = warm_coref_key(session_id)
     try:
         from packages.database.vector_ops import delete_user_memory
+        from packages.memory.memory_service import get_unified_memory_service
 
         delete_user_memory(tenant_id, user_id, key)
+        get_unified_memory_service(tenant_id=tenant_id).invalidate_warm(user_id)
     except Exception:
         logger.debug("clear session coref failed", exc_info=True)
     warm = dict(state.get("warm_memory") or {})

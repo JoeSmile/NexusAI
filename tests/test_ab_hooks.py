@@ -10,7 +10,7 @@ from packages.pipeline.state import make_initial_state
 
 
 @pytest.mark.asyncio
-async def test_experiment_hook_assigns_and_records_exposure(monkeypatch):
+async def test_experiment_hook_assigns_pending_exposure(monkeypatch):
     calls: list[dict] = []
 
     monkeypatch.setattr(
@@ -21,23 +21,16 @@ async def test_experiment_hook_assigns_and_records_exposure(monkeypatch):
             "variant_config": {"prompt_prefix": "PREFIX"},
         },
     )
-
-    def _record(**kwargs):
-        calls.append(kwargs)
-
-    monkeypatch.setattr(
-        "packages.pipeline.nodes.experiment_hook.record_event", _record
-    )
+    monkeypatch.setattr("packages.ab.service.record_event", lambda **kw: calls.append(kw))
 
     state = make_initial_state("acme", "u1", "s1", "hello")
     out = await experiment_hook(state)
     assert out["ab_experiment_id"] == "exp1"
     assert out["ab_variant"] == "B"
-    assert out["assembled_prompt"].startswith("PREFIX")
+    assert out["user_prompt_prefix"] == "PREFIX"
     assert out["raw_input"] == "hello"
-    assert len(calls) == 1
-    assert calls[0]["event_type"] == "exposure"
-    assert calls[0]["group"] == "B"
+    assert out["pending_exposure"]["experiment_id"] == "exp1"
+    assert calls == []
 
 
 @pytest.mark.asyncio

@@ -55,7 +55,7 @@ def process_one(xid: str, data: dict, *, deliveries: int = 1) -> float:
     if not tenant_id or not user_id:
         ack(xid)
         return 0.0
-    if kind != "l1_summarize" and not key:
+    if kind not in ("l1_summarize", "warm_extract") and not key:
         ack(xid)
         return 0.0
 
@@ -85,6 +85,17 @@ def process_one(xid: str, data: dict, *, deliveries: int = 1) -> float:
         from packages.memory.context_summarize import run_l1_summarize
 
         code = asyncio.run(run_l1_summarize(data))
+        if code == "skipped_lock":
+            return 0.0
+        ack(xid)
+        return 1.0 if code == "wrote" else 0.0
+
+    if kind == "warm_extract":
+        import asyncio
+
+        from packages.memory.warm_llm_extract import run_warm_extract
+
+        code = asyncio.run(run_warm_extract(data))
         if code == "skipped_lock":
             return 0.0
         ack(xid)

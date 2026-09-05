@@ -46,7 +46,9 @@ def choose_retrieval_mode(
 
 
 def estimate_prompt_tokens(text: str) -> int:
-    return max(1, len(text or "") // 4)
+    from packages.prompt_tokens import estimate_tokens
+
+    return estimate_tokens(text)
 
 
 def token_budget_warning(assembled: str, *, budget: int) -> str | None:

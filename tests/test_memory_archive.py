@@ -5,13 +5,13 @@ from __future__ import annotations
 from datetime import datetime
 
 import pytest
-from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from packages.database.pgvector_session import ChatMessage, ChatSession
 from packages.memory.memory_service import UnifiedMemoryService
 from packages.memory.turn_archive import select_turn_ids_to_archive
 from packages.pipeline.context_messages import CONTEXT_TOKEN_BUDGET, HOT_HISTORY_TURNS
+from tests.memory_sqlite import sqlite_memory_engine
 
 
 def test_chat_message_archived_at_is_nullable() -> None:
@@ -52,7 +52,7 @@ class _SF:
 
 @pytest.fixture()
 def mem_sqlite(monkeypatch: pytest.MonkeyPatch) -> _SF:
-    engine = create_engine("sqlite:///:memory:")
+    engine = sqlite_memory_engine()
     ChatSession.__table__.create(engine)
     ChatMessage.__table__.create(engine)
     sf = _SF(engine)
@@ -133,3 +133,20 @@ async def test_write_turn_archives_oldest_over_turn_window(
         user_id="u1", session_id="s1", hot_limit=20, include_warm=False, include_cold=False
     )
     assert [m["content"] for m in bundle.hot] == live
+
+
+def test_mem_sqlite_visible_from_worker_thread(mem_sqlite: _SF) -> None:
+    """T0: StaticPool so asyncio.to_thread readers see the same sqlite."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    with mem_sqlite.Session() as session:
+        session.add(ChatSession(session_id="s-thread", tenant_id="t1", user_id="u1", title="x"))
+        session.commit()
+
+    def _count() -> int:
+        with mem_sqlite.Session() as session:
+            return session.query(ChatSession).filter_by(session_id="s-thread").count()
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        n = pool.submit(_count).result(timeout=5)
+    assert n == 1

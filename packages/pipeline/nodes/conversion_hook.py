@@ -9,7 +9,25 @@ from packages.pipeline.state import PipelineState
 
 @observe(name="pipeline.conversion_hook")
 async def conversion_hook(state: PipelineState) -> PipelineState:
-    """有实验且有最终响应时记录 conversion；DB 故障不拖垮管线。"""
+    """Flush pending A/B exposure once, then record conversion when a response exists."""
+    pending = state.get("pending_exposure")
+    if pending:
+        try:
+            record_event(
+                user_id=state["user_id"],
+                experiment_id=str(pending.get("experiment_id") or ""),
+                group=str(pending.get("variant") or ""),
+                event_type="exposure",
+                event_data={
+                    "trace_id": state.get("trace_id"),
+                    "session_id": state.get("session_id"),
+                },
+                session_id=state.get("session_id"),
+            )
+        except Exception:
+            pass
+        state["pending_exposure"] = None
+
     # CR 4A: Chat 成功终态再写 chat.task_plan（非短路径且有 plan）
     if state.get("finish_reason") == "llm_generated" and state.get("task_plan"):
         try:

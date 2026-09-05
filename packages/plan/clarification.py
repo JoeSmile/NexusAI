@@ -211,6 +211,9 @@ async def clear_pending(
 
     try:
         delete_user_memory(tenant_id, user_id, key)
+        from packages.memory.memory_service import get_unified_memory_service
+
+        get_unified_memory_service(tenant_id=tenant_id).invalidate_warm(user_id)
     except Exception:
         logger.warning("clear clarification pending failed key=%s", key, exc_info=True)
 

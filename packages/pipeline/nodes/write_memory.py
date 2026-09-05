@@ -55,6 +55,21 @@ async def write_memory(state: PipelineState) -> PipelineState:
     except Exception:
         logger.debug("l1 summarize enqueue skipped", exc_info=True)
     try:
+        from packages.memory.warm_llm_extract import maybe_enqueue_warm_extract
+
+        user_turns = mem.count_session_messages(
+            user_id=user_id, session_id=session_id, role="user"
+        )
+        maybe_enqueue_warm_extract(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            session_id=session_id,
+            user_turns=user_turns,
+            trace_id=trace_id or "",
+        )
+    except Exception:
+        logger.debug("warm extract enqueue skipped", exc_info=True)
+    try:
         from packages.memory.context_summarize import l1_warm_key
         from packages.memory.hard_reset import maybe_hard_reset_l1
 

@@ -57,11 +57,9 @@ class OrchestratorError(Exception):
 
 
 def orchestrator_enabled() -> bool:
-    return os.getenv("ORCHESTRATOR_ENABLED", "").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-    )
+    """默认开。显式 0/false/no/off 关闭（Task 88 裁决 B）。"""
+    raw = (os.getenv("ORCHESTRATOR_ENABLED") or "true").strip().lower()
+    return raw in ("1", "true", "yes", "on")
 
 
 def should_run_orchestrator(state: PipelineState) -> bool:

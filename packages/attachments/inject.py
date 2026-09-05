@@ -138,24 +138,21 @@ async def _refresh_image_blocks(
     return full
 
 
-async def inject_session_attachments(state: dict[str, Any]) -> dict[str, Any]:
-    """Load this session's ready blocks into file_blocks + memory_prompt_block."""
+def _fetch_ready_attachments_sync(
+    *,
+    tenant_id: str,
+    session_id: str,
+    wanted: list[str],
+) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+    """list_session + N+1 get. Sync PG — caller must run off the event loop."""
     from packages.attachments.store import AttachmentForbidden, get_attachment_store
 
-    tenant_id = str(state.get("tenant_id") or "")
-    user_id = str(state.get("user_id") or "")
-    session_id = str(state.get("session_id") or "")
     store = get_attachment_store()
-    state.setdefault("file_blocks", [])
     try:
         rows = store.list_session(tenant_id=tenant_id, session_id=session_id)
     except Exception:
-        return state
-
-    wanted = [str(x) for x in (state.get("attachment_ids") or []) if str(x).strip()]
-    chunks: list[str] = []
-    file_blocks: list[dict[str, Any]] = []
-    query = str(state.get("message") or state.get("raw_input") or "")
+        return []
+    out: list[tuple[dict[str, Any], dict[str, Any]]] = []
     for row in rows:
         if row.get("status") != "ready" or not row_is_live(row):
             continue
@@ -170,6 +167,36 @@ async def inject_session_attachments(state: dict[str, Any]) -> dict[str, Any]:
             continue
         if full is None:
             continue
+        out.append((row, full))
+    return out
+
+
+async def inject_session_attachments(state: dict[str, Any]) -> dict[str, Any]:
+    """Load this session's ready blocks into file_blocks + memory_prompt_block."""
+    state.setdefault("file_blocks", [])
+    if (
+        state.get("session_attachment_present") is False
+        and not state.get("attachment_ids")
+    ):
+        return state
+    from packages.attachments.store import get_attachment_store
+    from packages.thread_pool import run_in_io_pool
+
+    tenant_id = str(state.get("tenant_id") or "")
+    user_id = str(state.get("user_id") or "")
+    session_id = str(state.get("session_id") or "")
+    store = get_attachment_store()
+    wanted = [str(x) for x in (state.get("attachment_ids") or []) if str(x).strip()]
+    fetched = await run_in_io_pool(
+        _fetch_ready_attachments_sync,
+        tenant_id=tenant_id,
+        session_id=session_id,
+        wanted=wanted,
+    )
+    chunks: list[str] = []
+    file_blocks: list[dict[str, Any]] = []
+    query = str(state.get("message") or state.get("raw_input") or "")
+    for row, full in fetched:
         full = await _refresh_image_blocks(
             store,
             full,

@@ -24,6 +24,13 @@ from packages.memory.types import EntityItem
 logger = logging.getLogger(__name__)
 
 
+def _invalidate_warm_cache(mem: UnifiedMemoryService, user_id: str) -> None:
+    try:
+        mem.invalidate_warm(user_id)
+    except Exception:
+        logger.debug("warm cache invalidate skipped", exc_info=True)
+
+
 async def persist_warm_by_key(
     mem: UnifiedMemoryService,
     *,
@@ -37,13 +44,13 @@ async def persist_warm_by_key(
     embed: bool = True,
 ) -> str:
     """I1：按 is_sync_key 分流。返回 queued | synced | degraded。"""
+    from packages.memory.extractor import is_sync_key
+    from packages.memory.memory_queue import enqueue_memory_write, queue_depth
     from packages.metrics_memory import (
         observe_queue_depth,
         record_backlog_trigger,
         record_degraded,
     )
-    from packages.memory.extractor import is_sync_key
-    from packages.memory.memory_queue import enqueue_memory_write, queue_depth
 
     if is_sync_key(key):
         await mem.write(
@@ -236,6 +243,7 @@ async def persist_structured_turn(
                     output_text=f"{pk}->{item.name}|span={item.source_span}",
                 )
                 delete_user_memory(tenant_id, user_id, pk)
+                _invalidate_warm_cache(mem, user_id)
 
         ok, reason = validate_and_reason(
             item, cand.source_text, known_entity_names=accepted_entities
@@ -276,3 +284,4 @@ async def persist_structured_turn(
             tenant_id, user_id, f"pending:{session_id}:"
         ):
             delete_user_memory(tenant_id, user_id, row["key"])
+            _invalidate_warm_cache(mem, user_id)

@@ -9,7 +9,7 @@ from packages.pipeline.state import PipelineState
 
 @observe(name="pipeline.load_memory")
 async def load_memory(state: PipelineState) -> PipelineState:
-    """加载用户记忆（hot/warm/cold）。"""
+    """加载用户记忆（message history / warm / cold）。``hot_memory`` 为 history 别名。"""
     svc = get_unified_memory_service(tenant_id=state["tenant_id"])
     bundle = await svc.read(
         user_id=state["user_id"],

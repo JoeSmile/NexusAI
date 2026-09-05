@@ -11,30 +11,30 @@ from packages.pipeline.state import make_initial_state
 
 
 def test_default_stream_skips_async_plan_for_ttfb(monkeypatch: pytest.MonkeyPatch) -> None:
-    """FORCE/ASYNC 均关时，不应进入异步规划等待（首 token 不被 PlanIR 阻塞）。"""
+    """简单闲聊默认不进异步规划（首 token 不被 PlanIR 阻塞）。"""
     monkeypatch.delenv("ASYNC_TASK_PLAN_ON_STREAM", raising=False)
     monkeypatch.delenv("ORCHESTRATOR_ENABLED", raising=False)
     monkeypatch.delenv("FORCE_TASK_PLAN_ON_STREAM", raising=False)
 
-    state = make_initial_state("t", "u", "s", "帮我写周报")
+    state = make_initial_state("t", "u", "s", "谢谢")
     state["stream_mode"] = True
-    state["intent"] = "content_creation"
-    state["intent_confidence"] = 0.5
+    state["intent"] = "conversation"
+    state["intent_confidence"] = 0.9
     assert should_async_plan_on_stream(state) is False
 
 
 def test_orchestrator_on_does_not_wait_8s_plan_before_tokens(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """编排开关只跑已有 PlanIR，不得把每条流式消息卡在规划 LLM 上。"""
+    """编排开关只跑已有 PlanIR；简单流式消息仍不卡规划 LLM。"""
     monkeypatch.delenv("ASYNC_TASK_PLAN_ON_STREAM", raising=False)
     monkeypatch.delenv("FORCE_TASK_PLAN_ON_STREAM", raising=False)
     monkeypatch.setenv("ORCHESTRATOR_ENABLED", "true")
 
-    state = make_initial_state("t", "u", "s", "帮我写个口播稿")
+    state = make_initial_state("t", "u", "s", "谢谢")
     state["stream_mode"] = True
-    state["intent"] = "content_creation"
-    state["intent_confidence"] = 0.5
+    state["intent"] = "conversation"
+    state["intent_confidence"] = 0.9
     assert should_async_plan_on_stream(state) is False
 
 

@@ -47,5 +47,6 @@ describe('HomeChat image path (76b)', () => {
     expect(src).toMatch(/uploadSessionFile/)
     expect(src).toMatch(/image\/webp/)
     expect(src).toMatch(/上传并识别中/)
+    expect(src).not.toMatch(/messages\.find\(/)
   })
 })

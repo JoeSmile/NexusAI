@@ -37,10 +37,13 @@ def select_turn_ids_to_archive(
     if not rows or max_turns < 1 or budget_tokens < 1:
         return []
     indexed = list(rows)
+    from packages.prompt_tokens import trim_token_budget
+
     keep = list(indexed[-max_turns:])
+    cap = trim_token_budget(budget_tokens)
     while keep:
         joined = "\n".join(content for _id, content in keep)
-        if estimate_prompt_tokens(joined) <= budget_tokens:
+        if estimate_prompt_tokens(joined) <= cap:
             break
         keep.pop(0)
     keep_ids = {i for i, _ in keep}

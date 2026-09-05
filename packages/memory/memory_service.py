@@ -3,14 +3,15 @@
 Pipeline / agent / ``/memory`` 管理 API 的唯一入口：``write()`` / ``read()`` /
 ``assemble_prompt_block()`` 以及 warm 管理方法。
 
-分层职责（不合并）:
-- hot  → ``chat_messages`` 未归档行（``archived_at IS NULL``；超窗打标，不删）
-- warm → ``user_memories``（画像 / 偏好 kv）
-- cold → ``cold_memories``（会话摘要）
+分层职责（Task 89 / memory-tier）:
+- message history（``MemoryBundle.hot`` 兼容别名）→ ``chat_messages`` 未归档行
+- warm → ``user_memories``（唯一真记忆：画像 / 偏好 kv）
+- cold → ``cold_memories``（跨会话叙事摘要）
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -19,6 +20,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Literal
 
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from packages.database.pgvector_session import (
@@ -114,7 +116,7 @@ _DEFAULT_COLD_HEAD_K = 25
 _DEFAULT_COLD_TAIL_K = 25
 _DEFAULT_DECAY_RATE = 0.9
 _DEFAULT_WARM_MIN_WEIGHT = 0.05
-_DEFAULT_BUNDLE_CACHE_TTL = 30
+_DEFAULT_TIER_CACHE_TTL = 300
 _DEFAULT_WARM_INJECT_CAP = 30
 
 
@@ -125,14 +127,22 @@ def decay_score(
     return float(original_score) * (float(decay_rate) ** float(days_ago))
 
 
-def _bundle_cache_ttl() -> int:
-    raw = (os.getenv("MEMORY_BUNDLE_CACHE_TTL") or "").strip()
+def _tier_cache_ttl(env_name: str) -> int:
+    raw = (os.getenv(env_name) or "").strip()
     if raw:
         try:
             return max(1, int(raw))
         except ValueError:
             pass
-    return _DEFAULT_BUNDLE_CACHE_TTL
+    return _DEFAULT_TIER_CACHE_TTL
+
+
+def _warm_cache_ttl() -> int:
+    return _tier_cache_ttl("MEMORY_WARM_TTL")
+
+
+def _cold_cache_ttl() -> int:
+    return _tier_cache_ttl("MEMORY_COLD_TTL")
 
 
 def _warm_inject_cap() -> int:
@@ -143,6 +153,133 @@ def _warm_inject_cap() -> int:
         except ValueError:
             pass
     return _DEFAULT_WARM_INJECT_CAP
+
+
+def _warm_sql_filter_enabled() -> bool:
+    raw = (os.getenv("MEMORY_WARM_SQL_FILTER") or "1").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def _warm_max_rows() -> int:
+    raw = (os.getenv("MEMORY_WARM_MAX_ROWS") or "300").strip()
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return 300
+
+
+def _session_is_postgres(session: Any) -> bool:
+    get_bind = getattr(session, "get_bind", None)
+    try:
+        bind = get_bind() if callable(get_bind) else getattr(session, "bind", None)
+    except Exception:
+        return False
+    name = getattr(getattr(bind, "dialect", None), "name", "") or ""
+    return name == "postgresql"
+
+
+_WARM_SQL = text(
+    """
+    SELECT key, value, summary_meta, confidence, updated_at, created_at
+    FROM user_memories
+    WHERE tenant_id = :tid AND user_id = :uid
+      AND key <> ''
+      AND COALESCE(confidence, 0.5)
+          * power(
+              0.9,
+              GREATEST(
+                  0,
+                  EXTRACT(
+                      EPOCH FROM (
+                          now() - COALESCE(updated_at, created_at)
+                      )
+                  ) / 86400.0
+              )
+          )
+          >= :min_w
+    ORDER BY (
+        COALESCE(confidence, 0.5)
+        * power(
+            0.9,
+            GREATEST(
+                0,
+                EXTRACT(
+                    EPOCH FROM (
+                        now() - COALESCE(updated_at, created_at)
+                    )
+                ) / 86400.0
+            )
+        )
+    ) DESC, updated_at DESC NULLS LAST
+    LIMIT :max_rows
+    """
+)
+
+
+def _summary_meta_dict(raw: Any) -> dict[str, Any] | None:
+    if not raw:
+        return None
+    if isinstance(raw, dict):
+        return dict(raw)
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            return None
+        return parsed if isinstance(parsed, dict) else None
+    return None
+
+
+def _rank_warm_rows(
+    rows: Sequence[Any],
+    *,
+    min_w: float,
+    max_rows: int | None,
+) -> tuple[dict[str, str], dict[str, dict[str, Any]]]:
+    """Filter empty keys, drop below min weight, optional weight sort + LIMIT."""
+    scored: list[tuple[float, datetime | None, Any]] = []
+    unbounded: list[Any] = []
+    for r in rows:
+        if not getattr(r, "key", None):
+            continue
+        conf = getattr(r, "confidence", None)
+        weight = decay_score(
+            float(conf if conf is not None else 0.5),
+            _days_ago(getattr(r, "updated_at", None) or getattr(r, "created_at", None)),
+        )
+        if weight < min_w:
+            continue
+        if max_rows is None:
+            unbounded.append(r)
+        else:
+            scored.append((weight, getattr(r, "updated_at", None), r))
+
+    if max_rows is None:
+        ordered = unbounded
+    else:
+
+        def _sort_key(item: tuple[float, datetime | None, Any]) -> tuple:
+            weight, updated, _row = item
+            if updated is None:
+                return (-weight, True, 0.0)
+            naive = (
+                updated.replace(tzinfo=None)
+                if getattr(updated, "tzinfo", None)
+                else updated
+            )
+            return (-weight, False, -naive.timestamp())
+
+        scored.sort(key=_sort_key)
+        ordered = [r for _w, _u, r in scored[:max_rows]]
+
+    warm: dict[str, str] = {}
+    warm_meta: dict[str, dict[str, Any]] = {}
+    for r in ordered:
+        warm[r.key] = r.value
+        meta = _summary_meta_dict(getattr(r, "summary_meta", None))
+        if meta:
+            warm_meta[r.key] = meta
+    return warm, warm_meta
 
 
 def _days_ago(dt: datetime | None) -> float:
@@ -186,12 +323,17 @@ def rule_based_session_summary(messages: list[dict[str, Any]]) -> str:
 
 @dataclass
 class MemoryBundle:
-    """``read()`` 三档视图。"""
+    """``read()`` 视图。``hot`` = 最近未归档 message history（兼容别名，不是独立记忆层）。"""
 
     hot: list[dict[str, Any]] = field(default_factory=list)
     warm: dict[str, str] = field(default_factory=dict)
     cold: list[dict[str, Any]] = field(default_factory=list)
     warm_meta: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+    @property
+    def message_history(self) -> list[dict[str, Any]]:
+        """最近未归档对话轮次；与 ``hot`` 同一 list。"""
+        return self.hot
 
     def to_pipeline_state(self) -> dict[str, Any]:
         return {
@@ -208,91 +350,69 @@ class UnifiedMemoryService:
     def __init__(self, tenant_id: str = "default") -> None:
         self.tenant_id = tenant_id or "default"
 
-    def _mem_bundle_key(
-        self,
-        user_id: str,
-        session_id: str | None,
-        *,
-        hot_limit: int,
-        include_warm: bool,
-        include_cold: bool,
-        cold_limit: int,
-    ) -> str:
-        """``mem:bundle:{tid}:{uid}:{session}:{hot}:{warm}:{cold}:{cold_limit}``.
-
-        视图参数必须进 key：load_memory 与 hydrate 的 hot/cold 开关不同，
-        短 key 会 30s 串包（拍板 2026-08-21 A）。失效仍扫 ``uid:*``。
-        """
+    def _warm_cache_key(self, user_id: str) -> str:
         from packages.redis_tools import cache_key
 
-        view = (
-            f"{session_id or '-'}:{int(hot_limit)}:"
-            f"{int(include_warm)}:{int(include_cold)}:{int(cold_limit)}"
-        )
-        return cache_key("mem", "bundle", self.tenant_id, f"{user_id}:{view}")
+        return cache_key("mem", "warm", self.tenant_id, user_id)
 
-    def _invalidate_mem_bundle(self, user_id: str) -> None:
+    def _cold_cache_key(
+        self, user_id: str, session_id: str | None, cold_limit: int
+    ) -> str:
+        """``mem:cold:{tid}:{uid}:{session|-}:{cold_limit}:xcold`` (Task 89 M2)."""
+        from packages.redis_tools import cache_key
+
+        view = f"{user_id}:{session_id or '-'}:{int(cold_limit)}:xcold"
+        return cache_key("mem", "cold", self.tenant_id, view)
+
+    def invalidate_warm(self, user_id: str) -> None:
+        from packages.redis_tools import get_sync_redis
+
+        client = get_sync_redis(decode_responses=True)
+        if client is None:
+            return
+        try:
+            client.delete(self._warm_cache_key(user_id))
+        except Exception:
+            logger.debug("mem warm cache invalidate skipped", exc_info=True)
+
+    def invalidate_cold(self, user_id: str) -> None:
         from packages.redis_tools import cache_key, get_sync_redis
 
         client = get_sync_redis(decode_responses=True)
         if client is None:
             return
         try:
-            pattern = cache_key("mem", "bundle", self.tenant_id, f"{user_id}:*")
+            pattern = cache_key("mem", "cold", self.tenant_id, f"{user_id}:*")
             keys = list(client.scan_iter(match=pattern, count=50))
             if keys:
                 client.delete(*keys)
         except Exception:
-            logger.debug("mem bundle cache invalidate skipped", exc_info=True)
+            logger.debug("mem cold cache invalidate skipped", exc_info=True)
 
-    def _cached_bundle(
-        self,
-        user_id: str,
-        session_id: str | None,
-        *,
-        hot_limit: int,
-        include_warm: bool,
-        include_cold: bool,
-        cold_limit: int,
-    ) -> MemoryBundle | None:
+    def _cached_warm(
+        self, user_id: str
+    ) -> tuple[dict[str, str], dict[str, dict[str, Any]]] | None:
         from packages.redis_tools import get_sync_redis
 
         client = get_sync_redis(decode_responses=True)
         if client is None:
             return None
         try:
-            raw = client.get(
-                self._mem_bundle_key(
-                    user_id,
-                    session_id,
-                    hot_limit=hot_limit,
-                    include_warm=include_warm,
-                    include_cold=include_cold,
-                    cold_limit=cold_limit,
-                )
-            )
+            raw = client.get(self._warm_cache_key(user_id))
             if not raw:
                 return None
             data = json.loads(raw)
-            return MemoryBundle(
-                hot=list(data.get("hot") or []),
-                warm=dict(data.get("warm") or {}),
-                cold=list(data.get("cold") or []),
-            )
+            meta_raw = data.get("warm_meta") or data.get("summary_meta") or {}
+            return dict(data.get("warm") or {}), dict(meta_raw)
         except Exception:
-            logger.debug("mem bundle cache get skipped", exc_info=True)
+            logger.debug("mem warm cache get skipped", exc_info=True)
             return None
 
-    def _store_bundle(
+    def _store_warm(
         self,
         user_id: str,
-        session_id: str | None,
-        bundle: MemoryBundle,
-        *,
-        hot_limit: int,
-        include_warm: bool,
-        include_cold: bool,
-        cold_limit: int,
+        warm: dict[str, str],
+        warm_meta: dict[str, dict[str, Any]],
     ) -> None:
         from packages.redis_tools import get_sync_redis
 
@@ -301,23 +421,54 @@ class UnifiedMemoryService:
             return
         try:
             payload = json.dumps(
-                {"hot": bundle.hot, "warm": bundle.warm, "cold": bundle.cold},
+                {"warm": warm, "warm_meta": warm_meta},
                 ensure_ascii=False,
             )
+            client.set(self._warm_cache_key(user_id), payload, ex=_warm_cache_ttl())
+        except Exception:
+            logger.debug("mem warm cache set skipped", exc_info=True)
+
+    def _cached_cold(
+        self, user_id: str, session_id: str | None, cold_limit: int
+    ) -> list[dict[str, Any]] | None:
+        from packages.redis_tools import get_sync_redis
+
+        client = get_sync_redis(decode_responses=True)
+        if client is None:
+            return None
+        try:
+            raw = client.get(self._cold_cache_key(user_id, session_id, cold_limit))
+            if not raw:
+                return None
+            data = json.loads(raw)
+            if isinstance(data, list):
+                return list(data)
+            return list(data.get("cold") or [])
+        except Exception:
+            logger.debug("mem cold cache get skipped", exc_info=True)
+            return None
+
+    def _store_cold(
+        self,
+        user_id: str,
+        session_id: str | None,
+        cold_limit: int,
+        cold: list[dict[str, Any]],
+    ) -> None:
+        from packages.redis_tools import get_sync_redis
+
+        client = get_sync_redis(decode_responses=True)
+        if client is None:
+            return
+        try:
+            payload = json.dumps({"cold": cold}, ensure_ascii=False)
             client.set(
-                self._mem_bundle_key(
-                    user_id,
-                    session_id,
-                    hot_limit=hot_limit,
-                    include_warm=include_warm,
-                    include_cold=include_cold,
-                    cold_limit=cold_limit,
-                ),
+                self._cold_cache_key(user_id, session_id, cold_limit),
                 payload,
-                ex=_bundle_cache_ttl(),
+                ex=_cold_cache_ttl(),
             )
         except Exception:
-            logger.debug("mem bundle cache set skipped", exc_info=True)
+            logger.debug("mem cold cache set skipped", exc_info=True)
 
     # ── write ──────────────────────────────────────────────────────────
 
@@ -481,7 +632,7 @@ class UnifiedMemoryService:
                     await cache_manager.bump_epoch(self.tenant_id)
                 except Exception:
                     logger.debug("cache epoch bump skipped", exc_info=True)
-            self._invalidate_mem_bundle(user_id)
+            self.invalidate_warm(user_id)
             return {
                 "id": mid,
                 "tier": "warm",
@@ -550,7 +701,6 @@ class UnifiedMemoryService:
                 session, user_id=user_id, session_id=session_id
             )
             session.commit()
-        self._invalidate_mem_bundle(user_id)
         attempted = bool(user_message) or bool(assistant_message)
         duplicate = attempted and not wrote_user and not wrote_assistant and bool(
             (user_client_message_id or "").strip()
@@ -856,7 +1006,7 @@ class UnifiedMemoryService:
             session.commit()
             rid = row.id
             summary_meta = row.summary_meta
-        self._invalidate_mem_bundle(user_id)
+        self.invalidate_cold(user_id)
         return {
             "tier": "cold",
             "id": rid,
@@ -868,6 +1018,35 @@ class UnifiedMemoryService:
 
     # ── read ───────────────────────────────────────────────────────────
 
+    async def _load_warm(
+        self, user_id: str
+    ) -> tuple[dict[str, str], dict[str, dict[str, Any]]]:
+        hit = self._cached_warm(user_id)
+        if hit is not None:
+            return hit
+        from packages.thread_pool import run_in_io_pool
+
+        warm, meta = await run_in_io_pool(self._read_warm_sync, user_id=user_id)
+        self._store_warm(user_id, warm, meta)
+        return warm, meta
+
+    async def _load_cold(
+        self, user_id: str, session_id: str | None, cold_limit: int
+    ) -> list[dict[str, Any]]:
+        hit = self._cached_cold(user_id, session_id, cold_limit)
+        if hit is not None:
+            return hit
+        from packages.thread_pool import run_in_io_pool
+
+        cold = await run_in_io_pool(
+            self._read_cold_sync,
+            user_id=user_id,
+            session_id=session_id,
+            cold_limit=cold_limit,
+        )
+        self._store_cold(user_id, session_id, cold_limit, cold)
+        return cold
+
     async def read(
         self,
         *,
@@ -878,36 +1057,30 @@ class UnifiedMemoryService:
         include_cold: bool = True,
         cold_limit: int = 5,
     ) -> MemoryBundle:
-        """读取三档视图；失败时返回空包（不阻断调用方）。"""
-        hit = self._cached_bundle(
-            user_id,
-            session_id,
-            hot_limit=hot_limit,
-            include_warm=include_warm,
-            include_cold=include_cold,
-            cold_limit=cold_limit,
-        )
-        if hit is not None:
-            return hit
+        """读取三档视图；失败时返回空包（不阻断调用方）。hot 不缓存。"""
+        from packages.thread_pool import run_in_io_pool
+
+        hot: list[dict[str, Any]] = []
+        warm: dict[str, str] = {}
+        warm_meta: dict[str, dict[str, Any]] = {}
+        cold: list[dict[str, Any]] = []
         try:
-            bundle = self._read_sync(
-                user_id=user_id,
-                session_id=session_id,
-                hot_limit=hot_limit,
-                include_warm=include_warm,
-                include_cold=include_cold,
-                cold_limit=cold_limit,
-            )
-            self._store_bundle(
-                user_id,
-                session_id,
-                bundle,
-                hot_limit=hot_limit,
-                include_warm=include_warm,
-                include_cold=include_cold,
-                cold_limit=cold_limit,
-            )
-            return bundle
+            tasks: list[Any] = [
+                run_in_io_pool(
+                    self._read_hot_sync,
+                    user_id=user_id,
+                    session_id=session_id,
+                    hot_limit=hot_limit,
+                )
+            ]
+            labels = ["hot"]
+            if include_warm:
+                tasks.append(self._load_warm(user_id))
+                labels.append("warm")
+            if include_cold:
+                tasks.append(self._load_cold(user_id, session_id, cold_limit))
+                labels.append("cold")
+            parts = await asyncio.gather(*tasks, return_exceptions=True)
         except Exception:
             logger.warning(
                 "UnifiedMemoryService.read failed tid=%s uid=%s",
@@ -917,16 +1090,31 @@ class UnifiedMemoryService:
             )
             return MemoryBundle()
 
-    def _read_sync(
+        for label, part in zip(labels, parts, strict=True):
+            if isinstance(part, BaseException):
+                logger.warning(
+                    "memory %s read failed tid=%s uid=%s: %s",
+                    label,
+                    self.tenant_id,
+                    user_id,
+                    part,
+                )
+                continue
+            if label == "hot":
+                hot = list(part or [])
+            elif label == "warm":
+                warm, warm_meta = part
+            else:
+                cold = list(part or [])
+        return MemoryBundle(hot=hot, warm=warm, cold=cold, warm_meta=warm_meta)
+
+    def _read_hot_sync(
         self,
         *,
         user_id: str,
         session_id: str | None,
         hot_limit: int,
-        include_warm: bool,
-        include_cold: bool,
-        cold_limit: int,
-    ) -> MemoryBundle:
+    ) -> list[dict[str, Any]]:
         session_factory = get_pg_session()
         with session_factory.Session() as session:
             q = session.query(ChatMessage).filter_by(
@@ -940,69 +1128,114 @@ class UnifiedMemoryService:
                 .limit(hot_limit)
                 .all()
             )
-            hot = [
+            return [
                 {"role": r.role, "content": r.content}
                 for r in reversed(recent)
             ]
 
-            warm: dict[str, str] = {}
-            warm_meta: dict[str, dict[str, Any]] = {}
-            if include_warm:
-                rows = (
-                    session.query(UserMemory)
-                    .filter_by(tenant_id=self.tenant_id, user_id=user_id)
-                    .all()
+    def _read_warm_sync(
+        self, *, user_id: str
+    ) -> tuple[dict[str, str], dict[str, dict[str, Any]]]:
+        min_w = _DEFAULT_WARM_MIN_WEIGHT
+        filter_on = _warm_sql_filter_enabled()
+        max_rows = _warm_max_rows() if filter_on else None
+        session_factory = get_pg_session()
+        with session_factory.Session() as session:
+            if filter_on and _session_is_postgres(session):
+                result = session.execute(
+                    _WARM_SQL,
+                    {
+                        "tid": self.tenant_id,
+                        "uid": user_id,
+                        "min_w": min_w,
+                        "max_rows": max_rows,
+                    },
                 )
-                min_w = _DEFAULT_WARM_MIN_WEIGHT
-                for r in rows:
-                    if not r.key:
+                warm: dict[str, str] = {}
+                warm_meta: dict[str, dict[str, Any]] = {}
+                for row in result.mappings():
+                    key = str(row["key"] or "")
+                    if not key:
                         continue
-                    weight = decay_score(
-                        float(r.confidence if r.confidence is not None else 0.5),
-                        _days_ago(r.updated_at or r.created_at),
-                    )
-                    if weight < min_w:
-                        continue
-                    warm[r.key] = r.value
-                    if getattr(r, "summary_meta", None):
-                        warm_meta[r.key] = dict(r.summary_meta)
+                    warm[key] = str(row["value"] or "")
+                    meta = _summary_meta_dict(row.get("summary_meta"))
+                    if meta:
+                        warm_meta[key] = meta
+                return warm, warm_meta
+            rows = (
+                session.query(UserMemory)
+                .filter_by(tenant_id=self.tenant_id, user_id=user_id)
+                .all()
+            )
+            return _rank_warm_rows(rows, min_w=min_w, max_rows=max_rows)
 
-            cold: list[dict[str, Any]] = []
-            if include_cold:
-                cq = session.query(ColdMemory).filter_by(
-                    tenant_id=self.tenant_id, user_id=user_id
+    def _read_cold_sync(
+        self,
+        *,
+        user_id: str,
+        session_id: str | None,
+        cold_limit: int,
+    ) -> list[dict[str, Any]]:
+        session_factory = get_pg_session()
+        with session_factory.Session() as session:
+            cq = session.query(ColdMemory).filter_by(
+                tenant_id=self.tenant_id, user_id=user_id
+            )
+            if session_id:
+                # Task 89 M2：本会话 cold 不进 prompt（与 message history/L1 重复）；
+                # 只注入其他会话浓缩 + 无 session 的用户级摘要。
+                cq = cq.filter(
+                    (ColdMemory.session_id.is_(None))
+                    | (ColdMemory.session_id != session_id)
                 )
-                if session_id:
-                    cq = cq.filter(
-                        (ColdMemory.session_id == session_id)
-                        | (ColdMemory.session_id.is_(None))
-                    )
-                # 多取再按衰减权重排序，保留最高权重的 cold_limit 条
-                crows = (
-                    cq.order_by(ColdMemory.created_at.desc())
-                    .limit(max(cold_limit * 3, cold_limit))
-                    .all()
+            crows = (
+                cq.order_by(ColdMemory.created_at.desc())
+                .limit(max(cold_limit * 3, cold_limit))
+                .all()
+            )
+            scored: list[dict[str, Any]] = []
+            for r in crows:
+                weight = decay_score(1.0, _days_ago(r.created_at))
+                scored.append(
+                    {
+                        "id": r.id,
+                        "summary": r.summary,
+                        "summary_meta": getattr(r, "summary_meta", None),
+                        "session_id": r.session_id,
+                        "created_at": (
+                            r.created_at.isoformat() if r.created_at else None
+                        ),
+                        "weight": weight,
+                    }
                 )
-                scored: list[dict[str, Any]] = []
-                for r in crows:
-                    weight = decay_score(1.0, _days_ago(r.created_at))
-                    scored.append(
-                        {
-                            "id": r.id,
-                            "summary": r.summary,
-                            "summary_meta": getattr(r, "summary_meta", None),
-                            "session_id": r.session_id,
-                            "created_at": (
-                                r.created_at.isoformat() if r.created_at else None
-                            ),
-                            "weight": weight,
-                        }
-                    )
-                scored.sort(key=lambda x: float(x.get("weight") or 0), reverse=True)
-                kept = scored[:cold_limit]
-                kept.sort(key=lambda x: x.get("created_at") or "")
-                cold = kept
+            scored.sort(key=lambda x: float(x.get("weight") or 0), reverse=True)
+            kept = scored[:cold_limit]
+            kept.sort(key=lambda x: x.get("created_at") or "")
+            return kept
 
+    def _read_sync(
+        self,
+        *,
+        user_id: str,
+        session_id: str | None,
+        hot_limit: int,
+        include_warm: bool,
+        include_cold: bool,
+        cold_limit: int,
+    ) -> MemoryBundle:
+        """Sequential fallback (tests / debug). Production ``read()`` is parallel."""
+        hot = self._read_hot_sync(
+            user_id=user_id, session_id=session_id, hot_limit=hot_limit
+        )
+        warm: dict[str, str] = {}
+        warm_meta: dict[str, dict[str, Any]] = {}
+        if include_warm:
+            warm, warm_meta = self._read_warm_sync(user_id=user_id)
+        cold: list[dict[str, Any]] = []
+        if include_cold:
+            cold = self._read_cold_sync(
+                user_id=user_id, session_id=session_id, cold_limit=cold_limit
+            )
         return MemoryBundle(hot=hot, warm=warm, cold=cold, warm_meta=warm_meta)
 
     def load_document_by_id_sync(
@@ -1085,7 +1318,7 @@ class UnifiedMemoryService:
                 return False
             session.delete(row)
             session.commit()
-        self._invalidate_mem_bundle(user_id)
+        self.invalidate_warm(user_id)
         return True
 
     async def update_warm_value(
@@ -1109,7 +1342,7 @@ class UnifiedMemoryService:
                 return False
             row.value = text
             session.commit()
-        self._invalidate_mem_bundle(user_id)
+        self.invalidate_warm(user_id)
         return True
 
     async def forget_user(self, user_id: str) -> dict[str, Any]:
@@ -1169,7 +1402,8 @@ class UnifiedMemoryService:
                     )
                 )
             session.commit()
-        self._invalidate_mem_bundle(user_id)
+        self.invalidate_warm(user_id)
+        self.invalidate_cold(user_id)
         logger.info(
             "forget_user tid=%s uid=%s warm=%s cold=%s redacted_msgs=%s",
             self.tenant_id,
@@ -1237,10 +1471,12 @@ class UnifiedMemoryService:
                 ratio = float(os.getenv("MEMORY_BUDGET_RATIO") or _DEFAULT_MEMORY_BUDGET_RATIO)
             except ValueError:
                 ratio = _DEFAULT_MEMORY_BUDGET_RATIO
-        budget = max(64, int(window * ratio))
+        from packages.prompt_tokens import estimate_tokens, trim_token_budget
+
+        budget = trim_token_budget(max(64, int(window * ratio)))
 
         def _tok(s: str) -> int:
-            return max(1, len(s) // 4)
+            return estimate_tokens(s)
 
         def _parse_val(raw: str) -> dict | str:
             try:
@@ -1338,7 +1574,7 @@ class UnifiedMemoryService:
             display = val if isinstance(val, str) else str(raw)
             user_lines.append(f"- {key}: {display}")
 
-        # 优先级：todo > decision > error > entity > 用户画像 > cold > hot
+        # 优先级：todo > decision > error > entity > 用户画像 > cold > message history
         # 收藏注入推迟到切片 4（事务内 warm 双写）；本轮只走 user_feedback
         cap = _warm_inject_cap()
 
@@ -1388,9 +1624,9 @@ class UnifiedMemoryService:
                 cold_blocks.append(f"- {format_summary_line(meta)}")
             else:
                 cold_blocks.append(f"- {c.get('summary')}")
-        hot_lines = [
+        history_lines = [
             f"{m.get('role')}: {m.get('content')}"
-            for m in bundle.hot
+            for m in bundle.message_history
             if m.get("content")
         ]
 
@@ -1406,15 +1642,15 @@ class UnifiedMemoryService:
             parts.append("[会话摘要]\n" + "\n".join(cold_kept))
 
         if include_hot:
-            hot_kept: list[str] = []
-            for line in reversed(hot_lines):
+            history_kept: list[str] = []
+            for line in reversed(history_lines):
                 t = _tok(line)
                 if used + t > budget:
                     break
-                hot_kept.insert(0, line)
+                history_kept.insert(0, line)
                 used += t
-            if hot_kept:
-                parts.append("[最近对话]\n" + "\n".join(hot_kept))
+            if history_kept:
+                parts.append("[最近对话]\n" + "\n".join(history_kept))
 
         return "\n\n".join(parts)
 
@@ -1513,7 +1749,8 @@ class UnifiedMemoryService:
                 return False
             row.confidence = new_importance
             session.commit()
-            return True
+        self.invalidate_warm(user_id)
+        return True
 
     async def warm_statistics(self, user_id: str) -> dict[str, Any]:
         from sqlalchemy import text

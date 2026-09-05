@@ -16,6 +16,20 @@ const STATUS_LABEL: Record<ExecutionStepStatus, string> = {
   skipped: '跳过',
 }
 
+const CAPABILITY_LABEL: Record<string, string> = {
+  'task.plan': '规划任务',
+  'rag.search': '检索公司知识库',
+  'rag.ask': '检索公司知识库',
+  'web.search': '检索全网资料',
+  'llm.generate': '生成文案',
+  'script.gen': '生成口播稿',
+  'hotspot.dig': '抓取热点',
+}
+
+export function capabilityLabel(capabilityId: string): string {
+  return CAPABILITY_LABEL[capabilityId] || capabilityId
+}
+
 function statusClass(status: ExecutionStepStatus): string {
   switch (status) {
     case 'running':
@@ -49,7 +63,7 @@ export function ExecutionPanel({ execution, className = '' }: Props) {
         >
           <Loader2 size={14} className="animate-spin shrink-0" />
           <span>
-            正在调用 <strong>{active.label}</strong>
+            正在调用 <strong>{capabilityLabel(active.label)}</strong>
             {active.capabilityId && active.capabilityId !== active.label
               ? ` (${active.capabilityId})`
               : ''}
@@ -78,7 +92,7 @@ export function ExecutionPanel({ execution, className = '' }: Props) {
                   <Loader2 size={14} className="animate-spin text-blue-600" />
                 ) : null}
                 <span className="font-mono text-xs text-muted-foreground">{step.id}</span>
-                <span className="text-xs">{step.capability_id}</span>
+                <span className="text-xs">{capabilityLabel(step.capability_id)}</span>
                 <span className={`ml-auto text-xs ${statusClass(step.status)}`}>
                   {STATUS_LABEL[step.status]}
                 </span>

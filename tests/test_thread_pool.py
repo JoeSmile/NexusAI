@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 
 import pytest
 
@@ -22,7 +23,13 @@ def _reset_pool():
     reset_thread_pool_for_tests()
 
 
-def test_thread_pool_default_stays_ten():
+def test_thread_pool_default_stays_ten(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.delenv("THREAD_POOL_MAX_WORKERS", raising=False)
+    monkeypatch.setattr(
+        PerformanceConfig,
+        "THREAD_POOL_MAX_WORKERS",
+        int(os.getenv("THREAD_POOL_MAX_WORKERS", "10")),
+    )
     assert thread_pool_max_workers() == 10
     assert PerformanceConfig.THREAD_POOL_MAX_WORKERS == 10
 

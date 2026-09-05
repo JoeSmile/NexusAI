@@ -15,6 +15,7 @@ from packages.pipeline.nodes.clarification_gate import (
     route_after_clarification,
 )
 from packages.pipeline.nodes.command_gate import command_gate, route_after_command
+from packages.pipeline.nodes.context_gate import context_gate, route_after_context_gate
 from packages.pipeline.nodes.conversion_hook import conversion_hook
 from packages.pipeline.nodes.experiment_hook import experiment_hook
 from packages.pipeline.nodes.guardrails_input import (
@@ -33,6 +34,7 @@ from packages.pipeline.nodes.orchestrator import (
 )
 from packages.pipeline.nodes.preprocess import preprocess, should_gate_block
 from packages.pipeline.nodes.rate_limiter import rate_limiter
+from packages.pipeline.nodes.run_skill import run_skill
 from packages.pipeline.nodes.task_plan import task_plan
 from packages.pipeline.nodes.write_memory import write_memory
 from packages.pipeline.state import PipelineState
@@ -94,8 +96,10 @@ def build_pipeline():
     builder.add_node(
         "clarification_gate", _lf_node("clarification_gate", clarification_gate)
     )
-    builder.add_node("build_context", _lf_node("build_context", build_context))
     builder.add_node("experiment_hook", _lf_node("experiment_hook", experiment_hook))
+    builder.add_node("context_gate", _lf_node("context_gate", context_gate))
+    builder.add_node("run_skill", _lf_node("run_skill", run_skill))
+    builder.add_node("build_context", _lf_node("build_context", build_context))
     builder.add_node("orchestrator", _lf_node("orchestrator", orchestrator))
     builder.add_node("model_router", _lf_node("model_router", model_router))
     builder.add_node("llm_generate", _lf_node("llm_generate", llm_generate))
@@ -150,17 +154,27 @@ def build_pipeline():
         route_after_clarification,
         {
             "hold": "write_memory",
-            "continue": "build_context",
+            "continue": "experiment_hook",
         },
     )
-    builder.add_edge("build_context", "experiment_hook")
+    builder.add_edge("experiment_hook", "context_gate")
+    builder.add_conditional_edges(
+        "context_gate",
+        route_after_context_gate,
+        {
+            "write_memory": "write_memory",
+            "run_skill": "run_skill",
+            "build_context": "build_context",
+        },
+    )
+    builder.add_edge("run_skill", "write_memory")
 
-    def _route_after_experiment(state: PipelineState) -> str:
+    def _route_after_build_context(state: PipelineState) -> str:
         return "orchestrator" if should_run_orchestrator(state) else "model_router"
 
     builder.add_conditional_edges(
-        "experiment_hook",
-        _route_after_experiment,
+        "build_context",
+        _route_after_build_context,
         {
             "orchestrator": "orchestrator",
             "model_router": "model_router",

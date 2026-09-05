@@ -6,7 +6,7 @@
  * Do NOT deep-import `@chatui/core/lib/...` (CJS) — Vite serves a second React
  * and hooks explode with "Cannot read properties of null (reading 'useState')".
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type UIEvent } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type UIEvent } from 'react'
 import { Bubble, Message, PullToRefresh, type MessageProps } from '@chatui/core'
 import { Bookmark, Copy, ThumbsDown, ThumbsUp } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
@@ -49,6 +49,48 @@ import { useWorkflowTriggerStore } from '@/stores/workflowTriggerStore'
 import { StreamAlertBanner } from '@/components/agent/StreamAlert'
 import { RenderHost } from '@/components/dynamic/RenderHost'
 import type { RenderAction } from '@/types/render'
+
+type BubbleContent = {
+  text?: string
+  status?: ChatMessage['status']
+  imagePreview?: string
+  render?: ChatMessage['render']
+  clarification?: ChatMessage['clarification']
+  cacheHit?: boolean
+  cacheType?: ChatMessage['cacheType']
+  role?: ChatMessage['role']
+}
+
+const ChatMessageRow = memo(function ChatMessageRow({
+  msg,
+  renderMessageContent,
+}: {
+  msg: ChatMessage
+  renderMessageContent: (msg: MessageProps) => ReactNode
+}) {
+  return (
+    <Message
+      _id={msg.id}
+      type="text"
+      content={{
+        text: msg.content,
+        status: msg.status,
+        imagePreview: msg.imagePreview,
+        render: msg.render,
+        clarification: msg.clarification,
+        cacheHit: msg.cacheHit,
+        cacheType: msg.cacheType,
+        role: msg.role,
+      }}
+      position={msg.role === 'user' ? 'right' : 'left'}
+      user={{
+        name:
+          msg.role === 'user' ? '你' : msg.role === 'system' ? '系统' : 'N',
+      }}
+      renderMessageContent={renderMessageContent}
+    />
+  )
+})
 
 export default function HomeChatPage() {
   const {
@@ -620,16 +662,16 @@ export default function HomeChatPage() {
 
   const renderMessageContent = useCallback(
     (msg: MessageProps) => {
-      const text = String(msg.content?.text ?? '')
-      const status = msg.content?.status as ChatMessage['status'] | undefined
+      const extra = (msg.content || {}) as BubbleContent
+      const text = String(extra.text ?? '')
+      const status = extra.status
       const isUser = msg.position === 'right'
       const body = !text && status === 'streaming' ? '…' : text
 
       const cid = String(msg._id)
-      const localMsg = messages.find((m) => m.id === cid)
-      const imagePreview = localMsg?.imagePreview
-      const render = localMsg?.render
-      const clarification = localMsg?.clarification
+      const imagePreview = extra.imagePreview
+      const render = extra.render
+      const clarification = extra.clarification
       const st = feedbackByMsg[cid]
       const liked = st?.reaction?.type === 'helpful'
       const disliked = st?.reaction?.type === 'irrelevant'
@@ -680,8 +722,8 @@ export default function HomeChatPage() {
               </div>
             )}
           </Bubble>
-          {!isUser && localMsg?.role !== 'system' && localMsg?.cacheHit ? (
-            <CacheAnswerBadge cacheType={localMsg.cacheType} />
+          {!isUser && extra.role !== 'system' && extra.cacheHit ? (
+            <CacheAnswerBadge cacheType={extra.cacheType} />
           ) : null}
           {!isUser && status === 'done' ? (
             <div className="chat-bubble-actions" data-client-message-id={cid}>
@@ -694,7 +736,7 @@ export default function HomeChatPage() {
               >
                 <Copy size={15} strokeWidth={1.75} />
               </button>
-              {localMsg?.role === 'system' ? null : (
+              {extra.role === 'system' ? null : (
                 <>
               <button
                 type="button"
@@ -743,7 +785,7 @@ export default function HomeChatPage() {
         </div>
       )
     },
-    [expandedDig, feedbackByMsg, messages, copyText, toggleReaction, toggleBookmark, handleRenderAction, send, streaming],
+    [expandedDig, feedbackByMsg, copyText, toggleReaction, toggleBookmark, handleRenderAction, send, streaming],
   )
 
   return (
@@ -816,23 +858,17 @@ export default function HomeChatPage() {
             >
               {/* PullToRefresh requires a single child (Children.only) */}
               <div className="chat-messages-inner">
-                <StreamAlertBanner alert={streamAlert} onDismiss={dismissStreamAlert} />
+                <StreamAlertBanner
+                  alert={
+                    streamAlert?.code === 'TASK_PLAN_PENDING' ? null : streamAlert
+                  }
+                  onDismiss={dismissStreamAlert}
+                />
                 <ExecutionPanel execution={execution} />
                 {messages.map((msg) => (
-                  <Message
+                  <ChatMessageRow
                     key={msg.id}
-                    _id={msg.id}
-                    type="text"
-                    content={{ text: msg.content, status: msg.status }}
-                    position={msg.role === 'user' ? 'right' : 'left'}
-                    user={{
-                      name:
-                        msg.role === 'user'
-                          ? '你'
-                          : msg.role === 'system'
-                            ? '系统'
-                            : 'N',
-                    }}
+                    msg={msg}
                     renderMessageContent={renderMessageContent}
                   />
                 ))}
@@ -919,6 +955,15 @@ export default function HomeChatPage() {
             }}
           />
           <div className="input-wrapper">
+            {streamAlert?.code === 'TASK_PLAN_PENDING' ||
+            execution?.steps.some((s) => s.id === '_planning') ? (
+              <div
+                className="mb-2 flex items-center gap-2 text-sm text-blue-800"
+                data-testid="planning-hint"
+              >
+                正在理解你的需求…
+              </div>
+            ) : null}
             <ClientInputGuardrailBar
               input={input}
               validationError={guardrailError}

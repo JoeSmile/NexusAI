@@ -23,6 +23,9 @@ class PipelineState(TypedDict):
     raw_input: str
     query_hash: str
     assembled_prompt: str | None
+    user_prompt_prefix: str | None
+    pending_exposure: dict[str, Any] | None
+    session_attachment_present: bool | None
     memory_prompt_block: str | None
     gate_reason: str | None
     cache_bypass: bool  # Task 39 GAP-2 / 40.86：触发型消息不查不写 exact
@@ -160,6 +163,9 @@ def make_initial_state(
         "raw_input": message,
         "query_hash": "",
         "assembled_prompt": None,
+        "user_prompt_prefix": None,
+        "pending_exposure": None,
+        "session_attachment_present": None,
         "memory_prompt_block": None,
         "gate_reason": None,
         "cache_bypass": False,

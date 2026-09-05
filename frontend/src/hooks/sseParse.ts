@@ -38,11 +38,35 @@ export type StreamAlertKind =
   | 'cancelled'
   | 'info'
 
+export type ErrorClass = 'framework' | 'business' | 'rate_limit' | 'timeout' | 'network'
+
+export const STREAM_ERROR = {
+  PARSE_FAILED: 'PARSE_FAILED',
+  SYS_001: 'SYS_001',
+  LLM_002: 'LLM_002',
+  RATE_001: 'RATE_001',
+  NET_DISCONNECT: 'NET_DISCONNECT',
+  NET_RECONNECT: 'NET_RECONNECT',
+  RECONNECT_TIMEOUT: 'RECONNECT_TIMEOUT',
+  CHAT_CANCELLED: 'CHAT_CANCELLED',
+  GUARDRAIL_ABORT: 'GUARDRAIL_ABORT',
+} as const
+
+export function classifyStreamError(code: string): ErrorClass {
+  const c = String(code || '')
+  if (c === STREAM_ERROR.PARSE_FAILED) return 'framework'
+  if (c.startsWith('NET_')) return 'network'
+  if (c.startsWith('RATE_')) return 'rate_limit'
+  if (c.includes('TIMEOUT')) return 'timeout'
+  return 'business'
+}
+
 export type StreamAlert = {
   kind: StreamAlertKind
   title?: string
   message: string
   code?: string
+  errorClass?: ErrorClass
 }
 
 export type SSEHandlers = {
@@ -65,6 +89,14 @@ export type SSEHandlers = {
   onNetworkError?: (error: Error) => void
 }
 
+const STEP_STATUS_RANK: Record<ExecutionStepStatus, number> = {
+  pending: 0,
+  running: 1,
+  succeeded: 2,
+  failed: 2,
+  skipped: 2,
+}
+
 function stepStatus(raw: unknown): ExecutionStepStatus {
   const s = String(raw || 'pending')
   if (
@@ -79,6 +111,15 @@ function stepStatus(raw: unknown): ExecutionStepStatus {
   return 'pending'
 }
 
+function mergeStepStatus(
+  current: ExecutionStepStatus | undefined,
+  incoming: ExecutionStepStatus,
+): ExecutionStepStatus {
+  if (!current) return incoming
+  if (STEP_STATUS_RANK[incoming] < STEP_STATUS_RANK[current]) return current
+  return incoming
+}
+
 /** 从 plan/step SSE 或 execution_snapshot 合并状态。 */
 export function applyExecutionEvent(
   prev: ExecutionState | null,
@@ -90,6 +131,7 @@ export function applyExecutionEvent(
   const t = String(event.type || '')
   if (t === 'plan') {
     base.goal = String(event.goal || base.goal || '')
+    base.steps = base.steps.filter((s) => s.id !== '_planning')
     const steps = Array.isArray(event.steps) ? event.steps : []
     const byId = new Map(base.steps.map((s) => [s.id, s]))
     for (const raw of steps) {
@@ -101,7 +143,7 @@ export function applyExecutionEvent(
       byId.set(id, {
         id,
         capability_id: String(row.capability_id || existing?.capability_id || ''),
-        status: existing?.status || 'pending',
+        status: existing?.status || stepStatus(row.status || 'pending'),
         summary: existing?.summary,
       })
     }
@@ -112,10 +154,12 @@ export function applyExecutionEvent(
     const id = String(event.id || '')
     if (!id) return base
     const idx = base.steps.findIndex((s) => s.id === id)
+    const incoming = stepStatus(event.status)
+    const status = mergeStepStatus(base.steps[idx]?.status, incoming)
     const next: ExecutionStep = {
       id,
       capability_id: String(event.capability_id || base.steps[idx]?.capability_id || ''),
-      status: stepStatus(event.status),
+      status,
       summary: event.summary ? String(event.summary) : base.steps[idx]?.summary,
     }
     if (idx >= 0) base.steps[idx] = next
@@ -182,6 +226,14 @@ export function dispatchSSEData(raw: string, h: SSEHandlers): 'done' | 'continue
   try {
     obj = JSON.parse(text) as Record<string, unknown>
   } catch {
+    console.warn('sse parse failed')
+    h.onStreamAlert?.({
+      kind: 'info',
+      title: '解析失败',
+      message: '收到无法解析的流式帧',
+      code: STREAM_ERROR.PARSE_FAILED,
+      errorClass: 'framework',
+    })
     return 'continue'
   }
   if (typeof obj.token === 'string') {
@@ -194,9 +246,20 @@ export function dispatchSSEData(raw: string, h: SSEHandlers): 'done' | 'continue
     return 'continue'
   }
   if (t === 'task_plan_pending') {
+    h.onPlan?.({
+      type: 'plan',
+      goal: '正在理解你的需求…',
+      steps: [
+        {
+          id: '_planning',
+          capability_id: 'task.plan',
+          status: 'running',
+        },
+      ],
+    })
     h.onStreamAlert?.({
       kind: 'info',
-      title: '正在规划',
+      title: '正在理解你的需求',
       message: String(obj.message || '正在规划任务步骤…'),
       code: 'TASK_PLAN_PENDING',
     })
@@ -267,12 +330,15 @@ export function dispatchSSEData(raw: string, h: SSEHandlers): 'done' | 'continue
     return 'continue'
   }
   if (t === 'error') {
-    h.onError?.(String(obj.code || 'SYS_001'), String(obj.message || 'error'))
+    const code = String(obj.code || STREAM_ERROR.SYS_001)
+    const message = String(obj.message || 'error')
+    h.onError?.(code, message)
     h.onStreamAlert?.({
       kind: 'error',
       title: '请求失败',
-      message: String(obj.message || 'error'),
-      code: String(obj.code || 'SYS_001'),
+      message,
+      code,
+      errorClass: classifyStreamError(code),
     })
     return 'done'
   }

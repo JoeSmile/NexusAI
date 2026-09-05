@@ -6,11 +6,11 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
-from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from packages.database.pgvector_session import ChatMessage, ChatSession
 from packages.memory.memory_service import UnifiedMemoryService
+from tests.memory_sqlite import sqlite_memory_engine
 
 
 class _SF:
@@ -21,7 +21,7 @@ class _SF:
 
 @pytest.fixture()
 def mem_sqlite(monkeypatch: pytest.MonkeyPatch) -> _SF:
-    engine = create_engine("sqlite:///:memory:")
+    engine = sqlite_memory_engine()
     ChatSession.__table__.create(engine)
     ChatMessage.__table__.create(engine)
     sf = _SF(engine)

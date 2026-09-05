@@ -1,15 +1,15 @@
-"""A/B 实验钩子 — build_context 之后注入变体配置。"""
+"""A/B 实验钩子 — clarification 之后写入变体配置与 pending_exposure。"""
 
 from __future__ import annotations
 
-from packages.ab.service import assign_variant, record_event
+from packages.ab.service import assign_variant
 from packages.observability.decorators import langfuse_context, observe
 from packages.pipeline.state import PipelineState
 
 
 @observe(name="pipeline.experiment_hook")
 async def experiment_hook(state: PipelineState) -> PipelineState:
-    """按用户确定性分流，写入 ab_* 字段并记录曝光。"""
+    """按用户确定性分流，写入 ab_* 与 pending_exposure（曝光在 conversion_hook 刷新）。"""
     try:
         assignment = assign_variant(state["user_id"])
     except Exception:
@@ -21,29 +21,13 @@ async def experiment_hook(state: PipelineState) -> PipelineState:
     state["ab_variant"] = assignment["variant"]
     state["ab_variant_config"] = assignment.get("variant_config") or {}
 
-    # prompt_prefix 拼进 assembled_prompt；system_prompt 由 llm_generate 作为 system 消息注入
+    # prompt_prefix → user_prompt_prefix（W6#1）；曝光延后到 conversion_hook
     cfg = state["ab_variant_config"]
     prefix = cfg.get("prompt_prefix")
     if prefix and isinstance(prefix, str):
-        base = (
-            state.get("assembled_prompt")
-            or state.get("message")
-            or ""
-        )
-        if not str(base).startswith(prefix):
-            state["assembled_prompt"] = f"{prefix}\n\n{base}"
+        state["user_prompt_prefix"] = prefix
 
-    try:
-        record_event(
-            user_id=state["user_id"],
-            experiment_id=assignment["experiment_id"],
-            group=assignment["variant"],
-            event_type="exposure",
-            event_data={"trace_id": state.get("trace_id"), "session_id": state.get("session_id")},
-            session_id=state.get("session_id"),
-        )
-    except Exception:
-        pass
+    state["pending_exposure"] = assignment
 
     try:
         langfuse_context.update_current_trace(  # type: ignore[attr-defined]

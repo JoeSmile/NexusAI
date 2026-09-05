@@ -59,7 +59,7 @@ flowchart TD
         CLAR["clarification_gate<br/>🔹 槽位缺失 / 低置信 / rewrite 标记 / 高危缺参<br/>🔹 hold → SSE 澄清卡片，本轮结束"]
         CTX["build_context<br/>🔹 拼 warm/cold 进 system 记忆块<br/>🔹 RAG sanitize + 角色漂移检测<br/>🔹 Mode A 直装全文 / Mode B 摘要+id"]
         EXP["experiment_hook<br/>🔹 A/B 用户哈希分流<br/>🔹 可覆盖 model / prompt_prefix"]
-        ORCH["orchestrator<br/>🔹 有 PlanIR 且 ORCHESTRATOR_ENABLED<br/>🔹 短路径/无计划/纯流式默认跳过<br/>🔹 终态（成功/取消/澄清/失败）→ write_memory"]
+        ORCH["orchestrator<br/>🔹 有 PlanIR 且编排开（默认开，=0 关）<br/>🔹 短路径/无计划/纯流式默认跳过<br/>🔹 终态（成功/取消/澄清/失败）→ write_memory"]
         ROUTER["model_router · 真双轨<br/>🔹 短：greeting/after_sales 且 ≥0.85 绑 Skill → write_memory<br/>🔹 长：ModelRegistry 选模 + BYOK 凭证<br/>🔹 短路径在此执行 Skill（不做图级跳过）"]
         LLM["llm_generate<br/>🔹 仅非流式长路径进此节点<br/>🔹 Harness + failover<br/>🔹 messages = 角色+记忆块 + hot 多轮 + user"]
         GOUT["guardrails_output<br/>🔹 长度截断 / 敏感拦截 / 学员名脱敏<br/>🔹 短路径跳过本节点，在 router 内补脱敏"]

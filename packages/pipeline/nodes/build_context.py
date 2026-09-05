@@ -2,44 +2,42 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 
 from packages.audit import write_audit_sync
 from packages.guardrails.output_guard import check_role_drift
-from packages.guardrails.rag_sanitize import sanitize_memory_bundle
+from packages.guardrails.rag_sanitize import RagSanitizeReport, sanitize_memory_bundle
 from packages.memory.memory_service import (
     MEMORY_ISOLATION_HEADER,
     MemoryBundle,
     get_unified_memory_service,
 )
 from packages.observability.decorators import enrich_span, observe
-from packages.pipeline.context_messages import resolved_query
+from packages.pipeline.context_messages import current_user_content, resolved_query
 from packages.pipeline.state import PipelineState
 from packages.plan.retrieval_mode import (
     choose_retrieval_mode,
     token_budget_warning,
 )
+from packages.thread_pool import (
+    assemble_timeout_s,
+    run_in_embed_pool,
+    run_in_io_pool,
+)
 
 
-@observe(name="pipeline.build_context")
-async def build_context(state: PipelineState) -> PipelineState:
-    """组装记忆段（warm/cold → system）；hot 由 llm_generate 多轮展开。"""
-    mem = get_unified_memory_service(tenant_id=state["tenant_id"])
-    bundle = MemoryBundle(
-        hot=list(state.get("hot_memory") or []),
-        warm=dict(state.get("warm_memory") or {}),
-        cold=list(state.get("cold_memory") or []),
-        warm_meta=dict(state.get("warm_meta") or {}),
-    )
+def _sanitize_and_assemble_sync(
+    state: PipelineState, bundle: MemoryBundle
+) -> tuple[MemoryBundle, RagSanitizeReport, str, str]:
     bundle, sanitize_report = sanitize_memory_bundle(bundle)
-    state["rag_retrieved_ids"] = list(sanitize_report.retrieved_ids)
-    candidate_count = len(bundle.cold) + len(bundle.warm)
     retrieval_mode = choose_retrieval_mode(
-        candidate_count=candidate_count,
+        candidate_count=len(bundle.cold) + len(bundle.warm),
         cold_items=bundle.cold,
         query=resolved_query(state),
     )
-    state["retrieval_mode"] = retrieval_mode
+    mem = get_unified_memory_service(tenant_id=state["tenant_id"])
     memory_block = mem.assemble_prompt_block(
         bundle,
         query=resolved_query(state),
@@ -47,6 +45,33 @@ async def build_context(state: PipelineState) -> PipelineState:
         retrieval_mode=retrieval_mode,
         include_hot=False,
     )
+    return bundle, sanitize_report, retrieval_mode, memory_block or ""
+
+
+@observe(name="pipeline.build_context")
+async def build_context(state: PipelineState) -> PipelineState:
+    """组装记忆段（warm/cold → system）；message history 由 llm_generate 多轮展开。"""
+    bundle = MemoryBundle(
+        hot=list(state.get("hot_memory") or []),
+        warm=dict(state.get("warm_memory") or {}),
+        cold=list(state.get("cold_memory") or []),
+        warm_meta=dict(state.get("warm_meta") or {}),
+    )
+    try:
+        bundle, sanitize_report, retrieval_mode, memory_block = await asyncio.wait_for(
+            run_in_embed_pool(_sanitize_and_assemble_sync, state, bundle),
+            timeout=assemble_timeout_s(),
+        )
+    except TimeoutError:
+        logging.getLogger(__name__).warning(
+            "build_context assemble timed out after %.1fs", assemble_timeout_s()
+        )
+        sanitize_report = RagSanitizeReport()
+        retrieval_mode = "A"
+        memory_block = ""
+    state["rag_retrieved_ids"] = list(sanitize_report.retrieved_ids)
+    state["retrieval_mode"] = retrieval_mode
+
     drift_blocked = False
     if memory_block:
         drift = await check_role_drift(memory_block)
@@ -54,11 +79,11 @@ async def build_context(state: PipelineState) -> PipelineState:
             memory_block = MEMORY_ISOLATION_HEADER
             drift_blocked = True
     state["memory_prompt_block"] = memory_block or ""
-    state["assembled_prompt"] = f"user: {resolved_query(state)}"
+    user_content = current_user_content(state)
     warn = token_budget_warning(
         "\n".join(
             part
-            for part in (memory_block, state["assembled_prompt"])
+            for part in (memory_block, user_content)
             if part
         ),
         budget=8000,
@@ -66,7 +91,8 @@ async def build_context(state: PipelineState) -> PipelineState:
     if warn:
         state["context_budget_warning"] = warn  # type: ignore[typeddict-item]
     if sanitize_report.retrieved_ids or sanitize_report.flags:
-        write_audit_sync(
+        await run_in_io_pool(
+            write_audit_sync,
             {
                 "tenant_id": state["tenant_id"],
                 "user_id": state["user_id"],
@@ -82,12 +108,12 @@ async def build_context(state: PipelineState) -> PipelineState:
                     ensure_ascii=False,
                 )[:4000],
                 "model": "memory",
-            }
+            },
         )
     enrich_span(
         input_data={"message": state.get("message")},
         output_data={
-            "assembled_prompt_len": len(state["assembled_prompt"] or ""),
+            "user_content_len": len(user_content),
             "memory_prompt_block_len": len(state.get("memory_prompt_block") or ""),
         },
         metadata={

@@ -157,3 +157,59 @@ describe('useChatStream image extra (76b)', () => {
     expect(payload).not.toHaveProperty('attachment_ids')
   })
 })
+
+describe('useChatStream streaming isolation (Task 85 F1)', () => {
+  it('does not replace committed history objects when tokens arrive', async () => {
+    startMock.mockImplementation(async (_url, _init, h) => {
+      h.onToken?.('he')
+      h.onToken?.('llo')
+    })
+    const { result } = renderHook(() => useChatStream('/chat/streaming'))
+    act(() => {
+      result.current.replaceHistory(
+        [
+          { id: 'h1', role: 'user', content: 'old-q', dbId: 1 },
+          { id: 'h2', role: 'assistant', content: 'old-a', dbId: 2, status: 'done' },
+        ],
+        false,
+      )
+    })
+    const hist0 = result.current.messages[0]
+    const hist1 = result.current.messages[1]
+    await act(async () => {
+      await result.current.send('new')
+    })
+    expect(result.current.messages[0]).toBe(hist0)
+    expect(result.current.messages[1]).toBe(hist1)
+    const asst = result.current.messages.find((m) => m.status === 'streaming')
+    expect(asst?.content).toBe('hello')
+  })
+})
+
+describe('useChatStream generation guard (Task 85 F3)', () => {
+  it('ignores onDone from an aborted previous stream', async () => {
+    let firstDone: ((meta?: Record<string, unknown>) => void) | undefined
+    startMock
+      .mockImplementationOnce(async (_url, _init, h) => {
+        firstDone = h.onDone
+      })
+      .mockImplementationOnce(async (_url, _init, h) => {
+        h.onToken?.('second-turn')
+      })
+    const { result } = renderHook(() => useChatStream('/chat/streaming'))
+    await act(async () => {
+      await result.current.send('first')
+    })
+    await act(async () => {
+      await result.current.send('second')
+    })
+    expect(result.current.streaming).toBe(true)
+    act(() => {
+      firstDone?.({})
+    })
+    expect(result.current.streaming).toBe(true)
+    const live = result.current.messages.filter((m) => m.role === 'assistant')
+    expect(live.some((m) => m.content === 'second-turn')).toBe(true)
+    expect(live.some((m) => m.status === 'streaming')).toBe(true)
+  })
+})

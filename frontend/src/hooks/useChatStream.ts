@@ -1,11 +1,13 @@
 /**
  * Chat 面板流式发送 → 消息列表（Task 30.12 / 47b slice0 + 历史分页）。
+ * Task 85: 流式气泡独立 state + 代际守卫，避免每 token 重写历史数组。
  */
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { cancelChatStream } from '@/api/chat'
 import {
   applyExecutionEvent,
+  classifyStreamError,
   executionFromSnapshot,
   type ExecutionState,
   type StreamAlert,
@@ -64,32 +66,55 @@ function cacheFromDone(meta?: Record<string, unknown>): {
 
 export function useChatStream(endpoint = '/chat/streaming') {
   const { start, abort: abortFetch } = useSSEStream()
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [committed, setCommitted] = useState<ChatMessage[]>([])
+  const [streamingMsg, setStreamingMsg] = useState<ChatMessage | null>(null)
   const [streaming, setStreaming] = useState(false)
   const [hasMore, setHasMore] = useState(false)
   const [execution, setExecution] = useState<ExecutionState | null>(null)
   const [streamAlert, setStreamAlert] = useState<StreamAlert | null>(null)
   const activeTraceRef = useRef<string | null>(null)
   const reconnectAbortRef = useRef<AbortController | null>(null)
+  const generationRef = useRef(0)
+  const streamingMsgRef = useRef<ChatMessage | null>(null)
+  const abortRef = useRef<() => void>(() => undefined)
+
+  const messages = useMemo(
+    () => (streamingMsg ? [...committed, streamingMsg] : committed),
+    [committed, streamingMsg],
+  )
 
   const abort = useCallback(() => {
+    generationRef.current += 1
     const tid = activeTraceRef.current
     if (tid) void cancelChatStream(tid).catch(() => undefined)
     reconnectAbortRef.current?.abort()
     reconnectAbortRef.current = null
     abortFetch()
+    const leftover = streamingMsgRef.current
+    if (leftover?.status === 'streaming') {
+      streamingMsgRef.current = null
+      setStreamingMsg(null)
+      setCommitted((m) => [...m, { ...leftover, status: 'aborted' }])
+    }
     setStreaming(false)
   }, [abortFetch])
 
+  useEffect(() => {
+    abortRef.current = abort
+  }, [abort])
+  useEffect(() => () => abortRef.current(), [])
+
   /** Initial page: always replace (empty list or re-entry). */
   const replaceHistory = useCallback((items: ChatMessage[], more: boolean) => {
-    setMessages(items)
+    setCommitted(items)
+    setStreamingMsg(null)
+    streamingMsgRef.current = null
     setHasMore(more)
   }, [])
 
   /** Older page: prepend, dedupe by message id. */
   const prependHistory = useCallback((items: ChatMessage[], more: boolean) => {
-    setMessages((prev) => {
+    setCommitted((prev) => {
       const seen = new Set(prev.map((m) => m.id))
       const older = items.filter((m) => !seen.has(m.id))
       return older.length ? [...older, ...prev] : prev
@@ -99,15 +124,20 @@ export function useChatStream(endpoint = '/chat/streaming') {
 
   /** @deprecated prefer replaceHistory — kept for callers that only fill empty */
   const loadHistory = useCallback((items: ChatMessage[]) => {
-    setMessages((prev) => (prev.length > 0 ? prev : items))
+    setCommitted((prev) => (prev.length > 0 ? prev : items))
   }, [])
 
   const send = useCallback(
     async (text: string, extra?: Record<string, unknown>) => {
       const trimmed = text.trim()
       if (!trimmed) return
-      if (streaming) {
+      if (streamingMsgRef.current) {
         abortFetch()
+        generationRef.current += 1
+        const leftover = streamingMsgRef.current
+        streamingMsgRef.current = null
+        setStreamingMsg(null)
+        setCommitted((m) => [...m, { ...leftover, status: 'aborted' }])
         setStreaming(false)
       }
 
@@ -125,39 +155,55 @@ export function useChatStream(endpoint = '/chat/streaming') {
         content: trimmed,
         ...(preview ? { imagePreview: preview } : {}),
       }
-      setMessages((m) => [
-        ...m,
-        userMsg,
-        { id: asstId, role: 'assistant', content: '', status: 'streaming' },
-      ])
+      const asstMsg: ChatMessage = {
+        id: asstId,
+        role: 'assistant',
+        content: '',
+        status: 'streaming',
+      }
+      const gen = ++generationRef.current
+      const alive = () => generationRef.current === gen
+
+      setCommitted((m) => [...m, userMsg])
+      streamingMsgRef.current = asstMsg
+      setStreamingMsg(asstMsg)
       setExecution(null)
       setStreamAlert(null)
       activeTraceRef.current = null
       setStreaming(true)
 
       const mergeExecution = (event: Record<string, unknown>) => {
+        if (!alive()) return
         setExecution((prev) => applyExecutionEvent(prev, event))
       }
 
-      const patch = (fn: (c: string) => string, status?: ChatMessage['status']) => {
-        setMessages((msgs) =>
-          msgs.map((msg) =>
-            msg.id === asstId
-              ? { ...msg, content: fn(msg.content), ...(status ? { status } : {}) }
-              : msg,
-          ),
-        )
+      const patchStream = (fn: (c: string) => string, status?: ChatMessage['status']) => {
+        if (!alive()) return
+        const prev = streamingMsgRef.current
+        if (!prev || prev.id !== asstId) return
+        const next = {
+          ...prev,
+          content: fn(prev.content),
+          ...(status ? { status } : {}),
+        }
+        streamingMsgRef.current = next
+        setStreamingMsg(next)
       }
 
-      const finishAssistant = (status: ChatMessage['status'] = 'done') => {
-        setMessages((msgs) =>
-          msgs.map((msg) => (msg.id === asstId ? { ...msg, status } : msg)),
-        )
+      const commitAssistant = (patch: Partial<ChatMessage>) => {
+        if (!alive()) return
+        const prev = streamingMsgRef.current
+        if (!prev || prev.id !== asstId) return
+        const done = { ...prev, ...patch }
+        streamingMsgRef.current = null
+        setStreamingMsg(null)
+        setCommitted((m) => [...m, done])
         setStreaming(false)
         activeTraceRef.current = null
       }
 
       const applyClarification = (payload: Record<string, unknown>) => {
+        if (!alive()) return
         const question = String(payload.question || '')
         const options = Array.isArray(payload.options)
           ? payload.options.map((o) => String(o))
@@ -171,18 +217,11 @@ export function useChatStream(endpoint = '/chat/streaming') {
             ? String(payload.original_query)
             : undefined,
         }
-        setMessages((msgs) =>
-          msgs.map((msg) =>
-            msg.id === asstId
-              ? {
-                  ...msg,
-                  content: question || msg.content,
-                  clarification: info,
-                  status: 'done',
-                }
-              : msg,
-          ),
-        )
+        commitAssistant({
+          content: question || streamingMsgRef.current?.content || '',
+          clarification: info,
+          status: 'done',
+        })
       }
 
       await start(
@@ -198,9 +237,10 @@ export function useChatStream(endpoint = '/chat/streaming') {
         },
         {
           onTraceId: (tid) => {
+            if (!alive()) return
             activeTraceRef.current = tid
           },
-          onToken: (t) => patch((c) => c + t),
+          onToken: (t) => patchStream((c) => c + t),
           onPlan: (p) => mergeExecution({ ...p, type: 'plan' }),
           onStep: (p) => mergeExecution({ ...p, type: 'step' }),
           onToolCall: (p) => mergeExecution({ ...p, type: 'tool_call' }),
@@ -208,39 +248,43 @@ export function useChatStream(endpoint = '/chat/streaming') {
           onRetry: () => undefined,
           onReplan: (p) => mergeExecution({ ...p, type: 'replan' }),
           onClarify: (p) => applyClarification(p),
-          onStreamAlert: (alert) => setStreamAlert(alert),
+          onStreamAlert: (alert) => {
+            if (!alive()) return
+            setStreamAlert(alert)
+          },
           onAbort: () => {
-            finishAssistant('aborted')
+            commitAssistant({ status: 'aborted' })
           },
           onCancelled: () => {
-            finishAssistant('aborted')
+            commitAssistant({ status: 'aborted' })
           },
           onRetraction: () => {
-            finishAssistant('done')
+            commitAssistant({ status: 'done' })
           },
           onError: (code, message) => {
-            setMessages((msgs) =>
-              msgs.map((msg) => {
-                if (msg.id !== asstId) return msg
-                if (msg.content.trim()) return { ...msg, status: 'done' }
-                return {
-                  ...msg,
-                  content: message ? `（${message}）` : '',
-                  status: 'error',
-                }
-              }),
+            if (!alive()) return
+            const prev = streamingMsgRef.current
+            const has = Boolean(prev?.content.trim())
+            commitAssistant(
+              has
+                ? { status: 'done' }
+                : {
+                    content: message ? `（${message}）` : '',
+                    status: 'error',
+                  },
             )
-            setStreamAlert((prev) =>
-              prev ?? {
+            setStreamAlert((cur) =>
+              cur ?? {
                 kind: 'error',
                 title: '请求失败',
                 message,
                 code,
+                errorClass: classifyStreamError(code),
               },
             )
-            finishAssistant('error')
           },
           onNetworkError: () => {
+            if (!alive()) return
             const tid = activeTraceRef.current
             if (!tid) {
               setStreamAlert({
@@ -248,8 +292,9 @@ export function useChatStream(endpoint = '/chat/streaming') {
                 title: '网络错误',
                 message: '连接中断，且无法识别 trace，请重试。',
                 code: 'NET_DISCONNECT',
+                errorClass: 'network',
               })
-              finishAssistant('error')
+              commitAssistant({ status: 'error' })
               return
             }
             setStreamAlert({
@@ -257,6 +302,7 @@ export function useChatStream(endpoint = '/chat/streaming') {
               title: '连接中断',
               message: '正在通过快照恢复执行进度…',
               code: 'NET_RECONNECT',
+              errorClass: 'network',
             })
             reconnectAbortRef.current?.abort()
             const ac = new AbortController()
@@ -266,7 +312,7 @@ export function useChatStream(endpoint = '/chat/streaming') {
               onProgress: setExecution,
               signal: ac.signal,
             }).then(({ result }) => {
-              if (ac.signal.aborted) return
+              if (ac.signal.aborted || !alive()) return
               reconnectAbortRef.current = null
               if (result === 'complete') {
                 setStreamAlert({
@@ -274,7 +320,7 @@ export function useChatStream(endpoint = '/chat/streaming') {
                   title: '进度已恢复',
                   message: '编排步骤已从快照对齐；文本流可能不完整。',
                 })
-                finishAssistant('done')
+                commitAssistant({ status: 'done' })
               } else if (result === 'cancelled') {
                 setStreamAlert({
                   kind: 'cancelled',
@@ -282,21 +328,23 @@ export function useChatStream(endpoint = '/chat/streaming') {
                   message: '本次任务在恢复前已被取消。',
                   code: 'CHAT_CANCELLED',
                 })
-                finishAssistant('aborted')
+                commitAssistant({ status: 'aborted' })
               } else if (result === 'not_found') {
-                finishAssistant('done')
+                commitAssistant({ status: 'done' })
               } else {
                 setStreamAlert({
                   kind: 'error',
                   title: '恢复超时',
                   message: '无法从快照恢复完整进度，请查看执行面板或重试。',
                   code: 'RECONNECT_TIMEOUT',
+                  errorClass: 'timeout',
                 })
-                finishAssistant('error')
+                commitAssistant({ status: 'error' })
               }
             })
           },
           onDone: (meta) => {
+            if (!alive()) return
             const tid = meta?.trace_id ? String(meta.trace_id) : activeTraceRef.current
             if (tid) activeTraceRef.current = tid
             const snap = executionFromSnapshot(
@@ -318,32 +366,25 @@ export function useChatStream(endpoint = '/chat/streaming') {
             const isCommand =
               finishReason === 'command_result' ||
               String(meta?.type || '') === 'command_result'
-            setMessages((msgs) =>
-              msgs.map((msg) =>
-                msg.id === asstId
-                  ? {
-                      ...msg,
-                      content: msg.content,
-                      status: 'done',
-                      ...(isCommand ? { role: 'system' as const } : {}),
-                      ...(render ? { render } : {}),
-                      ...(clarification ? { clarification } : {}),
-                      ...cache,
-                    }
-                  : msg,
-              ),
-            )
-            finishAssistant('done')
+            commitAssistant({
+              status: 'done',
+              ...(isCommand ? { role: 'system' as const } : {}),
+              ...(render ? { render } : {}),
+              ...(clarification ? { clarification } : {}),
+              ...cache,
+            })
           },
         },
       )
     },
-    [endpoint, start, streaming, abortFetch],
+    [endpoint, start, abortFetch],
   )
 
   const reset = useCallback(() => {
     abort()
-    setMessages([])
+    setCommitted([])
+    setStreamingMsg(null)
+    streamingMsgRef.current = null
     setStreaming(false)
     setHasMore(false)
     setExecution(null)
@@ -358,14 +399,20 @@ export function useChatStream(endpoint = '/chat/streaming') {
       imagePreview?: string,
     ) => {
       const id = newClientMessageId()
-      setMessages((m) => [...m, { id, role, content, status, imagePreview }])
+      setCommitted((m) => [...m, { id, role, content, status, imagePreview }])
       return id
     },
     [],
   )
 
   const patchLocal = useCallback((id: string, content: string, status?: ChatMessage['status']) => {
-    setMessages((msgs) =>
+    setStreamingMsg((prev) => {
+      if (prev?.id !== id) return prev
+      const next = { ...prev, content, ...(status ? { status } : {}) }
+      streamingMsgRef.current = next
+      return next
+    })
+    setCommitted((msgs) =>
       msgs.map((msg) =>
         msg.id === id
           ? { ...msg, content, ...(status ? { status } : {}) }
