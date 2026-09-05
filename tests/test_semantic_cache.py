@@ -34,7 +34,7 @@ class _FakeRedis:
 
 def _embed_bucket(text: str) -> list[float]:
     t = (text or "").lower()
-    vec = [0.0] * 768
+    vec = [0.0] * 1024
     if "python" in t:
         vec[0] = 1.0
     elif "java" in t:

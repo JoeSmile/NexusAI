@@ -7,7 +7,9 @@ import { formatApiError } from '@/api/http'
 import {
   ragAsk,
   ragDeleteDocument,
+  ragGetTask,
   ragListDocuments,
+  ragRetryTask,
   ragSearch,
   ragStatus,
   ragUploadPdf,
@@ -24,11 +26,44 @@ import { Progress } from '@/components/ui/progress'
 import { useAuthStore } from '@/stores/authStore'
 import { cn } from '@/lib/utils'
 
-function uploadPhaseLabel(pct: number): string {
-  if (pct >= 100) return '入库完成'
-  if (pct >= 55) return 'Embedding 向量化中…'
-  if (pct >= 25) return '解析 PDF…'
+const IN_FLIGHT = new Set(['queued', 'parsing', 'chunking', 'embedding'])
+
+function uploadPhaseLabel(status: string, pct: number): string {
+  if (status === 'ready' || pct >= 100) return '入库完成'
+  if (status === 'failed') return '处理失败'
+  if (status === 'embedding' || pct >= 55) return 'Embedding 向量化中…'
+  if (status === 'chunking' || pct >= 35) return '分块中…'
+  if (status === 'parsing' || pct >= 15) return '解析 PDF…'
+  if (status === 'queued') return '已排队…'
   return '上传文件中…'
+}
+
+function statusBadgeVariant(
+  status: string | undefined,
+): 'success' | 'destructive' | 'warning' | 'outline' {
+  if (status === 'ready') return 'success'
+  if (status === 'failed') return 'destructive'
+  if (status && IN_FLIGHT.has(status)) return 'warning'
+  return 'outline'
+}
+
+function statusLabel(status: string | undefined): string {
+  switch (status) {
+    case 'queued':
+      return '排队中'
+    case 'parsing':
+      return '解析中'
+    case 'chunking':
+      return '分块中'
+    case 'embedding':
+      return '向量化'
+    case 'ready':
+      return '就绪'
+    case 'failed':
+      return '失败'
+    default:
+      return status || '就绪'
+  }
 }
 
 export default function RagPanel() {
@@ -41,34 +76,13 @@ export default function RagPanel() {
   const [busy, setBusy] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadPct, setUploadPct] = useState(0)
+  const [uploadStatus, setUploadStatus] = useState('')
+  const [pollTaskId, setPollTaskId] = useState<string | null>(null)
   const [err, setErr] = useState('')
   const [hint, setHint] = useState('')
   const [pdfFile, setPdfFile] = useState<File | null>(null)
   const skip = useRef(true)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  const stopProgressTicker = () => {
-    if (progressTimer.current) {
-      clearInterval(progressTimer.current)
-      progressTimer.current = null
-    }
-  }
-
-  const startProgressTicker = () => {
-    stopProgressTicker()
-    setUploadPct(5)
-    progressTimer.current = setInterval(() => {
-      setUploadPct((p) => {
-        if (p >= 90) return 90
-        if (p >= 55) return p + 1.5
-        if (p >= 25) return p + 2.5
-        return p + 4
-      })
-    }, 400)
-  }
-
-  useEffect(() => () => stopProgressTicker(), [])
 
   const loadStatus = useCallback(async () => {
     const r = await ragStatus()
@@ -101,11 +115,60 @@ export default function RagPanel() {
     setSearch(null)
     setUploading(false)
     setUploadPct(0)
+    setUploadStatus('')
+    setPollTaskId(null)
     setHint('')
     setErr('')
-    stopProgressTicker()
     void refreshAll()
   }, [roleEpoch, refreshAll])
+
+  const hasInFlight = docs.some((d) => d.status && IN_FLIGHT.has(d.status))
+
+  useEffect(() => {
+    if (!hasInFlight && !pollTaskId) return
+    const tick = window.setInterval(() => {
+      void loadDocs()
+      void loadStatus()
+    }, 1500)
+    return () => window.clearInterval(tick)
+  }, [hasInFlight, pollTaskId, loadDocs, loadStatus])
+
+  useEffect(() => {
+    if (!pollTaskId) return
+    let cancelled = false
+    const run = async () => {
+      try {
+        const r = await ragGetTask(pollTaskId)
+        if (cancelled) return
+        const st = r.data?.status || ''
+        const pct = Math.round((r.data?.progress ?? 0) * 100)
+        setUploadStatus(st)
+        setUploadPct(pct)
+        if (st === 'ready') {
+          setUploading(false)
+          setPollTaskId(null)
+          setHint('入库完成')
+          await loadDocs()
+          await loadStatus()
+        } else if (st === 'failed') {
+          setUploading(false)
+          setPollTaskId(null)
+          setErr(r.data?.error_code || '处理失败')
+          await loadDocs()
+        }
+      } catch (e) {
+        if (!cancelled) setErr(formatApiError(e, 'chat:write'))
+      }
+    }
+    void run()
+    const tick = window.setInterval(() => {
+      void run()
+    }, 1500)
+    return () => {
+      cancelled = true
+      window.clearInterval(tick)
+    }
+  }, [pollTaskId, loadDocs, loadStatus])
 
   const onFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0] ?? null
@@ -127,25 +190,60 @@ export default function RagPanel() {
     }
     setBusy(true)
     setUploading(true)
+    setUploadPct(5)
+    setUploadStatus('queued')
     setErr('')
     setHint('')
-    startProgressTicker()
     try {
       const r = await ragUploadPdf(pdfFile)
-      stopProgressTicker()
-      setUploadPct(100)
-      setHint(r.message || '上传成功')
+      const doc = r.documents?.[0] || r.data
+      const taskId = doc?.doc_id || r.task_ids?.[0] || ''
+      setHint(r.message || '已排队解析')
       setPdfFile(null)
       if (fileInputRef.current) fileInputRef.current.value = ''
       await refreshAll()
-      window.setTimeout(() => {
+      if (doc?.duplicate && doc.status === 'ready') {
+        setUploading(false)
+        setUploadPct(100)
+        setUploadStatus('ready')
+        setPollTaskId(null)
+        return
+      }
+      if (doc?.status === 'failed') {
         setUploading(false)
         setUploadPct(0)
-      }, 600)
+        setPollTaskId(null)
+        setErr(doc.duplicate ? '文件已存在（上次失败，可在列表重试）' : '处理失败')
+        return
+      }
+      if (taskId) {
+        setPollTaskId(taskId)
+        setUploadStatus(doc?.status || 'queued')
+      } else {
+        setUploading(false)
+      }
     } catch (e) {
-      stopProgressTicker()
       setUploading(false)
       setUploadPct(0)
+      setPollTaskId(null)
+      setErr(formatApiError(e, 'chat:write'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onRetry = async (docId: string, name: string) => {
+    setBusy(true)
+    setErr('')
+    try {
+      const r = await ragRetryTask(docId)
+      setHint(r.message || `已重新排队「${name}」`)
+      setPollTaskId(docId)
+      setUploading(true)
+      setUploadStatus('queued')
+      setUploadPct(0)
+      await refreshAll()
+    } catch (e) {
       setErr(formatApiError(e, 'chat:write'))
     } finally {
       setBusy(false)
@@ -280,7 +378,7 @@ export default function RagPanel() {
         <div className="border-b border-[#E2E8F0] px-5 py-4">
           <h2 className="text-sm font-semibold text-[#0F172A]">上传 PDF</h2>
           <p className="mt-0.5 text-xs text-[#64748B]">
-            须真实 PDF（带文本层）。扫描件请先 OCR 或走图片分支。
+            须真实 PDF（带文本层）。上传后立即排队，可离开页面；扫描件请先 OCR 或走图片分支。
           </p>
         </div>
         <div className="space-y-4 px-5 py-5">
@@ -293,7 +391,7 @@ export default function RagPanel() {
               id="rag-pdf"
               type="file"
               accept=".pdf,application/pdf"
-              disabled={uploading}
+              disabled={busy}
               className="h-11 max-w-xl rounded-xl border-[#E2E8F0] bg-[#F8FAFC]"
               onChange={onFileChange}
             />
@@ -306,16 +404,19 @@ export default function RagPanel() {
           <div className="flex flex-wrap items-center gap-3">
             <Button
               type="button"
-              disabled={busy || uploading || !pdfFile}
+              disabled={busy || !pdfFile}
               className="h-10 rounded-xl bg-[#165DFF] px-5 font-semibold text-white hover:bg-[#1263D8]"
               onClick={() => void onUpload()}
             >
-              {uploading ? '处理中…' : '上传到知识库'}
+              {uploading ? '已排队…' : '上传到知识库'}
             </Button>
           </div>
           {uploading ? (
             <div className="max-w-xl">
-              <Progress value={uploadPct} label={uploadPhaseLabel(uploadPct)} />
+              <Progress
+                value={uploadPct}
+                label={uploadPhaseLabel(uploadStatus, uploadPct)}
+              />
             </div>
           ) : null}
         </div>
@@ -327,7 +428,7 @@ export default function RagPanel() {
           <div>
             <h2 className="text-sm font-semibold text-[#0F172A]">已入库文档</h2>
             <p className="mt-0.5 text-xs text-[#64748B]">
-              按文件名聚合；删除会清除该文件对应的全部向量块。
+              按文件名聚合；删除会清除该文件对应的全部向量块。失败可重试。
             </p>
           </div>
         </div>
@@ -337,6 +438,7 @@ export default function RagPanel() {
               <tr>
                 <th className="px-5 py-3 font-semibold">文件名</th>
                 <th className="px-5 py-3 font-semibold">类型</th>
+                <th className="px-5 py-3 font-semibold">状态</th>
                 <th className="px-5 py-3 font-semibold">向量块</th>
                 <th className="px-5 py-3 font-semibold">最近入库</th>
                 <th className="px-5 py-3 font-semibold">操作</th>
@@ -346,7 +448,7 @@ export default function RagPanel() {
               {docs.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="px-5 py-12 text-center text-[#64748B]"
                   >
                     暂无文档 — 在上方上传 PDF 后会出现在这里
@@ -355,7 +457,7 @@ export default function RagPanel() {
               ) : (
                 docs.map((d) => (
                   <tr
-                    key={`${d.source}-${d.source_type}`}
+                    key={d.doc_id || `${d.source}-${d.source_type}`}
                     className="border-t border-[#E2E8F0]"
                   >
                     <td
@@ -369,6 +471,21 @@ export default function RagPanel() {
                         {d.source_type || 'text'}
                       </Badge>
                     </td>
+                    <td className="px-5 py-3">
+                      <div className="flex flex-col gap-0.5">
+                        <Badge
+                          variant={statusBadgeVariant(d.status)}
+                          className="font-normal"
+                        >
+                          {statusLabel(d.status)}
+                        </Badge>
+                        {d.status === 'failed' && d.error_code ? (
+                          <span className="text-[11px] text-red-600">
+                            {d.error_code}
+                          </span>
+                        ) : null}
+                      </div>
+                    </td>
                     <td className="px-5 py-3 tabular-nums text-[#334155]">
                       {d.chunk_count}
                     </td>
@@ -378,19 +495,33 @@ export default function RagPanel() {
                         : '—'}
                     </td>
                     <td className="px-5 py-3">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={busy || !d.source}
-                        className={cn(
-                          'h-8 rounded-lg text-xs',
-                          !d.source && 'opacity-50',
-                        )}
-                        onClick={() => void onDelete(d.source, d.name)}
-                      >
-                        删除
-                      </Button>
+                      <div className="flex flex-wrap gap-2">
+                        {d.status === 'failed' && d.doc_id ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={busy}
+                            className="h-8 rounded-lg text-xs"
+                            onClick={() => void onRetry(d.doc_id as string, d.name)}
+                          >
+                            重试
+                          </Button>
+                        ) : null}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={busy || !d.source}
+                          className={cn(
+                            'h-8 rounded-lg text-xs',
+                            !d.source && 'opacity-50',
+                          )}
+                          onClick={() => void onDelete(d.source, d.name)}
+                        >
+                          删除
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))

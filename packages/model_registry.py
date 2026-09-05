@@ -171,7 +171,7 @@ def select_embedding_model() -> ModelSpec:
     if candidates:
         return min(candidates, key=lambda s: (float(s.cost_per_1k), s.name))
 
-    name = os.getenv("EMBEDDING_MODEL", "text-embedding-v3")
+    name = os.getenv("EMBEDDING_MODEL", "text-embedding-v4")
     base_url = os.getenv(
         "EMBEDDING_BASE_URL",
         "https://dashscope.aliyuncs.com/compatible-mode/v1",
@@ -182,7 +182,7 @@ def select_embedding_model() -> ModelSpec:
         base_url=base_url,
         api_key_ref="QWEN_API_KEY",
         capability="embedding",
-        cost_per_1k=0.0001,
+        cost_per_1k=0.0007,
         max_tokens=0,
         tier="cheap",
     )

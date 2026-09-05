@@ -7,7 +7,11 @@ from typing import Any
 
 from sqlalchemy import text
 
-from packages.database.embeddings import embed_text
+from packages.database.embeddings import (
+    embed_result_is_semantic,
+    embed_text,
+    embedding_uses_hash_fallback,
+)
 from packages.database.pgvector_session import (
     CacheEntry,
     ChatMessage,
@@ -15,6 +19,7 @@ from packages.database.pgvector_session import (
     UserMemory,
     get_pg_session,
 )
+from packages.errors import ErrorCode, NexusAIException
 
 
 def store_embedding(message_id: int, embedding: list[float]) -> None:
@@ -299,8 +304,22 @@ def add_knowledge(
     source: str = "",
     source_type: str = "text",
     org_unit_id: str | None = None,
+    doc_id: str | None = None,
+    page_no: int | None = None,
 ) -> int:
+    if embedding_uses_hash_fallback(tenant_id):
+        raise NexusAIException(
+            ErrorCode.EMBED_UNAVAILABLE.value,
+            "embedding_api_unavailable",
+            detail="knowledge ingest refused hash fallback",
+        )
     emb = embed_text(text, tenant_id=tenant_id)
+    if not embed_result_is_semantic():
+        raise NexusAIException(
+            ErrorCode.EMBED_UNAVAILABLE.value,
+            "embedding_api_unavailable",
+            detail="knowledge ingest refused non-semantic embedding",
+        )
     meta = dict(metadata or {})
     if org_unit_id:
         meta.setdefault("org_unit_id", org_unit_id)
@@ -315,6 +334,8 @@ def add_knowledge(
             meta=meta,
             embedding=emb,
             org_unit_id=org_unit_id,
+            doc_id=doc_id,
+            page_no=page_no,
         )
         session.add(row)
         session.commit()

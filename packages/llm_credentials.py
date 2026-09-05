@@ -43,7 +43,7 @@ _TENANT_KEY_CHAIN_SQL = text(
     """
 )
 
-EMBEDDING_DIMENSIONS = 768
+EMBEDDING_DIMENSIONS = 1024
 
 
 def normalize_purpose(raw: str) -> str:

@@ -40,15 +40,50 @@ export async function ragStatus() {
   return apiGet<{ success: boolean; data: RagStatusData }>('/api/rag/status')
 }
 
-/** POST /api/rag/upload/pdf — multipart FormData field name = file */
+/** POST /api/rag/upload/pdf — multipart FormData field name = file; 202 queued */
+export type RagIngestDoc = {
+  doc_id: string
+  filename: string
+  status: string
+  duplicate: boolean
+}
+
+export type RagUploadResult = {
+  success: boolean
+  message: string
+  task_ids?: string[]
+  documents?: RagIngestDoc[]
+  data?: RagIngestDoc
+}
+
 export async function ragUploadPdf(file: File) {
   const fd = new FormData()
   fd.append('file', file)
-  return apiPost<{
-    success: boolean
-    message: string
-    data: RagStatusData
-  }>('/api/rag/upload/pdf', fd)
+  return apiPost<RagUploadResult>('/api/rag/upload/pdf', fd)
+}
+
+export type RagTaskData = {
+  task_id: string
+  doc_id: string
+  filename: string
+  status: string
+  progress: number
+  chunks_so_far: number
+  chunk_count: number
+  pages?: number | null
+  error_code?: string | null
+}
+
+export async function ragGetTask(taskId: string) {
+  return apiGet<{ success: boolean; data: RagTaskData }>(
+    `/api/rag/tasks/${encodeURIComponent(taskId)}`,
+  )
+}
+
+export async function ragRetryTask(taskId: string) {
+  return apiPost<RagUploadResult>(
+    `/api/rag/tasks/${encodeURIComponent(taskId)}/retry`,
+  )
 }
 
 export type RagDocumentItem = {
@@ -57,6 +92,10 @@ export type RagDocumentItem = {
   source_type: string
   chunk_count: number
   created_at?: string | null
+  doc_id?: string | null
+  status?: string
+  error_code?: string | null
+  pages?: number | null
 }
 
 export async function ragListDocuments() {

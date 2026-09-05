@@ -59,13 +59,21 @@ class ChatMessage(Base):
     content = Column(Text, nullable=False)
     # 47b I1: FE UUID; history returns as-is for feedback hydrate
     client_message_id = Column(String(64), nullable=True, index=True)
-    embedding = Column(Vector(768), nullable=True)
+    embedding = Column(Vector(1024), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     # Task 78.1 — NULL = live L0; set when rolled out of the model window
     archived_at = Column(DateTime, nullable=True)
 
     __table_args__ = (
         Index("idx_messages_tenant_session", "tenant_id", "session_id"),
+        Index(
+            "uq_chat_messages_tenant_client_role",
+            "tenant_id",
+            "client_message_id",
+            "role",
+            unique=True,
+            postgresql_where=text("client_message_id IS NOT NULL"),
+        ),
     )
 
 
@@ -79,7 +87,7 @@ class UserMemory(Base):
     confidence = Column(Float, default=1.0)
     source = Column(String(50), default="extracted")
     summary_meta = Column(JSON, nullable=True)
-    embedding = Column(Vector(768), nullable=True)
+    embedding = Column(Vector(1024), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     __table_args__ = (UniqueConstraint("tenant_id", "user_id", "key"),)
@@ -93,7 +101,7 @@ class ColdMemory(Base):
     session_id = Column(String(100))
     summary = Column(Text, nullable=False)
     summary_meta = Column(JSON, nullable=True)
-    embedding = Column(Vector(768), nullable=True)
+    embedding = Column(Vector(1024), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -610,7 +618,7 @@ class SkillAsset(Base):
     status = Column(String(32), nullable=False, default="draft")
     visibility = Column(String(32), nullable=False, default="private")
     usage_stats = Column(JSON, nullable=False, default=dict)
-    embedding = Column(Vector(768), nullable=True)
+    embedding = Column(Vector(1024), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     __table_args__ = (
@@ -621,6 +629,31 @@ class SkillAsset(Base):
             unique=True,
             postgresql_where=text("status = 'published'"),
         ),
+    )
+
+
+class KnowledgeDocument(Base):
+    """RAG 上传任务 / 文档行（Task 83）。status: queued→parsing→chunking→embedding→ready|failed"""
+
+    __tablename__ = "knowledge_documents"
+    id = Column(String(36), primary_key=True)
+    tenant_id = Column(String(50), nullable=False, index=True)
+    org_unit_id = Column(String(36), nullable=True, index=True)
+    filename = Column(String(256), nullable=False)
+    storage_path = Column(Text, nullable=False, default="")
+    file_hash = Column(String(64), nullable=False)
+    pages = Column(Integer, nullable=True)
+    chunk_count = Column(Integer, nullable=False, default=0)
+    chunks_so_far = Column(Integer, nullable=False, default=0)
+    status = Column(String(20), nullable=False, default="queued", index=True)
+    error_code = Column(String(64), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id", "file_hash", name="uq_knowledge_documents_tenant_hash"
+        ),
+        Index("ix_knowledge_documents_tenant_status", "tenant_id", "status"),
     )
 
 
@@ -635,8 +668,15 @@ class KnowledgeChunk(Base):
     source = Column(String(256), default="")
     source_type = Column(String(32), default="text", index=True)  # text|pdf|audio|image
     meta = Column(JSON, default=dict)
-    embedding = Column(Vector(768), nullable=True)
+    embedding = Column(Vector(1024), nullable=True)
     org_unit_id = Column(String(36), nullable=True, index=True)
+    doc_id = Column(
+        String(36),
+        ForeignKey("knowledge_documents.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    page_no = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

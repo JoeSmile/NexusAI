@@ -111,7 +111,7 @@ def test_embed_http_uses_slot(monkeypatch: pytest.MonkeyPatch) -> None:
     seen: list[int] = []
 
     class _Resp:
-        data = [SimpleNamespace(embedding=[0.1] * 768)]
+        data = [SimpleNamespace(embedding=[0.1] * 1024)]
 
     class _Embeddings:
         def create(self, **kwargs):
@@ -133,7 +133,7 @@ def test_embed_cache_hit_skips_slot(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(
         "packages.rag.cache.l2_get",
-        lambda model, text: [0.3] * 768,
+        lambda model, text: [0.3] * 1024,
     )
     monkeypatch.setattr(
         "packages.database.embeddings._resolve_embedding_endpoint",
@@ -144,7 +144,7 @@ def test_embed_cache_hit_skips_slot(monkeypatch: pytest.MonkeyPatch) -> None:
                 "model": "m",
                 "api_key": "sk",
                 "base_url": "https://x.example/v1",
-                "dimensions": 768,
+                "dimensions": 1024,
                 "source": "t",
             },
         )(),

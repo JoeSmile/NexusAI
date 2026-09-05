@@ -65,7 +65,7 @@ def test_select_embedding_model_env_fallback(monkeypatch):
 
     mr.reload_registry()
     spec = mr.select_embedding_model()
-    assert spec.name == "text-embedding-v3"
+    assert spec.name == "text-embedding-v4"
     assert spec.capability == "embedding"
     assert "dashscope.aliyuncs.com" in spec.base_url
     assert spec.api_key_ref == "QWEN_API_KEY"
@@ -83,7 +83,7 @@ def test_embed_text_calls_api_with_dimensions(monkeypatch):
         '"cost_per_1k":0.0001}]',
     )
     monkeypatch.setenv("QWEN_API_KEY", "sk-test")
-    monkeypatch.setenv("EMBEDDING_DIMENSIONS", "768")
+    monkeypatch.setenv("EMBEDDING_DIMENSIONS", "1024")
     monkeypatch.delenv("EMBEDDING_API_KEY", raising=False)
     mr.reload_registry()
 
@@ -91,7 +91,7 @@ def test_embed_text_calls_api_with_dimensions(monkeypatch):
     client_kwargs: dict = {}
 
     class _Resp:
-        data = [SimpleNamespace(embedding=[0.1] * 768)]
+        data = [SimpleNamespace(embedding=[0.1] * 1024)]
 
     class _Embeddings:
         def create(self, **kwargs):
@@ -107,11 +107,11 @@ def test_embed_text_calls_api_with_dimensions(monkeypatch):
 
     vec = emb.embed_text("你好 NexusAI")
     assert created["model"] == "text-embedding-v3"
-    assert created["dimensions"] == 768
+    assert created["dimensions"] == 1024
     assert client_kwargs.get("api_key") == "sk-test"
     assert "dashscope.example" in str(client_kwargs.get("base_url") or "")
-    assert len(vec) == emb.EMBED_DIM
-    assert vec[768:] == [0.0] * (emb.EMBED_DIM - 768)
+    assert emb.EMBED_DIM == 1024
+    assert len(vec) == 1024
     assert emb.embedding_model_label() == "text-embedding-v3"
 
 
@@ -126,7 +126,7 @@ def test_embed_text_retries_without_dimensions(monkeypatch):
         '"api_key_ref":"QWEN_API_KEY","capability":"embedding"}]',
     )
     monkeypatch.setenv("QWEN_API_KEY", "sk-test")
-    monkeypatch.setenv("EMBEDDING_DIMENSIONS", "768")
+    monkeypatch.setenv("EMBEDDING_DIMENSIONS", "1024")
     mr.reload_registry()
 
     calls: list[dict] = []
@@ -243,7 +243,7 @@ def test_embed_text_uses_tenant_embedding_credential(monkeypatch):
     from packages.key_repository import LLMKey
 
     monkeypatch.setenv("QWEN_API_KEY", "sk-should-not-use")
-    monkeypatch.setenv("EMBEDDING_DIMENSIONS", "768")
+    monkeypatch.setenv("EMBEDDING_DIMENSIONS", "1024")
 
     key = LLMKey(
         id="9",
@@ -281,7 +281,7 @@ def test_embed_text_uses_tenant_embedding_credential(monkeypatch):
 
     vec = emb.embed_text("tenant path", tenant_id="acme")
     assert created["model"] == "text-embedding-3-small"
-    assert created["dimensions"] == 768
+    assert created["dimensions"] == 1024
     assert client_kwargs.get("api_key") == "sk-tenant-embed"
     assert "tenant.embed.example" in str(client_kwargs.get("base_url") or "")
     assert len(vec) == emb.EMBED_DIM
@@ -301,7 +301,7 @@ def test_embed_text_tenant_missing_falls_back_to_registry(monkeypatch):
         '"cost_per_1k":0.0001}]',
     )
     monkeypatch.setenv("QWEN_API_KEY", "sk-registry")
-    monkeypatch.setenv("EMBEDDING_DIMENSIONS", "768")
+    monkeypatch.setenv("EMBEDDING_DIMENSIONS", "1024")
     monkeypatch.delenv("EMBEDDING_API_KEY", raising=False)
     mr.reload_registry()
 
@@ -317,7 +317,7 @@ def test_embed_text_tenant_missing_falls_back_to_registry(monkeypatch):
     client_kwargs: dict = {}
 
     class _Resp:
-        data = [SimpleNamespace(embedding=[0.1] * 768)]
+        data = [SimpleNamespace(embedding=[0.1] * 1024)]
 
     class _Embeddings:
         def create(self, **kwargs):

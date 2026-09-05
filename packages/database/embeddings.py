@@ -1,4 +1,4 @@
-"""Embedding：租户凭证优先 + registry/env 回退；失败回退确定性哈希向量 (1536 维存储)。"""
+"""Embedding：租户凭证优先 + registry/env 回退；失败回退确定性哈希向量（与 EMBED_DIM 对齐）。"""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from typing import Literal
 
 logger = logging.getLogger(__name__)
 
-EMBED_DIM = 768  # pgvector 列维度（nomic-embed-text）；API 返回更短时补零
+EMBED_DIM = 1024  # pgvector 列维度（text-embedding-v4）；API 返回更短时补零
 
 EmbedMode = Literal["api", "hash", "api-error", "cache", "unconfigured"]
 _last_embed_mode: EmbedMode | None = None
@@ -116,7 +116,7 @@ def _resolve_registry_embedding() -> _EmbedEndpoint:
         or ""
     ).rstrip("/")
     api_key = _resolve_api_key(spec.api_key_ref, base_url)
-    dims = int(os.getenv("EMBEDDING_DIMENSIONS", "768") or "768")
+    dims = int(os.getenv("EMBEDDING_DIMENSIONS", "1024") or "1024")
     return _EmbedEndpoint(
         model=spec.name,
         api_key=api_key,
@@ -164,6 +164,11 @@ def embedding_uses_hash_fallback(tenant_id: str | None = None) -> bool:
     return not (ep.api_key and ep.base_url)
 
 
+def embed_result_is_semantic() -> bool:
+    """True = 最近一次 embed_text 来自真实 API 或 L2 缓存，不是 hash 兜底。"""
+    return _last_embed_mode in ("api", "cache")
+
+
 def embedding_model_label(tenant_id: str | None = None) -> str:
     """供 /status、get_stats:反映配置 + 最近一次 embed 结果。"""
     name = _last_embed_model
@@ -186,7 +191,7 @@ def embedding_model_label(tenant_id: str | None = None) -> str:
 def embed_text(text: str, tenant_id: str | None = None) -> list[float]:
     """生成 embedding。优先租户 Embedding 凭证；未配置则回退 registry/env；再失败才哈希兜底。
 
-    L2 缓存(Task 29):归一化文本 → redis `rag:e:{model}:{hash}`;命中补零到 1536。
+    L2 缓存(Task 29):归一化文本 → redis `rag:e:{model}:{hash}`;命中补零到 EMBED_DIM。
     """
     from packages.rag.cache import (
         get_redis,
