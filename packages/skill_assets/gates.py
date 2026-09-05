@@ -45,10 +45,15 @@ def _scan_text(text: str) -> None:
 def _scan_ir_skeleton(skeleton: dict[str, Any] | None) -> None:
     raw = json.dumps(skeleton or {}, ensure_ascii=False)
     _scan_text(raw)
-    steps = (skeleton or {}).get("steps") if isinstance(skeleton, dict) else None
-    if not isinstance(steps, list):
-        return
-    for step in steps:
+    body = skeleton if isinstance(skeleton, dict) else {}
+    chunks: list[Any] = []
+    steps = body.get("steps")
+    if isinstance(steps, list):
+        chunks.extend(steps)
+    nodes = body.get("nodes")
+    if isinstance(nodes, list):
+        chunks.extend(nodes)
+    for step in chunks:
         if not isinstance(step, dict):
             continue
         params = step.get("params") or {}

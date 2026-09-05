@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import {
   deprecateConsoleSkill,
@@ -12,7 +13,10 @@ import {
   type SkillSummary,
 } from '@/api/adminConsole'
 import { formatApiError } from '@/api/http'
+import { getWorkflow, type Workflow } from '@/api/workflows'
+import { startRun } from '@/api/workflowRuns'
 import { RightDrawer } from '@/components/agent/RightDrawer'
+import { WorkflowRunDialog } from '@/components/workflow/WorkflowRunDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -51,6 +55,7 @@ function JsonBlock({ value }: { value: unknown }) {
 }
 
 export default function SkillsConsolePage() {
+  const navigate = useNavigate()
   const [items, setItems] = useState<SkillSummary[]>([])
   const [evolution, setEvolution] = useState<SkillEvolution | null>(null)
   const [err, setErr] = useState('')
@@ -61,6 +66,7 @@ export default function SkillsConsolePage() {
   const [detail, setDetail] = useState<SkillDetail | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [actionMsg, setActionMsg] = useState('')
+  const [runTarget, setRunTarget] = useState<Workflow | null>(null)
 
   const load = useCallback(async () => {
     setBusy(true)
@@ -123,6 +129,26 @@ export default function SkillsConsolePage() {
       await load()
     } catch (e) {
       setActionMsg(formatApiError(e, 'console_access'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onRunSkill() {
+    const wid = detail?.workflow_id
+    if (!wid) return
+    setBusy(true)
+    setActionMsg('')
+    try {
+      const wf = await getWorkflow(wid)
+      if (!wf.ir?.inputs || Object.keys(wf.ir.inputs).length === 0) {
+        const run = await startRun(wf.id)
+        navigate(`/runs/${run.id}`)
+        return
+      }
+      setRunTarget(wf)
+    } catch (e) {
+      setActionMsg(formatApiError(e, 'run'))
     } finally {
       setBusy(false)
     }
@@ -281,20 +307,44 @@ export default function SkillsConsolePage() {
                 </>
               ) : null}
               {detail.status === 'published' ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={() => void runAction('deprecate')}
-                >
-                  下架
-                </Button>
+                <>
+                  {detail.workflow_id ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={busy}
+                      onClick={() => void onRunSkill()}
+                    >
+                      运行
+                    </Button>
+                  ) : null}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => void runAction('deprecate')}
+                  >
+                    下架
+                  </Button>
+                </>
               ) : null}
             </div>
           </div>
         ) : null}
       </RightDrawer>
+      <WorkflowRunDialog
+        workflow={runTarget}
+        busy={busy}
+        onClose={() => setRunTarget(null)}
+        onError={setActionMsg}
+        onSubmit={async (input) => {
+          if (!runTarget) return
+          const run = await startRun(runTarget.id, input)
+          setRunTarget(null)
+          navigate(`/runs/${run.id}`)
+        }}
+      />
     </ConsoleSectionPage>
   )
 }

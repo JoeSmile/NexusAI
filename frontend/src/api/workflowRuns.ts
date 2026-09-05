@@ -47,8 +47,10 @@ export type RunNode = {
   finished_at?: string | null
 }
 
-export function startRun(workflowId: string) {
-  return apiPost<WorkflowRun>(`/api/workflows/${workflowId}/runs`, {})
+export function startRun(workflowId: string, input?: Record<string, unknown>) {
+  return apiPost<WorkflowRun>(`/api/workflows/${workflowId}/runs`, {
+    input: input ?? {},
+  })
 }
 
 export function listRuns(opts?: { status?: string; limit?: number; offset?: number }) {

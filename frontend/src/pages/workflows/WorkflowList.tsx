@@ -8,6 +8,7 @@ import {
   forkDraft,
   listWorkflows,
   publishWorkflow,
+  workflowRunInputs,
   type Workflow,
 } from '@/api/workflows'
 import { startRun } from '@/api/workflowRuns'
@@ -30,6 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { WorkflowRunDialog } from '@/components/workflow/WorkflowRunDialog'
 import { useAuthStore } from '@/stores/authStore'
 
 function statusBadge(status: string) {
@@ -48,6 +50,7 @@ export default function WorkflowListPage() {
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const [newName, setNewName] = useState('')
+  const [runTarget, setRunTarget] = useState<Workflow | null>(null)
 
   const load = useCallback(async () => {
     setErr('')
@@ -112,17 +115,27 @@ export default function WorkflowListPage() {
     }
   }
 
-  async function onRun(w: Workflow) {
+  async function launchRun(w: Workflow, input?: Record<string, unknown>) {
     setBusy(true)
     setErr('')
     try {
-      const run = await startRun(w.id)
+      const run = await startRun(w.id, input)
+      setRunTarget(null)
       navigate(`/runs/${run.id}`)
     } catch (e) {
       setErr(formatApiError(e, 'run'))
     } finally {
       setBusy(false)
     }
+  }
+
+  async function onRun(w: Workflow) {
+    const specs = workflowRunInputs(w.ir)
+    if (Object.keys(specs).length === 0) {
+      await launchRun(w)
+      return
+    }
+    setRunTarget(w)
   }
 
   async function onDelete(w: Workflow) {
@@ -216,6 +229,14 @@ export default function WorkflowListPage() {
           )}
         </CardContent>
       </Card>
+
+      <WorkflowRunDialog
+        workflow={runTarget}
+        busy={busy}
+        onClose={() => setRunTarget(null)}
+        onError={setErr}
+        onSubmit={(input) => launchRun(runTarget!, input)}
+      />
     </div>
   )
 }

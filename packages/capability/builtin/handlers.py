@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
@@ -73,6 +74,7 @@ async def _dispatch(
         "plan.status": _plan_status,
         "blackboard.search": _blackboard_search,
         "image.describe": _image_describe,
+        "llm.generate": _llm_generate,
     }
     fn = handlers.get(handler_id)
     if fn is None:
@@ -113,6 +115,8 @@ async def _rag_search(payload: dict[str, Any], tenant: TenantContext) -> dict[st
 
 
 async def _web_search(payload: dict[str, Any], tenant: TenantContext) -> dict[str, Any]:
+    from packages.search_service.service import hits_to_web_search_results, search_web
+
     query = str(payload.get("query") or "").strip()
     url = payload.get("url")
     if url:
@@ -122,12 +126,24 @@ async def _web_search(payload: dict[str, Any], tenant: TenantContext) -> dict[st
             validate_base_url(str(url))
         except UrlValidationError as exc:
             raise ValueError(str(exc)) from exc
+    recency = str(payload.get("recency") or "one_week")
+    count = int(payload.get("count") or 10)
+    if not query:
+        return {"ok": True, "data": {"query": "", "results": []}}
+    outcome = await asyncio.to_thread(
+        search_web,
+        query,
+        recency=recency,  # type: ignore[arg-type]
+        count=count,
+        tenant_id=tenant.tenant_id,
+    )
     return {
         "ok": True,
         "data": {
             "query": query,
-            "results": [],
-            "note": "web search provider not configured; SSRF guard applied",
+            "results": hits_to_web_search_results(outcome),
+            "provider": outcome.provider,
+            "degrade": outcome.degrade_code,
         },
     }
 
@@ -366,6 +382,99 @@ async def _image_describe(
         "source": data.get("source"),
         "model": data.get("model"),
         "cached": data.get("cached"),
+    }
+
+
+async def _resolve_generate_model(tenant_id: str, model: str | None) -> str:
+    requested = (model or "").strip()
+    if requested:
+        return requested
+    try:
+        from packages.llm_credentials import resolve_chat_model_for_request
+
+        return await resolve_chat_model_for_request(tenant_id, None)
+    except Exception:
+        import os
+
+        return (
+            (os.getenv("DEFAULT_MODEL") or os.getenv("LLM_MODEL") or "mock-local").strip()
+            or "mock-local"
+        )
+
+
+async def _generate_credentials(tenant_id: str, model_name: str) -> tuple[str, str]:
+    if model_name == "mock-local":
+        return "", ""
+    try:
+        from packages.llm_credentials import resolve_tenant_credential
+
+        key = await resolve_tenant_credential(tenant_id, model_name)
+        return str(key.api_key or ""), str(key.base_url or "")
+    except Exception:
+        pass
+    import os
+
+    api_key = os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or ""
+    base_url = os.getenv("LLM_BASE_URL") or ""
+    try:
+        from packages.model_registry import get_model
+
+        spec = get_model(model_name)
+        if spec is not None:
+            if spec.api_key_ref:
+                api_key = api_key or os.getenv(spec.api_key_ref) or ""
+            base_url = spec.base_url or base_url
+    except Exception:
+        pass
+    return api_key, base_url
+
+
+def _generate_user_content(payload: dict[str, Any], instruction: str) -> str:
+    parts = [instruction]
+    material = str(payload.get("user_material") or "").strip()
+    if material:
+        parts.append(f"用户素材：\n{material}")
+    context = payload.get("context")
+    if isinstance(context, dict) and context:
+        parts.append("上下文：\n" + json.dumps(context, ensure_ascii=False))
+    elif isinstance(context, str) and context.strip():
+        parts.append(f"上下文：\n{context.strip()}")
+    return "\n\n".join(parts)
+
+
+async def _llm_generate(
+    payload: dict[str, Any], tenant: TenantContext
+) -> dict[str, Any]:
+    instruction = str(payload.get("instruction") or "").strip()
+    if not instruction:
+        raise ValueError("instruction is required")
+    from packages.harness.llm import LLMHarness
+
+    requested = payload.get("model")
+    model_name = await _resolve_generate_model(
+        tenant.tenant_id,
+        requested if isinstance(requested, str) else None,
+    )
+    api_key, base_url = await _generate_credentials(tenant.tenant_id, model_name)
+    harness = LLMHarness()
+    result = await harness.generate(
+        model=model_name,
+        messages=[{"role": "user", "content": _generate_user_content(payload, instruction)}],
+        tenant_id=tenant.tenant_id,
+        api_key=api_key,
+        base_url=base_url,
+    )
+    if not result.success:
+        raise ValueError(result.error or "llm_generate_failed")
+    meta = result.metadata or {}
+    return {
+        "text": str(result.output or ""),
+        "model": model_name,
+        "usage": {
+            "input": meta.get("input_tokens"),
+            "output": meta.get("output_tokens"),
+            "cost": meta.get("cost"),
+        },
     }
 
 

@@ -10,17 +10,12 @@ from typing import Any
 
 from packages.audit import write_audit_sync
 from packages.audit_context import get_audit_lineage
+from packages.auth.models import TenantContext
 from packages.capability.invoke import capability_visible_to
 from packages.capability.registry import get_capability_registry
 from packages.guardrails.output_guard import check_output
 from packages.harness import LLMHarness
-from packages.plan.event_bus import bus_for_state
-from packages.plan.llm_output_guard import prevalidate_llm_plan
-from packages.plan.models import plan_to_state_dict
-from packages.plan.tool_index import search_capabilities
-from packages.plan.validator import validate_plan_ir
 from packages.observability.decorators import enrich_span, observe
-from packages.auth.models import TenantContext
 from packages.pipeline.intent_path import (
     resolve_short_path_skill,
     short_path_predicate,
@@ -29,6 +24,11 @@ from packages.pipeline.intent_path import (
 )
 from packages.pipeline.nodes.query_rewrite import attach_query_rewrite_to_plan
 from packages.pipeline.state import PipelineState
+from packages.plan.event_bus import bus_for_state
+from packages.plan.llm_output_guard import prevalidate_llm_plan
+from packages.plan.models import plan_to_state_dict
+from packages.plan.tool_index import search_capabilities
+from packages.plan.validator import validate_plan_ir
 
 logger = logging.getLogger(__name__)
 harness = LLMHarness()
@@ -98,17 +98,13 @@ def _force_task_plan_on_stream() -> bool:
 
 
 def _async_task_plan_on_stream_enabled() -> bool:
-    """Task 70: 异步规划需显式开启，或编排开关打开（编排消费 PlanIR）。
+    """Task 70: 流式等规划必须显式 ASYNC_TASK_PLAN_ON_STREAM。
 
-    默认关：避免每条长路径消息都白等规划 LLM（5–8s）。FORCE 仍走图内同步（演示用）。
+    默认关。ORCHESTRATOR_ENABLED 只表示「有 PlanIR 时跑编排」，
+    不得把每条 SSE 消息卡在规划 LLM（8s 上限也只是砍刀，不是思考时间）。
+    FORCE_TASK_PLAN_ON_STREAM 仍走图内同步（演示用）。
     """
-    if os.getenv("ASYNC_TASK_PLAN_ON_STREAM", "").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-    ):
-        return True
-    return os.getenv("ORCHESTRATOR_ENABLED", "").strip().lower() in (
+    return os.getenv("ASYNC_TASK_PLAN_ON_STREAM", "").strip().lower() in (
         "1",
         "true",
         "yes",

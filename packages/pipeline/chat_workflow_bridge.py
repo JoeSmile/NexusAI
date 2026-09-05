@@ -1,4 +1,4 @@
-"""Chat → published workflow bridge (Task 40.86 / 45b)."""
+"""Chat → published workflow bridge (Task 40.86 / 45b / 87)."""
 
 from __future__ import annotations
 
@@ -65,6 +65,33 @@ def _plan_tags(plan: dict[str, Any] | None, intent: str | None) -> set[str]:
     return {t for t in tags if t}
 
 
+def bridge_run_inputs(
+    *,
+    ir_json: dict[str, Any] | None,
+    message: str,
+    extras: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Chat → start_run payload.
+
+    Workflows with ``inputs``: fill ``topic`` from the user message; start_run
+    applies ParamSpec defaults. Empty-input workflows (hotspot) keep extras.
+    """
+    from packages.workflow.ir import WorkflowIR
+
+    try:
+        ir = WorkflowIR.model_validate(dict(ir_json or {}))
+    except Exception:
+        ir = None
+    if ir is not None and ir.inputs:
+        out: dict[str, Any] = {}
+        if "topic" in ir.inputs:
+            out["topic"] = (message or "")[:500]
+        return out
+    payload = dict(extras or {})
+    payload["topic"] = (message or "")[:500]
+    return payload
+
+
 def match_published_workflow(
     *,
     tenant_id: str,
@@ -106,6 +133,67 @@ def match_published_workflow(
                 best_score = score
                 best = wf
         return best if best_score > 0 else None
+
+
+def match_workflow_via_skill_search(
+    *,
+    tenant_id: str,
+    message: str,
+    user_id: str | None,
+) -> tuple[Workflow | None, str | None]:
+    """Path ②: vector-search published skills; only those linked to a live workflow."""
+    msg = (message or "").strip()
+    if len(msg) < 2:
+        return None, None
+    try:
+        from packages.skill_assets.service import search_published
+
+        hits = search_published(
+            tenant_id=tenant_id,
+            query=msg,
+            limit=5,
+            user_id=user_id,
+        )
+    except Exception:
+        logger.debug("skill search for workflow bridge skipped", exc_info=True)
+        return None, None
+    if not hits:
+        return None, None
+    sf = get_pg_session()
+    with sf.Session() as session:
+        for asset, _score in hits:
+            stats = getattr(asset, "usage_stats", None)
+            if not isinstance(stats, dict):
+                stats = {}
+            wid = str(stats.get("workflow_id") or "").strip()
+            if not wid:
+                continue
+            row = (
+                session.query(Workflow)
+                .filter(
+                    Workflow.id == wid,
+                    Workflow.tenant_id == tenant_id,
+                    Workflow.status == "published",
+                )
+                .one_or_none()
+            )
+            if row is None:
+                continue
+            session.expunge(row)
+            return row, str(asset.id)
+    return None, None
+
+
+def bridge_triggered_copy(*, workflow_name: str, run_id: str, message: str) -> str:
+    if message_intent_tags(message):
+        return (
+            f"正在抓取相关热点（run_id={run_id}，workflow={workflow_name}）。"
+            "完成后可在「内容库」查看今日合集。"
+        )
+    return (
+        f"已开始运行「{workflow_name}」（run_id={run_id}）。"
+        "完成后可在「运行历史」查看进度。"
+    )
 
 
 def try_bridge_start_run(state: PipelineState) -> PipelineState:
@@ -150,12 +238,19 @@ def try_bridge_start_run(state: PipelineState) -> PipelineState:
             confidence=conf,
             message=message,
         )
+        asset_id: str | None = None
+        if wf is None:
+            wf, asset_id = match_workflow_via_skill_search(
+                tenant_id=state["tenant_id"],
+                message=message,
+                user_id=state.get("user_id"),
+            )
         if wf is None:
             return state
 
+        from packages.auth.models import TenantContext
         from packages.org.scope import resolve_org_scope
         from packages.workflow import runner as run_svc
-        from packages.auth.models import TenantContext
 
         uc = state.get("user_context") or {}
         tenant = TenantContext(
@@ -175,8 +270,9 @@ def try_bridge_start_run(state: PipelineState) -> PipelineState:
                 is_cross_tenant=tenant.is_cross_tenant,
             )
             asset = state.get("skill_asset_hit") or {}
-            run_inputs = {
-                "topic": message[:500],
+            if asset_id and not (isinstance(asset, dict) and asset.get("id")):
+                asset = {"id": asset_id}
+            extras = {
                 "intent": state.get("intent"),
                 "conversation_id": state.get("session_id"),
                 "platform": (uc.get("platform") or "chat"),
@@ -184,6 +280,11 @@ def try_bridge_start_run(state: PipelineState) -> PipelineState:
                 "adapter": "topic_agent",
                 "save": True,
             }
+            run_inputs = bridge_run_inputs(
+                ir_json=dict(getattr(wf, "ir_json", None) or {}),
+                message=message,
+                extras=extras,
+            )
             started = run_svc.start_run(
                 session,
                 tenant=tenant,
@@ -191,6 +292,17 @@ def try_bridge_start_run(state: PipelineState) -> PipelineState:
                 workflow_id=wf.id,
                 run_inputs=run_inputs,
             )
+        if asset_id:
+            try:
+                from packages.skill_assets.service import bump_usage_by_id
+
+                bump_usage_by_id(
+                    tenant_id=state["tenant_id"],
+                    asset_id=asset_id,
+                    ok=True,
+                )
+            except Exception:
+                logger.debug("skill usage bump skipped", exc_info=True)
         run_svc.schedule_execute(started["id"])
         from packages.pipeline.exact_cache import invalidate_exact_cache
 
@@ -205,9 +317,10 @@ def try_bridge_start_run(state: PipelineState) -> PipelineState:
             "workflow_name": wf.name,
         }
         state["cache_bypass"] = True
-        state["response"] = (
-            f"正在抓取相关热点（run_id={started['id']}，workflow={wf.name}）。"
-            "完成后可在「内容库」查看今日合集。"
+        state["response"] = bridge_triggered_copy(
+            workflow_name=str(wf.name or wf.id),
+            run_id=started["id"],
+            message=message,
         )
         state["finish_reason"] = "workflow_triggered"
         state["total_cost"] = 0.0

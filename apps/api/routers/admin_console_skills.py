@@ -6,6 +6,12 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from packages.auth.models import TenantContext
+from packages.capability.console_access import (
+    is_console_super_admin,
+    require_console_reader,
+)
+from packages.database.pgvector_session import SkillAsset
 from packages.skill_assets.builtin_catalog import BUILTIN_SKILL_ASSET_CATALOG
 from packages.skill_assets.service import (
     deprecate,
@@ -14,12 +20,6 @@ from packages.skill_assets.service import (
     list_skill_assets,
     publish,
     reject_draft,
-)
-from packages.database.pgvector_session import SkillAsset
-from packages.auth.models import TenantContext
-from packages.capability.console_access import (
-    is_console_super_admin,
-    require_console_reader,
 )
 
 router = APIRouter()
@@ -70,6 +70,9 @@ def _summary(row: SkillAsset) -> dict[str, Any]:
         "description": (row.description or "")[:240],
         "source": _skill_source(row),
         "usage": usage,
+        "workflow_id": (row.usage_stats or {}).get("workflow_id")
+        if isinstance(row.usage_stats, dict)
+        else None,
         "updated_at": row.updated_at.isoformat() if row.updated_at else None,
         "created_at": row.created_at.isoformat() if row.created_at else None,
     }

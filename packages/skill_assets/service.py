@@ -133,8 +133,15 @@ def publish(
                 detail={"code": "SKA_409", "message": "publish_cas_conflict"},
             )
         session.refresh(row)
+        from packages.skill_assets.workflow_sync import sync_skill_workflow_on_publish
+
+        workflow_id = sync_skill_workflow_on_publish(
+            session, asset=row, created_by=actor_user_id
+        )
         stats = dict(row.usage_stats or {})
         stats["required_permissions"] = perms
+        if workflow_id:
+            stats["workflow_id"] = workflow_id
         row.usage_stats = stats
         session.commit()
         write_audit_sync(
@@ -188,7 +195,15 @@ def deprecate(*, tenant_id: str, asset_id: str) -> SkillAsset:
                 status_code=409,
                 detail={"code": "SKA_409", "message": "not_published"},
             )
+        from packages.skill_assets.workflow_sync import archive_skill_workflow
+
+        archive_skill_workflow(
+            session, tenant_id=tenant_id, asset_id=asset_id
+        )
         row.status = "deprecated"
+        stats = dict(row.usage_stats or {})
+        stats.pop("workflow_id", None)
+        row.usage_stats = stats
         row.updated_at = datetime.utcnow()
         session.commit()
         session.refresh(row)

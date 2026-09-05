@@ -9,11 +9,12 @@ from typing import Any
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from packages.org.scope import OrgScope, assert_org_access, visible_org_filter
-from packages.database.pgvector_session import Workflow
 from packages.auth.models import TenantContext
+from packages.capability.errors import CapabilityNotFoundError
 from packages.capability.models import CapabilitySpec, CapabilityStatus
 from packages.capability.registry import get_capability_registry
+from packages.database.pgvector_session import Workflow
+from packages.org.scope import OrgScope, assert_org_access, visible_org_filter
 from packages.workflow.ir import WorkflowIR, validate_ir_capabilities
 from packages.workflow.models import workflow_to_dict
 
@@ -69,11 +70,17 @@ def validate_ir_for_save(ir_data: dict[str, Any], tenant: TenantContext) -> Work
     reg = get_capability_registry()
 
     def exists(cid: str) -> bool:
-        spec = reg.get(cid)
+        try:
+            spec = reg.get(cid)
+        except CapabilityNotFoundError:
+            return False
         return spec is not None and capability_catalog_visible(spec, tenant)
 
     def param_spec(cid: str) -> dict[str, Any] | None:
-        spec = reg.get(cid)
+        try:
+            spec = reg.get(cid)
+        except CapabilityNotFoundError:
+            return None
         return dict(spec.param_spec) if spec and spec.param_spec else None
 
     try:
@@ -165,6 +172,18 @@ def list_workflows(
     limit: int = 50,
     offset: int = 0,
 ) -> list[dict[str, Any]]:
+    try:
+        from packages.content_ops.workflow_seed import ensure_builtin_llm_generate_workflow
+
+        ensure_builtin_llm_generate_workflow(
+            session,
+            tenant_id=tenant.tenant_id,
+            created_by=tenant.user_id or "system",
+            org_unit_id=org_scope.primary_org_unit_id,
+        )
+        session.commit()
+    except Exception:
+        session.rollback()
     q = session.query(Workflow).filter(Workflow.tenant_id == tenant.tenant_id)
     if status:
         q = q.filter(Workflow.status == status)

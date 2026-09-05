@@ -498,7 +498,8 @@ async def chat_streaming(
             should_async_plan_on_stream,
         )
 
-        # Task 70 C: 复杂路径先发占位帧，再异步规划（≤8s），超时降级直答
+        # 仅 ASYNC_TASK_PLAN_ON_STREAM 时：复杂路径先异步规划再出字。
+        # greeting 短路径不会进这里。默认关，避免每条 SSE 空等规划 LLM。
         if should_async_plan_on_stream(final):
             tid = str(final.get("trace_id") or "")
             bus = get_run_bus(tid) if tid else None

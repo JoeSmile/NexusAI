@@ -15,14 +15,14 @@ from typing import Any
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from packages.errors import ErrorCode, NexusAIException
-from packages.guardrails.input_guard import detect_injection_in_params
-from packages.org.scope import OrgScope, resolve_org_scope
-from packages.database.pgvector_session import Workflow, WorkflowRun, WorkflowRunNode
 from packages.auth.models import TenantContext
 from packages.capability.errors import CapabilityNotFoundError
 from packages.capability.invoke import invoke
 from packages.capability.registry import get_capability_registry
+from packages.database.pgvector_session import Workflow, WorkflowRun, WorkflowRunNode
+from packages.errors import ErrorCode, NexusAIException
+from packages.guardrails.input_guard import detect_injection_in_params
+from packages.org.scope import OrgScope, resolve_org_scope
 from packages.workflow.composition import (
     CompositionDepthExceeded,
     check_composition_budget,
@@ -54,6 +54,34 @@ from packages.workflow.security_gates import HangGateError, assert_hang_wait_all
 from packages.workflow.service import capability_catalog_visible
 
 logger = logging.getLogger(__name__)
+
+
+async def sanitize_workflow_answer(
+    answer: str,
+    *,
+    tenant_id: str,
+    names: list[str] | None = None,
+    warm: dict[str, Any] | None = None,
+) -> tuple[str, dict[str, Any]]:
+    """节点出口与 chat/script.gen 同一套护栏。"""
+    from packages.guardrails.generation_exit import sanitize_generation_exit
+
+    result = await sanitize_generation_exit(
+        answer,
+        tenant_id=tenant_id,
+        names=names,
+        warm=warm,
+        apply_length_limit=False,
+    )
+    meta: dict[str, Any] = {}
+    reason = result.reason or ""
+    if "edu_marketing" in reason:
+        meta["marketing_redline_hits"] = reason
+    if "g7_student_pii" in reason:
+        meta["student_pii_redacted"] = True
+    if result.action == "blocked":
+        meta["output_blocked"] = True
+    return result.redacted_text, meta
 
 
 async def _execute_ir_ready_driven(
@@ -442,35 +470,31 @@ async def _execute_node(
                 elif ev == "done":
                     done_meta = dict(frame.get("data") or {})
         answer = "".join(text_parts)
-        # G7: script.gen / 口播类出口脱敏（fail-open）
-        if cap_id in ("script.gen", "content.script_gen") or str(
-            done_meta.get("op") or ""
-        ) in ("script.gen", "content.script_gen"):
-            try:
-                from packages.memory.memory_service import redact_student_names_in_text
-
-                names = params.get("student_names")
-                if isinstance(names, str):
-                    names = [names]
-                if not isinstance(names, list):
-                    names = None
-                warm = params.get("warm") if isinstance(params.get("warm"), dict) else None
-                before = answer
-                answer = redact_student_names_in_text(
-                    answer,
-                    tenant_id=run.tenant_id,
-                    names=names,
-                    warm=warm,
-                )
-                if answer != before:
-                    done_meta = dict(done_meta)
-                    done_meta["student_pii_redacted"] = True
-                    if isinstance(done_meta.get("result"), dict):
-                        done_meta["result"] = dict(done_meta["result"])
+        try:
+            names = params.get("student_names")
+            if isinstance(names, str):
+                names = [names]
+            if not isinstance(names, list):
+                names = None
+            warm = params.get("warm") if isinstance(params.get("warm"), dict) else None
+            before = answer
+            answer, extra = await sanitize_workflow_answer(
+                answer,
+                tenant_id=run.tenant_id,
+                names=names,
+                warm=warm,
+            )
+            if extra or answer != before:
+                done_meta = dict(done_meta)
+                done_meta.update(extra)
+                if isinstance(done_meta.get("result"), dict):
+                    done_meta["result"] = dict(done_meta["result"])
+                    if "script" in done_meta["result"]:
                         done_meta["result"]["script"] = answer
+                    if extra.get("student_pii_redacted"):
                         done_meta["result"]["student_pii_redacted"] = True
-            except Exception:
-                logger.debug("runner G7 redaction skipped", exc_info=True)
+        except Exception:
+            logger.debug("runner generation exit skipped", exc_info=True)
         sources = done_meta.get("sources")
         if not isinstance(sources, list):
             sources = []

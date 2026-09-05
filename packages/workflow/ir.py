@@ -139,6 +139,28 @@ class WorkflowIR(BaseModel):
         return self
 
 
+def apply_workflow_input_defaults(
+    ir: WorkflowIR,
+    run_inputs: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Fill ParamSpec.default; raise if required inputs are still missing."""
+    out: dict[str, Any] = dict(run_inputs or {})
+    missing: list[str] = []
+    for name, spec in ir.inputs.items():
+        val = out.get(name)
+        empty = val is None or (isinstance(val, str) and not str(val).strip())
+        if empty:
+            if spec.default is not None:
+                out[name] = spec.default
+            elif spec.required:
+                missing.append(name)
+            else:
+                out.pop(name, None)
+    if missing:
+        raise ValueError(f"missing required inputs: {', '.join(missing)}")
+    return out
+
+
 def parse_param_spec_map(raw: dict[str, Any] | None) -> dict[str, ParamSpec]:
     """capability.param_spec dict → ParamSpec by name."""
     if not raw:

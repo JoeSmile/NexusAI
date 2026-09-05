@@ -21,6 +21,23 @@ import {
 
 const TERMINAL = new Set(['succeeded', 'failed', 'cancelled'])
 
+function formatOutput(output: unknown): string | null {
+  if (output == null) return null
+  if (typeof output === 'string') return output
+  if (typeof output !== 'object') return String(output)
+  const rec = output as Record<string, unknown>
+  const result = rec.result
+  if (result && typeof result === 'object') {
+    const r = result as Record<string, unknown>
+    if (typeof r.answer === 'string' && r.answer.trim()) return r.answer
+  }
+  try {
+    return JSON.stringify(output, null, 2)
+  } catch {
+    return String(output)
+  }
+}
+
 function formatDuration(start?: string | null, end?: string | null): string {
   if (!start || !end) return '—'
   const ms = new Date(end).getTime() - new Date(start).getTime()
@@ -102,7 +119,9 @@ export default function RunDetailPage() {
           {nodes.length === 0 ? (
             <p className="text-sm text-muted-foreground">暂无节点输出。</p>
           ) : (
-            nodes.map((n) => (
+            nodes.map((n) => {
+              const outText = formatOutput(n.output)
+              return (
               <div key={n.id} className="rounded-md border p-3 space-y-2">
                 <div className="flex items-center gap-2 text-sm">
                   <span className="font-medium">{n.node_id}</span>
@@ -132,8 +151,17 @@ export default function RunDetailPage() {
                     ))
                   )}
                 </div>
+                {outText ? (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">输出</p>
+                    <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words text-sm">
+                      {outText}
+                    </pre>
+                  </div>
+                ) : null}
               </div>
-            ))
+              )
+            })
           )}
         </CardContent>
       </Card>

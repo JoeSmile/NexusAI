@@ -19,12 +19,17 @@ from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from packages.auth.models import TenantContext
+from packages.database.pgvector_session import (
+    Workflow,
+    WorkflowRun,
+    WorkflowRunNode,
+    get_pg_session,
+)
 from packages.errors import ErrorCode
 from packages.org.scope import OrgScope, assert_org_access
-from packages.database.pgvector_session import Workflow, WorkflowRun, WorkflowRunNode, get_pg_session
-from packages.auth.models import TenantContext
 from packages.workflow.composition import CompositionDepthExceeded, check_composition_budget
-from packages.workflow.ir import WorkflowIR
+from packages.workflow.ir import WorkflowIR, apply_workflow_input_defaults
 from packages.workflow.node_exec import _execute_ir_ready_driven
 from packages.workflow.run_parent import _wake_parent_after_fail, wake_parent
 from packages.workflow.run_state import assert_transition
@@ -160,9 +165,15 @@ def start_run(
             )
 
     ir_snap = copy.deepcopy(dict(wf.ir_json or {}))
-    WorkflowIR.model_validate(ir_snap)
+    ir_model = WorkflowIR.model_validate(ir_snap)
 
-    inputs = dict(run_inputs or {})
+    try:
+        inputs = apply_workflow_input_defaults(ir_model, run_inputs)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "BAD_INPUT", "message": str(exc)},
+        ) from exc
     run = WorkflowRun(
         id=str(uuid.uuid4()),
         tenant_id=tenant.tenant_id,

@@ -9,8 +9,14 @@ from packages.model_registry import get_model, select_model_for_intent
 from packages.observability.decorators import enrich_span, observe
 from packages.observability.sampling import set_tracing_enabled, should_sample
 from packages.pipeline.intent_path import resolve_short_path_skill, skill_to_state
+from packages.pipeline.nodes.guardrails_output import apply_generation_exit_to_state
 from packages.pipeline.state import PipelineState
 from packages.skills.registry import registry
+
+
+async def apply_short_path_output_guards(state: PipelineState) -> PipelineState:
+    """Skill 短路径与长路径共用生成出口。"""
+    return await apply_generation_exit_to_state(state)
 
 
 def _maybe_disable_short_path_trace(finish_reason: str) -> None:
@@ -56,19 +62,14 @@ async def model_router(state: PipelineState) -> PipelineState:
                 state["approval_request_id"] = result.approval_request_id
             if result.error:
                 state["error_code"] = result.error
-            # G7：短路径跳过 guardrails_output → 此处强制脱敏
+            # 短路径跳过 guardrails_output 节点 → 此处走同一套生成出口
             try:
-                from packages.pipeline.nodes.guardrails_output import (
-                    apply_student_output_redaction,
-                )
-
-                apply_student_output_redaction(state)
+                state = await apply_short_path_output_guards(state)
             except Exception:
-                # I-7(评审 08-15)：禁静默 pass——脱敏失败可观测
                 import logging
 
                 logging.getLogger(__name__).exception(
-                    "short-path student redaction failed"
+                    "short-path generation exit failed"
                 )
             enrich_span(
                 metadata={

@@ -10,10 +10,27 @@ export type WorkflowNode = {
   approval_note?: string | null
 }
 
+export type WorkflowParamSpec = {
+  name?: string
+  type?: 'string' | 'number' | 'boolean' | 'enum'
+  required?: boolean
+  description?: string
+  default?: unknown
+  enum_values?: string[] | null
+}
+
 export type WorkflowIR = {
   ir_schema?: string
   nodes: WorkflowNode[]
   edges?: unknown[]
+  inputs?: Record<string, WorkflowParamSpec>
+  output_node_id?: string | null
+}
+
+export function workflowRunInputs(ir?: WorkflowIR | null): Record<string, WorkflowParamSpec> {
+  const raw = ir?.inputs
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
+  return raw
 }
 
 export type RequestPolicy = {
