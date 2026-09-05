@@ -4,11 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from packages.content_ops.search_adapter import SearchRequest
-from packages.content_ops.search_failover import (
-    SearchAdapterError,
-    search_with_failover,
-)
+from packages.search_service.adapter import SearchAdapterError, SearchRequest
+from packages.search_service.failover import search_with_failover
 
 
 class _FakeRedis:
@@ -25,6 +22,12 @@ class _FakeRedis:
         return self.data[key]
 
     def expire(self, key: str, ttl: int) -> bool:
+        return True
+
+    def set(self, key: str, value: object, nx: bool = False, ex: int | None = None) -> bool:
+        if nx and key in self.data:
+            return False
+        self.data[key] = 1
         return True
 
 
@@ -60,7 +63,7 @@ class _Boom:
 def test_primary_429_uses_backup(monkeypatch) -> None:
     redis = _FakeRedis()
     monkeypatch.setattr(
-        "packages.content_ops.search_failover.get_sync_redis",
+        "packages.search_service.failover.get_sync_redis",
         lambda **_k: redis,
     )
     monkeypatch.setenv("SEARCH_GLOBAL_MONTH_CAP", "100")
@@ -79,12 +82,13 @@ def test_primary_429_uses_backup(monkeypatch) -> None:
     assert out.degrade_code == "SEARCH_FAILOVER"
 
 
-def test_tenant_day_cap_blocks_paid_search(monkeypatch) -> None:
+def test_tenant_day_cap_warns_but_still_searches(monkeypatch) -> None:
     redis = _FakeRedis()
     monkeypatch.setattr(
-        "packages.content_ops.search_failover.get_sync_redis",
+        "packages.search_service.failover.get_sync_redis",
         lambda **_k: redis,
     )
+    monkeypatch.setattr("packages.audit.write_audit_sync", lambda *_a, **_k: True)
     monkeypatch.setenv("SEARCH_GLOBAL_MONTH_CAP", "100")
     monkeypatch.setenv("SEARCH_TENANT_DAY_CAP", "1")
     monkeypatch.setenv("SEARCH_TENANT_MONTH_CAP", "100")
@@ -93,18 +97,21 @@ def test_tenant_day_cap_blocks_paid_search(monkeypatch) -> None:
     req = SearchRequest(query="考研", tenant_id="t1")
     first = search_with_failover(primary, backup, req)
     assert first.hits[0]["source"] == "doubao"
+    assert first.degrade_code is None
     second = search_with_failover(primary, backup, req)
-    assert second.hits == []
+    assert second.hits[0]["source"] == "doubao"
     assert second.degrade_code == "SEARCH_CAP_EXCEEDED"
     assert backup.calls == 0
+    assert primary.calls == 2
 
 
-def test_both_over_cap_returns_crawl_only_code(monkeypatch) -> None:
+def test_over_global_cap_still_returns_hits(monkeypatch) -> None:
     redis = _FakeRedis()
     monkeypatch.setattr(
-        "packages.content_ops.search_failover.get_sync_redis",
+        "packages.search_service.failover.get_sync_redis",
         lambda **_k: redis,
     )
+    monkeypatch.setattr("packages.audit.write_audit_sync", lambda *_a, **_k: True)
     monkeypatch.setenv("SEARCH_GLOBAL_MONTH_CAP", "1")
     monkeypatch.setenv("SEARCH_TENANT_DAY_CAP", "100")
     monkeypatch.setenv("SEARCH_TENANT_MONTH_CAP", "100")
@@ -113,13 +120,13 @@ def test_both_over_cap_returns_crawl_only_code(monkeypatch) -> None:
     req = SearchRequest(query="考研", tenant_id="t1")
     search_with_failover(primary, backup, req)
     out = search_with_failover(primary, backup, req)
-    assert out.hits == []
+    assert out.hits[0]["source"] == "doubao"
     assert out.degrade_code == "SEARCH_CAP_EXCEEDED"
 
 
 def test_both_http_fail_returns_both_failed() -> None:
     with patch(
-        "packages.content_ops.search_failover.get_sync_redis",
+        "packages.search_service.failover.get_sync_redis",
         lambda **_k: _FakeRedis(),
     ), patch.dict(
         "os.environ",
@@ -139,8 +146,29 @@ def test_both_http_fail_returns_both_failed() -> None:
     assert out.degrade_code == "SEARCH_BOTH_FAILED"
 
 
+def test_cap_plus_primary_fail_reports_failover_not_cap(monkeypatch) -> None:
+    redis = _FakeRedis()
+    monkeypatch.setattr(
+        "packages.search_service.failover.get_sync_redis",
+        lambda **_k: redis,
+    )
+    monkeypatch.setattr("packages.audit.write_audit_sync", lambda *_a, **_k: True)
+    monkeypatch.setenv("SEARCH_GLOBAL_MONTH_CAP", "100")
+    monkeypatch.setenv("SEARCH_TENANT_DAY_CAP", "1")
+    monkeypatch.setenv("SEARCH_TENANT_MONTH_CAP", "100")
+    ok = _Ok("doubao")
+    boom = _Boom("doubao", 429)
+    backup = _Ok("zhipu")
+    req = SearchRequest(query="考研", tenant_id="t1")
+    search_with_failover(ok, backup, req)
+    out = search_with_failover(boom, backup, req)
+    assert out.degrade_code == "SEARCH_FAILOVER"
+    assert out.cap_warned is True
+    assert out.hits[0]["source"] == "zhipu"
+
+
 def test_zhipu_payload_uses_official_recency_filter() -> None:
-    from packages.content_ops.search_adapter import (
+    from packages.search_service.adapter import (
         ZhipuSearchAdapter,
         recency_to_zhipu,
     )
@@ -165,7 +193,7 @@ def test_zhipu_payload_uses_official_recency_filter() -> None:
         resp.raise_for_status = lambda: None
         return resp
 
-    with patch("packages.content_ops.search_adapter.requests.post", _post), patch.dict(
+    with patch("packages.search_service.adapter.requests.post", _post), patch.dict(
         "os.environ", {"SEARCH_BACKUP_API_KEY": "zk-test"}, clear=False
     ):
         rows = ZhipuSearchAdapter().search(

@@ -91,7 +91,7 @@ def test_doubao_payload_uses_official_timerange_not_time_range() -> None:
         resp.raise_for_status = MagicMock()
         return resp
 
-    with patch("packages.content_ops.search_adapter.requests.post", _post), patch.dict(
+    with patch("packages.search_service.adapter.requests.post", _post), patch.dict(
         "os.environ", {"SEARCH_API_KEY": "sk-test"}, clear=False
     ):
         rows = DoubaoSearchAdapter().search(
@@ -110,6 +110,33 @@ def test_doubao_payload_uses_official_timerange_not_time_range() -> None:
     assert rows[0]["title"] == "政策"
     assert rows[0]["source"] == "doubao"
     assert rows[0]["snippet"] == "摘要"
+
+
+def test_doubao_parses_web_results_path() -> None:
+    def _post(url, headers=None, json=None, timeout=None, **_k):
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.json.return_value = {
+            "Result": {
+                "WebResults": [
+                    {
+                        "Title": "网页结果",
+                        "Url": "https://example.com/w",
+                        "Snippet": "web摘要",
+                    }
+                ]
+            }
+        }
+        resp.raise_for_status = MagicMock()
+        return resp
+
+    with patch("packages.search_service.adapter.requests.post", _post), patch.dict(
+        "os.environ", {"SEARCH_API_KEY": "sk-test"}, clear=False
+    ):
+        rows = DoubaoSearchAdapter().search(SearchRequest(query="考研", count=3))
+    assert rows[0]["title"] == "网页结果"
+    assert rows[0]["url"] == "https://example.com/w"
+    assert rows[0]["snippet"] == "web摘要"
 
 
 def test_topic_agent_merges_search_when_keywords_present() -> None:
@@ -140,18 +167,13 @@ def test_topic_agent_merges_search_when_keywords_present() -> None:
         }
     ]
 
-    class _Ad:
-        name = "doubao"
-
-        def search(self, req):
-            assert "考研" in req.query
-            return hits
+    from packages.search_service.failover import SearchOutcome
 
     with patch(
         "packages.content_ops.hotspot_crawl.crawl_hotspots", return_value=crawl
     ), patch(
-        "packages.content_ops.search_adapter.get_search_adapters",
-        return_value=(_Ad(), _Ad()),
+        "packages.search_service.service.search_web",
+        return_value=SearchOutcome(hits=hits, provider="doubao"),
     ):
         items, meta = _topic_agent_items(
             org_profile={},
