@@ -1,6 +1,7 @@
 """Terms acceptance service (Task 55 slice 3)."""
 
 from packages.terms.service import (
+    REQUIRED_TERMS_KIND,
     enforce_terms_for_chat,
     get_current_terms,
     has_accepted,
@@ -12,6 +13,7 @@ from packages.terms.service import (
 )
 
 __all__ = [
+    "REQUIRED_TERMS_KIND",
     "enforce_terms_for_chat",
     "get_current_terms",
     "has_accepted",

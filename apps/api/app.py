@@ -130,6 +130,30 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Skill discovery failed: %s", e)
 
+    _skip_intent = os.getenv("APP_ENV", "").strip().lower() == "test" or bool(
+        os.getenv("PYTEST_CURRENT_TEST")
+    )
+    if not _skip_intent:
+        try:
+            from packages.intent.routers.intent_router import (
+                get_intent_service,
+                intent_runtime_status,
+            )
+
+            get_intent_service()
+            st = intent_runtime_status()
+            if st.get("status") == "bert":
+                logger.info("✓ Intent v8 BERT loaded (%s)", st.get("path"))
+            else:
+                logger.warning(
+                    "Intent BERT 未加载，走规则回退（greeting 关键词仍可短路径；"
+                    "其余句子会当复杂路径）。本地: "
+                    "uv sync --extra intent-model --extra dev && "
+                    "uv run python scripts/check_intent_model.py --setup"
+                )
+        except Exception as e:
+            logger.warning("Intent warmup skipped: %s", e)
+
     try:
         from packages.observability.langfuse_client import get_langfuse, langfuse_enabled
 

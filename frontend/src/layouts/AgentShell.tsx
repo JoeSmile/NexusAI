@@ -13,7 +13,6 @@ import { cn } from '@/lib/utils'
 
 const TABS = [
   { to: '/workspace', end: true, label: '对话' },
-  { to: '/workspace/dashboard', label: '工作台' },
   { to: '/workspace/knowledge', label: '知识库' },
   { to: '/workspace/content', label: '内容运营' },
   { to: '/workspace/social', label: '社媒对标' },

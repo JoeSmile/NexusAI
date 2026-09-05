@@ -1,5 +1,7 @@
 import { apiGet, apiPost } from '@/api/http'
 
+export const USER_AGREEMENT_KIND = 'user_agreement'
+
 export type TermsDoc = {
   id: number
   version: string
@@ -9,7 +11,9 @@ export type TermsDoc = {
 }
 
 export async function fetchTermsCurrent(kind: string) {
-  return apiGet<TermsDoc>(`/api/terms/current?kind=${encodeURIComponent(kind)}`)
+  return apiGet<TermsDoc>(`/api/terms/current?kind=${encodeURIComponent(kind)}`, {
+    skipAuth: true,
+  })
 }
 
 export async function fetchTermsPending() {

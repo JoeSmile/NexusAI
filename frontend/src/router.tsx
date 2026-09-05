@@ -12,7 +12,6 @@ import AgentLoginPage from '@/pages/agent/LoginPage'
 import AdminHomePage from '@/pages/agent/AdminHome'
 import TraceConsole from '@/pages/agent/TraceConsole'
 import HomeChatPage from '@/pages/agent/HomeChat'
-import WorkspaceDashboard from '@/pages/agent/WorkspaceDashboard'
 import RootLanding from '@/pages/marketing/Landing'
 import PrivacyPage from '@/pages/legal/PrivacyPage'
 import TermsPage from '@/pages/legal/TermsPage'
@@ -86,7 +85,7 @@ export const router = createBrowserRouter([
         element: <AgentHomeShell />,
         children: [
           { index: true, element: <HomeChatPage /> },
-          { path: 'dashboard', element: <WorkspaceDashboard /> },
+          { path: 'dashboard', element: <Navigate to="/workspace" replace /> },
           { path: 'knowledge', element: <RagPanel /> },
           { path: 'content', element: <ContentStudioPage /> },
           { path: 'social', element: <SocialBenchmarkPage /> },

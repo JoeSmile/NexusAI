@@ -20,8 +20,9 @@ from packages.database.pgvector_session import (
 
 
 def _mock_embedding() -> list[float]:
+    """Fake vectors for demo retrieval. Dim must match ORM Vector(1024) / alembic 040."""
     rng = np.random.RandomState(42)
-    return rng.randn(1536).tolist()
+    return rng.randn(1024).tolist()
 
 
 SEED_CHATS = [

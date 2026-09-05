@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Request
 
+from packages.auth.dual_auth import verify_human_or_legacy_key
+from packages.auth.models import TenantContext
 from packages.billing.context import get_billing_context
 from packages.terms.service import (
     get_current_terms,
     list_pending_terms,
     record_acceptance,
 )
-from packages.auth.dual_auth import verify_human_or_legacy_key
-from packages.auth.models import TenantContext
 
 router = APIRouter(prefix="/terms", tags=["terms"])
 
@@ -24,7 +24,7 @@ def _client_ip(request: Request) -> str | None:
 
 @router.get("/current")
 async def terms_current(
-    kind: str = Query(..., description="company_key|byok|privacy|general"),
+    kind: str = Query(..., description="user_agreement|privacy|general|company_key|byok"),
 ):
     """当前有效条款（公开可读）。"""
     doc = get_current_terms(kind)

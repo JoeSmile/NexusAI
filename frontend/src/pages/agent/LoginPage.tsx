@@ -1,10 +1,11 @@
 /**
  * AgentUI-styled login — password primary.
  */
-import { useState, type FormEvent } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useEffect, useState, type FormEvent } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { ApiError } from '@/api/http'
+import { acceptTerms, fetchTermsCurrent, USER_AGREEMENT_KIND, type TermsDoc } from '@/api/terms'
 import { resolvePostLoginPath } from '@/lib/routes'
 import { useAuthStore } from '@/stores/authStore'
 
@@ -24,15 +25,39 @@ export default function AgentLoginPage() {
   const loginWithPassword = useAuthStore((s) => s.loginWithPassword)
   const [username, setUsername] = useState('content_demo')
   const [password, setPassword] = useState('')
+  const [agreed, setAgreed] = useState(false)
+  const [termsDoc, setTermsDoc] = useState<TermsDoc | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const doc = await fetchTermsCurrent(USER_AGREEMENT_KIND)
+        if (!cancelled) setTermsDoc(doc)
+      } catch {
+        if (!cancelled) setTermsDoc(null)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
+    if (!agreed) {
+      setError('请先阅读并同意用户协议')
+      return
+    }
     setError('')
     setBusy(true)
     try {
       await loginWithPassword(username, password)
+      if (termsDoc) {
+        await acceptTerms(termsDoc.kind, termsDoc.version)
+      }
       navigate(resolvePostLoginPath(params.get('next')), { replace: true })
     } catch (err) {
       setError(passwordErrorMessage(err))
@@ -65,16 +90,22 @@ export default function AgentLoginPage() {
           <h1 className="text-xl font-semibold text-slate-900">NexusAI</h1>
           <p className="text-xs text-slate-500">内容运营 · 智能工作台</p>
         </div>
-        <label className="mb-1 block text-xs font-medium text-slate-600">用户名</label>
+        <label htmlFor="login-username" className="mb-1 block text-xs font-medium text-slate-600">
+          用户名
+        </label>
         <input
+          id="login-username"
           className="mb-3 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           autoComplete="username"
           required
         />
-        <label className="mb-1 block text-xs font-medium text-slate-600">密码</label>
+        <label htmlFor="login-password" className="mb-1 block text-xs font-medium text-slate-600">
+          密码
+        </label>
         <input
+          id="login-password"
           type="password"
           className="mb-4 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
           value={password}
@@ -82,6 +113,26 @@ export default function AgentLoginPage() {
           autoComplete="current-password"
           required
         />
+        <label className="mb-4 flex cursor-pointer items-start gap-2 text-xs leading-5 text-slate-600">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-slate-300 text-indigo-600"
+            checked={agreed}
+            onChange={(e) => setAgreed(e.target.checked)}
+          />
+          <span>
+            我已阅读并同意
+            <Link
+              to="/terms"
+              target="_blank"
+              rel="noreferrer"
+              className="mx-0.5 font-medium text-indigo-600 underline-offset-2 hover:underline"
+              onClick={(ev) => ev.stopPropagation()}
+            >
+              《用户协议》
+            </Link>
+          </span>
+        </label>
         {error ? (
           <p className="mb-3 text-xs text-rose-600" role="alert">
             {error}
@@ -89,7 +140,7 @@ export default function AgentLoginPage() {
         ) : null}
         <button
           type="submit"
-          disabled={busy}
+          disabled={busy || !agreed}
           className="w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
         >
           {busy ? '登录中…' : '登录'}

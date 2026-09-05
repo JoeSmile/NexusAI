@@ -8,6 +8,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from apps.api.routers.terms import router as terms_router
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
 from packages.errors import NexusAIException
@@ -17,8 +18,8 @@ from packages.terms.service import (
     get_current_terms,
     list_pending_terms,
     record_acceptance,
+    required_terms_kinds,
 )
-from apps.api.routers.terms import router as terms_router
 
 
 @pytest.fixture
@@ -26,11 +27,21 @@ def user() -> TenantContext:
     return TenantContext("acme", "u1", "user", [], False)
 
 
+def test_required_terms_kinds_is_single_user_agreement() -> None:
+    assert required_terms_kinds("company") == ["user_agreement"]
+    assert required_terms_kinds("byok") == ["user_agreement"]
+
+
 def test_get_current_terms_after_migration() -> None:
-    doc = get_current_terms("privacy")
+    doc = get_current_terms("user_agreement")
     assert doc is not None
     assert doc["version"] == "v1.0.0"
-    assert "[律师审]" in doc["content_md"]
+    assert "用户协议" in doc["content_md"]
+    assert "正式法律文本将由运营补充" in doc["content_md"]
+    # Legacy kinds remain readable for old /terms?kind= links.
+    privacy = get_current_terms("privacy")
+    assert privacy is not None
+    assert "[律师审]" in privacy["content_md"]
 
 
 def test_record_and_clear_pending(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -39,7 +50,8 @@ def test_record_and_clear_pending(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TERMS_ENFORCEMENT_ENABLED", "1")
 
     pending_before = list_pending_terms(tenant_id=tid, user_id=uid)
-    assert len(pending_before) >= 3
+    assert len(pending_before) == 1
+    assert pending_before[0]["kind"] == "user_agreement"
 
     for doc in pending_before:
         record_acceptance(
@@ -64,9 +76,9 @@ def test_enforce_raises_when_pending(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_terms_current_api_public() -> None:
     app = FastAPI()
     app.include_router(terms_router, prefix="/api")
-    r = TestClient(app).get("/api/terms/current?kind=general")
+    r = TestClient(app).get("/api/terms/current?kind=user_agreement")
     assert r.status_code == 200
-    assert r.json()["kind"] == "general"
+    assert r.json()["kind"] == "user_agreement"
 
 
 def test_terms_pending_api(user: TenantContext) -> None:

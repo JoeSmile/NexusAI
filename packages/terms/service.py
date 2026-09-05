@@ -7,12 +7,15 @@ from datetime import UTC, datetime
 
 from sqlalchemy import text
 
-from packages.errors import ErrorCode, NexusAIException
 from packages.database.pgvector_session import get_pg_session
+from packages.errors import ErrorCode, NexusAIException
 
 _TERMS_NOT_ACCEPTED = ErrorCode.TERMS_NOT_ACCEPTED.value
 
-_VALID_KINDS = frozenset({"company_key", "byok", "privacy", "general"})
+REQUIRED_TERMS_KIND = "user_agreement"
+_VALID_KINDS = frozenset(
+    {"company_key", "byok", "privacy", "general", REQUIRED_TERMS_KIND}
+)
 
 
 def is_terms_enforcement_enabled() -> bool:
@@ -30,8 +33,9 @@ def resolve_mode_kind(credential_kind: str = "company") -> str:
 
 
 def required_terms_kinds(credential_kind: str = "company") -> list[str]:
-    mode = resolve_mode_kind(credential_kind)
-    return ["general", "privacy", mode]
+    """Gate on one unified agreement. `credential_kind` kept for call-site compat."""
+    _ = credential_kind
+    return [REQUIRED_TERMS_KIND]
 
 
 def get_current_terms(kind: str) -> dict | None:

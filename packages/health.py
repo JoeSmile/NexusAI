@@ -109,12 +109,23 @@ async def health_check():
 
     # 6. 审计写入失败计数（Task 59 S3）
     try:
-        from packages.audit import audit_write_failure_count
+        from packages.audit import audit_circuit_open, audit_write_failure_count
 
         failures = audit_write_failure_count()
-        checks["audit"] = {"write_failures": failures}
+        checks["audit"] = {
+            "write_failures": failures,
+            "circuit": "open" if audit_circuit_open() else "closed",
+        }
     except Exception:
         checks["audit"] = {"write_failures": None, "status": "unknown"}
+
+    # 7. 意图 BERT（缺权重不 503：规则兜底仍可用）
+    try:
+        from packages.intent.routers.intent_router import intent_runtime_status
+
+        checks["intent_model"] = intent_runtime_status()
+    except Exception:
+        checks["intent_model"] = {"status": "unknown"}
 
     http_status = 200 if overall == "healthy" else 503
     return JSONResponse(
