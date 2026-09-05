@@ -266,10 +266,15 @@ async def _try_tenant_l2(
     except Exception:
         return None
     prompt = (
-        "Decide if the user continues the current task or starts a new topic. "
-        "Reply with JSON only: "
+        "判断用户当前这句话是在【继续当前任务/对话】，还是【开启全新话题】。\n"
+        "判断准则：\n"
+        "1. 指代延续：句子含\"它/那个/刚才/上次/继续/还有/那然后呢\"且能对应到 belief/recall 里的对象 → 大概率继续。\n"
+        "2. 话题跳跃：句子提到 belief/recall 里完全没有的新对象、新领域、新请求 → 大概率新话题。\n"
+        "3. 内容创作延续：用户在讨论某条内容（口播稿/选题/脚本）后继续说修改要求（\"再短点/换个开场/加个案例\"）→ 是 continue_prev_task=true 的续写，不是新话题。\n"
+        "4. 拿不准时：倾向 is_new_topic=false（续当前），因为误判\"新话题\"会丢上下文；除非证据明显是新请求。\n"
+        "只输出 JSON："
         '{"is_new_topic": bool, "continue_prev_task": bool, '
-        '"updated_slots": {}, "confidence": 0.0, "reason": ""}.\n'
+        '"updated_slots": {}, "confidence": 0.0, "reason": "中文一句话说明判断依据"}\n'
         f"belief:{json.dumps(_trim_belief(belief), ensure_ascii=False)}\n"
         f"recall:{json.dumps(state.get('funnel_recall') or [], ensure_ascii=False)}\n"
         f"utterance:{_message(state)[:500]}"
