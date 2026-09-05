@@ -298,8 +298,10 @@ docker compose -f docker-compose.local.yml up -d
 ### 3) 安装依赖
 
 ```bash
-uv sync
-# 如需本地跑意图模型（可选，见下节）：uv sync --extra intent-model
+uv sync --extra dev
+# 本地手测必做（意图 BERT 在 API 进程内加载，没有单独启动命令）：
+uv sync --extra intent-model --extra dev
+uv run python scripts/check_intent_model.py --setup
 ```
 
 ### 4) 初始化数据
@@ -348,16 +350,11 @@ curl -s -X POST http://localhost:8000/chat \
   -d '{"message":"帮我写个口播稿","session_id":"demo","user_id":"alice"}'
 ```
 
-### 9) 获取意图模型（可选）
+### 9) 意图模型（本地手测必做，不是独立服务）
 
-自研 8 类意图模型（V1.0，BERT 微调）**不随仓库分发**（约 400MB，见独立训练仓库）：
+自研 8 类 BERT **随 API 进程加载**，没有 `ollama serve` 那种第二进程。权重不随 git 分发（约 400MB）。步骤 3 的 `check_intent_model.py --setup` 会从本机 `D:\LLMs\intent_project\models\intent_model_v8\model` 拷到 `data/models/intent_v8/`（已存在则只检查）。
 
-```bash
-uv sync --extra intent-model
-# 将模型权重放入 data/models/intent_v8/（下载链接见意图模型仓库 release）
-```
-
-> 未安装模型时，意图识别**自动降级为规则引擎**（日志出现 "using rule/heuristic fallback"），不影响其余功能；安装后 L0 走真实模型。
+API 启动日志应有 `Intent v8 BERT loaded`；`GET /health` 里 `checks.intent_model.status` 为 `bert`。缺权重时静默规则回退（API 仍能起），L0 路由会漂。
 
 ---
 
