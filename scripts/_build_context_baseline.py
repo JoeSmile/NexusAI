@@ -111,15 +111,8 @@ def main() -> None:
     n = int(os.getenv("BASELINE_SAMPLES") or "30")
     lines = asyncio.run(run_inprocess(n))
     print("\n".join(lines))
-    out = ROOT / "docs" / "build-context-s0-baseline.md"
-    out.write_text(
-        "# Build Context S0 基线（Task 89 之后）\n\n"
-        "in-process 微基准，**不是** LangFuse/HTTP 金标。"
-        "live 流式请用 `scripts/_latency_bench.py`（需 token + :8000）。\n\n"
-        "```\n" + "\n".join(lines) + "\n```\n",
-        encoding="utf-8",
-    )
-    print(f"wrote {out}")
+    # S5 起基线数字手写对比进 docs/build-context-s0-baseline.md，脚本只打印以免覆盖 S0。
+    print("(not rewriting docs/build-context-s0-baseline.md)")
 
 
 if __name__ == "__main__":
