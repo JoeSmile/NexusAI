@@ -11,7 +11,6 @@ import re
 
 logger = logging.getLogger(__name__)
 
-# 较长短语优先，避免「名师」先把「国家级名师」切碎。
 _REPLACEMENTS: tuple[tuple[str, str], ...] = (
     ("保证孩子提分", "帮孩子稳步提升"),
     ("承诺提分", "注重学习方法与习惯"),
@@ -40,6 +39,8 @@ _REPLACEMENTS: tuple[tuple[str, str], ...] = (
     ("立减", "优惠"),
     ("全额退款", "退费以公示规则为准"),
 )
+
+REDLINE_SOURCE_TERMS = tuple(src for src, _dst in _REPLACEMENTS)
 
 _RESIDUAL = re.compile(r"(保过|包过|押题|承诺提分|保证提分|保证孩子提分)")
 

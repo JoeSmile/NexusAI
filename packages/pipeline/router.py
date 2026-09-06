@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 import time
 from collections.abc import AsyncIterator
 from typing import Any
@@ -18,7 +17,6 @@ from packages.auth.models import TenantContext
 from packages.auth.permissions import require_permission
 from packages.billing.context import bind_billing_context
 from packages.errors import ErrorCode, NexusAIException
-from packages.guardrails.output_guard import DRIFT_PATTERNS, VIOLATION_PATTERNS
 from packages.observability.decorators import observe
 from packages.pipeline.graph import compiled_graph
 from packages.pipeline.state import make_initial_state
@@ -35,11 +33,6 @@ from packages.plan.run_cancel import (
 )
 
 router = APIRouter(tags=["chat"])
-
-_STREAM_FILTER = re.compile(
-    "|".join(VIOLATION_PATTERNS + DRIFT_PATTERNS),
-    re.IGNORECASE,
-)
 
 
 class ChatRequest(BaseModel):
@@ -546,7 +539,20 @@ async def chat_streaming(
             for line in _sse_buffered_execution_events(final.get("trace_id")):
                 yield line
 
-        buffer = ""
+        from packages.audit import write_audit_sync
+        from packages.guardrails.generation_exit import resolve_output_guard_profile
+        from packages.guardrails.stream_guard import (
+            apply_stream_block_to_state,
+            remaining_pending,
+            sanitize_streaming_chunk,
+            stream_block_audit_record,
+            student_names_from_warm,
+        )
+
+        stream_profile = resolve_output_guard_profile(str(final.get("tenant_id") or ""))
+        stream_names = student_names_from_warm(final.get("warm_memory") or {})
+        emitted = ""
+        unsent = ""
         token_iter = harness.stream(
             model=model,
             messages=stream_messages,
@@ -579,26 +585,49 @@ async def chat_streaming(
                     yield ": ping\n\n"
                     continue
 
-                buffer += tok
-                if _STREAM_FILTER.search(buffer):
+                unsent += tok
+                delta, reason = sanitize_streaming_chunk(
+                    clean_so_far=emitted,
+                    new_chunk=unsent,
+                    tenant_id=str(final.get("tenant_id") or ""),
+                    profile=stream_profile,
+                    names=stream_names,
+                    max_chars=4000,
+                )
+                next_unsent = remaining_pending(emitted, unsent, stream_names)
+                if reason.startswith("blocked"):
                     yield _sse_data({"type": "abort", "reason": "content_filter"})
+                    apply_stream_block_to_state(final, reason=reason)
+                    try:
+                        write_audit_sync(
+                            stream_block_audit_record(
+                                final, reason=reason, profile=stream_profile
+                            )
+                        )
+                    except Exception:
+                        logger.debug("stream_block audit skipped", exc_info=True)
+                    await write_memory(final)
+                    await conversion_hook(final)
+                    yield _sse_data(_sse_done_payload(final))
                     yield "data: [DONE]\n\n"
                     return
-                yield _sse_data({"token": tok})
+                if delta:
+                    yield _sse_data({"token": delta})
+                    emitted += delta
+                if reason == "length_retracted":
+                    yield _sse_data({"type": "retraction", "reason": "length_exceeded"})
+                    unsent = ""
+                    break
+                unsent = next_unsent
 
-            if not buffer and await request.is_disconnected():
+            if not emitted and await request.is_disconnected():
                 return
 
-            if len(buffer) > 4000:
-                yield _sse_data({"type": "retraction", "reason": "length_exceeded"})
-                buffer = buffer[:4000]
-
-            if buffer:
-                final["response"] = buffer
+            if emitted:
+                final["response"] = emitted
                 final["finish_reason"] = harness.stream_finish_reason()
                 await write_memory(final)
                 # SSE 长路径: 图在 conversion_hook 处已结束(stream_mode),此处补记转化。
-                # 仅正常结束(含 retraction)记;abort/断连/异常已提前 return,不会到这。
                 await conversion_hook(final)
             yield _sse_data(_sse_done_payload(final))
             yield "data: [DONE]\n\n"
