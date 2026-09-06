@@ -128,7 +128,7 @@ async def lifespan(app: FastAPI):
         registry.load()
         logger.info("Skill registry: %s skills loaded", len(registry._skills))
     except Exception as e:
-        logger.warning("Skill discovery failed: %s", e)
+        logger.warning("Skill registry load failed: %s", e)
 
     _skip_intent = os.getenv("APP_ENV", "").strip().lower() == "test" or bool(
         os.getenv("PYTEST_CURRENT_TEST")

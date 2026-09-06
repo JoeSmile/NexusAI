@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import uuid
+
+from pydantic import ValidationError
+
 from packages.skills.base import BaseSkill, SkillResult
 from packages.skills.builtin.complaint_escalation import ComplaintEscalationSkill
 from packages.skills.builtin.greeting import GreetingSkill
@@ -40,10 +44,12 @@ class SkillRegistry:
                 bucket.append(skill.id)
 
     def load(self) -> None:
-        self._skills = dict(SKILL_REGISTRY)
-        self._intent_map = {}
-        for skill in self._skills.values():
+        pending = dict(SKILL_REGISTRY)
+        for skill in pending.values():
             self._assert_executable(skill)
+        self._skills = {}
+        self._intent_map = {}
+        for skill in pending.values():
             self.register(skill)
 
     def _assert_executable(self, skill: BaseSkill) -> None:
@@ -52,15 +58,27 @@ class SkillRegistry:
 
         if skill.skill_type != SkillType.WORKFLOW:
             return
+        key = (skill.workflow_asset_id or "").strip()
+        if key:
+            try:
+                uuid.UUID(key)
+            except ValueError:
+                pass
+            else:
+                raise ValueError(
+                    f"skill {skill.id}: workflow_asset_id 必须是逻辑键，禁止 UUID"
+                )
         if skill.workflow_ir:
             try:
-                WorkflowIR.model_validate(skill.workflow_ir)
-            except Exception as exc:
+                ir = WorkflowIR.model_validate(skill.workflow_ir)
+            except ValidationError as exc:
                 raise ValueError(
                     f"skill {skill.id}: workflow_ir invalid: {exc}"
                 ) from exc
+            if not ir.nodes:
+                raise ValueError(f"skill {skill.id}: workflow_ir.nodes 不能为空")
             return
-        if (skill.workflow_asset_id or "").strip():
+        if key:
             return
         raise ValueError(
             f"skill {skill.id}: type=workflow 必须有可校验 workflow_ir 或 "

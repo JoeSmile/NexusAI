@@ -76,6 +76,21 @@ def test_workflow_type_requires_executable_carrier() -> None:
     with pytest.raises(ValueError):
         reg._assert_executable(bare_list)
 
+    empty_nodes = FakeWorkflow()
+    empty_nodes.workflow_ir = {
+        "ir_schema": "1",
+        "nodes": [],
+        "edges": [],
+        "inputs": {},
+    }
+    with pytest.raises(ValueError, match="nodes"):
+        reg._assert_executable(empty_nodes)
+
+    uuid_only = FakeWorkflow()
+    uuid_only.workflow_asset_id = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
+    with pytest.raises(ValueError, match="禁止 UUID"):
+        reg._assert_executable(uuid_only)
+
     ok = FakeWorkflow()
     ok.workflow_ir = {
         "ir_schema": "1",
