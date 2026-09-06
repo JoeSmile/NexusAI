@@ -17,7 +17,13 @@ class RefundPolicySkill(BaseSkill):
     skill_type = SkillType.CODE
     short_path = True
 
-    async def _do_execute(self, entities: dict) -> SkillResult:
+    async def _do_execute(
+        self,
+        entities: dict,
+        *,
+        tenant_id: str = "",
+        user_context: dict | None = None,
+    ) -> SkillResult:
         order_id = entity_str(entities, "order_id", "（未提供订单号）")
         reason = entity_str(entities, "reason", "用户申请退款")
         body = render_sections(

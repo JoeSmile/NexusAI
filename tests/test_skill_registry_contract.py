@@ -64,7 +64,13 @@ def test_workflow_type_requires_executable_carrier() -> None:
         id = "fake_wf"
         skill_type = SkillType.WORKFLOW
 
-        async def _do_execute(self, entities: dict) -> SkillResult:
+        async def _do_execute(
+            self,
+            entities: dict,
+            *,
+            tenant_id: str = "",
+            user_context: dict | None = None,
+        ) -> SkillResult:
             return SkillResult(output="")
 
     reg = SkillRegistry()

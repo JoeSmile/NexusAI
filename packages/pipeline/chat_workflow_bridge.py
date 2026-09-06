@@ -190,10 +190,20 @@ def bridge_triggered_copy(*, workflow_name: str, run_id: str, message: str) -> s
             f"正在抓取相关热点（run_id={run_id}，workflow={workflow_name}）。"
             "完成后可在「内容库」查看今日合集。"
         )
-    return (
-        f"已开始运行「{workflow_name}」（run_id={run_id}）。"
-        "完成后可在「运行历史」查看进度。"
-    )
+    return f"已开始运行「{workflow_name}」（run_id={run_id}）。完成后可在「运行历史」查看进度。"
+
+
+def prefer_hotspot_script_carrier(
+    message: str | None,
+    intent: str | None,
+) -> bool:
+    """口播 / 热点脚本走 hotspot_script 统一 resolve，而不是只靠关键词表。"""
+    msg = message or ""
+    if any(k in msg for k in ("口播", "短视频脚本", "热点脚本")):
+        return True
+    if intent == "content_creation" and any(k in msg for k in ("脚本", "口播", "热点")):
+        return True
+    return bool(message_intent_tags(msg))
 
 
 def try_bridge_start_run(state: PipelineState) -> PipelineState:
@@ -212,32 +222,61 @@ def try_bridge_start_run(state: PipelineState) -> PipelineState:
             state["bridge_skipped"] = "bypass_marker"  # type: ignore[typeddict-item]
             return state
 
-        # 确保内置热点 workflow 存在（幂等）
+        # 确保内置 Skill workflow 载体已 published（幂等；热点走同一逻辑键）
         try:
-            from packages.content_ops.workflow_seed import (
-                ensure_builtin_hotspot_workflow,
-            )
+            from packages.skills.workflow_bind import ensure_skill_workflows_published
 
             sf0 = get_pg_session()
             with sf0.Session() as session:
-                ensure_builtin_hotspot_workflow(
+                ensure_skill_workflows_published(
                     session,
                     tenant_id=state["tenant_id"],
                     created_by=state.get("user_id") or "system",
                 )
                 session.commit()
         except Exception:
-            logger.debug("builtin hotspot workflow seed skipped", exc_info=True)
+            logger.debug("skill workflow seed skipped", exc_info=True)
 
         plan = state.get("task_plan")
         conf = float(state.get("intent_confidence") or 0.0)
-        wf = match_published_workflow(
-            tenant_id=state["tenant_id"],
-            plan=plan if isinstance(plan, dict) else None,
-            intent=state.get("intent"),
-            confidence=conf,
-            message=message,
-        )
+        wf: Workflow | None = None
+        if prefer_hotspot_script_carrier(message, state.get("intent")):
+            try:
+                from packages.skills.registry import SKILL_REGISTRY
+                from packages.skills.workflow_bind import resolve_workflow_id
+
+                sf_hs = get_pg_session()
+                with sf_hs.Session() as session:
+                    wid = resolve_workflow_id(
+                        session,
+                        tenant_id=state["tenant_id"],
+                        skill=SKILL_REGISTRY["hotspot_script"],
+                        created_by=state.get("user_id") or "system",
+                    )
+                    session.commit()
+                    wf = (
+                        session.query(Workflow)
+                        .filter(
+                            Workflow.tenant_id == state["tenant_id"],
+                            Workflow.id == wid,
+                            Workflow.status == "published",
+                        )
+                        .one_or_none()
+                    )
+                    if wf is not None:
+                        # detach for use outside session
+                        session.expunge(wf)
+            except Exception:
+                logger.debug("hotspot_script resolve skipped", exc_info=True)
+                wf = None
+        if wf is None:
+            wf = match_published_workflow(
+                tenant_id=state["tenant_id"],
+                plan=plan if isinstance(plan, dict) else None,
+                intent=state.get("intent"),
+                confidence=conf,
+                message=message,
+            )
         asset_id: str | None = None
         if wf is None:
             wf, asset_id = match_workflow_via_skill_search(

@@ -78,12 +78,22 @@ class BaseSkill(ABC):
             )
 
         start = time.time()
-        result = await self._do_execute(entities)
+        result = await self._do_execute(
+            entities,
+            tenant_id=tenant_id,
+            user_context=user_context,
+        )
         result.latency_ms = (time.time() - start) * 1000
         return result
 
     @abstractmethod
-    async def _do_execute(self, entities: dict) -> SkillResult:
+    async def _do_execute(
+        self,
+        entities: dict,
+        *,
+        tenant_id: str = "",
+        user_context: dict | None = None,
+    ) -> SkillResult:
         ...
 
     def _has_permission(self, required: str, user_perms: list[str]) -> bool:

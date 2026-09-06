@@ -16,7 +16,13 @@ class SkillExtractSkill(BaseSkill):
     skill_type = SkillType.CODE
     short_path = False
 
-    async def _do_execute(self, entities: dict) -> SkillResult:
+    async def _do_execute(
+        self,
+        entities: dict,
+        *,
+        tenant_id: str = "",
+        user_context: dict | None = None,
+    ) -> SkillResult:
         body = render_sections(
             "话术萃取指引",
             [

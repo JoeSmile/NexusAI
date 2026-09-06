@@ -18,7 +18,13 @@ class ComplaintEscalationSkill(BaseSkill):
     skill_type = SkillType.CODE
     short_path = True
 
-    async def _do_execute(self, entities: dict) -> SkillResult:
+    async def _do_execute(
+        self,
+        entities: dict,
+        *,
+        tenant_id: str = "",
+        user_context: dict | None = None,
+    ) -> SkillResult:
         topic = entity_str(entities, "topic", "服务投诉")
         body = render_sections(
             "投诉升级草案",

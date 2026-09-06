@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from packages.skills.base import BaseSkill, SkillResult
 from packages.skills.types import SkillType
+from packages.skills.workflow_bind import start_skill_workflow_run
 
 
 class WeeklyReportSkill(BaseSkill):
@@ -41,9 +42,16 @@ class WeeklyReportSkill(BaseSkill):
         },
     }
 
-    async def _do_execute(self, entities: dict) -> SkillResult:
-        return SkillResult(
-            success=False,
-            error="WORKFLOW_USE_ENGINE",
-            output="WORKFLOW_USE_ENGINE",
+    async def _do_execute(
+        self,
+        entities: dict,
+        *,
+        tenant_id: str = "",
+        user_context: dict | None = None,
+    ) -> SkillResult:
+        return start_skill_workflow_run(
+            skill=self,
+            entities=entities,
+            tenant_id=tenant_id,
+            user_context=user_context,
         )
