@@ -37,6 +37,10 @@ async def conversion_hook(state: PipelineState) -> PipelineState:
         except Exception:
             pass
 
+    # Stream/output block: still flush exposure above; do not count conversion.
+    if state.get("finish_reason") == "blocked":
+        return state
+
     experiment_id = state.get("ab_experiment_id")
     variant = state.get("ab_variant")
     response = state.get("response")

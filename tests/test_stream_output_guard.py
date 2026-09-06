@@ -8,9 +8,11 @@ import pytest
 
 from packages.guardrails.stream_guard import (
     STREAM_BLOCK_PLACEHOLDER,
+    apply_and_audit_stream_block,
     apply_stream_block_to_state,
     sanitize_streaming_chunk,
     student_names_from_warm,
+    suffix_hold_len,
 )
 from packages.memory.memory_service import redact_student_names_in_text
 from packages.pipeline.state import make_initial_state
@@ -136,6 +138,22 @@ def test_apply_stream_block_placeholder() -> None:
     assert state["finish_reason"] == "blocked"
 
 
+def test_apply_and_audit_stream_block(monkeypatch: pytest.MonkeyPatch) -> None:
+    recs: list[dict] = []
+    monkeypatch.setattr(
+        "packages.audit.write_audit_sync",
+        lambda rec: recs.append(rec),
+    )
+    state = make_initial_state("t1", "u1", "s1", "hi")
+    apply_and_audit_stream_block(
+        state, reason="blocked:role_drift:家人们", profile="secretary"
+    )
+    assert state["response"] == STREAM_BLOCK_PLACEHOLDER
+    assert state["finish_reason"] == "blocked"
+    assert recs
+    assert recs[0]["action"] == "guardrails.stream_block"
+
+
 def test_pending_hold_then_redact_like_router() -> None:
     from packages.guardrails.stream_guard import remaining_pending
 
@@ -193,6 +211,116 @@ def test_event_contract_abort_payload() -> None:
     rec = stream_block_audit_record(state, reason=reason_out, profile="secretary")
     assert rec["action"] == "guardrails.stream_block"
     assert "role_drift" in rec["output_text"]
+
+
+def test_suffix_hold_after_name_already_seen() -> None:
+    assert suffix_hold_len("张三和张", ["张三"]) == 1
+
+
+def _drive(tokens: list[str], *, profile: str, names: list[str], tenant_id: str = "t1"):
+    from packages.guardrails.stream_guard import (
+        flush_stream_guard,
+        step_stream_guard,
+    )
+
+    emitted = ""
+    unsent = ""
+    events: list[dict] = []
+    end_reason = ""
+    for tok in tokens:
+        unsent += tok
+        delta, reason, unsent = step_stream_guard(
+            emitted,
+            unsent,
+            tenant_id=tenant_id,
+            profile=profile,
+            names=names,
+        )
+        if reason.startswith("blocked"):
+            events.append({"type": "abort", "reason": "content_filter"})
+            end_reason = reason
+            break
+        if delta:
+            events.append({"token": delta})
+            emitted += delta
+        if reason == "length_retracted":
+            events.append({"type": "retraction", "reason": "length_exceeded"})
+            end_reason = reason
+            unsent = ""
+            break
+    if unsent and not end_reason.startswith("blocked"):
+        delta, reason, unsent = flush_stream_guard(
+            emitted,
+            unsent,
+            tenant_id=tenant_id,
+            profile=profile,
+            names=names,
+        )
+        if reason.startswith("blocked"):
+            events.append({"type": "abort", "reason": "content_filter"})
+            end_reason = reason
+        else:
+            if delta:
+                events.append({"token": delta})
+                emitted += delta
+            if reason == "length_retracted":
+                events.append({"type": "retraction", "reason": "length_exceeded"})
+    events.append({"type": "done"})
+    return events, emitted, end_reason
+
+
+def test_drive_content_factory_jia_ren_men_tokens() -> None:
+    events, emitted, reason = _drive(
+        ["家", "人们，直播间见"],
+        profile="content_factory",
+        names=[],
+        tenant_id="t-edu",
+    )
+    assert events[-1] == {"type": "done"}
+    assert all(e.get("type") != "abort" for e in events)
+    assert "家人们" in emitted
+    assert "直播间" in emitted
+    assert reason == ""
+
+
+def test_drive_secretary_abort_before_done() -> None:
+    events, _emitted, reason = _drive(
+        ["今晚", "家人们来直播间"],
+        profile="secretary",
+        names=[],
+        tenant_id="t-sec",
+    )
+    types = [e.get("type") for e in events]
+    assert "abort" in types
+    assert types.index("abort") < types.index("done")
+    assert events[types.index("abort")] == {"type": "abort", "reason": "content_filter"}
+    assert reason.startswith("blocked:")
+
+
+def test_eos_flushes_held_marketing_suffix() -> None:
+    events, emitted, reason = _drive(
+        ["效果", "最"],
+        profile="content_factory",
+        names=[],
+    )
+    assert reason == ""
+    assert all(e.get("type") != "abort" for e in events)
+    assert emitted.endswith("最")
+
+
+def test_second_name_prefix_does_not_abort() -> None:
+    names = ["张三"]
+    alias = redact_student_names_in_text("张三", tenant_id="t1", names=names)
+    events, emitted, reason = _drive(
+        ["张三和张", "三"],
+        profile="content_factory",
+        names=names,
+    )
+    assert all(e.get("type") != "abort" for e in events)
+    assert reason == ""
+    assert "张三" not in emitted
+    assert not emitted.endswith("张")
+    assert emitted.count(alias) >= 1
 
 
 @pytest.mark.asyncio

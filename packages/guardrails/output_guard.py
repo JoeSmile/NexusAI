@@ -60,7 +60,11 @@ def drift_patterns_for(profile: str) -> list[str]:
 
 
 def match_role_drift(text: str, *, profile: str = "secretary") -> str | None:
-    """同步正则：命中返回 pattern，否则 None。S4 逐条记忆过滤与输出闸共用。"""
+    """同步正则：命中返回 pattern，否则 None。
+
+    S4 逐条记忆过滤与输出闸共用。流式护栏（Task 90）依赖此函数；回滚案 A
+    记忆拼装时须保留本 helper，不可把 ``output_guard`` 整文件还原到 S4 之前。
+    """
     blob = text or ""
     if not blob:
         return None

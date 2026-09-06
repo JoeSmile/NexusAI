@@ -48,6 +48,21 @@ def apply_stream_block_to_state(state: PipelineState, *, reason: str) -> Pipelin
     return state
 
 
+def apply_and_audit_stream_block(
+    state: PipelineState, *, reason: str, profile: str
+) -> PipelineState:
+    apply_stream_block_to_state(state, reason=reason)
+    try:
+        from packages.audit import write_audit_sync
+
+        write_audit_sync(
+            stream_block_audit_record(state, reason=reason, profile=profile)
+        )
+    except Exception:
+        logger.debug("stream_block audit skipped", exc_info=True)
+    return state
+
+
 def stream_block_audit_record(
     state: PipelineState, *, reason: str, profile: str
 ) -> dict[str, Any]:
@@ -73,12 +88,16 @@ def _hold_needles(names: list[str]) -> list[str]:
 
 
 def suffix_hold_len(text: str, names: list[str]) -> int:
-    """Chars at the end that are a proper prefix of a name or redline term."""
+    """Chars at the end that are a proper prefix of a name or redline term.
+
+    Hold even if the needle already appeared earlier in ``text`` (e.g. ``张三和张``).
+    A complete needle at the end is not held so G7/redline can rewrite it.
+    """
     if not text:
         return 0
     hold = 0
     for needle in _hold_needles(names):
-        if needle in text:
+        if not needle or text.endswith(needle):
             continue
         max_k = min(len(needle) - 1, len(text))
         for k in range(max_k, 0, -1):
@@ -115,11 +134,12 @@ def sanitize_streaming_chunk(
     profile: str | None,
     names: list[str],
     max_chars: int = 4000,
+    hold_suffix: bool = True,
 ) -> tuple[str, str]:
     """Return (yieldable_delta, reason). reason: '' | length_retracted | blocked:..."""
     resolved = profile if profile in VALID_PROFILES else resolve_output_guard_profile(tenant_id)
     working = (clean_so_far or "") + (new_chunk or "")
-    hold = suffix_hold_len(working, names)
+    hold = suffix_hold_len(working, names) if hold_suffix else 0
     confirmed = working[:-hold] if hold else working
     if len(confirmed) < len(clean_so_far):
         return "", ""
@@ -149,7 +169,57 @@ def sanitize_streaming_chunk(
         retracted = True
 
     if not body.startswith(clean_so_far):
-        return "", "blocked:output_rewrite"
+        # Already-sent prefix diverged (G7/redline). Do not abort tokens on the wire.
+        return "", ""
 
     delta = body[len(clean_so_far) :]
     return delta, ("length_retracted" if retracted else "")
+
+
+def step_stream_guard(
+    emitted: str,
+    unsent: str,
+    *,
+    tenant_id: str,
+    profile: str | None,
+    names: list[str],
+    max_chars: int = 4000,
+    hold_suffix: bool = True,
+) -> tuple[str, str, str]:
+    """One token-buffer step. Returns (delta, reason, next_unsent)."""
+    delta, reason = sanitize_streaming_chunk(
+        clean_so_far=emitted,
+        new_chunk=unsent,
+        tenant_id=tenant_id,
+        profile=profile,
+        names=names,
+        max_chars=max_chars,
+        hold_suffix=hold_suffix,
+    )
+    if reason.startswith("blocked") or reason == "length_retracted" or not hold_suffix:
+        return delta, reason, ""
+    nxt = remaining_pending(emitted, unsent, names)
+    return delta, reason, nxt
+
+
+def flush_stream_guard(
+    emitted: str,
+    unsent: str,
+    *,
+    tenant_id: str,
+    profile: str | None,
+    names: list[str],
+    max_chars: int = 4000,
+) -> tuple[str, str, str]:
+    """EOS drain: release a held suffix without waiting for more tokens."""
+    if not unsent:
+        return "", "", ""
+    return step_stream_guard(
+        emitted,
+        unsent,
+        tenant_id=tenant_id,
+        profile=profile,
+        names=names,
+        max_chars=max_chars,
+        hold_suffix=False,
+    )

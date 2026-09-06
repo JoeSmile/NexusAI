@@ -77,3 +77,23 @@ async def test_empty_pending_no_exposure_on_build_context_error(
     # build_context raised → conversion_hook never ran; simulate arriving without pending
     await conversion_hook(state)
     assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_blocked_stream_exposes_not_converts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(
+        "packages.pipeline.nodes.conversion_hook.record_event",
+        lambda **kw: calls.append(str(kw.get("event_type"))),
+    )
+    state = make_initial_state("t", "u", "s", "hi")
+    state["pending_exposure"] = {"experiment_id": "e1", "variant": "A"}
+    state["ab_experiment_id"] = "e1"
+    state["ab_variant"] = "A"
+    state["finish_reason"] = "blocked"
+    state["response"] = "该回复因命中内容安全规则已停止生成。"
+    await conversion_hook(state)
+    assert calls == ["exposure"]
+    assert state.get("pending_exposure") is None

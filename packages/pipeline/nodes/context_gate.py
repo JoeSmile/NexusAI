@@ -25,7 +25,8 @@ async def context_gate(state: PipelineState) -> PipelineState:
             str(state.get("session_id") or ""),
         )
     except Exception:
-        present = False
+        # Probe failure: fail closed to the long path so attachments are not skipped.
+        present = True
     state["session_attachment_present"] = bool(present)
     return state
 

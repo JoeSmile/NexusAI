@@ -58,3 +58,22 @@ def test_missing_skill_is_not_short_path(monkeypatch: pytest.MonkeyPatch) -> Non
         lambda _s: None,
     )
     assert should_take_skill_short_path(_skill_state(), attachments_present=False) is False
+
+
+@pytest.mark.asyncio
+async def test_context_gate_probe_error_fail_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from packages.pipeline.nodes.context_gate import context_gate, route_after_context_gate
+
+    def _boom(*_a, **_k):
+        raise RuntimeError("redis down")
+
+    monkeypatch.setattr(
+        "packages.pipeline.nodes.context_gate.run_in_io_pool",
+        _boom,
+    )
+    state = _skill_state()
+    await context_gate(state)
+    assert state["session_attachment_present"] is True
+    assert route_after_context_gate(state) == "build_context"

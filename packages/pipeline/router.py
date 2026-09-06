@@ -539,13 +539,11 @@ async def chat_streaming(
             for line in _sse_buffered_execution_events(final.get("trace_id")):
                 yield line
 
-        from packages.audit import write_audit_sync
         from packages.guardrails.generation_exit import resolve_output_guard_profile
         from packages.guardrails.stream_guard import (
-            apply_stream_block_to_state,
-            remaining_pending,
-            sanitize_streaming_chunk,
-            stream_block_audit_record,
+            apply_and_audit_stream_block,
+            flush_stream_guard,
+            step_stream_guard,
             student_names_from_warm,
         )
 
@@ -567,6 +565,13 @@ async def chat_streaming(
             key_id=final.get("llm_key_id"),
         )
 
+        async def _blocked_sse_exit(reason: str) -> None:
+            apply_and_audit_stream_block(
+                final, reason=reason, profile=stream_profile
+            )
+            await write_memory(final)
+            await conversion_hook(final)
+
         try:
             while True:
                 if is_cancelled(final.get("trace_id")):
@@ -586,28 +591,17 @@ async def chat_streaming(
                     continue
 
                 unsent += tok
-                delta, reason = sanitize_streaming_chunk(
-                    clean_so_far=emitted,
-                    new_chunk=unsent,
+                delta, reason, unsent = step_stream_guard(
+                    emitted,
+                    unsent,
                     tenant_id=str(final.get("tenant_id") or ""),
                     profile=stream_profile,
                     names=stream_names,
                     max_chars=4000,
                 )
-                next_unsent = remaining_pending(emitted, unsent, stream_names)
                 if reason.startswith("blocked"):
                     yield _sse_data({"type": "abort", "reason": "content_filter"})
-                    apply_stream_block_to_state(final, reason=reason)
-                    try:
-                        write_audit_sync(
-                            stream_block_audit_record(
-                                final, reason=reason, profile=stream_profile
-                            )
-                        )
-                    except Exception:
-                        logger.debug("stream_block audit skipped", exc_info=True)
-                    await write_memory(final)
-                    await conversion_hook(final)
+                    await _blocked_sse_exit(reason)
                     yield _sse_data(_sse_done_payload(final))
                     yield "data: [DONE]\n\n"
                     return
@@ -618,7 +612,28 @@ async def chat_streaming(
                     yield _sse_data({"type": "retraction", "reason": "length_exceeded"})
                     unsent = ""
                     break
-                unsent = next_unsent
+
+            if unsent:
+                delta, reason, unsent = flush_stream_guard(
+                    emitted,
+                    unsent,
+                    tenant_id=str(final.get("tenant_id") or ""),
+                    profile=stream_profile,
+                    names=stream_names,
+                    max_chars=4000,
+                )
+                if reason.startswith("blocked"):
+                    yield _sse_data({"type": "abort", "reason": "content_filter"})
+                    await _blocked_sse_exit(reason)
+                    yield _sse_data(_sse_done_payload(final))
+                    yield "data: [DONE]\n\n"
+                    return
+                if delta:
+                    yield _sse_data({"token": delta})
+                    emitted += delta
+                if reason == "length_retracted":
+                    yield _sse_data({"type": "retraction", "reason": "length_exceeded"})
+                    unsent = ""
 
             if not emitted and await request.is_disconnected():
                 return
