@@ -7,6 +7,7 @@ import json
 import logging
 
 from packages.audit import write_audit_sync
+from packages.guardrails.generation_exit import resolve_output_guard_profile
 from packages.guardrails.memory_drift import (
     MEMORY_BG_OMITTED_NOTICE,
     DriftFilterReport,
@@ -37,7 +38,8 @@ def _sanitize_and_assemble_sync(
     state: PipelineState, bundle: MemoryBundle
 ) -> tuple[MemoryBundle, RagSanitizeReport, DriftFilterReport, str, str]:
     bundle, sanitize_report = sanitize_memory_bundle(bundle)
-    bundle, drift_report = filter_bundle_role_drift(bundle)
+    profile = resolve_output_guard_profile(str(state.get("tenant_id") or ""))
+    bundle, drift_report = filter_bundle_role_drift(bundle, profile=profile)
     retrieval_mode = choose_retrieval_mode(
         candidate_count=len(bundle.cold) + len(bundle.warm),
         cold_items=bundle.cold,

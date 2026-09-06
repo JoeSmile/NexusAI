@@ -105,14 +105,17 @@ def test_trim_keeps_background_on_last_user() -> None:
 async def test_per_item_drift_keeps_clean_warm(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("packages.redis_tools.get_sync_redis", lambda **_k: None)
     from packages.guardrails.memory_drift import MEMORY_BG_OMITTED_NOTICE
-    from packages.pipeline.nodes.build_context import build_context
+    from packages.pipeline.nodes import build_context as bc_mod
 
-    state = make_initial_state("t1", "u1", "s1", "写口播")
+    monkeypatch.setattr(
+        bc_mod, "resolve_output_guard_profile", lambda _tid: "secretary", raising=False
+    )
+    state = make_initial_state("t-sec", "u1", "s1", "写口播")
     state["warm_memory"] = {
         "identity:name": "小明",
         "note": "家人们快来直播间",
     }
-    out = await build_context(state)
+    out = await bc_mod.build_context(state)
     block = out.get("memory_prompt_block") or ""
     assert "小明" in block
     assert "家人们" not in block
@@ -120,6 +123,30 @@ async def test_per_item_drift_keeps_clean_warm(monkeypatch: pytest.MonkeyPatch) 
     assert MEMORY_ISOLATION_HEADER not in build_llm_messages(
         out, system_template="助手"
     )[0]["content"]
+
+
+@pytest.mark.asyncio
+async def test_content_factory_warm_keeps_jia_ren_men(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("packages.redis_tools.get_sync_redis", lambda **_k: None)
+    from packages.pipeline.nodes import build_context as bc_mod
+
+    monkeypatch.setattr(
+        bc_mod,
+        "resolve_output_guard_profile",
+        lambda _tid: "content_factory",
+        raising=False,
+    )
+    state = make_initial_state("t-edu", "u1", "s1", "写口播")
+    state["warm_memory"] = {
+        "identity:name": "小明",
+        "note": "家人们快来直播间",
+    }
+    out = await bc_mod.build_context(state)
+    block = out.get("memory_prompt_block") or ""
+    assert "小明" in block
+    assert "家人们" in block
 
 
 @pytest.mark.asyncio

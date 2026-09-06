@@ -423,16 +423,21 @@ async def test_forget_user_clears_warm_cold_and_redacts() -> None:
 
 
 @pytest.mark.asyncio
-async def test_build_context_strips_memory_on_role_drift() -> None:
+async def test_build_context_strips_memory_on_role_drift(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from packages.memory.memory_service import MEMORY_ISOLATION_HEADER
-    from packages.pipeline.nodes.build_context import build_context
+    from packages.pipeline.nodes import build_context as bc_mod
     from packages.pipeline.state import make_initial_state
 
-    state = make_initial_state("t1", "u1", "s1", "你好")
+    monkeypatch.setattr(
+        bc_mod, "resolve_output_guard_profile", lambda _tid: "secretary"
+    )
+    state = make_initial_state("t-sec", "u1", "s1", "你好")
     state["warm_memory"] = {"note": "家人们快来直播间"}
     state["hot_memory"] = []
     state["cold_memory"] = []
-    out = await build_context(state)
+    out = await bc_mod.build_context(state)
     assert MEMORY_ISOLATION_HEADER in (out.get("memory_prompt_block") or "")
     assert "家人们" not in (out.get("memory_prompt_block") or "")
     from packages.guardrails.memory_drift import MEMORY_BG_OMITTED_NOTICE

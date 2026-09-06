@@ -566,8 +566,13 @@ async def chat_streaming(
         )
 
         async def _blocked_sse_exit(reason: str) -> None:
-            apply_and_audit_stream_block(
-                final, reason=reason, profile=stream_profile
+            from packages.thread_pool import run_in_io_pool
+
+            await run_in_io_pool(
+                apply_and_audit_stream_block,
+                final,
+                reason=reason,
+                profile=stream_profile,
             )
             await write_memory(final)
             await conversion_hook(final)

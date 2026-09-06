@@ -661,6 +661,31 @@ class UnifiedMemoryService:
         """写入一轮对话到 ``chat_messages``（+ 确保 session 行）。"""
         if not session_id:
             raise ValueError("session_id_required")
+        from packages.thread_pool import run_in_io_pool
+
+        return await run_in_io_pool(
+            self._write_turn_sync,
+            user_id=user_id,
+            session_id=session_id,
+            user_message=user_message,
+            assistant_message=assistant_message,
+            title=title,
+            user_client_message_id=user_client_message_id,
+            assistant_client_message_id=assistant_client_message_id,
+        )
+
+    def _write_turn_sync(
+        self,
+        *,
+        user_id: str,
+        session_id: str,
+        user_message: str,
+        assistant_message: str,
+        title: str | None = None,
+        user_client_message_id: str | None = None,
+        assistant_client_message_id: str | None = None,
+    ) -> dict[str, Any]:
+        """写入一轮对话到 ``chat_messages``（+ 确保 session 行）。"""
         session_factory = get_pg_session()
         with session_factory.Session() as session:
             existing = (
