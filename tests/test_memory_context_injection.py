@@ -5,15 +5,15 @@ from __future__ import annotations
 import pytest
 
 from packages.memory.memory_service import MEMORY_ISOLATION_HEADER
-from packages.prompt_service import DEFAULT_CHAT_SYSTEM, render_prompt
 from packages.pipeline.context_messages import (
     build_llm_messages,
     current_user_content,
     expand_hot_messages,
 )
-from packages.pipeline.nodes import load_memory as lm
 from packages.pipeline.nodes import llm_generate as lg
+from packages.pipeline.nodes import load_memory as lm
 from packages.pipeline.state import make_initial_state
+from packages.prompt_service import DEFAULT_CHAT_SYSTEM, render_prompt
 
 
 def test_render_prompt_whitelist_only() -> None:
@@ -40,7 +40,8 @@ def test_build_llm_messages_appends_memory_without_placeholder() -> None:
     state = make_initial_state("t1", "u1", "s1", "问")
     state["memory_prompt_block"] = "[用户背景]\n- identity:name: 小明"
     msgs = build_llm_messages(state, system_template="你是助手。")
-    assert "小明" in msgs[0]["content"]
+    assert "小明" not in msgs[0]["content"]
+    assert "小明" in msgs[-1]["content"]
 
 
 def test_build_llm_messages_injects_memory_and_hot() -> None:
@@ -52,10 +53,11 @@ def test_build_llm_messages_injects_memory_and_hot() -> None:
     ]
     msgs = build_llm_messages(state, system_template=DEFAULT_CHAT_SYSTEM)
     assert msgs[0]["role"] == "system"
-    assert "小明" in msgs[0]["content"]
+    assert "小明" not in msgs[0]["content"]
+    assert "小明" in msgs[-1]["content"]
     assert msgs[1]["role"] == "user"
     assert msgs[2]["role"] == "assistant"
-    assert msgs[-1] == {"role": "user", "content": "我叫小明"}
+    assert "我叫小明" in msgs[-1]["content"]
 
 
 @pytest.mark.asyncio
@@ -99,7 +101,8 @@ async def test_llm_generate_uses_multi_turn_messages(monkeypatch) -> None:
     messages = captured.get("messages") or []
     assert messages[0]["role"] == "system"
     assert any(m.get("content") == "历史" for m in messages)
-    assert messages[-1]["content"] == "当前问题"
+    assert messages[-1]["content"].endswith("当前问题")
+    assert MEMORY_ISOLATION_HEADER in messages[-1]["content"]
 
 
 @pytest.mark.asyncio
@@ -136,4 +139,5 @@ async def test_build_context_splits_memory_and_user() -> None:
     assert MEMORY_ISOLATION_HEADER in (out.get("memory_prompt_block") or "")
     assert "小明" in (out.get("memory_prompt_block") or "")
     assert "上一轮" not in (out.get("memory_prompt_block") or "")
-    assert current_user_content(out) == "你好"
+    assert current_user_content(out).endswith("你好")
+    assert "小明" in current_user_content(out)

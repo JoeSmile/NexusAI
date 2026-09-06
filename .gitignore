@@ -74,6 +74,9 @@ data/*
 !data/intent/
 !data/intent/**
 data/intent/eval/reports/
+!data/context/
+!data/context/golden/
+!data/context/golden/**
 chroma_db/
 uploads/
 

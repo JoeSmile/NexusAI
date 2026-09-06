@@ -45,6 +45,36 @@ class RagSanitizeReport:
         return out
 
 
+def has_structural_injection(text: str) -> bool:
+    """跨消息/结构注入标记。不含扮演类词（A6：扮演只扫 user 与记忆）。"""
+    s = text or ""
+    if not s:
+        return False
+    for pattern in _RAG_EXTRA_PATTERNS:
+        if re.search(pattern, s, re.IGNORECASE | re.MULTILINE):
+            return True
+    return False
+
+
+def sanitize_attachment_fragment(
+    text: str, *, max_chars: int | None = None
+) -> tuple[str, list[str]]:
+    """附件只清控制字符并截断，不跑扮演/INJECTION_PATTERNS。"""
+    flags: list[str] = []
+    s = (text or "").strip()
+    if not s:
+        return "", flags
+    cleaned = _CONTROL_CHAR_RE.sub("", s)
+    if cleaned != s:
+        flags.append("control_chars_removed")
+        s = cleaned
+    limit = max_chars if max_chars is not None else _max_fragment_chars()
+    if len(s) > limit:
+        s = s[:limit] + "…"
+        flags.append("truncated")
+    return s, flags
+
+
 def sanitize_fragment(text: str, *, max_chars: int | None = None) -> tuple[str, list[str]]:
     """Clean a single retrieved fragment; returns sanitized text + flags."""
     flags: list[str] = []

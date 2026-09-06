@@ -59,15 +59,26 @@ def drift_patterns_for(profile: str) -> list[str]:
     return list(DRIFT_PATTERNS)
 
 
+def match_role_drift(text: str, *, profile: str = "secretary") -> str | None:
+    """同步正则：命中返回 pattern，否则 None。S4 逐条记忆过滤与输出闸共用。"""
+    blob = text or ""
+    if not blob:
+        return None
+    for pattern in drift_patterns_for(profile):
+        if re.search(pattern, blob):
+            return pattern
+    return None
+
+
 async def check_role_drift(response: str, *, profile: str = "secretary") -> GuardResult:
     """检测角色漂移: 企业助手人设 → 消费域/违规人设(带货、陪聊、迷信、资金诱导)。"""
-    for pattern in drift_patterns_for(profile):
-        if re.search(pattern, response):
-            return GuardResult(
-                action="blocked",
-                redacted_text="[OUTPUT BLOCKED: 角色漂移]",
-                reason=f"role_drift:{pattern}",
-            )
+    hit = match_role_drift(response, profile=profile)
+    if hit:
+        return GuardResult(
+            action="blocked",
+            redacted_text="[OUTPUT BLOCKED: 角色漂移]",
+            reason=f"role_drift:{hit}",
+        )
     return GuardResult(action="pass", redacted_text=response, reason="")
 
 

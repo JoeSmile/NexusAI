@@ -435,9 +435,13 @@ async def test_build_context_strips_memory_on_role_drift() -> None:
     out = await build_context(state)
     assert MEMORY_ISOLATION_HEADER in (out.get("memory_prompt_block") or "")
     assert "家人们" not in (out.get("memory_prompt_block") or "")
+    from packages.guardrails.memory_drift import MEMORY_BG_OMITTED_NOTICE
     from packages.pipeline.context_messages import current_user_content
 
-    assert current_user_content(out) == "你好"
+    assert MEMORY_BG_OMITTED_NOTICE in (out.get("memory_prompt_block") or "")
+
+    assert current_user_content(out).endswith("你好")
+    assert MEMORY_ISOLATION_HEADER in current_user_content(out)
     assert out["raw_input"] == "你好"
 
 
@@ -463,8 +467,8 @@ def test_prompt_composer_clamps_relaxed_style() -> None:
 def test_require_memory_admin_roles() -> None:
     from fastapi import HTTPException
 
-    from packages.auth.models import TenantContext
     from apps.api.routers.memory import _require_memory_admin
+    from packages.auth.models import TenantContext
 
     admin = TenantContext(
         tenant_id="t1",

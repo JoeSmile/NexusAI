@@ -12,8 +12,9 @@ import math
 import os
 import time
 
-from packages.text_normalize import make_normalized_query_hash, normalize_text
+from packages.pipeline.context_messages import MESSAGE_FORMAT_VERSION
 from packages.pipeline.state import PipelineState
+from packages.text_normalize import make_normalized_query_hash, normalize_text
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +78,7 @@ def scope_key(
 ) -> str:
     return (
         f"{tenant_id}:{model}:{prompt_version}:{intent or '-'}:{context_hash or '-'}"
+        f":fmt:{MESSAGE_FORMAT_VERSION}"
     )
 
 

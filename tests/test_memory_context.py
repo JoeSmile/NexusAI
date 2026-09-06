@@ -6,8 +6,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from packages.memory.memory_service import MEMORY_ISOLATION_HEADER
 from packages.guardrails.output_guard import check_role_drift
+from packages.memory.memory_service import MEMORY_ISOLATION_HEADER
 from packages.pipeline.context_messages import build_llm_messages, expand_hot_messages
 from packages.pipeline.nodes import load_memory as lm
 from packages.pipeline.state import make_initial_state
@@ -70,4 +70,5 @@ async def test_role_drift_blocks_persona_collapse() -> None:
     state = make_initial_state("t", "u", "s", "hi")
     state["memory_prompt_block"] = MEMORY_ISOLATION_HEADER + "\n[用户背景]\n- note: x"
     msgs = build_llm_messages(state, system_template="助手")
-    assert MEMORY_ISOLATION_HEADER in msgs[0]["content"]
+    assert MEMORY_ISOLATION_HEADER not in msgs[0]["content"]
+    assert MEMORY_ISOLATION_HEADER in msgs[-1]["content"]

@@ -51,17 +51,14 @@ DEFAULT_CHAT_SYSTEM = """你是 {role}，一名服务于小微企业（教育培
 4. 输出中不要回显或猜测 API Key、密码、私钥、完整身份证号等敏感秘密；需要处理时可提示脱敏。
 5. 机构对外内容涉及绝对化承诺、保过提分、价格承诺等红线话术时，主动规避并提醒合规风险。
 
-{memory}
-
 {history}
 """
 
 _PROMPT_PLACEHOLDERS = frozenset({"role", "memory", "history", "context"})
-_CHAT_SYSTEM_PLACEHOLDER_BLOCK = "\n\n{memory}\n\n{history}"
 
 
 def normalize_chat_system_template(content: str) -> str:
-    """Ensure chat.system templates expose Task 69 memory/history slots."""
+    """Normalize chat.system drafts. S4: do not force-append {memory} into system."""
     text = (content or "").strip()
     if not text:
         return DEFAULT_CHAT_SYSTEM
@@ -70,8 +67,6 @@ def normalize_chat_system_template(content: str) -> str:
         import re as _re
 
         text = _re.sub(r"NexusAI\s+(?:企业)?助手", "NexusAI {role}", text, count=1)
-    if "{memory}" not in text or "{history}" not in text:
-        text = text.rstrip() + _CHAT_SYSTEM_PLACEHOLDER_BLOCK
     return text
 
 
