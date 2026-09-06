@@ -17,6 +17,27 @@ class ComplaintEscalationSkill(BaseSkill):
     requires_human_approval = True
     skill_type = SkillType.CODE
     short_path = True
+    cot_template = (
+        "1. 记录投诉摘要与严重级别\n"
+        "2. 触发审批（REQUIRE_APPROVAL）\n"
+        "3. 通过后 im.notify 升级工单"
+    )
+    ir_skeleton = {
+        "steps": [
+            {
+                "id": "draft",
+                "capability_id": "mail.draft",
+                "params": {"subject": "complaint escalation"},
+                "depends_on": [],
+            },
+            {
+                "id": "notify",
+                "capability_id": "im.notify",
+                "params": {"type": "escalation", "summary": "complaint"},
+                "depends_on": ["draft"],
+            },
+        ]
+    }
 
     async def _do_execute(
         self,

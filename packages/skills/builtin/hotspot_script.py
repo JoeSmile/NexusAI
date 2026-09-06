@@ -15,6 +15,11 @@ class HotspotScriptSkill(BaseSkill):
     required_permissions = ["chat:write"]
     skill_type = SkillType.WORKFLOW
     short_path = False
+    cot_template = (
+        "1. 解析选题 / 热点意图\n"
+        "2. 走 builtin:hotspot published workflow（或 llm.generate fallback）\n"
+        "3. 产出口播脚本"
+    )
     workflow_asset_id = "builtin:hotspot"
     workflow_ir = {
         "ir_schema": "1",
@@ -23,6 +28,9 @@ class HotspotScriptSkill(BaseSkill):
                 "node_id": "generate",
                 "kind": "capability",
                 "capability_id": "llm.generate",
+                "params": {
+                    "instruction": "根据选题生成短视频口播脚本。",
+                },
             }
         ],
         "edges": [],

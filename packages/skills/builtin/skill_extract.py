@@ -15,6 +15,27 @@ class SkillExtractSkill(BaseSkill):
     required_permissions = ["chat:write"]
     skill_type = SkillType.CODE
     short_path = False
+    cot_template = (
+        "1. 扫描 chat.task_plan 审计轨迹\n"
+        "2. miner 归纳 CoT + ir_skeleton\n"
+        "3. draft → 管理员审核 → publish 三关"
+    )
+    ir_skeleton = {
+        "steps": [
+            {
+                "id": "plan",
+                "capability_id": "plan.status",
+                "params": {"run_id": "{{run_id}}"},
+                "depends_on": [],
+            },
+            {
+                "id": "metrics",
+                "capability_id": "sys.metrics",
+                "params": {"component": "skill_assets"},
+                "depends_on": [],
+            },
+        ]
+    }
 
     async def _do_execute(
         self,

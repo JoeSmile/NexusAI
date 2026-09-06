@@ -16,6 +16,27 @@ class RefundPolicySkill(BaseSkill):
     required_permissions = ["chat:write"]
     skill_type = SkillType.CODE
     short_path = True
+    cot_template = (
+        "1. 确认订单与支付渠道\n"
+        "2. 核对退款原因与收货状态\n"
+        "3. 给出时效预期与加急路径"
+    )
+    ir_skeleton = {
+        "steps": [
+            {
+                "id": "mem",
+                "capability_id": "memory.search",
+                "params": {"query": "order refund history"},
+                "depends_on": [],
+            },
+            {
+                "id": "notify",
+                "capability_id": "im.notify",
+                "params": {"type": "refund", "summary": "refund ticket"},
+                "depends_on": ["mem"],
+            },
+        ]
+    }
 
     async def _do_execute(
         self,

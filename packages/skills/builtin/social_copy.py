@@ -15,6 +15,10 @@ class SocialCopySkill(BaseSkill):
     required_permissions = ["chat:write"]
     skill_type = SkillType.WORKFLOW
     short_path = False
+    cot_template = (
+        "1. 明确主题与受众\n"
+        "2. llm.generate 生成多平台文案"
+    )
     workflow_ir = {
         "ir_schema": "1",
         "nodes": [
@@ -22,6 +26,9 @@ class SocialCopySkill(BaseSkill):
                 "node_id": "generate",
                 "kind": "capability",
                 "capability_id": "llm.generate",
+                "params": {
+                    "instruction": "根据主题生成多平台社媒短文案。",
+                },
             }
         ],
         "edges": [],

@@ -15,6 +15,10 @@ class WeeklyReportSkill(BaseSkill):
     required_permissions = ["chat:write", "analytics:read"]
     skill_type = SkillType.WORKFLOW
     short_path = False
+    cot_template = (
+        "1. analytics.summary 拉取窗口指标\n"
+        "2. llm.generate 汇总为周报大纲"
+    )
     workflow_ir = {
         "ir_schema": "1",
         "nodes": [
@@ -27,6 +31,9 @@ class WeeklyReportSkill(BaseSkill):
                 "node_id": "generate",
                 "kind": "capability",
                 "capability_id": "llm.generate",
+                "params": {
+                    "instruction": "根据效能摘要写一份社媒周报大纲。",
+                },
             },
         ],
         "edges": [

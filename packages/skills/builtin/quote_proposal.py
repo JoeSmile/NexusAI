@@ -15,6 +15,10 @@ class QuoteProposalSkill(BaseSkill):
     required_permissions = ["chat:write"]
     skill_type = SkillType.WORKFLOW
     short_path = False
+    cot_template = (
+        "1. 确认 SKU 与数量\n"
+        "2. docx.generate 输出报价单"
+    )
     workflow_ir = {
         "ir_schema": "1",
         "nodes": [
@@ -22,7 +26,6 @@ class QuoteProposalSkill(BaseSkill):
                 "node_id": "docx",
                 "kind": "capability",
                 "capability_id": "docx.generate",
-                "params": {"template": "quote"},
             }
         ],
         "edges": [],
