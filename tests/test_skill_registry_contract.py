@@ -113,3 +113,59 @@ def test_workflow_type_requires_executable_carrier() -> None:
         },
     }
     reg._assert_executable(ok)  # 不抛
+
+
+@pytest.mark.asyncio
+async def test_execute_rejects_disabled() -> None:
+    skill = SKILL_REGISTRY["greeting"]
+    prev = skill.enabled
+    skill.enabled = False
+    try:
+        result = await skill.execute(entities={}, tenant_id="t1", user_context={})
+        assert result.success is False
+        assert result.error == "SKILL_DISABLED"
+    finally:
+        skill.enabled = prev
+
+
+@pytest.mark.asyncio
+async def test_execute_rejects_tenant_mismatch() -> None:
+    skill = SKILL_REGISTRY["greeting"]
+    prev = skill.tenant_allowlist
+    skill.tenant_allowlist = ["other-tenant"]
+    try:
+        result = await skill.execute(entities={}, tenant_id="t1", user_context={})
+        assert result.success is False
+        assert result.error == "SKILL_TENANT"
+    finally:
+        skill.tenant_allowlist = prev
+
+
+def test_resolve_ignores_non_short_path() -> None:
+    from packages.pipeline.intent_path import resolve_short_path_skill
+    from packages.pipeline.state import make_initial_state
+    from packages.skills.registry import registry
+
+    registry.load()
+    state = make_initial_state("t1", "u1", "s1", "写个小红书口播")
+    state["intent"] = "content_creation"
+    state["intent_confidence"] = 0.99
+    assert resolve_short_path_skill(state) is None
+
+
+def test_resolve_ignores_disabled_short_path_skill() -> None:
+    from packages.pipeline.intent_path import resolve_short_path_skill
+    from packages.pipeline.state import make_initial_state
+    from packages.skills.registry import registry
+
+    registry.load()
+    skill = SKILL_REGISTRY["greeting"]
+    prev = skill.enabled
+    skill.enabled = False
+    try:
+        state = make_initial_state("t1", "u1", "s1", "你好")
+        state["intent"] = "greeting"
+        state["intent_confidence"] = 0.99
+        assert resolve_short_path_skill(state) is None
+    finally:
+        skill.enabled = prev

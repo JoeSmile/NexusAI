@@ -53,6 +53,20 @@ class BaseSkill(ABC):
         user_context: dict | None = None,
     ) -> SkillResult:
         """安全壳 + 实际执行"""
+        if not self.enabled:
+            return SkillResult(
+                success=False,
+                error="SKILL_DISABLED",
+                output="Skill 已停用",
+            )
+        allow = self.tenant_allowlist
+        if allow and tenant_id not in allow:
+            return SkillResult(
+                success=False,
+                error="SKILL_TENANT",
+                output="当前租户不可用该 Skill",
+            )
+
         perms = user_context.get("permissions", []) if user_context else []
 
         if self.required_permissions:

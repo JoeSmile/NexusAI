@@ -8,9 +8,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from packages.pipeline.state import PipelineState
 from packages.skills.base import BaseSkill
 from packages.skills.registry import registry
-from packages.pipeline.state import PipelineState
 
 SHORT_PATH_CONFIDENCE = 0.85
 # 仅整类可安全短路径的 L0 意图（Task 65 slice 8）
@@ -42,6 +42,10 @@ def resolve_short_path_skill(state: PipelineState | dict) -> BaseSkill | None:
     """与 model_router 同源：registry.get_skill_for_intent；优先复用 state 已解析结果。"""
     existing = _skill_from_state_value(state.get("short_path_skill"))
     if existing is not None:
+        if not getattr(existing, "enabled", True):
+            return None
+        if not getattr(existing, "short_path", False):
+            return None
         return existing
 
     intent = state.get("intent", "default") or "default"
@@ -51,9 +55,16 @@ def resolve_short_path_skill(state: PipelineState | dict) -> BaseSkill | None:
     if confidence < SHORT_PATH_CONFIDENCE:
         return None
     text = str(state.get("message") or state.get("raw_input") or "")
-    return registry.get_skill_for_intent(
+    skill = registry.get_skill_for_intent(
         intent, confidence, threshold=SHORT_PATH_CONFIDENCE, text=text
     )
+    if skill is None:
+        return None
+    if not getattr(skill, "enabled", True):
+        return None
+    if not getattr(skill, "short_path", False):
+        return None
+    return skill
 
 
 def short_path_predicate(state: PipelineState | dict) -> bool:

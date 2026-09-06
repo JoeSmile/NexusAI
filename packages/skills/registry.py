@@ -117,13 +117,16 @@ class SkillRegistry:
         if not skill_ids:
             return None
         if len(skill_ids) == 1:
-            return self._skills.get(skill_ids[0])
+            skill = self._skills.get(skill_ids[0])
+            if skill is None or not skill.enabled:
+                return None
+            return skill
         text_l = (text or "").lower()
         best_id: str | None = None
         best_score = -1
         for sid in skill_ids:
             skill = self._skills.get(sid)
-            if skill is None:
+            if skill is None or not skill.enabled:
                 continue
             keywords = list(getattr(skill, "short_path_keywords", None) or [])
             score = sum(1 for kw in keywords if kw and kw in text_l)
@@ -131,8 +134,16 @@ class SkillRegistry:
                 best_score = score
                 best_id = sid
         if best_id and best_score >= 0:
-            return self._skills.get(best_id)
-        return self._skills.get(skill_ids[0])
+            skill = self._skills.get(best_id)
+            return skill if skill is not None and skill.enabled else None
+        first = self._skills.get(skill_ids[0])
+        if first is not None and first.enabled:
+            return first
+        for sid in skill_ids[1:]:
+            skill = self._skills.get(sid)
+            if skill is not None and skill.enabled:
+                return skill
+        return None
 
     async def execute_skill(
         self,

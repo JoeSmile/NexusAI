@@ -60,6 +60,26 @@ def test_missing_skill_is_not_short_path(monkeypatch: pytest.MonkeyPatch) -> Non
     assert should_take_skill_short_path(_skill_state(), attachments_present=False) is False
 
 
+def test_disabled_skill_not_short_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    """enabled=false must not pass the short-path gate (Task 2)."""
+    from packages.pipeline import intent_path
+    from packages.skills.registry import SKILL_REGISTRY, registry
+
+    registry.load()
+    monkeypatch.setattr(
+        "packages.pipeline.short_path.resolve_short_path_skill",
+        intent_path.resolve_short_path_skill,
+    )
+    skill = SKILL_REGISTRY["greeting"]
+    prev = skill.enabled
+    skill.enabled = False
+    try:
+        state = _skill_state()
+        assert should_take_skill_short_path(state, attachments_present=False) is False
+    finally:
+        skill.enabled = prev
+
+
 @pytest.mark.asyncio
 async def test_context_gate_probe_error_fail_closed(
     monkeypatch: pytest.MonkeyPatch,
