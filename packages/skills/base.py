@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from sqlalchemy import text
 
 from packages.database.pgvector_session import get_pg_session
+from packages.skills.types import SkillType
 
 
 @dataclass
@@ -35,6 +36,15 @@ class BaseSkill(ABC):
     required_permissions: list[str] = []
     requires_human_approval: bool = False
     approval_timeout: int = 3600
+    skill_type: SkillType = SkillType.CODE
+    skill_version: str = "1.0.0"
+    enabled: bool = True
+    tenant_allowlist: list[str] | None = None  # None/[] = 全租户
+    short_path: bool = False
+    tool_whitelist: list[str] = []
+    source: str = "first_party"  # first_party | third_party
+    workflow_ir: dict | None = None  # 必须能 WorkflowIR.model_validate
+    workflow_asset_id: str | None = None  # 逻辑键（如 builtin:hotspot），禁止 UUID
 
     async def execute(
         self,

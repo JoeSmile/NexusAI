@@ -1,9 +1,9 @@
-"""Builtin skill — social media copy."""
+"""Builtin skill — social media copy (type=workflow)."""
 
 from __future__ import annotations
 
 from packages.skills.base import BaseSkill, SkillResult
-from packages.skills.builtin._render import entity_str, render_sections
+from packages.skills.types import SkillType
 
 
 class SocialCopySkill(BaseSkill):
@@ -12,15 +12,26 @@ class SocialCopySkill(BaseSkill):
     description = "生成多平台社媒短文案"
     trigger_intents = ["content_creation"]
     required_permissions = ["chat:write"]
+    skill_type = SkillType.WORKFLOW
+    short_path = False
+    workflow_ir = {
+        "ir_schema": "1",
+        "nodes": [
+            {
+                "node_id": "generate",
+                "kind": "capability",
+                "capability_id": "llm.generate",
+            }
+        ],
+        "edges": [],
+        "inputs": {
+            "theme": {"name": "theme", "type": "string", "required": False},
+        },
+    }
 
     async def _do_execute(self, entities: dict) -> SkillResult:
-        theme = entity_str(entities, "theme", "产品更新")
-        body = render_sections(
-            "社媒文案包",
-            [
-                ("微博", f"【{theme}】一文看懂本次更新亮点，转发抽体验名额。"),
-                ("朋友圈", f"刚体验完 {theme}，效率提升肉眼可见，推荐试试。"),
-                ("小红书", f"实测 {theme}｜3 个细节让工作流更顺，附操作清单。"),
-            ],
+        return SkillResult(
+            success=False,
+            error="WORKFLOW_USE_ENGINE",
+            output="WORKFLOW_USE_ENGINE",
         )
-        return SkillResult(output=body)

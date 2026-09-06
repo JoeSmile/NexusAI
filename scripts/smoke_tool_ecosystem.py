@@ -45,7 +45,7 @@ async def _counts() -> dict[str, int]:
     from packages.skills.registry import SkillRegistry
 
     reg_skill = SkillRegistry()
-    reg_skill.discover()
+    reg_skill.load()
     validate_builtin_catalog()
 
     from packages.capability.registry import CapabilityRegistry

@@ -20,7 +20,7 @@ from packages.skills.registry import SkillRegistry
 
 def list_skills() -> None:
     reg = SkillRegistry()
-    reg.discover()
+    reg.load()
     ids = sorted(reg._skills.keys())  # noqa: SLF001 — smoke script
     print(f"discovered skills: {len(ids)}")
     for sid in ids:
@@ -38,7 +38,7 @@ def list_catalog() -> None:
 
 async def run_skill(skill_id: str) -> None:
     reg = SkillRegistry()
-    reg.discover()
+    reg.load()
     skill = reg.get_skill(skill_id)
     if skill is None:
         raise SystemExit(f"skill not found: {skill_id}")

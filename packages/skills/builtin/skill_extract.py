@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from packages.skills.base import BaseSkill, SkillResult
 from packages.skills.builtin._render import render_sections
+from packages.skills.types import SkillType
 
 
 class SkillExtractSkill(BaseSkill):
@@ -12,6 +13,8 @@ class SkillExtractSkill(BaseSkill):
     description = "演示从 task_plan 轨迹半自动萃取 skill_asset 草案"
     trigger_intents = ["skill_extract", "meta"]
     required_permissions = ["chat:write"]
+    skill_type = SkillType.CODE
+    short_path = False
 
     async def _do_execute(self, entities: dict) -> SkillResult:
         body = render_sections(

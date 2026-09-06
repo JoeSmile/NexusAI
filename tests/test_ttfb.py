@@ -41,7 +41,7 @@ def test_orchestrator_on_does_not_wait_8s_plan_before_tokens(
 def test_short_path_never_async_plans(monkeypatch: pytest.MonkeyPatch) -> None:
     from packages.skills.registry import registry
 
-    registry.discover()
+    registry.load()
     monkeypatch.setenv("ASYNC_TASK_PLAN_ON_STREAM", "1")
     state = make_initial_state("t", "u", "s", "你好")
     state["stream_mode"] = True

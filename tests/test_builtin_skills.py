@@ -16,7 +16,7 @@ from packages.skills.registry import SkillRegistry
 
 def test_discover_builtin_skills() -> None:
     reg = SkillRegistry()
-    reg.discover()
+    reg.load()
     for sid in BUILTIN_SKILL_IDS:
         assert reg.get_skill(sid) is not None, sid
     assert reg.get_skill("greeting") is not None
@@ -25,7 +25,7 @@ def test_discover_builtin_skills() -> None:
 @pytest.mark.asyncio
 async def test_refund_policy_executes() -> None:
     reg = SkillRegistry()
-    reg.discover()
+    reg.load()
     skill = reg.get_skill("refund_policy")
     assert skill is not None
     result = await skill.execute(
@@ -40,7 +40,7 @@ async def test_refund_policy_executes() -> None:
 @pytest.mark.asyncio
 async def test_complaint_escalation_requires_approval() -> None:
     reg = SkillRegistry()
-    reg.discover()
+    reg.load()
     skill = reg.get_skill("complaint_escalation")
     assert skill is not None
     with patch.object(

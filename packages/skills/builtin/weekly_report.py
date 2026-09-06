@@ -1,9 +1,9 @@
-"""Builtin skill — weekly social report from hotspots + analytics."""
+"""Builtin skill — weekly report (type=workflow)."""
 
 from __future__ import annotations
 
 from packages.skills.base import BaseSkill, SkillResult
-from packages.skills.builtin._render import entity_str, render_sections
+from packages.skills.types import SkillType
 
 
 class WeeklyReportSkill(BaseSkill):
@@ -12,15 +12,38 @@ class WeeklyReportSkill(BaseSkill):
     description = "汇总热点与效能指标，输出社媒周报大纲"
     trigger_intents = ["content_creation"]
     required_permissions = ["chat:write", "analytics:read"]
+    skill_type = SkillType.WORKFLOW
+    short_path = False
+    workflow_ir = {
+        "ir_schema": "1",
+        "nodes": [
+            {
+                "node_id": "summary",
+                "kind": "capability",
+                "capability_id": "analytics.summary",
+            },
+            {
+                "node_id": "generate",
+                "kind": "capability",
+                "capability_id": "llm.generate",
+            },
+        ],
+        "edges": [
+            {
+                "from_node_id": "summary",
+                "from_field": "result",
+                "to_node_id": "generate",
+                "to_param": "instruction",
+            }
+        ],
+        "inputs": {
+            "window": {"name": "window", "type": "string", "required": False},
+        },
+    }
 
     async def _do_execute(self, entities: dict) -> SkillResult:
-        window = entity_str(entities, "window", "7d")
-        body = render_sections(
-            "社媒文案周报",
-            [
-                ("数据概览", f"统计窗口 {window}：并行拉取 hotspot.dig + analytics.summary。"),
-                ("热点回顾", "Top3 话题与传播峰值（占位，接 content_ops 真数据）。"),
-                ("下周计划", "延续高互动话题，安排 2 条短视频 + 1 篇长文。"),
-            ],
+        return SkillResult(
+            success=False,
+            error="WORKFLOW_USE_ENGINE",
+            output="WORKFLOW_USE_ENGINE",
         )
-        return SkillResult(output=body)

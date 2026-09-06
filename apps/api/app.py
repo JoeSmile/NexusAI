@@ -125,7 +125,7 @@ async def lifespan(app: FastAPI):
     try:
         from packages.skills.registry import registry
 
-        registry.discover()
+        registry.load()
         logger.info("Skill registry: %s skills loaded", len(registry._skills))
     except Exception as e:
         logger.warning("Skill discovery failed: %s", e)

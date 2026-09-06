@@ -17,7 +17,7 @@ from packages.skills.registry import registry
 
 @pytest.fixture(scope="module", autouse=True)
 def _discover_skills():
-    registry.discover()
+    registry.load()
 
 
 @pytest.mark.parametrize(

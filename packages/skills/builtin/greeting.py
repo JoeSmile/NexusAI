@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from packages.skills.base import BaseSkill, SkillResult
+from packages.skills.types import SkillType
 
 
 class GreetingSkill(BaseSkill):
@@ -11,6 +12,8 @@ class GreetingSkill(BaseSkill):
     description = "对问候意图给出快速回复"
     trigger_intents = ["greeting"]
     required_permissions: list[str] = []
+    skill_type = SkillType.CODE
+    short_path = True
 
     async def _do_execute(self, entities: dict) -> SkillResult:
         return SkillResult(

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from packages.skills.base import BaseSkill, SkillResult
 from packages.skills.builtin._render import entity_str, render_sections
+from packages.skills.types import SkillType
 
 
 class RefundPolicySkill(BaseSkill):
@@ -13,6 +14,8 @@ class RefundPolicySkill(BaseSkill):
     trigger_intents = ["after_sales"]
     short_path_keywords = ["退款", "退货", "退钱", "换货", "发票"]
     required_permissions = ["chat:write"]
+    skill_type = SkillType.CODE
+    short_path = True
 
     async def _do_execute(self, entities: dict) -> SkillResult:
         order_id = entity_str(entities, "order_id", "（未提供订单号）")

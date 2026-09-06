@@ -62,7 +62,7 @@ def test_unsure_conversation_stays_deterministic() -> None:
 def test_short_path_greeting_never_complex() -> None:
     from packages.skills.registry import registry
 
-    registry.discover()
+    registry.load()
     st = _state("你好", "greeting", 0.95)
     assert is_complex_task(st) is False
 

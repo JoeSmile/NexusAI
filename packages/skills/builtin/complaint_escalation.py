@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from packages.skills.base import BaseSkill, SkillResult
 from packages.skills.builtin._render import entity_str, render_sections
+from packages.skills.types import SkillType
 
 
 class ComplaintEscalationSkill(BaseSkill):
@@ -14,6 +15,8 @@ class ComplaintEscalationSkill(BaseSkill):
     short_path_keywords = ["投诉", "升级", "差评", "举报"]
     required_permissions = ["chat:write"]
     requires_human_approval = True
+    skill_type = SkillType.CODE
+    short_path = True
 
     async def _do_execute(self, entities: dict) -> SkillResult:
         topic = entity_str(entities, "topic", "服务投诉")

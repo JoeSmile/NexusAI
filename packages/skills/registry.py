@@ -1,11 +1,28 @@
-"""Skill 注册中心 — 自动发现 + 权限传播"""
+"""Skill 注册中心 — 显式 SKILL_REGISTRY + 权限传播"""
 
 from __future__ import annotations
 
-import importlib
-import pkgutil
-
 from packages.skills.base import BaseSkill, SkillResult
+from packages.skills.builtin.complaint_escalation import ComplaintEscalationSkill
+from packages.skills.builtin.greeting import GreetingSkill
+from packages.skills.builtin.hotspot_script import HotspotScriptSkill
+from packages.skills.builtin.quote_proposal import QuoteProposalSkill
+from packages.skills.builtin.refund_policy import RefundPolicySkill
+from packages.skills.builtin.skill_extract import SkillExtractSkill
+from packages.skills.builtin.social_copy import SocialCopySkill
+from packages.skills.builtin.weekly_report import WeeklyReportSkill
+from packages.skills.types import SkillType
+
+SKILL_REGISTRY: dict[str, BaseSkill] = {
+    "greeting": GreetingSkill(),
+    "refund_policy": RefundPolicySkill(),
+    "complaint_escalation": ComplaintEscalationSkill(),
+    "quote_proposal": QuoteProposalSkill(),
+    "hotspot_script": HotspotScriptSkill(),
+    "social_copy": SocialCopySkill(),
+    "weekly_report": WeeklyReportSkill(),
+    "skill_extract": SkillExtractSkill(),
+}
 
 
 class SkillRegistry:
@@ -22,25 +39,48 @@ class SkillRegistry:
             if skill.id not in bucket:
                 bucket.append(skill.id)
 
-    def discover(self) -> None:
-        """自动扫描 builtin/ 目录"""
-        try:
-            import packages.skills.builtin as builtin_pkg
+    def load(self) -> None:
+        self._skills = dict(SKILL_REGISTRY)
+        self._intent_map = {}
+        for skill in self._skills.values():
+            self._assert_executable(skill)
+            self.register(skill)
 
-            for _importer, modname, _ispkg in pkgutil.iter_modules(
-                builtin_pkg.__path__
-            ):
-                module = importlib.import_module(f"packages.skills.builtin.{modname}")
-                for attr_name in dir(module):
-                    cls = getattr(module, attr_name)
-                    if (
-                        isinstance(cls, type)
-                        and issubclass(cls, BaseSkill)
-                        and cls is not BaseSkill
-                    ):
-                        self.register(cls())
-        except Exception:
-            pass
+    def _assert_executable(self, skill: BaseSkill) -> None:
+        """规则 16：WorkflowIR.model_validate 或非空逻辑键。"""
+        from packages.workflow.ir import WorkflowIR
+
+        if skill.skill_type != SkillType.WORKFLOW:
+            return
+        if skill.workflow_ir:
+            try:
+                WorkflowIR.model_validate(skill.workflow_ir)
+            except Exception as exc:
+                raise ValueError(
+                    f"skill {skill.id}: workflow_ir invalid: {exc}"
+                ) from exc
+            return
+        if (skill.workflow_asset_id or "").strip():
+            return
+        raise ValueError(
+            f"skill {skill.id}: type=workflow 必须有可校验 workflow_ir 或 "
+            "workflow_asset_id 逻辑键"
+        )
+
+    discover = load
+
+    def list_routable(self, tenant_id: str) -> list[BaseSkill]:
+        out: list[BaseSkill] = []
+        for skill in self._skills.values():
+            if not skill.enabled:
+                continue
+            allow = skill.tenant_allowlist
+            if allow and tenant_id not in allow:
+                continue
+            if skill.skill_type == SkillType.AGENT:
+                continue
+            out.append(skill)
+        return out
 
     def get_skill(self, skill_id: str) -> BaseSkill | None:
         return self._skills.get(skill_id)
