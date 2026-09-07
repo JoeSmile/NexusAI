@@ -89,3 +89,8 @@ docs/pitch/
 
 # Internal launch gap analysis ? NOT open-source (do not commit)
 docs/audit/2026-08-24-launch-gap-checklist.md
+
+# Internal docs/plans/tasks — local-only, never pushed to GitHub (2026-09-07)
+/docs/
+/tasks/
+/AGENTS.md
