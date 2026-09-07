@@ -1,6 +1,7 @@
 /**
  * Chat 面板流式发送 → 消息列表（Task 30.12 / 47b slice0 + 历史分页）。
  * Task 85: 流式气泡独立 state + 代际守卫，避免每 token 重写历史数组。
+ * Task 94 S3: idle watchdog + 断线轮询 v2（status 分流 / 终态回填 / cleanup 不发 DELETE）。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
@@ -15,6 +16,9 @@ import {
 import { pollRunSnapshot } from '@/hooks/streamReconnect'
 import { useSSEStream } from '@/hooks/useSSEStream'
 import { isRenderDirective, type RenderDirective } from '@/types/render'
+
+/** Task 94 D10: 字节级 idle 阈值 45-60s 取 50s（服务端 :ping 15s → 容忍 3+ 次漏 ping） */
+const CHAT_STREAM_IDLE_MS = 50_000
 
 export type ChatRole = 'user' | 'assistant' | 'system'
 
@@ -65,7 +69,9 @@ function cacheFromDone(meta?: Record<string, unknown>): {
 }
 
 export function useChatStream(endpoint = '/chat/streaming') {
-  const { start, abort: abortFetch } = useSSEStream()
+  const { start, abort: abortFetch } = useSSEStream({
+    idleTimeoutMs: CHAT_STREAM_IDLE_MS,
+  })
   const [committed, setCommitted] = useState<ChatMessage[]>([])
   const [streamingMsg, setStreamingMsg] = useState<ChatMessage | null>(null)
   const [streaming, setStreaming] = useState(false)
@@ -102,7 +108,18 @@ export function useChatStream(endpoint = '/chat/streaming') {
   useEffect(() => {
     abortRef.current = abort
   }, [abort])
-  useEffect(() => () => abortRef.current(), [])
+  useEffect(
+    () => () => {
+      // Task 94 #1a（拍板）：卸载 ≠ 取消。cleanup 只做客户端拆除（断 SSE + 停轮询 +
+      // 失效代际），绝不发 DELETE——后台 producer 保温跑完落库，用户可从历史看到结果。
+      generationRef.current += 1
+      reconnectAbortRef.current?.abort()
+      reconnectAbortRef.current = null
+      abortFetch()
+      activeTraceRef.current = null
+    },
+    [abortFetch],
+  )
 
   /** Initial page: always replace (empty list or re-entry). */
   const replaceHistory = useCallback((items: ChatMessage[], more: boolean) => {
@@ -133,6 +150,8 @@ export function useChatStream(endpoint = '/chat/streaming') {
       if (!trimmed) return
       if (streamingMsgRef.current) {
         abortFetch()
+        reconnectAbortRef.current?.abort()
+        reconnectAbortRef.current = null
         generationRef.current += 1
         const leftover = streamingMsgRef.current
         streamingMsgRef.current = null
@@ -309,16 +328,23 @@ export function useChatStream(endpoint = '/chat/streaming') {
             reconnectAbortRef.current = ac
             void pollRunSnapshot({
               traceId: tid,
+              assistantClientMessageId: streamingMsgRef.current?.id,
               onProgress: setExecution,
               signal: ac.signal,
-            }).then(({ result }) => {
+            }).then(({ result, finalContent }) => {
               if (ac.signal.aborted || !alive()) return
               reconnectAbortRef.current = null
               if (result === 'complete') {
+                if (finalContent) {
+                  // 终态文本回填：以 DB 终态覆盖本地残缺文本（幂等，cid 唯一）
+                  patchStream(() => finalContent)
+                }
                 setStreamAlert({
                   kind: 'info',
                   title: '进度已恢复',
-                  message: '编排步骤已从快照对齐；文本流可能不完整。',
+                  message: finalContent
+                    ? '已从服务端对齐完整结果。'
+                    : '编排步骤已从快照对齐；文本流可能不完整，可刷新历史查看。',
                 })
                 commitAssistant({ status: 'done' })
               } else if (result === 'cancelled') {
@@ -329,17 +355,26 @@ export function useChatStream(endpoint = '/chat/streaming') {
                   code: 'CHAT_CANCELLED',
                 })
                 commitAssistant({ status: 'aborted' })
+              } else if (result === 'failed') {
+                setStreamAlert({
+                  kind: 'error',
+                  title: '生成失败',
+                  message: '后台任务异常终止，请重试或换个说法。',
+                  code: 'CHAT_RUN_FAILED',
+                  errorClass: 'business',
+                })
+                commitAssistant({ status: 'error' })
               } else if (result === 'not_found') {
+                // 恢复窗已过且 DB 无该轮记录：按现有文本提交，不悬挂
                 commitAssistant({ status: 'done' })
               } else {
                 setStreamAlert({
-                  kind: 'error',
-                  title: '恢复超时',
-                  message: '无法从快照恢复完整进度，请查看执行面板或重试。',
+                  kind: 'info',
+                  title: '仍在后台生成',
+                  message: '网络已中断较久，任务仍在后台继续；完成后可在历史中查看完整结果。',
                   code: 'RECONNECT_TIMEOUT',
-                  errorClass: 'timeout',
                 })
-                commitAssistant({ status: 'error' })
+                commitAssistant({ status: 'done' })
               }
             })
           },

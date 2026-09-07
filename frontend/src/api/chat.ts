@@ -63,14 +63,32 @@ export async function cancelChatStream(traceId: string): Promise<{ ok: boolean; 
   return apiDelete(`/api/chat/streaming/${encodeURIComponent(traceId)}`)
 }
 
+/** Task 94 S2 — run 终态（snapshot status 分流）。 */
+export type RunSnapshotStatus = 'streaming' | 'completed' | 'cancelled' | 'failed'
+
 /** GET /api/chat/run/{trace_id}/snapshot — Task 56 执行图快照 */
 export async function fetchRunSnapshot(traceId: string): Promise<{
   trace_id: string
+  status: RunSnapshotStatus
   snapshot: Record<string, unknown>
   events: Record<string, unknown>[]
   latest_seq: number
 }> {
   return apiGet(`/api/chat/run/${encodeURIComponent(traceId)}/snapshot`)
+}
+
+/** Task 94 S3 — 断线续传的终态文本回填（按 FE 生成的 client_message_id 幂等查本人终态）。 */
+export type ChatMessageLookup = {
+  found: boolean
+  message?: ChatHistoryItem | null
+}
+
+export async function fetchAssistantMessageByClientId(
+  clientMessageId: string,
+): Promise<ChatMessageLookup> {
+  return apiGet(
+    `/api/chat/messages/by-client-id?client_message_id=${encodeURIComponent(clientMessageId)}`,
+  )
 }
 
 /** GET /api/chat/history — 47b slice0 + 游标分页 */
