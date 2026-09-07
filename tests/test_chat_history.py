@@ -11,9 +11,9 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from apps.api.routers.chat_history import router as chat_history_router
 from packages.auth.dual_auth import verify_human_or_legacy_key
 from packages.auth.models import TenantContext
-from apps.api.routers.chat_history import router as chat_history_router
 
 
 def _row(
@@ -539,3 +539,143 @@ def test_history_filters_by_tenant_user_in_query(tenant_a: TenantContext) -> Non
     assert captured.get("filter_calls")
     # First filter call: tenant + session + or_(user)
     assert len(captured["filter_calls"][0]) == 3
+
+
+# ── Task 94 S3 — 终态文本回填端点 GET /api/chat/messages/by-client-id ──────
+
+
+class _LookupQ:
+    """by-client-id 端点专用 fake：等值 filter + id desc + first。"""
+
+    def __init__(self, rows: list[Any]) -> None:
+        self._rows = list(rows)
+        self._eqs: list[tuple[str, Any]] = []
+
+    def filter(self, *args: Any) -> _LookupQ:
+        for a in args:
+            right = getattr(a, "right", None)
+            left = getattr(a, "left", None)
+            op = getattr(getattr(a, "operator", None), "__name__", "") or ""
+            if right is not None and left is not None and ("eq" in op or "==" in op):
+                self._eqs.append((str(left.name), getattr(right, "value", right)))
+        return self
+
+    def order_by(self, *_a: Any) -> _LookupQ:
+        return self
+
+    def first(self) -> Any:
+        out: list[Any] = []
+        for r in self._rows:
+            if all(getattr(r, k, None) == v for k, v in self._eqs):
+                out.append(r)
+        if not out:
+            return None
+        return max(out, key=lambda r: int(r.id))
+
+
+class _LookupSession:
+    def __init__(self, rows: list[Any]) -> None:
+        self.rows = rows
+
+    def query(self, *_a: Any) -> _LookupQ:
+        return _LookupQ(self.rows)
+
+    def __enter__(self) -> _LookupSession:
+        return self
+
+    def __exit__(self, *_a: Any) -> None:
+        return None
+
+
+def _lookup_client(rows: list[Any], tenant: TenantContext) -> TestClient:
+    app = FastAPI()
+    app.include_router(chat_history_router)
+
+    async def _auth() -> TenantContext:
+        return tenant
+
+    app.dependency_overrides[verify_human_or_legacy_key] = _auth
+
+    class _Factory:
+        def Session(self) -> _LookupSession:  # noqa: N802
+            return _LookupSession(rows)
+
+    with patch(
+        "apps.api.routers.chat_history.get_pg_session", return_value=_Factory()
+    ):
+        yield TestClient(app)
+    app.dependency_overrides.clear()
+
+
+def test_by_client_id_found_and_scoped(tenant_a: TenantContext) -> None:
+    rows = [
+        _row(
+            id=1,
+            tenant_id="t-a",
+            user_id="u1",
+            session_id="workspace-chat",
+            role="user",
+            content="帮我查政策",
+            client_message_id="cid-asst-1",
+        ),
+        _row(
+            id=2,
+            tenant_id="t-a",
+            user_id="u1",
+            session_id="workspace-chat",
+            role="assistant",
+            content="终态全文",
+            client_message_id="cid-asst-1",
+        ),
+        _row(
+            id=3,
+            tenant_id="t-a",
+            user_id="u2",
+            session_id="workspace-chat",
+            role="assistant",
+            content="别人的消息",
+            client_message_id="cid-asst-1",
+        ),
+        _row(
+            id=4,
+            tenant_id="t-b",
+            user_id="u9",
+            session_id="workspace-chat",
+            role="assistant",
+            content="异租户消息",
+            client_message_id="cid-asst-1",
+        ),
+    ]
+    gen = _lookup_client(rows, tenant_a)
+    client = next(gen)
+    try:
+        r = client.get(
+            "/api/chat/messages/by-client-id", params={"client_message_id": "cid-asst-1"}
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["found"] is True
+        assert body["message"]["content"] == "终态全文"  # assistant + 本租户 + 本用户
+        assert body["message"]["role"] == "assistant"
+        assert body["message"]["client_message_id"] == "cid-asst-1"
+    finally:
+        try:
+            next(gen)
+        except StopIteration:
+            pass
+
+
+def test_by_client_id_not_found(tenant_a: TenantContext) -> None:
+    gen = _lookup_client([], tenant_a)
+    client = next(gen)
+    try:
+        r = client.get(
+            "/api/chat/messages/by-client-id", params={"client_message_id": "no-such-cid"}
+        )
+        assert r.status_code == 200
+        assert r.json() == {"found": False, "message": None}
+    finally:
+        try:
+            next(gen)
+        except StopIteration:
+            pass

@@ -36,6 +36,20 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
+def _clear_run_registries():
+    """每用例清空进程级 run 注册表（run_cancel / event_bus），防跨用例串扰。"""
+    yield
+    from packages.plan import event_bus as _eb
+    from packages.plan import run_cancel as _rc
+    from packages.plan import run_registry as _rr
+
+    _rc._active.clear()
+    _rc._cancelled.clear()
+    _eb._RUN_BUSES.clear()
+    _rr._runs.clear()
+
+
+@pytest.fixture(autouse=True)
 def _ssrf_default_deny(monkeypatch: pytest.MonkeyPatch) -> None:
     """Unit tests default-deny loopback; opt in with SSRF_ALLOW_LOCAL_DEV in the test."""
     monkeypatch.delenv("SSRF_ALLOW_LOCAL_DEV", raising=False)

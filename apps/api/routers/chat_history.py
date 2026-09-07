@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
-from packages.database.pgvector_session import ChatMessage, get_pg_session
-from packages.logging_config import get_logger
 from packages.auth.models import TenantContext
 from packages.auth.permissions import require_permission
+from packages.database.pgvector_session import ChatMessage, get_pg_session
+from packages.logging_config import get_logger
 
 router = APIRouter(prefix="/api/chat", tags=["chat-history"])
 logger = get_logger(__name__)
@@ -48,7 +50,12 @@ class ChatSearchResponse(BaseModel):
     items: list[ChatHistoryItem] = Field(default_factory=list)
 
 
-def _item_from_row(r: object) -> ChatHistoryItem:
+class ChatMessageLookupResponse(BaseModel):
+    found: bool = False
+    message: ChatHistoryItem | None = None
+
+
+def _item_from_row(r: Any) -> ChatHistoryItem:
     created = getattr(r, "created_at", None)
     return ChatHistoryItem(
         id=int(r.id),
@@ -57,6 +64,37 @@ def _item_from_row(r: object) -> ChatHistoryItem:
         client_message_id=getattr(r, "client_message_id", None),
         created_at=created.isoformat() if created else None,
     )
+
+
+@router.get("/messages/by-client-id", response_model=ChatMessageLookupResponse)
+async def get_message_by_client_id(
+    client_message_id: str = Query(..., min_length=1, max_length=64),
+    tenant: TenantContext = Depends(require_permission("chat:write")),
+) -> ChatMessageLookupResponse:
+    """Task 94 S3 — 断线续传的终态文本回填：按前端 client_message_id 查本人终态消息。
+
+    恢复语义（plan #2 拍板）：断线丢的文本唯一可靠恢复 = completed 后回拉终态文本，
+    按 assistant_client_message_id 幂等回填。租户+用户双隔离，只返回自己的消息。
+    """
+    cid = (client_message_id or "").strip()
+    if not cid:
+        return ChatMessageLookupResponse(found=False)
+    session_factory = get_pg_session()
+    with session_factory.Session() as session:
+        row = (
+            session.query(ChatMessage)
+            .filter(
+                ChatMessage.tenant_id == tenant.tenant_id,
+                ChatMessage.user_id == tenant.user_id,
+                ChatMessage.client_message_id == cid,
+                ChatMessage.role == "assistant",
+            )
+            .order_by(ChatMessage.id.desc())
+            .first()
+        )
+    if row is None:
+        return ChatMessageLookupResponse(found=False)
+    return ChatMessageLookupResponse(found=True, message=_item_from_row(row))
 
 
 def _like_pattern(needle: str) -> str:

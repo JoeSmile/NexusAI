@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import threading
 from collections import deque
 from dataclasses import dataclass, field
@@ -77,9 +78,17 @@ class PlanEventBus:
         self._goal = ""
         self._seq = 0
         self._lock = threading.Lock()
+        # Task 94: 有界队列淘汰断点（被挤掉的最大 seq；0=未淘汰过）
+        self._dropped_upto: int = 0
+        # Task 94: asyncio 等待者（wait_next）。emit 与 wait_next 均在事件循环内调用；
+        # 若未来 emit 来自其他线程，需改 loop.call_soon_threadsafe。
+        self._waiters: set[asyncio.Event] = set()
 
     def emit(self, event_type: str, payload: dict[str, Any]) -> PlanGraphEvent:
         with self._lock:
+            if len(self._events) == self._max_events:
+                # 本次 append 将挤掉最老事件，记录其 seq 作为补发 gap 断点
+                self._dropped_upto = self._events[0].seq
             self._seq += 1
             event = PlanGraphEvent(
                 seq=self._seq,
@@ -88,7 +97,61 @@ class PlanEventBus:
                 payload=dict(payload),
             )
             self._events.append(event)
-            return event
+        self._notify_waiters()
+        return event
+
+    def dropped_upto(self) -> int:
+        """已被有界队列淘汰的最大事件 seq；0 = 无淘汰。
+
+        订阅方补发时若 last_seq < dropped_upto()，说明存在空洞，
+        必须降级（如回拉终态文本），不能静默拼出残缺序列。
+        """
+        with self._lock:
+            return self._dropped_upto
+
+    def _notify_waiters(self) -> None:
+        for waiter in list(self._waiters):
+            if not waiter.is_set():
+                waiter.set()
+
+    async def wait_next(
+        self, last_seq: int, *, timeout: float | None = None
+    ) -> list[PlanGraphEvent]:
+        """等待并返回 seq > last_seq 的新事件；超时返回 []。
+
+        若 last_seq 已被有界队列淘汰（存在空洞）则抛 BusGapError——
+        调用方应降级（快照/终态文本），不得静默续拼。
+        """
+        while True:
+            # gap 判定必须先于 events_since：deque 淘汰总是从最老开始，
+            # 剩余序列本身连续，但 last_seq 之后被淘汰的部分对订阅方就是洞
+            if self.dropped_upto() > last_seq:
+                raise BusGapError(
+                    f"event gap: last_seq={last_seq} dropped_upto={self.dropped_upto()}"
+                )
+            events = self.events_since(last_seq)
+            if events:
+                return events
+            waiter = asyncio.Event()
+            self._waiters.add(waiter)
+            try:
+                # 注册后再查一次：消灭「注册前已 emit」的漏事件窗口
+                if self.dropped_upto() > last_seq:
+                    raise BusGapError(
+                        f"event gap: last_seq={last_seq} dropped_upto={self.dropped_upto()}"
+                    )
+                events = self.events_since(last_seq)
+                if events:
+                    return events
+                if timeout is None:
+                    await waiter.wait()
+                else:
+                    try:
+                        await asyncio.wait_for(waiter.wait(), timeout=timeout)
+                    except TimeoutError:
+                        return []
+            finally:
+                self._waiters.discard(waiter)
 
     def set_goal(self, goal: str) -> None:
         with self._lock:
@@ -340,3 +403,7 @@ def release_run_bus(trace_id: str) -> None:
         return
     with _REGISTRY_LOCK:
         _RUN_BUSES.pop(tid, None)
+
+
+class BusGapError(Exception):
+    """事件序列存在空洞（有界队列淘汰），补发不完整，需调用方降级。"""
