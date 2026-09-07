@@ -173,5 +173,16 @@ def test_drift_audit_cooldown(monkeypatch: pytest.MonkeyPatch) -> None:
     os.getenv("RUN_S4_GOLDEN_LAB") != "1",
     reason="S4 LLM lab gate (背景≥90%/漂移0/营销越界0); set RUN_S4_GOLDEN_LAB=1",
 )
-def test_golden_lab_llm_gate() -> None:
-    pytest.skip("lab runner compares live model; not wired in unit tests")
+@pytest.mark.asyncio
+async def test_golden_lab_llm_gate() -> None:
+    from packages.pipeline.s4_golden_lab import (
+        gates_pass,
+        lab_failure_summary,
+        live_lab_generate,
+        run_s4_golden_lab,
+    )
+
+    result = await run_s4_golden_lab(generate=live_lab_generate)
+    if result.skipped_reason:
+        pytest.skip(result.skipped_reason)
+    assert gates_pass(result.aggregate), lab_failure_summary(result)
