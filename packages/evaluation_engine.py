@@ -19,8 +19,8 @@ except ImportError:
 
 # 导入日志配置
 from packages.harness import get_llm_client
-from packages.logging_config import get_logger
 from packages.llm.harness import resolve_llm_settings
+from packages.logging_config import get_logger
 
 logger = get_logger(__name__)
 
@@ -97,7 +97,7 @@ class EvaluationEngine:
         self.api_base_url = _cfg.base_url
         self.model = _cfg.model
 
-        # Task 26 / EVID-08: mock/replay 无需 API_KEY
+        # Task 26 / EVID-08: mock 无需 API_KEY;openai 需配置
         self.llm = get_llm_client(
             temperature=0.3,
             prefer_evaluation_model=True,

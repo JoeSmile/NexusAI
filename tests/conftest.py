@@ -7,6 +7,31 @@ import os
 # Strong JWT before apps.api.app import (Task 59 S6 startup check)
 os.environ.setdefault("JWT_SECRET", "test-jwt-secret-wave-a-min-32-bytes!!")
 
+# Test default: NEVER hit real LLM APIs during unit tests.
+# provider is resolved per-call (get_llm_provider), but config.env (loaded on package
+# import) sets LLM_PROVIDER=openai + real keys. Neutralize here, before any
+# packages.* import, so a bare `uv run pytest` stays offline and free.
+# Escape hatches (any of these -> conftest does NOT lock provider/keys):
+#   RUN_S4_GOLDEN_LAB=1        golden lab live eval (user explicitly wants real calls)
+#   LLM_PROVIDER=<...>         explicit env (CI integration tests)
+#   TEST_LLM_PROVIDER=<...>    per-invocation override
+_LAB_RUN = os.getenv("RUN_S4_GOLDEN_LAB", "").strip().lower() in ("1", "true", "yes")
+_EXPLICIT_PROVIDER = bool(
+    os.getenv("LLM_PROVIDER") or os.getenv("TEST_LLM_PROVIDER")
+)
+if not _LAB_RUN and not _EXPLICIT_PROVIDER:
+    # 空串占位而非 pop:config.py load_dotenv(override=False) 只注入缺失变量,
+    # 空值可阻止真实 key 在后续 import 时被重新灌入。
+    os.environ["LLM_PROVIDER"] = os.environ.get("TEST_LLM_PROVIDER", "mock")
+    for _k in (
+        "LLM_API_KEY",
+        "OPENAI_API_KEY",
+        "DEEPSEEK_API_KEY",
+        "QWEN_API_KEY",
+        "DASHSCOPE_API_KEY",
+    ):
+        os.environ[_k] = ""
+
 import pytest
 
 

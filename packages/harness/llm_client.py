@@ -1,4 +1,4 @@
-"""统一 LLM 客户端工厂 — 复用 provider mock/record/replay（EVID-08 / Task 26）
+"""统一 LLM 客户端工厂 — mock / openai（EVID-08 / Task 26）
 
 RAG / Agent / Eval 等旁路通过 get_llm_client() 获取客户端，与 /chat 的
 LLM_PROVIDER 行为一致；不再各自直读 LLM_API_KEY。
@@ -9,13 +9,11 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from packages.llm.harness import resolve_llm_settings
 from packages.harness.provider import (
     get_llm_provider,
-    load_fixture,
     mock_response,
-    save_fixture,
 )
+from packages.llm.harness import resolve_llm_settings
 
 
 def _messages_to_prompt(messages: list[dict]) -> str:
@@ -117,7 +115,7 @@ def complete_via_provider(
     key_chain: list | None = None,
     key_id: str | None = None,
 ) -> str:
-    """按 LLM_PROVIDER 完成一次文本生成（同步）。openai/record 支持 429/401 切 key。"""
+    """按 LLM_PROVIDER 完成一次文本生成（同步）。openai 支持 429/401 切 key。"""
     from packages.llm_concurrency import llm_slot_sync
 
     with llm_slot_sync(base_url=base_url, key_id=key_id):
@@ -151,12 +149,6 @@ def _complete_via_provider_unlocked(
     if provider == "mock":
         return _mock_or_eval_json(model, prompt)
 
-    if provider == "replay":
-        hit = load_fixture(model, messages)
-        if hit is not None:
-            return hit
-        return _mock_or_eval_json(model, prompt)
-
     from openai import OpenAI
 
     from packages.key_failover import call_with_key_failover_sync
@@ -168,7 +160,7 @@ def _complete_via_provider_unlocked(
         if not key:
             raise RuntimeError(
                 f"LLM_PROVIDER={provider} 需要配置 LLM_API_KEY（或 OPENAI_API_KEY）；"
-                "离线演示请使用 LLM_PROVIDER=mock 或 LLM_PROVIDER=replay"
+                "离线演示请使用 LLM_PROVIDER=mock"
             )
         keys = [
             LLMKey(
@@ -197,8 +189,6 @@ def _complete_via_provider_unlocked(
             temperature=temperature,
         )
         text = (resp.choices[0].message.content or "").strip()
-        if provider == "record" and text:
-            save_fixture(model, messages, text)
         return text
 
     return call_with_key_failover_sync(
@@ -388,8 +378,8 @@ def get_llm_client(
     """
     按 LLM_PROVIDER 返回统一 LLM 客户端。
 
-    - mock / replay（及无密钥）: 走 harness provider，不依赖 LLM_API_KEY
-    - record / openai: 真实调用；record 时落盘 fixture
+    - mock（及无密钥）: 走 harness provider，不依赖 LLM_API_KEY
+    - openai: 真实调用
     """
     settings = resolve_llm_settings(
         model=model, prefer_evaluation_model=prefer_evaluation_model

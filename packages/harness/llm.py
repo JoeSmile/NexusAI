@@ -18,14 +18,12 @@ from packages.cost_manager import (
     record_consumption,
 )
 from packages.fallback import get_fallback
-from packages.key_repository import LLMKey
 from packages.harness.base import Harness, HarnessResult
 from packages.harness.provider import (
     get_llm_provider,
-    load_fixture,
     mock_response,
-    save_fixture,
 )
+from packages.key_repository import LLMKey
 
 logger = logging.getLogger(__name__)
 
@@ -33,15 +31,14 @@ _MAX_MODEL_FALLBACKS = 2
 
 
 async def _budget_allows(tenant_id: str, estimated: float) -> bool:
-    """mock/replay 不花钱,跳过预算检查(本地 demo/测试不被拦);
-    真实 provider(record/openai)保留预算拦截。"""
-    if get_llm_provider() in ("mock", "replay"):
+    """mock 不花钱,跳过预算检查(本地 demo/测试不被拦);openai 保留预算拦截。"""
+    if get_llm_provider() == "mock":
         return True
     return await check_budget(tenant_id, estimated)
 
 
 async def _wallet_allows(tenant_id: str, estimated: float) -> bool:
-    if get_llm_provider() in ("mock", "replay"):
+    if get_llm_provider() == "mock":
         return True
     from packages.billing.context import get_billing_context
     from packages.billing.wallet import check_wallet_allows
@@ -51,7 +48,7 @@ async def _wallet_allows(tenant_id: str, estimated: float) -> bool:
 
 
 async def _terms_allows(tenant_id: str) -> bool:
-    if get_llm_provider() in ("mock", "replay"):
+    if get_llm_provider() == "mock":
         return True
     from packages.billing.context import get_billing_context
     from packages.terms.service import is_terms_enforcement_enabled, list_pending_terms
@@ -224,12 +221,7 @@ class LLMHarness(Harness):
                 prompt = "\n".join(m.get("content", "") for m in messages)
                 if provider == "mock":
                     return mock_response(model, prompt)
-                if provider == "replay":
-                    hit = load_fixture(model, messages)
-                    if hit is not None:
-                        return hit
-                    return mock_response(model, prompt)
-                # record / openai:真实调用 + Task 27 key failover
+                # openai:真实调用 + Task 27 key failover
                 return await self._call_api(
                     model,
                     messages,
@@ -341,14 +333,8 @@ class LLMHarness(Harness):
         collected: list[str] = []
         prompt = "\n".join(m.get("content", "") for m in messages)
 
-        if provider in ("mock", "replay"):
-            text = (
-                load_fixture(model, messages)
-                if provider == "replay"
-                else None
-            )
-            if text is None:
-                text = mock_response(model, prompt)
+        if provider == "mock":
+            text = mock_response(model, prompt)
             task = asyncio.current_task()
             for ch in text:
                 if task is not None and task.cancelled():
@@ -356,7 +342,6 @@ class LLMHarness(Harness):
                 collected.append(ch)
                 yield ch
         else:
-            recorded = ""
             original_model = model
             final_model = model
             try:
@@ -371,7 +356,6 @@ class LLMHarness(Harness):
                     key_provider=str(kwargs.get("provider") or "default"),
                 ):
                     collected.append(delta)
-                    recorded += delta
                     yield delta
                 final_model = getattr(self, "_last_stream_model", model)
             except Exception:
@@ -382,8 +366,6 @@ class LLMHarness(Harness):
                     collected.append(ch)
                     yield ch
                 return
-            if provider == "record" and recorded:
-                save_fixture(final_model or model, messages, recorded)
             _record_fallback_metadata(
                 original_model=original_model,
                 final_model=final_model or model,
@@ -523,10 +505,8 @@ class LLMHarness(Harness):
 
         from packages.key_failover import call_with_key_failover, should_try_next_model
         from packages.key_repository import LLMKeyRepository
-        from packages.harness.provider import get_llm_provider, save_fixture
 
         repo = LLMKeyRepository()
-        llm_mode = get_llm_provider()
         last_err: BaseException | None = None
         original = model
         final_model = model
@@ -562,8 +542,6 @@ class LLMHarness(Harness):
                     )
                 )
                 text = (resp.choices[0].message.content or "").strip()
-                if llm_mode == "record" and text:
-                    save_fixture(m, messages, text)
                 return text
 
             try:

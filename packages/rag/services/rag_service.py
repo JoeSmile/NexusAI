@@ -22,9 +22,9 @@ try:
 except ImportError:  # pragma: no cover
     PromptTemplate = None
 
-from packages.logging_config import get_logger
 from config import Config
 from packages.harness import get_llm_client
+from packages.logging_config import get_logger
 
 from ..core.knowledge_base import KnowledgeBaseManager
 
@@ -50,7 +50,7 @@ class RAGService:
                 logger.warning(f"加载向量存储失败，可能需要先初始化知识库: {e}")
         
         self.kb_manager = kb_manager
-        # Task 26 / EVID-08: 走 LLM_PROVIDER mock|record|replay|openai，不再硬依赖 API_KEY
+        # Task 26 / EVID-08: 走 LLM_PROVIDER mock|openai，不再硬依赖 API_KEY
         self.llm = get_llm_client(temperature=0.7)
         if self.llm is None:
             logger.warning("RAG: get_llm_client 返回空，部分 RAG 能力不可用")
@@ -88,7 +88,7 @@ class RAGService:
         """
         if self.llm is None:
             raise RuntimeError(
-                "RAG 需要可用的 LLM（LLM_PROVIDER=mock|record|replay|openai；"
+                "RAG 需要可用的 LLM（LLM_PROVIDER=mock|openai；"
                 "真实调用时请配置 LLM_API_KEY 与 LLM_BASE_URL）"
             )
         try:
@@ -357,7 +357,7 @@ class RAGService:
 
                 if self.llm is None:
                     raise RuntimeError(
-                        "RAG 需要可用的 LLM（LLM_PROVIDER=mock|record|replay|openai；"
+                        "RAG 需要可用的 LLM（LLM_PROVIDER=mock|openai；"
                         "真实调用时请配置 LLM_API_KEY 与 LLM_BASE_URL）"
                     )
 
@@ -463,7 +463,7 @@ class RAGService:
         """
         if self.llm is None:
             raise RuntimeError(
-                "RAG 需要可用的 LLM（LLM_PROVIDER=mock|record|replay|openai；"
+                "RAG 需要可用的 LLM（LLM_PROVIDER=mock|openai；"
                 "真实调用时请配置 LLM_API_KEY 与 LLM_BASE_URL）"
             )
         try:

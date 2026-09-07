@@ -1,4 +1,4 @@
-"""LLM helpers for pipeline nodes — soft mock when LLM_MOCK or no key."""
+"""LLM helpers for pipeline nodes — soft mock when mock provider or no key."""
 
 from __future__ import annotations
 
@@ -6,25 +6,16 @@ import os
 
 
 async def generate_text(prompt: str, model: str = "", api_key: str = "", base_url: str = "") -> str:
-    from packages.harness.provider import (
-        get_llm_provider,
-        load_fixture,
-        mock_response,
-        save_fixture,
-    )
+    from packages.harness.provider import get_llm_provider, mock_response
 
     provider = get_llm_provider()
     key = api_key or os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or ""
 
-    if provider == "mock" or (provider in ("replay", "openai", "record") and not key):
-        return mock_response(model, prompt)
-    if provider == "replay":
-        hit = load_fixture(model, [{"role": "user", "content": prompt}])
-        if hit is not None:
-            return hit
+    # mock 或无 key 时一律软 mock,不真调外部
+    if provider == "mock" or (provider == "openai" and not key):
         return mock_response(model, prompt)
 
-    # record / openai:真实调用(record 落盘 fixture)
+    # openai:真实调用
     result = "系统暂时繁忙，请稍后再试。"
     try:
         from packages.llm.core.llm_core import ChatEngine
@@ -40,6 +31,4 @@ async def generate_text(prompt: str, model: str = "", api_key: str = "", base_ur
     except Exception as exc:
         result = f"系统暂时繁忙，请稍后再试。({exc})"
 
-    if provider == "record":
-        save_fixture(model, [{"role": "user", "content": prompt}], result)
     return result

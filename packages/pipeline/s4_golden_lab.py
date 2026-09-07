@@ -100,7 +100,7 @@ async def live_lab_generate(messages: list[dict[str, str]]) -> str:
     from packages.harness.provider import get_llm_provider
 
     provider = get_llm_provider()
-    if provider in ("mock", "replay"):
+    if provider == "mock":
         raise LabSkip(f"lab requires live LLM_PROVIDER, got {provider}")
     api_key = (os.getenv("LLM_API_KEY") or "").strip()
     if not api_key:
