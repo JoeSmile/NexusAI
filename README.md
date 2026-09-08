@@ -37,7 +37,7 @@
 
 ## 3. 系统架构
 
-对照 `backend/pipeline/graph.py`：**外层**是 LangGraph 编译节点与条件边；**内层**是 `orchestrator` 单步循环（治理链 / 黑板 / L2）。实线 = 已落地；虚线 + `【plan】` = 设计已写、未接线或仅 stub。
+对照 `backend/pipeline/graph.py`：**外层**是 LangGraph 编译节点与条件边；**内层**是 `orchestrator` 单步循环（治理链 / 结论层 / L2）。实线 = 已落地；虚线 + `【plan】` = 设计已写、未接线或仅 stub。
 
 真双轨开关在 `model_router`（不是 L0 之后立刻分叉）。短路径仍会经过 `task_planning`（空跑）、`clarification_gate`、`build_context`。BM25+向量 RRF 用在 **capability 工具检索**，不是文档库的固定 Tier‑1 节点。
 
@@ -96,21 +96,21 @@ flowchart TD
         GOV["治理链 · invoke 统一入口<br/>🔹 policy 子 Agent 高危拦截<br/>🔹 budget 配额/限流<br/>🔹 approval stub（UI【plan】）<br/>🔹 IAM 权限串<br/>🔹 audit 写 DecisionExplain"]
         LAZY["Mode B lazy-load<br/>🔹 按 cold id / warm key 回读正文<br/>🔹 不是 DocID 白名单二次向量检索"]
         EXE["异构执行<br/>🔹 Tool 原子工具<br/>🔹 Skill 话术技能<br/>🔹 SubAgent spawn（最小权限）<br/>🔹 MCP 外部工具"]
-        BB["Blackboard 运行时<br/>🔹 结构化 fact≤800 字 / topic 注册表<br/>🔹 容量 50 + TTL + 低置信淘汰<br/>🔹 冲突预处理；当前在 pipeline state 内存"]
+        CST["状态层 运行时<br/>🔹 结构化 fact≤800 字 / topic 注册表<br/>🔹 容量 50 + TTL + 低置信淘汰<br/>🔹 冲突预处理；当前在 pipeline state 内存"]
         L2["L2 漂移<br/>🔹 detect_intent_drift<br/>🔹 偏离 → replan 剩余步骤，最多 2 次"]
         LOOP["LoopGuard<br/>🔹 连续重复调用判死循环<br/>🔹 单会话步数上限"]
         FAIL["on_fail 四语义<br/>🔹 retry / skip / replan / fail"]
-        AGG["聚合生成<br/>🔹 读黑板结构化事实 + step_results<br/>🔹 _synthesize_response 面向用户"]
+        AGG["聚合生成<br/>🔹 读结论层结构化事实 + step_results<br/>🔹 _synthesize_response 面向用户"]
     end
 
-    ORCH --> DAG --> SLOT --> GOV --> LAZY --> EXE --> BB
-    BB -.->|回填下一步 params| DAG
+    ORCH --> DAG --> SLOT --> GOV --> LAZY --> EXE --> CST
+    CST -.->|回填下一步 params| DAG
     EXE --> L2
     EXE --> LOOP
     EXE --> FAIL
     L2 -->|漂移 replan| DAG
     FAIL -->|replan| DAG
-    BB --> AGG
+    CST --> AGG
     AGG --> WM
 
     %% ========== 记忆写：请求内轻量 + 队列 ==========
@@ -152,13 +152,13 @@ flowchart TD
     %% ========== plan ==========
     subgraph PLAN["【plan】设计已写、未接线或仅 stub"]
         P1["审批真接线<br/>🔹 approval_requests UI<br/>🔹 现治理链 requires_approval 仅 stub deny"]
-        P2["黑板 Run 结束持久化到审计库<br/>🔹 非独立 blackboard 业务表<br/>🔹 当前只在 state + 审计 span"]
+        P2["结论层 Run 结束持久化到审计库<br/>🔹 非独立 状态层 业务表<br/>🔹 当前只在 state + 审计 span"]
         P3["记忆 BM25 summary+tags 倒排<br/>🔹 统一档位 cron：hot→warm→cold<br/>🔹 现冷摘要靠消息条数阈值，无档位 cron"]
         P4["子任务 RAG 限定 Tier-1 DocID 白名单<br/>🔹 现 RAG 为 capability 全库/租户检索"]
         P5["对等协作档③ / 图快照持久化可动画回放"]
     end
 
-    BB -.-> P2
+    CST -.-> P2
     GOV -.-> P1
     LAZY -.-> P4
     COLDJ -.-> P3
@@ -364,7 +364,7 @@ API 启动日志应有 `Intent v8 BERT loaded`；`GET /health` 里 `checks.inten
 - **三层意图**：L0 入口（每轮一次）→ L1 子任务（PlanIR 步骤即意图）→ L2 漂移（事件驱动 replan）
 - **编排粒度是步骤，agent 只是执行形态**：复合诉求拆成异构步骤链（agent 干生成 / tool 干查询 / skill 干话术），依赖的串行、无依赖的并行，每步独立权限独立审计
 - **模型分层路由**：分类/路由用自训 110M 小模型（CPU 毫秒级零成本），生成用大模型——成本架构的核心杠杆
-- **中心化编排（supervisor 式）**：Planner 一次性拆 DAG，Supervisor 按依赖派发并行组并统一收口聚合——子任务结论结构化回传（source/fact/confidence，内部称"黑板"状态层），容量预算 + 低置信淘汰，防上下文堆积
+- **中心化编排（supervisor 式）**：Planner 一次性拆 DAG，Supervisor 按依赖派发并行组并统一收口聚合——子任务结论结构化回传（source/fact/confidence，内部称"结论层"状态层），容量预算 + 低置信淘汰，防上下文堆积
 - **延迟加载**：复杂任务主 Agent 只带文档 ID + 摘要，全文按需取用
 
 ---
