@@ -364,7 +364,7 @@ API 启动日志应有 `Intent v8 BERT loaded`；`GET /health` 里 `checks.inten
 - **三层意图**：L0 入口（每轮一次）→ L1 子任务（PlanIR 步骤即意图）→ L2 漂移（事件驱动 replan）
 - **编排粒度是步骤，agent 只是执行形态**：复合诉求拆成异构步骤链（agent 干生成 / tool 干查询 / skill 干话术），依赖的串行、无依赖的并行，每步独立权限独立审计
 - **模型分层路由**：分类/路由用自训 110M 小模型（CPU 毫秒级零成本），生成用大模型——成本架构的核心杠杆
-- **中心化编排（supervisor 式）**：Planner 一次性拆 DAG，Supervisor 按依赖派发并行组并统一收口聚合——子任务结论结构化回传（source/fact/confidence，内部称"结论层"状态层），容量预算 + 低置信淘汰，防上下文堆积
+- **中心化编排（supervisor 式）**：Planner 一次性拆 DAG，Supervisor 按依赖派发并行组并统一收口聚合——子任务结论结构化回传（source/fact/confidence，落显式共享状态层），容量预算 + 低置信淘汰，防上下文堆积
 - **延迟加载**：复杂任务主 Agent 只带文档 ID + 摘要，全文按需取用
 
 ---
